@@ -89,9 +89,23 @@ describe('MakerResultPanelComponent', () => {
     fixture.detectChanges();
 
     const element = fixture.nativeElement as HTMLElement;
-    expect(element.querySelector('[role="alert"]')?.textContent).toContain('Unable to submit the transaction');
+    expect(element.querySelector('[role="alert"]')?.textContent).toContain('Check transaction details');
+    expect(element.querySelector('[role="alert"]')?.textContent).toContain('Submission failed');
+    expect(element.textContent).not.toContain('BAL-UI-UNEXPECTED');
     expect(element.querySelector('button')).toBeNull();
     expect(fixture.componentInstance.statusLabel).toBe('');
+  });
+
+  it('shows a backend validation reason for HTTP 400 instead of BAL-UI-UNEXPECTED', () => {
+    const fixture = TestBed.createComponent(MakerResultPanelComponent);
+    fixture.componentRef.setInput('error', 'REQUEST_VALIDATION_FAILED');
+    fixture.componentRef.setInput('errorCause', { status: 400, error: { code: 'REQUEST_VALIDATION_FAILED', message: 'Amount exceeds available balance.' } });
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('Transaction rejected');
+    expect(text).toContain('Amount exceeds available balance.');
+    expect(text).not.toContain('BAL-UI-UNEXPECTED');
   });
 
   it('classifies Maker Submit HTTP failures from the preserved raw cause', () => {

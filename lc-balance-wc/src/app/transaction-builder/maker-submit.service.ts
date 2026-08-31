@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { Observable, of } from 'rxjs';
+import { defer, Observable, of } from 'rxjs';
 import { catchError, map, switchMap } from 'rxjs/operators';
 import { BalanceComponentApiService, BalanceContract, BalanceMovement, BalanceSnapshot, CreateMovementRequest } from './balance-component-api.service';
 import { InstrumentType, TransactionFunction } from './balance-component.model';
@@ -64,6 +64,12 @@ export class MakerSubmitService {
   constructor(private readonly api: BalanceComponentApiService) {}
 
   submit(req: CreateMovementRequest, ctx: MakerSubmitContext): Observable<MakerSubmitOutcome> {
+    return defer(() => this.routeSubmission(req, ctx)).pipe(
+      catchError((err) => of<MakerSubmitOutcome>({ kind: 'failed', message: describeApiError(err), cause: err, secondary: {} })),
+    );
+  }
+
+  private routeSubmission(req: CreateMovementRequest, ctx: MakerSubmitContext): Observable<MakerSubmitOutcome> {
     const strategy = ctx.selectedFunction ? deriveFunctionStrategy(ctx.selectedFunction) : null;
     if (strategy?.compoundSubmission.possibleShapes.includes('documentArrivalWithSg') && ctx.selectedArrivalSg && ctx.arrivalSgSnapshot) {
       return this.submitDocumentArrivalWithSg(req, ctx);

@@ -22,6 +22,23 @@ function actionLabel(context: ApiActionContext): string {
   return context === 'LOAD' ? 'load the queue' : `${context.toLowerCase()} the transaction`;
 }
 
+function safeBusinessMessage(rawMessage?: string): string | undefined {
+  const message = rawMessage?.trim();
+  if (!message || message.length > 240 || /https?:\/\/|\bat\s+\S+\s*\(|\n|\r/i.test(message)) return undefined;
+  return message;
+}
+
+/** Local form/rule failures are not transport failures and must never receive BAL-UI-UNEXPECTED. */
+export function presentValidationError(message: string): UiMessage {
+  return {
+    severity: 'WARNING',
+    title: 'Check transaction details',
+    message,
+    nextAction: 'Correct the highlighted transaction details and submit again.',
+    retryable: false,
+  };
+}
+
 /** Pure transport/backend-error to user-feedback policy. Raw technical details are never primary UI copy. */
 export function presentApiError(error: unknown, context: ApiActionContext, query?: string): UiMessage {
   const { status, code, rawMessage } = errorDetails(error);
@@ -57,6 +74,67 @@ export function presentApiError(error: unknown, context: ApiActionContext, query
       message: 'Another action has already changed this transaction.',
       nextAction: 'Refresh the queue before continuing.',
       retryable: true,
+      technicalCode,
+    };
+  }
+
+  if (status === 401) {
+    return {
+      severity: 'ERROR',
+      title: 'Authentication required',
+      message: 'Your session is no longer authorized to complete this request.',
+      nextAction: 'Sign in again, then resubmit the transaction.',
+      retryable: false,
+      supportCode: 'BAL-API-HTTP-401',
+      technicalCode,
+    };
+  }
+
+  if (status === 403) {
+    return {
+      severity: 'ERROR',
+      title: 'Permission denied',
+      message: 'You are not authorized to complete this transaction action.',
+      nextAction: 'Check your Maker/Checker permissions or contact support.',
+      retryable: false,
+      supportCode: 'BAL-API-HTTP-403',
+      technicalCode,
+    };
+  }
+
+  if (status === 404) {
+    return {
+      severity: 'WARNING',
+      title: 'Transaction target not found',
+      message: 'The selected contract or transaction is no longer available.',
+      nextAction: 'Refresh the index, select the transaction again, and resubmit.',
+      retryable: false,
+      supportCode: 'BAL-API-HTTP-404',
+      technicalCode,
+    };
+  }
+
+  if (status === 400 || status === 422) {
+    const businessMessage = safeBusinessMessage(rawMessage);
+    return {
+      severity: 'WARNING',
+      title: 'Transaction rejected',
+      message: businessMessage ?? 'The service rejected one or more transaction details. Your input has been kept.',
+      nextAction: businessMessage ? 'Correct the transaction details and submit again.' : 'Review the transaction details and submit again.',
+      retryable: false,
+      supportCode: code ?? `BAL-API-HTTP-${status}`,
+      technicalCode,
+    };
+  }
+
+  if (status !== undefined && status >= 400 && status < 500) {
+    return {
+      severity: 'ERROR',
+      title: `Unable to ${actionLabel(context)}`,
+      message: 'The request was rejected by the service. Your input has been kept.',
+      nextAction: 'Review the transaction details or contact support.',
+      retryable: false,
+      supportCode: code ?? `BAL-API-HTTP-${status}`,
       technicalCode,
     };
   }

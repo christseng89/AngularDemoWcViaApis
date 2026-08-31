@@ -6,6 +6,7 @@
     "dist/balance-component-wc",
     "dist/adapters",
     "README.md",
+    "docs/http-retry-policy.md",
     "docs/web-component-usage.md",
     "docs/web-component.md",
     "docs/framework-integrations.md",

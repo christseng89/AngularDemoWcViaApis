@@ -4509,3 +4509,9 @@ Maker Submit 隨後套用相同的 raw-cause preservation 原則：`MakerSubmitO
 同步更新 `analysis/README.md`、architecture／current behavior、正式 `http-retry-policy.md`、WC operations／index 及 Obsidian API／Architecture／Freshness 導覽；歷史 v1.42.0 記錄保留不改寫。
 
 驗證：63 suites／1,735 tests、Angular／WC／adapter typecheck、lint 0 errors、兩份 OAS parse、WC docs validation、Angular production build及 WC bundle build通過；保留既有 SCSS budget warning。
+
+## 2026-08-31 — Maker Submit validation／4xx error classification
+
+Angular host 與 `<balance-component-app>` 共用的 Maker result policy 現在區分本地 validation 與 HTTP failure。本地錯誤顯示可修正的 validation message；HTTP 400／422 顯示安全的 backend business reason，401／403／404 與其他 4xx 使用明確且不可自動重試的分類，避免 A2 及其他 Function 被誤標為 `BAL-UI-UNEXPECTED`。
+
+`MakerSubmitService.submit()` 以 RxJS `defer` 包覆全部 dispatch shape，使單筆與 compound submission 的同步例外都保留 raw cause。參數化測試涵蓋 A1-A11／B1-B7；WC 全套 63 suites／1,763 tests 通過，coverage 97.87%／95.13%／96.36%／98.33%，Angular／WC／adapter typecheck、lint 0 errors及 production build通過。Microservice OAS 維持 v1.42.1、Channel OAS 維持 v1.9.0，因本次沒有 HTTP 或 event wire change；Web Component DOM contract 亦未改變。

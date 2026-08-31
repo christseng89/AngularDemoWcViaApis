@@ -20,5 +20,7 @@ tags:
 - Maker Queue、Inquire Events、Inquire Delete Pending 保留原始 HTTP status；status 0／5xx 显示服务不可用，不再误报 `BAL-UI-UNEXPECTED`。
 - Angular client 对安全读取采用 `.env` 可配置的 3 次 bounded exponential backoff；POST command 不自动重送。
 - `x-client-retry-policy` 是 client operational metadata，不改变 HTTP 或 Channel wire contract。
+- Maker Submit error policy 已覆盖 A1-A11／B1-B7：本地 validation 与 HTTP 4xx 分开呈现，保留 backend status／code／安全的 business reason；同步 dispatch exception 也统一转为 failed outcome。
+- 本次 UI error-classification 没有 wire change，因此 Microservice OAS 保持 v1.42.1、Channel OAS 保持 v1.9.0。
 
 权威入口：`analysis/balance-component-api.yaml`、`docs/current-behavior.md`、`docs/balance-business-rules.md`。

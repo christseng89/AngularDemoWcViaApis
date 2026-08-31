@@ -5,6 +5,7 @@ import * as yaml from 'js-yaml';
 const root = resolve(new URL('..', import.meta.url).pathname.slice(1));
 const docs = [
   'README.md',
+  'docs/http-retry-policy.md',
   'docs/web-component-usage.md',
   'docs/web-component.md',
   'docs/framework-integrations.md',

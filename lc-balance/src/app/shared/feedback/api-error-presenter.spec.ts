@@ -1,4 +1,4 @@
-import { presentApiError } from './api-error-presenter';
+import { presentApiError, presentValidationError } from './api-error-presenter';
 
 describe('presentApiError', () => {
   it('presents a 404 search as an informational no-match with the query', () => {
@@ -17,6 +17,46 @@ describe('presentApiError', () => {
     expect(presentApiError({ status: 409 }, 'APPROVE')).toEqual(
       expect.objectContaining({ severity: 'WARNING', title: 'Transaction already processed', retryable: true }),
     );
+  });
+
+  it.each([400, 422])('maps HTTP %s business validation without BAL-UI-UNEXPECTED', (status) => {
+    const result = presentApiError({ status, error: { code: 'REQUEST_VALIDATION_FAILED', message: 'Amount exceeds the available balance.' } }, 'SUBMIT');
+    expect(result).toMatchObject({
+      severity: 'WARNING',
+      title: 'Transaction rejected',
+      message: 'Amount exceeds the available balance.',
+      retryable: false,
+      supportCode: 'REQUEST_VALIDATION_FAILED',
+    });
+    expect(result.supportCode).not.toBe('BAL-UI-UNEXPECTED');
+  });
+
+  it('does not expose unsafe backend validation details as primary copy', () => {
+    const result = presentApiError({ status: 400, error: { message: 'See http://internal/private for a stack trace' } }, 'SUBMIT');
+    expect(result.message).toBe('The service rejected one or more transaction details. Your input has been kept.');
+    expect(result.message).not.toContain('http://internal/private');
+  });
+
+  it('maps other HTTP 4xx statuses without treating them as client exceptions', () => {
+    expect(presentApiError({ status: 418, error: { code: 'POLICY_REJECTED' } }, 'SUBMIT')).toMatchObject({
+      supportCode: 'POLICY_REJECTED',
+      retryable: false,
+    });
+  });
+
+  it.each([
+    [401, 'Authentication required'],
+    [403, 'Permission denied'],
+    [404, 'Transaction target not found'],
+  ])('maps submit HTTP %s to an actionable client error', (status, title) => {
+    expect(presentApiError({ status }, 'SUBMIT')).toMatchObject({ title, retryable: false, supportCode: `BAL-API-HTTP-${status}` });
+  });
+
+  it('presents local validation separately from API failures', () => {
+    expect(presentValidationError('Amendment No. is mandatory.')).toEqual(
+      expect.objectContaining({ severity: 'WARNING', title: 'Check transaction details', retryable: false }),
+    );
+    expect(presentValidationError('Amendment No. is mandatory.').supportCode).toBeUndefined();
   });
 
   it('maps connection failures without exposing the request URL as primary copy', () => {

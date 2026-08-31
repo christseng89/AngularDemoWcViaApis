@@ -14,6 +14,8 @@ API 行为变化时同步 schema、版本／changelog、实现、客户端和合
 field，也不表示服务端自动重试。成功 response shape、endpoint 与 Channel contract 均未改变。详细设置见
 `../docs/http-retry-policy.md`。
 
+Maker Submit 的 validation／HTTP 4xx 显示分类属于 Angular client presentation policy；既有 OAS Error schema 与 400 responses 已涵盖服务端 contract，因此本次 UI 修正不提升 OAS 版本。
+
 ## 基础业务规格
 
 - `TF_Balance_Component_Spec-en.docx`／`TF_Balance_Component_Spec-zh.docx`

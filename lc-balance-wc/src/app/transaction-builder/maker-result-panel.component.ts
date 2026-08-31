@@ -6,7 +6,7 @@ import type { CompoundLegState } from './maker-panel.component';
 import { TransactionStatusPhase } from './transaction-status-badge.component';
 import { FeedbackMessageComponent } from '../shared/feedback/feedback-message.component';
 import { UiMessage } from '../shared/feedback/ui-message.model';
-import { presentApiError } from '../shared/feedback/api-error-presenter';
+import { presentApiError, presentValidationError } from '../shared/feedback/api-error-presenter';
 
 export interface MakerAccountEntriesRequest {
   movement: BalanceMovement;
@@ -41,6 +41,7 @@ export class MakerResultPanelComponent {
 
   get errorFeedback(): UiMessage | null {
     if (!this.error) return null;
+    if (this.errorCause === null || this.errorCause === undefined) return presentValidationError(this.error);
     return { ...presentApiError(this.errorCause ?? { message: this.error }, 'SUBMIT'), retryable: false };
   }
 

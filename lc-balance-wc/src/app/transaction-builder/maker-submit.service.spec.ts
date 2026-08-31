@@ -107,6 +107,17 @@ function makeContext(overrides: Partial<MakerSubmitContext> = {}): MakerSubmitCo
 }
 
 describe('MakerSubmitService.submit() — dispatch routing', () => {
+  it.each([...IMPORT_FUNCTIONS, ...EXPORT_FUNCTIONS])('$code preserves the HTTP cause on a failed Maker Submit', (selectedFunction, done) => {
+    const failure = { status: 400, error: { code: 'REQUEST_VALIDATION_FAILED', message: `${selectedFunction.code} rejected` } };
+    const api = makeApi({ createMovement: jest.fn(() => throwError(() => failure)) });
+    const service = new MakerSubmitService(api);
+
+    service.submit(makeReq(), makeContext({ selectedFunction })).subscribe((outcome) => {
+      expect(outcome).toMatchObject({ kind: 'failed', cause: failure, secondary: {} });
+      done();
+    });
+  });
+
   it('routes to the plain path when no compound flags are set (A1)', (done) => {
     const api = makeApi();
     const service = new MakerSubmitService(api);
@@ -115,6 +126,17 @@ describe('MakerSubmitService.submit() — dispatch routing', () => {
     service.submit(makeReq(), ctx).subscribe((outcome) => {
       expect(outcome.kind).toBe('submitted');
       expect(api.createMovement).toHaveBeenCalledTimes(1);
+      done();
+    });
+  });
+
+  it('converts a synchronous submission exception into the shared failed outcome', (done) => {
+    const failure = new Error('synchronous client failure');
+    const api = makeApi({ createMovement: jest.fn(() => { throw failure; }) });
+    const service = new MakerSubmitService(api);
+
+    service.submit(makeReq(), makeContext({ selectedFunction: A1 })).subscribe((outcome) => {
+      expect(outcome).toMatchObject({ kind: 'failed', message: 'synchronous client failure', cause: failure, secondary: {} });
       done();
     });
   });

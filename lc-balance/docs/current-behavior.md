@@ -52,6 +52,7 @@ A4、A6、B4 不得繞過 prerequisite eligibility。Business Case Runner 的 Ru
 - 自動重試僅適用於 network/status 0、408、429 與 5xx。Submit、Approve、Fix/Delete Pending 等 POST command 絕不自動重送，以避免重複交易或 Account Entries。
 - Maker Queue、Inquire Events 與 Inquire Delete Pending 會保留原始 HTTP error status，再交由共用 presenter 分類。
 - Maker Submit 同樣保留 raw error cause；HTTP 5xx 顯示 `BAL-SVC-HTTP-{status}`，network/status 0 顯示 Balance service unavailable，而非誤標為 `BAL-UI-UNEXPECTED`。
+- Maker Submit 的本地 validation 顯示 `Check transaction details`；HTTP 400／422 顯示可安全呈現的 business validation reason，401／403／404 與其他 4xx 各有明確分類。這項共用 policy 適用 A1-A11／B1-B7，複合與單筆 submission 的同步例外也會轉為同一個 failed outcome。
 - Network／status `0` 顯示 Balance service unavailable；HTTP `5xx` 顯示 temporarily unavailable，support code 使用 `BAL-SVC-HTTP-{status}`。
 - `BAL-UI-UNEXPECTED` 僅保留給沒有可辨識 HTTP status 或技術代碼的 client-side failure。Retry 保留原搜尋條件。
 
@@ -61,4 +62,4 @@ A4、A6、B4 不得繞過 prerequisite eligibility。Business Case Runner 的 Ru
 
 ## Verification baseline
 
-截至 2026-08-31：Retry policy 變更後 Angular 驗證為 53 suites／1,704 tests；typecheck、lint（0 errors）與 production build 通過。既有 SCSS budget warning 仍為 10.08 kB／8 kB。Backend Runner 57 與 Balance microservice 784 是前次 2026-08-30 基準，本次未重新執行。版本日期與驗證範圍分開記錄，避免把舊結果誤報為本次執行。
+截至 2026-08-31：Submit error classification 變更後 Angular 驗證為 53 suites／1,732 tests，coverage 98.26%／95.61%／96.76%／98.64%；typecheck、lint（0 errors）與 production build 通過。OAS wire contract 未變。Backend Runner 57 與 Balance microservice 784 是前次 2026-08-30 基準，本次未重新執行。
