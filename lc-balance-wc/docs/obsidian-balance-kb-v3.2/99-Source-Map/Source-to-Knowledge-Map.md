@@ -166,3 +166,4 @@ tags:
 | `test/unit/app.test.ts`                   | [[MOVEMENT-RULE-002]], [[MOVEMENT-RULE-003]], [[MOVEMENT-RULE-010]], [[MOVEMENT-RULE-015]], [[MOVEMENT-RULE-016]]                        |
 
 - `src/adapters/**` → [[balance-component-web-component-phase-4]]
+- `e2e/**`, `playwright.config.ts`, `scripts/*release*` → [[balance-component-web-component-phase-5]]

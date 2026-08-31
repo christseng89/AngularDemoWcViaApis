@@ -112,3 +112,10 @@ Angular, React and Vue integrations are deliberately one-way thin ports over the
 element contract. `adapter-core.ts` centralizes property assignment, typed event subscription and
 method forwarding. No adapter may import transaction-builder domain services. React and Vue are
 host-provided runtimes and therefore cannot increase the core WC runtime dependency graph.
+
+# Phase 5 release boundary
+
+The distributable is a single package with independent subpath exports for WC assets, the versioned
+contract and each adapter. A generated asset manifest makes the un-hashed WC output reproducible and
+auditable. Browser E2E uses real framework runtimes only in dev fixtures. Optional peer declarations
+prevent Angular, React or Vue from becoming core WC runtime dependencies.

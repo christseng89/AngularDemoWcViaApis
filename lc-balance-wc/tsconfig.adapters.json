@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist/adapters",
+    "rootDir": "./src",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "module": "CommonJS",
+    "moduleResolution": "node"
+  },
+  "include": ["src/adapters/**/*.ts", "src/app/web-component/balance-component-element.contract.ts"],
+  "exclude": ["src/**/*.spec.ts"]
+}

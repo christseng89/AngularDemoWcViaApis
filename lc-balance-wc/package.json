@@ -1,7 +1,37 @@
 {
   "name": "lc-balance-wc",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
+  "files": [
+    "dist/balance-component-wc",
+    "dist/adapters",
+    "README.md"
+  ],
+  "exports": {
+    "./wc": "./dist/balance-component-wc/browser/main.js",
+    "./wc/styles.css": "./dist/balance-component-wc/browser/styles.css",
+    "./manifest": "./dist/balance-component-wc/browser/asset-manifest.json",
+    "./contract": {
+      "types": "./dist/adapters/app/web-component/balance-component-element.contract.d.ts",
+      "default": "./dist/adapters/app/web-component/balance-component-element.contract.js"
+    },
+    "./adapters": {
+      "types": "./dist/adapters/adapters/index.d.ts",
+      "default": "./dist/adapters/adapters/index.js"
+    },
+    "./adapters/angular": {
+      "types": "./dist/adapters/adapters/angular/balance-component-adapter.component.d.ts",
+      "default": "./dist/adapters/adapters/angular/balance-component-adapter.component.js"
+    },
+    "./adapters/react": {
+      "types": "./dist/adapters/adapters/react/balance-component-react.d.ts",
+      "default": "./dist/adapters/adapters/react/balance-component-react.js"
+    },
+    "./adapters/vue": {
+      "types": "./dist/adapters/adapters/vue/balance-component-vue.d.ts",
+      "default": "./dist/adapters/adapters/vue/balance-component-vue.js"
+    }
+  },
   "scripts": {
     "generate:calendar": "node scripts/generate-domestic-calendar.mjs",
     "pretest": "npm run generate:calendar",
@@ -15,6 +45,14 @@
     "build": "ng build lc-balance-wc",
     "build:wc": "ng build balance-component-wc",
     "typecheck:wc": "tsc -p tsconfig.web-component.json --noEmit",
+    "typecheck:adapters": "tsc -p tsconfig.adapters.json --noEmit",
+    "build:adapters": "tsc -p tsconfig.adapters.json",
+    "build:e2e-hosts": "node scripts/build-e2e-hosts.mjs",
+    "e2e": "playwright test",
+    "release:manifest": "node scripts/generate-wc-manifest.mjs",
+    "release:prepare": "npm run build:wc && npm run build:adapters && npm run release:manifest",
+    "release:verify": "node scripts/verify-release.mjs",
+    "prepack": "npm run release:prepare",
     "watch": "ng build lc-balance-wc --watch --configuration development",
     "dev:all": "concurrently -n microservice,backend,angular -c blue,green,magenta \"npm run dev --prefix microservices/balance-component\" \"npm start --prefix backend\" \"ng serve\""
   },
@@ -40,7 +78,10 @@
     "@angular/cli": "^20.3.35",
     "@angular/compiler-cli": "^20.3.30",
     "@eslint/js": "^9.39.5",
+    "@playwright/test": "^1.62.1",
     "@types/jest": "^29.5.14",
+    "@types/react": "^19.1.12",
+    "@types/react-dom": "^19.1.9",
     "angular-eslint": "^20.7.0",
     "concurrently": "^10.0.4",
     "eslint": "^9.39.5",
@@ -48,7 +89,26 @@
     "jest-environment-jsdom": "^29.7.0",
     "jest-preset-angular": "^14.6.2",
     "prettier": "^3.9.6",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
     "typescript": "~5.8.3",
-    "typescript-eslint": "^8.67.0"
+    "typescript-eslint": "^8.67.0",
+    "vue": "^3.5.21"
+  },
+  "peerDependencies": {
+    "@angular/core": ">=20 <21",
+    "react": ">=18 <20",
+    "vue": ">=3.4 <4"
+  },
+  "peerDependenciesMeta": {
+    "@angular/core": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    },
+    "vue": {
+      "optional": true
+    }
   }
 }

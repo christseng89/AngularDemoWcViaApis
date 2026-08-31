@@ -105,3 +105,10 @@ host and are not included in the core WC bundle.
 
 All adapters assign `config` as a DOM property, forward `navigate()` and `refresh()` Promises, and
 remove their instance-owned Custom Event listeners during unmount.
+
+# Testing and package verification (Phase 5)
+
+The release candidate is built with `npm run release:prepare` and checked with
+`npm run release:verify` plus `npm pack --dry-run`. The package exposes deterministic WC assets,
+TypeScript declarations and three adapter entry points. Playwright exercises compiled Angular,
+React and Vue host fixtures; see `docs/releasing-web-component.md` for the CI sequence.
