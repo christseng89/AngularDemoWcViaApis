@@ -210,8 +210,11 @@ Formly/Angular-dependent and only reachable through the full `ng serve` app.
   payment/FX/accounting flows, decision tables, requirement→code→test traceability) out of source, APIs,
   and tests; start from `00-Home/Payment-Knowledge-Home.md`. **Gitignored** (root `.gitignore`'s
   `obsidian-payment-kb/` rule) — a local generated artifact, not tracked in git. A companion
-  `docs/obsidian-payment-kb.zip` sits alongside it, untracked but NOT excluded by that rule (which only
-  matches the directory) — an optional versioned-backup path nobody has opted into yet. See
+  `docs/obsidian-payment-kb.zip` sits alongside it: the gitignore rule only matches the directory, so
+  the zip is a plain file and is now committed (`cc1d077`, 2026-08-22) as a versioned backup — 354
+  files at that snapshot; `git ls-files` confirms it's still tracked (verified 2026-08-31). It's opaque
+  to `git diff`/`grep` and can't be browsed or `[[Wiki Link]]`-navigated on GitHub the way the unpacked
+  vault can, so treat it as a backup, not a substitute for reading the vault directly. See
   `lc-payment-wc/CLAUDE.md`'s own "Payment Knowledge Base (Obsidian)" section for its evidence-status
   convention (CONFIRMED/INFERRED/UNCLEAR/CONFLICT) and staleness caveat before trusting it over the code
   or this file's decision log.

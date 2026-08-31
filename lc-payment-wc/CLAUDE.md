@@ -145,10 +145,10 @@ linked knowledge base for BAs, architects, testers, and other AI agents — see 
 `docs/obsidian-payment-kb/` is **gitignored** (root `.gitignore`'s `obsidian-payment-kb/` rule) — a
 locally generated artifact, not tracked in git, so it may not exist in every checkout. A companion
 `docs/obsidian-payment-kb.zip` snapshot sits alongside it: the gitignore rule only matches the directory,
-so the zip is a plain untracked file, not excluded — anyone can `git add` it to keep a versioned backup
-without committing the 354 individual notes, though a zip is opaque to `git diff`/`grep` and can't be
-browsed or `[[Wiki Link]]`-navigated on GitHub the way the unpacked vault can; as of this writing it has
-not been added. Where present, the unpacked vault (354 files) reverse-engineers this
+so the zip is a plain file and is now committed (`cc1d077`, 2026-08-22) as the versioned-backup
+path this section used to describe as unopted-into — a zip is still opaque to `git diff`/`grep` and
+can't be browsed or `[[Wiki Link]]`-navigated on GitHub the way the unpacked vault can, so treat it as
+a backup, not a substitute for reading the vault directly. Where present, the unpacked vault (354 files) reverse-engineers this
 microservice's **business** knowledge — not just its code — out of source, APIs, data models, tests, and
 this file itself: domain concepts, business rules, payment/FX/accounting flows, decision tables, and a
 requirement→code→test traceability matrix, cross-linked with `[[Wiki Links]]` rather than left as
