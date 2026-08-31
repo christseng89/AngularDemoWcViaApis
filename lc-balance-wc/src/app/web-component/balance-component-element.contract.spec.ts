@@ -1,0 +1,21 @@
+import { BALANCE_COMPONENT_CONTRACT_VERSION, normalizeBalanceComponentConfig } from './balance-component-element.contract';
+
+describe('Balance Component element contract', () => {
+  it('uses the transaction builder when configuration is absent', () => {
+    expect(normalizeBalanceComponentConfig(undefined)).toEqual({
+      version: BALANCE_COMPONENT_CONTRACT_VERSION,
+      initialView: 'transaction-builder',
+    });
+  });
+
+  it('accepts a partial versioned configuration', () => {
+    expect(normalizeBalanceComponentConfig({ version: '1', initialView: 'business-cases' })).toEqual({
+      version: '1',
+      initialView: 'business-cases',
+    });
+  });
+
+  it('rejects unsupported contract versions at the boundary', () => {
+    expect(() => normalizeBalanceComponentConfig({ version: '2' as '1' })).toThrow('Unsupported Balance Component contract version: 2');
+  });
+});

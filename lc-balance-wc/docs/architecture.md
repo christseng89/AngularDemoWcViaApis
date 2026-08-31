@@ -29,6 +29,13 @@ Balance Microservice (:4100)
   同时选择 LC 与 SG／IB／EB Secondary Reference，并显示对应金额，避免两阶段选择造成错配。
 - 尚未选择 Function 时不渲染 Maker、Checker 和 Look Up panels。
 
+### Web Component Phase 1
+
+- `src/web-component.ts` 通过 Angular Elements 幂等注册 `<balance-component-app>`，独立产物由 `npm run build:wc` 生成。
+- `src/app/web-component/` 定义版本化、框架中立的配置与 DOM 事件契约，并以组件内部状态切换两个业务视图。
+- Web Component 不安装 Angular Router；既有应用继续由 `src/main.ts`、`AppComponent` 和 `app.routes.ts` 驱动。
+- 两种入口只共享 `shared-app.providers.ts` 的 HTTP/Formly provider，不改变任何业务服务或 HTTP API 合约。宿主集成说明见 `web-component.md`。
+
 ## Backend Orchestrator
 
 - `backend/server.js` 提供 Business Case Runner 使用的 API。

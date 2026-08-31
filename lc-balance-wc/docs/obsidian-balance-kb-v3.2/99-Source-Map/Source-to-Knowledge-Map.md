@@ -24,6 +24,8 @@ tags:
 
 **2026-08-31 增量同步：** 复核 `InquireDeletePendingComponent` 的 standalone dependency 边界；移除模板未使用的 `TbIconComponent` 后，确认无 API contract 变化，两份 OAS 保持不变。详见 [[InquireDeletePendingComponent]]。
 
+**2026-08-31 Web Component Phase 1：** 新增 `src/web-component.ts`、`src/app/shared-app.providers.ts` 与 `src/app/web-component/*`，建立无 Router 的 Angular Elements 入口、版本化配置和 DOM 事件契约。详见 [[balance-component-web-component-phase-1]]；两份 OAS 经复核后保持不变。
+
 ## Angular UI — 交易构建器（Transaction Builder，29 个文件）
 
 | 源文件 | 生成的规则 |

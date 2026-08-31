@@ -19,6 +19,12 @@ module.exports = tseslint.config(
     rules: {
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-unused-vars': 'warn',
+      // angular-eslint 20 enables these two rules in its recommended preset, while this existing
+      // codebase deliberately supports constructor-injected services (including direct construction
+      // in unit tests) and already has a domain output named `select`. Preserve the pre-upgrade gate;
+      // migrating those conventions is separate from the Web Component dependency security update.
+      '@angular-eslint/prefer-inject': 'off',
+      '@angular-eslint/no-output-native': 'off',
       '@angular-eslint/directive-selector': ['error', { type: 'attribute', prefix: 'app', style: 'camelCase' }],
       '@angular-eslint/component-selector': ['error', { type: 'element', prefix: 'app', style: 'kebab-case' }],
     },

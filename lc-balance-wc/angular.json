@@ -55,6 +55,42 @@
           }
         }
       }
+    },
+    "balance-component-wc": {
+      "projectType": "application",
+      "root": "",
+      "sourceRoot": "src",
+      "prefix": "app",
+      "architect": {
+        "build": {
+          "builder": "@angular/build:application",
+          "options": {
+            "outputPath": "dist/balance-component-wc",
+            "index": false,
+            "browser": "src/web-component.ts",
+            "polyfills": ["zone.js"],
+            "tsConfig": "tsconfig.web-component.json",
+            "assets": [],
+            "styles": ["node_modules/bootstrap/dist/css/bootstrap.min.css", "src/styles.scss"],
+            "scripts": []
+          },
+          "configurations": {
+            "production": {
+              "outputHashing": "none",
+              "budgets": [
+                { "type": "initial", "maximumWarning": "1.5mb", "maximumError": "2mb" },
+                { "type": "anyComponentStyle", "maximumWarning": "8kb", "maximumError": "12kb" }
+              ]
+            },
+            "development": {
+              "optimization": false,
+              "extractLicenses": false,
+              "sourceMap": true
+            }
+          },
+          "defaultConfiguration": "production"
+        }
+      }
     }
   },
   "cli": {

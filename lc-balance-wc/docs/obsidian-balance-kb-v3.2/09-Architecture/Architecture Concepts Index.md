@@ -19,6 +19,10 @@ tags:
 
 `09-Architecture/` 目录下的架构笔记，供直接浏览本知识库区块使用。
 
+## 2026-08-31 Web Component 更新
+
+- [[balance-component-web-component-phase-1|Balance Component Web Component Phase 1]]
+
 - [[Balance Architecture]]
 - [[CatalogPickerService]]
 - [[DocumentArrivalHintsService]]

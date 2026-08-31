@@ -8,6 +8,7 @@
   },
   "include": [
     "src/**/*.spec.ts",
+    "src/web-component.ts",
     "src/**/*.d.ts",
     "setup-jest.ts"
   ]

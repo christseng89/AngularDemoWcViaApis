@@ -1,6 +1,9 @@
 /** @type {import('jest').Config} */
 module.exports = {
   preset: 'jest-preset-angular',
+  // This root suite owns only the Angular application. The backend and balance microservice are
+  // independent packages with their own Jest/TypeScript configurations and must never be cross-loaded.
+  roots: ['<rootDir>/src'],
   setupFilesAfterEnv: ['<rootDir>/setup-jest.ts'],
   testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/dist/', '<rootDir>/backend/', '<rootDir>/microservices/'],
   transform: {
@@ -22,6 +25,7 @@ module.exports = {
     '!src/app/app.component.ts',
     '!src/app/app.config.ts',
     '!src/app/app.routes.ts',
+    '!src/app/shared-app.providers.ts',
   ],
   coverageReporters: ['text', 'text-summary', 'lcov'],
   // Raised from the original 90% floor (lc-payment-wc/jest.config.js's own convention) to 95%.
