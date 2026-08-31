@@ -13,8 +13,8 @@ relevant project before running any command.
 | `lc-issue-angular/` | yes | Angular 17 + Formly demo for LC (Letter of Credit) **Issue** — charge calculation, balance/tolerance commission. |
 | `lc-payment-wc/` | yes | Angular 17 demo for LC **Payment** journal entries + a Formly-driven Payment Component Business Case Simulator. Contains a nested, independently-versioned TypeScript microservice under `microservices/payment-component/`. |
 | `lc-balance/` | yes | Angular 17 demo for the **Balance Component** — contingent-liability/on-balance-sheet ledger (BalanceContract/BalanceMovement) for LC, Shipping Guarantee, Acceptance/DPU, UPAS, Export Confirmation. Contains a nested TypeScript microservice under `microservices/balance-component/` and its own Node orchestrator under `backend/`. |
+| `lc-balance-wc/` | yes | Full duplicate of `lc-balance/` (same Angular Maker/Checker UI, `backend/` orchestrator, `microservices/balance-component/` ledger) plus a **Web Component packaging layer** on top — publishes the Transaction Builder/Business Case Runner UI as a framework-agnostic `<balance-component-app>` custom element with Angular/React/Vue adapters. Publishable npm package (`private: false`, an `exports` map, optional peerDependencies). |
 | `lc-issue/` | **no (gitignored)** | Older, plain JS/HTML scratch version of the LC Issue demo (`lc-issue-demo*.html`, `gen-spec.js`). Superseded by `lc-issue-angular/`; treat as reference only, not a place to build new work. |
-| `lc-balance-new/` | **no (gitignored)** | A full, independent parallel copy of `lc-balance/` — own `package.json`/`angular.json`/`backend/`/`microservices/balance-component/` and its own nested `CLAUDE.md`. Not the tracked project; don't assume work done here is reflected in (or should be ported to) `lc-balance/` without checking with the user first. |
 | `*.docx` at root | yes | MVV architecture design docs (LcIssueElement / BalanceComponent), bilingual EN/CN. |
 
 Everything here revolves around **trade finance back-office domain logic**: LC issuance charge/commission
@@ -51,6 +51,13 @@ idempotency-key redesign has been proposed for it); its design docs
 are cited by section number throughout the microservice's source but, like `lc-payment-wc/`'s reverted
 RDD note, were never committed as files — the nested `CLAUDE.md`'s own decision log is the only
 place that captures them.
+
+`lc-balance-wc/` has its own nested `CLAUDE.md` too, but it's a leftover copy from `lc-balance/`'s —
+it still opens with "本文件是 `lc-balance` 的仓库级开发入口" and its 常用命令/文档导航 sections don't
+mention the Web Component layer at all (not yet reworded since the duplication). Its cross-layer
+business rules and decision-log content are still current (the underlying domain logic is untouched),
+but for anything about the packaging layer itself, use the `## lc-balance-wc/` section below and
+`lc-balance-wc/docs/web-component*.md` instead — don't expect the nested file to know about them.
 
 Also relevant to trade finance accounting entries/exposure-transformation questions in general
 (not tied to either project's specific code): the `cs-tf-balance-knowhow` skill.
@@ -429,3 +436,68 @@ forgotten; check it, not just `Quality-report-balance.md`, before assuming somet
   own "Balance Knowledge Base (Obsidian)" section for its evidence-status convention
   (CONFIRMED/INFERRED/UNCLEAR/CONFLICT) and staleness caveat before trusting it over the code or this
   file's decision log.
+
+## `lc-balance-wc/` — Balance Component Web Component packaging
+
+Created as a duplicate of `lc-balance/` (commit `d99bf31`, "Duplicate lc-balance to lc-balance-ws" —
+note the commit message's own typo; the directory is `lc-balance-wc/`) and still shares its three-process
+dev setup, `npm install`/`dev:all` steps, Jest testing commands, 95% coverage floor, and full source
+layout (`src/app/transaction-builder/`, `src/app/business-case-runner/`, `backend/`,
+`microservices/balance-component/`, `analysis/`) byte-for-byte — see the `lc-balance/` section above for
+all of that; it isn't repeated here. Because the ports are identical (`:4200`/`:4300`/`:4100`), don't run
+`lc-balance/`'s and `lc-balance-wc/`'s `dev:all` at the same time — whichever starts second will fail to
+bind. Everything below is what `lc-balance-wc/` adds on top: a layer that
+packages the Angular UI as a standalone, framework-agnostic Web Component, built up incrementally across
+six phases logged in `docs/plans/2026-08-31-web-component-phase-{1..6}.md`.
+
+### The Web Component itself
+
+`src/web-component.ts` + `src/app/web-component/` wrap the existing `TransactionBuilderComponent`/
+business-case-runner UI as a single `<balance-component-app>` custom element (Angular Elements,
+`ViewEncapsulation.ShadowDom`, its own bundled `styles.css` loaded into the shadow root before the first
+view activates):
+
+- **Config contract** (`balance-component-element.contract.ts`): `{ version: '1', initialView?:
+  'transaction-builder' | 'business-cases', theme?: 'system' | 'light' | 'dark' }` — set as a DOM
+  property, never serialized to an attribute. `theme: 'system'` (the default) tracks
+  `prefers-color-scheme` live via a `MediaQueryList` listener.
+- **Imperative API**: `element.navigate(view)` / `element.refresh()` return Promises. The outer custom-
+  element class and the inner Angular component are bridged via a `balance-component-element.command.ts`
+  `CustomEvent` (resolve/reject carried in the event detail) rather than reaching into Angular internals
+  from outside the zone.
+- **Events**: `balance-ready`, `balance-navigation`, `balance-refresh`, `balance-error` (typed `code`s
+  incl. `INVALID_CONFIG`, `VIEW_LOAD_FAILED`, `STYLESHEET_LOAD_FAILED`, `ELEMENT_NOT_CONNECTED`, each
+  carrying an `operation` field so a host can tell which call failed).
+- **Styling**: a documented `--balance-color-*`/`--balance-font-*`/`--balance-radius` CSS custom-property
+  token list (`docs/web-component-styling.md`) lets a host restyle the shadow content without piercing
+  encapsulation.
+- **Framework adapters** (`src/adapters/`): `adapter-core.ts` centralizes config/event wiring and the
+  `navigate`/`refresh` handle shared by every binding; `adapters/angular/`, `adapters/react/`,
+  `adapters/vue/` are thin per-framework mount/lifecycle glue over that core. React and Vue are taken as
+  an injected runtime parameter rather than imported directly, so the package carries no hard react/vue
+  dependency — both are optional `peerDependencies` alongside `@angular/core`.
+
+### Build, package, and verify
+
+```bash
+npm run build:wc          # ng build balance-component-wc → dist/balance-component-wc (the element itself)
+npm run build:adapters    # tsc -p tsconfig.adapters.json → dist/adapters
+npm run release:prepare   # build:wc + build:adapters + release:manifest (asset-manifest.json); also runs as `prepack`
+npm run release:verify    # scripts/verify-release.mjs — checks every package.json `exports` entry actually resolves
+npm run docs:verify       # scripts/validate-wc-docs.mjs — structure/links/OAS-route coverage across docs/web-component*.md
+npm run e2e               # playwright test — e2e/framework-hosts.spec.ts drives real Angular/React/Vue host pages
+                           # against the built element in system Chrome (playwright.config.ts uses channel: 'chrome',
+                           # not a Playwright-managed browser download)
+```
+
+`package.json` is `private: false` with an `exports` map (`./wc`, `./wc/styles.css`, `./manifest`,
+`./contract`, `./adapters`, `./adapters/angular`, `./adapters/react`, `./adapters/vue`) pointing at the
+built `dist/` output — don't hand-edit those paths without re-running `release:verify` afterward.
+
+### Docs
+
+`docs/web-component.md` is the entry point; `web-component-contract.md`, `web-component-styling.md`,
+`web-component-governance.md`, `web-component-operations.md`, `web-component-testing.md`,
+`web-component-usage.md`, and `framework-integrations.md` split out the formalized reference set (added
+phase 6, 2026-08-31), plus `docs/migrations/web-component-v1.md` and dated entries under
+`docs/decisions/` for that phase's OAS-impact and doc-formalization decisions.
