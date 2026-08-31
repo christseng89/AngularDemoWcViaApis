@@ -122,7 +122,7 @@ export class TransactionBuilderComponent {
 
   /** Forwarded to `MakerPanelComponent`'s `externalCheckerOutcome` `@Input()` (a fresh object per emission, read via `ngOnChanges()`) for every release/reject/delete outcome except the whole-screen-reset case. */
   makerOutcomeSignal: CheckerActionOutcome | null = null;
-  /** Forwarded to `MakerPanelComponent`'s `refreshRequested` `@Input()` — used by `checkerAct()`'s plain release/reject path instead of `makerOutcomeSignal`. */
+  /** Forwarded to MakerPanel after a plain Reject; successful Release now resets the whole screen. */
   refreshNonce = 0;
   /** Forwarded to `MakerPanelComponent`'s `externalFixPendingRequest` `@Input()` — see `onMakerQueueFixPending()`'s own doc comment. */
   externalFixPendingRequest: BalanceMovement | null = null;
@@ -678,23 +678,27 @@ export class TransactionBuilderComponent {
   /**
    * A3 only (plain, deferSettlement without an SG match) — restored 2026-08-20 ("A3 A3S 交易 Approve
    * 過後 不要再顯示"): persists the Checker's own acknowledgment via CheckerActionsService instead of the
-   * former purely client-side approveArrival(), then reloads the Checker Queue in place so the
-   * now-approved item stops reappearing (see checkerQueueRefreshNonce's own doc comment).
+   * former purely client-side approveArrival(), then runs the shared post-Release screen reset.
    */
   acknowledgeArrival(): void {
     this.actionBusy = true;
+    const fn = this.selectedFunction;
+    const movementId = this.selectedCheckerMovement?.movementId;
     this.checkerActions.acknowledgeArrival(this.buildCheckerActionContext()).subscribe((outcome) => {
       this.actionBusy = false;
+      if (fn && movementId && outcome.kind === 'documentArrivalAcknowledged') {
+        this.resetAfterSuccessfulCheckerRelease(fn, movementId);
+        return;
+      }
       this.forwardOutcomeToMaker(outcome);
     });
   }
 
   /**
    * Forwards a non-special outcome to `MakerPanelComponent` via `makerOutcomeSignal`. Also reloads the
-   * Checker Queue in place for any outcome that genuinely changed a movement's state — 'released' (e.g.
-   * reject()'s own success, which never resets the whole screen the way release()'s
-   * own selectFunction() call does) and 'documentArrivalAcknowledged' (A3S) — never for 'failed'. Same
-   * unification as checkerAct()'s own plain path (see checkerQueueRefreshNonce's own doc comment).
+   * Checker Queue in place for a non-reset outcome that genuinely changed movement state (principally
+   * Reject); failed outcomes never refresh it. Successful Checker Release/Acknowledge is handled by
+   * resetAfterSuccessfulCheckerRelease() instead.
    * Also refreshes Look Up Current Balance (Common Requirement — every successful Maker Submit or
    * Checker Release/Acknowledge refreshes it), so the Event Timeline's own EARMARKING -> EARMARKED flip
    * (business instruction 2026-08-20, "狀態必須是 EARMARKED") shows without a manual re-search.
@@ -730,13 +734,25 @@ export class TransactionBuilderComponent {
     this.checkerActions.release(this.buildCheckerActionContext()).subscribe((outcome) => {
       this.actionBusy = false;
       if (fn && outcome.kind === 'released') {
-        this.selectFunction(fn);
-        this.refreshLookUpForLastMakerContext();
-        this.releaseSuccessHint = `Release completed (movement ${outcome.result.movementId}) — screen reset for a new ${fn.code} (${fn.label}) transaction.`;
+        this.resetAfterSuccessfulCheckerRelease(fn, outcome.result.movementId);
         return;
       }
       this.forwardOutcomeToMaker(outcome);
     });
+  }
+
+  /**
+   * One post-Release state transition for every A/B function. A released movement must not remain in
+   * Maker Result or any Fix/Delete review signal, otherwise the next action resubmits its old id.
+   */
+  private resetAfterSuccessfulCheckerRelease(fn: TransactionFunction, movementId: string): void {
+    this.externalFixPendingRequest = null;
+    this.externalDeletePendingReviewRequest = null;
+    this.makerOutcomeSignal = null;
+    this.checkerSyncSignal = null;
+    this.selectFunction(fn);
+    this.refreshLookUpForLastMakerContext();
+    this.releaseSuccessHint = `Release completed (movement ${movementId}) — screen reset for a new ${fn.code} (${fn.label}) transaction.`;
   }
 
   private buildCheckerActionContext(): CheckerActionContext {
@@ -758,6 +774,7 @@ export class TransactionBuilderComponent {
   checkerAct(action: 'release' | 'reject'): void {
     if (!this.selectedCheckerMovement) return;
     const movementId = this.selectedCheckerMovement.movementId;
+    const fn = this.selectedFunction;
 
     if (this.isCheckerCompoundOwnSubmission) {
       if (action === 'release') this.release();
@@ -787,14 +804,13 @@ export class TransactionBuilderComponent {
     this.checkerError = null;
     const obs = action === 'release' ? this.api.release(movementId, this.checkerId) : this.api.reject(movementId, this.checkerId, 'MANUAL_QUEUE_REJECT');
     obs.subscribe({
-      next: () => {
+      next: (result) => {
         this.checkerBusy = false;
-        // Plain path never touches submitResult; refreshRequested tells MakerPanelComponent to
-        // refresh its own snapshot + re-sync instead. checkerQueueRefreshNonce reloads the Checker's
-        // own queue in place — business instruction 2026-08-20 ("純粹 APPROVE PENDING 交易, APPROVED
-        // 後該筆交易應該消失, 不能重複 APPROVED" — unified across every function, not just A3/A3S's own
-        // acknowledgment path; repro'd live via S101/A2's plain Release leaving the just-Approved item
-        // still listed).
+        if (action === 'release' && fn) {
+          this.resetAfterSuccessfulCheckerRelease(fn, result.movementId ?? movementId);
+          return;
+        }
+        // Reject keeps the Maker result available for correction and only refreshes the queues.
         this.refreshNonce++;
         this.checkerQueueRefreshNonce++;
       },

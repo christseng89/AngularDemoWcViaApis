@@ -4515,3 +4515,9 @@ Maker Submit 隨後套用相同的 raw-cause preservation 原則：`MakerSubmitO
 Angular host 與 `<balance-component-app>` 共用的 Maker result policy 現在區分本地 validation 與 HTTP failure。本地錯誤顯示可修正的 validation message；HTTP 400／422 顯示安全的 backend business reason，401／403／404 與其他 4xx 使用明確且不可自動重試的分類，避免 A2 及其他 Function 被誤標為 `BAL-UI-UNEXPECTED`。
 
 `MakerSubmitService.submit()` 以 RxJS `defer` 包覆全部 dispatch shape，使單筆與 compound submission 的同步例外都保留 raw cause。參數化測試涵蓋 A1-A11／B1-B7；WC 全套 63 suites／1,763 tests 通過，coverage 97.87%／95.13%／96.36%／98.33%，Angular／WC／adapter typecheck、lint 0 errors及 production build通過。Microservice OAS 維持 v1.42.1、Channel OAS 維持 v1.9.0，因本次沒有 HTTP 或 event wire change；Web Component DOM contract 亦未改變。
+
+## 2026-08-31 — Checker Release 後統一清除 Maker transaction state
+
+一般、compound 與 acknowledgment Checker Release 成功後，Angular host 與 `<balance-component-app>` 現在共用同一 reset transition：保留所選 Function，但清除 Maker Result、已 RELEASED movement、selected Checker movement、Fix/Delete Pending one-shot signals 與舊同步 signal。這避免已完成 movement 再次進入 Fix Pending 所造成的 duplicate／illegal transition；Reject 與失敗結果仍保留 Maker 資料。
+
+參數化 regression 覆蓋 A1-A11／B1-B7；全套 63 suites／1,781 tests 通過，coverage 97.85%／95.10%／96.36%／98.31%。HTTP OAS、Channel OAS 與 Web Component DOM contract 均無 wire change；本資料夾的 Microservice／Channel OAS 分別維持 v1.42.1／v1.9.0。

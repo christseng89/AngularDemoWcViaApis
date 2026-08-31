@@ -4515,3 +4515,9 @@ Microservice OAS 升至 v1.42.1，使用 `x-client-retry-policy` 記錄 client o
 修正 A2 回報及所有 A1-A11／B1-B7 共用的 Submit error path。本地 `validateSubmit`／request-build failure 直接顯示可修正的 validation message；HTTP 400／422 顯示安全的 backend business reason，401／403／404 與其他 4xx 使用明確且不可自動重試的分類。`BAL-UI-UNEXPECTED` 只留給沒有 HTTP status 的未知 client exception。
 
 `MakerSubmitService.submit()` 以 RxJS `defer` 包覆 dispatch，單筆與 compound shape 的同步例外統一轉成保留 raw cause 的 `failed` outcome。參數化測試覆蓋全部 A／B Function；Angular 全套 53 suites／1,732 tests 通過，coverage 98.26%／95.61%／96.76%／98.64%，typecheck、lint 0 errors及 production build通過。Microservice OAS 維持 v1.42.1、Channel OAS 維持 v1.9.0：既有 Error schema／400 responses 已涵蓋 backend contract，本次沒有 endpoint、request、response 或 event wire change。
+
+## 2026-08-31 — Checker Release 後統一清除 Maker transaction state
+
+一般 `checkerAct()`、compound `release()` 與 A3/A3S acknowledgment 原先有不同成功後狀態處理；一般路徑只刷新 Checker Queue，使已 RELEASED movement 仍留在 Maker Result，使用者可再次點 Fix Pending 而觸發 duplicate／illegal transition。現在三條成功路徑統一由 `resetAfterSuccessfulCheckerRelease()` 重設同一 Function，清除 Maker Result、selected Checker movement、Fix/Delete Pending one-shot signals 與舊同步 signal。Reject 與失敗結果不清除 Maker 資料。
+
+參數化 regression 覆蓋 A1-A11／B1-B7；全套 53 suites／1,750 tests 通過，coverage 98.24%／95.58%／96.76%／98.62%。HTTP endpoint、payload、response 與 Channel event 均未改變，因此 Microservice OAS 維持 v1.42.1、Channel OAS 維持 v1.9.0。

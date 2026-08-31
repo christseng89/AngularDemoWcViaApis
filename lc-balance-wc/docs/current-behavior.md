@@ -45,6 +45,7 @@ A4、A6、B4 不得繞過 prerequisite eligibility。Business Case Runner 的 Ru
 - A3S、A6、B4、B5 等多腿事件的建立／Release 使用 `/balance-movements/compound*`，由 SQLite transaction 保證全部成功或全部回滾。
 - Fix Pending 修改原 movement 並保留 audit。A4、A6、A7、A9、B4、B5 採 Remarks-only：只能修改 Remark，不得改變金額、Balance、Account Entries 或 compound sibling。
 - Fix Pending 開始、送出及成功回覆時會清除先前的 Maker submit error；成功的 A7 Remarks-only Save 不得繼續顯示舊的 `BAL-UI-UNEXPECTED`。此行為在 Angular host 與 Web Component host 一致。
+- 所有 A1-A11／B1-B7 在 Checker Release 成功後都重設同一 Function 的 Maker／Checker 畫面，清除舊 movement、Maker Result 與 Fix/Delete Pending signals；已 RELEASED 的 movement 不得再次進入 Fix Pending。Angular 與 Web Component host 行為一致；Reject 仍保留 Maker 資料供修正。
 - Transaction Processing 的 Maker Submit 成功後，A1-A11／B1-B7 均可在同一 session 執行 Delete Pending；這不會改變 Maker Queue／Fix Pending 的獨立流程。
 - A1／B1 Confirm Delete Pending 成功後重設為新的 natural-key 輸入；其他 Function 回到各自的 Transaction Index。
 - A4 的 Delete Pending 是撤回 Maker Submit，使用 `/withdraw-maker-submit`，不得取消其 A3／A3S source movement。
@@ -66,4 +67,4 @@ A4、A6、B4 不得繞過 prerequisite eligibility。Business Case Runner 的 Ru
 
 ## Verification baseline
 
-截至 2026-08-31：Submit error classification 變更後 WC 驗證為 63 suites／1,763 tests，coverage 97.87%／95.13%／96.36%／98.33%；Angular／WC／adapter typecheck、lint（0 errors）與 production build 通過。OAS wire 與 Web Component DOM contract 均未變。Backend Runner 57 與 Balance microservice 784 是前次 2026-08-30 基準，本次未重新執行。
+截至 2026-08-31：Checker Release reset 變更後 WC 驗證為 63 suites／1,781 tests，coverage 97.85%／95.10%／96.36%／98.31%。OAS wire 與 Web Component DOM contract 均未變。Backend Runner 57 與 Balance microservice 784 是前次 2026-08-30 基準，本次未重新執行。

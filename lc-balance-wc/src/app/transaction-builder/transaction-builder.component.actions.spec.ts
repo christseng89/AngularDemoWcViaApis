@@ -2,6 +2,7 @@ import { Observable, forkJoin, of, throwError } from 'rxjs';
 import { TransactionBuilderComponent } from './transaction-builder.component';
 import { BalanceComponentApiService, BalanceContract, BalanceSnapshot } from './balance-component-api.service';
 import { IMPORT_FUNCTIONS, EXPORT_FUNCTIONS } from './balance-component.model';
+import type { TransactionFunction } from './balance-component.model';
 import type { MakerCheckerContext } from './maker-panel.component';
 
 /**
@@ -127,6 +128,14 @@ function setMakerContext(comp: TransactionBuilderComponent, overrides: Partial<M
     createdBy: 'maker1',
     ...overrides,
   };
+}
+
+function makerContextOf(comp: TransactionBuilderComponent): MakerCheckerContext {
+  return (comp as unknown as { makerContext: MakerCheckerContext }).makerContext;
+}
+
+function resetAfterRelease(comp: TransactionBuilderComponent, fn: TransactionFunction, movementId: string): void {
+  (comp as unknown as { resetAfterSuccessfulCheckerRelease: (selected: TransactionFunction, id: string) => void }).resetAfterSuccessfulCheckerRelease(fn, movementId);
 }
 
 describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
@@ -933,7 +942,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(comp.pendingMakerQueueDeleteRow).toBeNull();
       expect(comp.activeMode).toBe('PROCESSING');
       expect(comp.selectedFunction).toBe(A1);
-      expect((comp as any).makerContext.submitResult).toBeNull();
+      expect(makerContextOf(comp).submitResult).toBeNull();
       expect((comp as any).makerContext.createdBy).toBe('maker1');
       expect(comp.selectedCheckerMovement).toBeNull();
       expect(comp.checkerError).toBeNull();
@@ -953,7 +962,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
       expect(api.cancel).toHaveBeenCalledWith('mv-a3-delete', 'maker3', 'MAKER_EC');
       expect(comp.selectedFunction).toBe(A3);
-      expect((comp as any).makerContext.submitResult).toBeNull();
+      expect(makerContextOf(comp).submitResult).toBeNull();
       expect(comp.checkerResetNonce).toBe(resetNonceBeforeDelete + 1);
       expect(comp.activeMode).toBe('PROCESSING');
     });
@@ -1284,15 +1293,19 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(api.release).not.toHaveBeenCalled();
     });
 
-    it('acknowledgeArrival() persists via CheckerActionsService, then sets arrivalApproved through the shared documentArrivalAcknowledged outcome', () => {
+    it('acknowledgeArrival() persists and resets the A3 Maker screen after the successful Checker action', () => {
       const { comp, api } = setup();
       comp.selectFunction(A3);
       comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-2', movementType: 'UTILIZE' });
+      setMakerContext(comp, { submitResult: makeMovement({ movementId: 'mv-2' }) });
 
       comp.acknowledgeArrival();
 
       expect(api.acknowledge).toHaveBeenCalledWith('mv-2', comp.checkerId);
-      expect(comp.arrivalApproved).toBe(true);
+      expect((comp as any).makerContext.submitResult).toBeNull();
+      expect(comp.selectedCheckerMovement).toBeNull();
+      expect(comp.arrivalApproved).toBe(false);
+      expect(comp.releaseSuccessHint).toContain('movement mv-2');
       expect(comp.actionBusy).toBe(false);
     });
 
@@ -1327,27 +1340,55 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       comp.selectFunction(A2);
       comp.checkerId = 'checker7';
       comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-4' });
+      setMakerContext(comp, { submitResult: makeMovement({ movementId: 'mv-4' }) });
 
       comp.checkerAct('release');
 
       expect(api.release).toHaveBeenCalledWith('mv-4', 'checker7');
       expect(comp.checkerBusy).toBe(false);
+      expect((comp as any).makerContext.submitResult).toBeNull();
+      expect(comp.selectedCheckerMovement).toBeNull();
+      expect(comp.releaseSuccessHint).toContain('movement mv-released');
     });
 
     // Business instruction 2026-08-20 ("純粹 APPROVE PENDING 交易, APPROVED 後該筆交易應該消失, 不能重複
     // APPROVED" — repro'd live via S101/A2's own plain Release leaving the just-Approved item still
     // listed in the Checker Queue): unified so EVERY successful Checker action reloads the queue, not
     // just A3/A3S's own acknowledgment path.
-    it('plain path (A2) release bumps checkerQueueRefreshNonce so CheckerPanelComponent reloads its queue in place', () => {
+    it('plain path (A2) release bumps the shared reset nonce so Maker and Checker both start fresh', () => {
       const { comp } = setup();
       comp.selectFunction(A2);
       comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-4' });
-      const before = comp.checkerQueueRefreshNonce;
+      const before = comp.checkerResetNonce;
 
       comp.checkerAct('release');
 
-      expect(comp.checkerQueueRefreshNonce).toBe(before + 1);
+      expect(comp.checkerResetNonce).toBe(before + 1);
     });
+
+    it.each([...IMPORT_FUNCTIONS, ...EXPORT_FUNCTIONS])(
+      'post-Release reset clears every stale Maker action signal for $code',
+      (fn) => {
+        const { comp } = setup();
+        comp.selectFunction(fn);
+        setMakerContext(comp, { submitResult: makeMovement({ movementId: `mv-${fn.code}` }) });
+        comp.selectedCheckerMovement = makeMovement({ movementId: `mv-${fn.code}` });
+        comp.externalFixPendingRequest = makeMovement({ movementId: `mv-${fn.code}` });
+        comp.externalDeletePendingReviewRequest = makeMovement({ movementId: `mv-${fn.code}` });
+        comp.makerOutcomeSignal = { kind: 'failed', message: 'stale' };
+        comp.checkerSyncSignal = { lcNumber: 'LC-OLD', secondaryRef: null };
+
+        resetAfterRelease(comp, fn, `mv-${fn.code}`);
+
+        expect(comp.selectedFunction).toBe(fn);
+        expect(makerContextOf(comp).submitResult).toBeNull();
+        expect(comp.selectedCheckerMovement).toBeNull();
+        expect(comp.externalFixPendingRequest).toBeNull();
+        expect(comp.externalDeletePendingReviewRequest).toBeNull();
+        expect(comp.makerOutcomeSignal).toBeNull();
+        expect(comp.checkerSyncSignal).toBeNull();
+      },
+    );
 
     // A4's UTILIZE uses the same plain fallback path as A2; gated on makerSubmittedAt (a real A4 Submit
     // always sets it).
@@ -1388,11 +1429,15 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
     it('plain path: reject calls api.reject with MANUAL_QUEUE_REJECT', () => {
       const { comp, api } = setup();
       comp.selectFunction(A2);
-      comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-4' });
+      const pending = makeMovement({ movementId: 'mv-4' });
+      comp.selectedCheckerMovement = pending;
+      setMakerContext(comp, { submitResult: pending });
 
       comp.checkerAct('reject');
 
       expect(api.reject).toHaveBeenCalledWith('mv-4', comp.checkerId, 'MANUAL_QUEUE_REJECT');
+      expect(makerContextOf(comp).submitResult).toBe(pending);
+      expect(comp.selectedCheckerMovement).toBe(pending);
     });
 
     it('plain path: a failed release sets checkerError and resets checkerBusy', () => {

@@ -22,5 +22,6 @@ tags:
 - `x-client-retry-policy` 是 client operational metadata，不改变 HTTP、Channel 或 DOM contract。
 - Maker Submit error policy 已覆盖 A1-A11／B1-B7：本地 validation 与 HTTP 4xx 分开呈现，保留 backend status／code／安全的 business reason；同步 dispatch exception 也统一转为 failed outcome。
 - 本次 Angular／WC UI error-classification 没有 wire 或 DOM change，因此 Microservice OAS 保持 v1.42.1、Channel OAS 保持 v1.9.0。
+- 所有 A1-A11／B1-B7 的 Checker Release 成功后，Angular 与 Web Component host 都统一 reset Maker／Checker 画面；旧 movement 与 Fix/Delete Pending signals 不再残留，Reject 保留资料供修正。HTTP、Channel 与 DOM contract 均无变化。
 
 权威入口：`analysis/balance-component-api.yaml`、`docs/current-behavior.md`、`docs/balance-business-rules.md`。
