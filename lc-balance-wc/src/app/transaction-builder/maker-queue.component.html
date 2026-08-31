@@ -1,0 +1,133 @@
+<section class="tb-section tb-section--maker">
+  <div class="tb-section__body">
+    <!-- Import LC／Export Confirmed split (user-directed 2026-08-28, "Maker Queue進口 出口 分開 (similar
+             as Inquire Events)") — same `.tb-tabs.tb-tabs--side` two-tab convention
+             inquire-events.component.html already uses. `selectSide()` never re-fetches (see that
+             method's own doc comment in maker-queue.service.ts) — `items` already holds both sides, this
+             just re-derives which slice of it `pagedItems`/`paging.total` operate over. -->
+    <div class="tb-tabs tb-tabs--side">
+      <button type="button" class="tb-tab" [class.tb-tab--active]="makerQueue.side === 'IMPORT'" (click)="makerQueue.selectSide('IMPORT')">Import LC</button>
+      <button type="button" class="tb-tab" [class.tb-tab--active]="makerQueue.side === 'EXPORT'" (click)="makerQueue.selectSide('EXPORT')">Export Confirmed</button>
+    </div>
+    <app-transaction-search-field
+      label="Maker (createdBy)"
+      placeholder="maker1"
+      [required]="true"
+      [value]="makerQueue.createdBy"
+      [loading]="makerQueue.loading"
+      idleText="Load"
+      busyText="Loading…"
+      (valueChange)="makerQueue.createdBy = $event"
+      (searchRequested)="makerQueue.load()"
+    ></app-transaction-search-field>
+    <!-- LC Number Search (user-directed 2026-08-28, "Maker Queue 提供 LC Number Search 功能" — "支援
+             LIKE / Partial Match") — a substring filter on the same worklist; `makerQueue.load()`
+             defaults its own `resetToFirstPage` param to `true`, so reusing it here (same as the Maker
+             field above) already starts a fresh search from page 1 rather than staying on whatever page
+             a PRIOR search/load left `paging.page` on. Both this field and the Maker field above run
+             through the exact same `load()` → group → sort → window pipeline (`MakerQueueService`'s own
+             doc comment), so a search's own results always share the SAME ordering (Function ASC → LC
+             Number ASC → Secondary Reference Number ASC) as the unfiltered index — never a separate
+             client-side sort of its own. -->
+    <app-transaction-search-field
+      label="LC Number"
+      placeholder="Search LC Number… (partial match)"
+      [value]="makerQueue.lcNumberSearch"
+      [loading]="makerQueue.loading"
+      (valueChange)="makerQueue.lcNumberSearch = $event"
+      (searchRequested)="makerQueue.load()"
+    ></app-transaction-search-field>
+    <app-feedback-message
+      *ngIf="errorFeedback as feedback"
+      [message]="feedback"
+      (retry)="makerQueue.load()"
+    ></app-feedback-message>
+    <div class="tb-hint mt-2" role="status" aria-live="polite" aria-busy="true" *ngIf="makerQueue.loading">
+      <span class="tb-spinner" aria-hidden="true"></span>Loading My Pending/My Rejected…
+    </div>
+
+    <div class="tb-table-scroll mt-2" *ngIf="!makerQueue.loading && makerQueue.sideFilteredItems.length">
+      <table class="tb-table">
+        <caption class="visually-hidden">My Pending/My Rejected</caption>
+        <thead>
+          <tr>
+            <th>Function</th>
+            <th>LC Number</th>
+            <th>Reference</th>
+            <th>Amount</th>
+            <th>Status</th>
+            <th>Created At</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let row of makerQueue.pagedItems">
+            <td>
+              <span class="tb-type-tag" *ngIf="makerQueue.functionFor(row) as fn">{{ fn.code }} · {{ fn.label }}</span>
+              <span class="tb-muted" *ngIf="!makerQueue.functionFor(row)">—</span>
+            </td>
+            <td class="tb-table__ref">{{ row.contract.naturalKey.lcNumber }}</td>
+            <td class="tb-table__ref">{{ row.movement.sourceTransactionRef || '—' }}</td>
+            <td class="tb-table__amount">{{ row.movement.amount | monetaryAmount: row.movement.currency }} {{ row.movement.currency }}</td>
+            <td class="tb-table__status">
+              <app-transaction-status-badge
+                [status]="row.movement.status"
+                [instrumentType]="row.contract.instrumentType"
+                [movementType]="row.movement.movementType"
+                [phase]="makerQueue.displayPhaseFor(row)"
+                [acknowledgedAt]="row.movement.acknowledgedAt"
+              ></app-transaction-status-badge>
+            </td>
+            <td class="tb-table__time">{{ row.movement.createdAt | date: 'short' }}</td>
+            <td>
+              <!-- Fix Pending (2026-08-28, "Maker Queue Need to provide Fix Pending button as well")
+                 reuses the exact same trial-scope gate (`fixPendingSupported()`) the in-session
+                 Transaction Builder screen's own button already reads — A1/A3 today, never a compound
+                 row (see that method's own doc comment). Delete Pending (2026-08-28, "Maker Queue Delete
+                 Pending 也要顯示交易畫面 確認刪除與否") no longer deletes on click — it opens a read-only
+                 review screen with its own Confirm/Cancel buttons (MakerPanelComponent's own
+                 deletePendingReviewMode); the actual cascade-aware delete (compound submissions, A3S/B4/
+                 B5, shown as ONE merged row here — see MakerQueueService.isCompoundShape()'s own doc
+                 comment) only fires once confirmed there. Wrapped in a flex row with `gap` (same
+                 `.tb-maker-result-actions`/`.tb-checker-actions` convention used elsewhere on this
+                 screen) so the two buttons get real spacing when both render. -->
+              <div class="tb-maker-queue-actions">
+                <button
+                  type="button"
+                  class="tb-btn tb-btn--tiny tb-btn--outline"
+                  *ngIf="makerQueue.fixPendingSupported(row)"
+                  (click)="fixPendingRequested.emit(row)"
+                >
+                  Fix Pending
+                </button>
+                <button
+                  type="button"
+                  class="tb-btn tb-btn--tiny tb-btn--danger-outline"
+                  [title]="deletePendingLabel(row)"
+                  (click)="deletePendingRequested.emit(row)"
+                >
+                  Delete Pending
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <app-transaction-pagination
+      *ngIf="makerQueue.paging.totalPages > 1"
+      [page]="makerQueue.paging.page"
+      [totalPages]="makerQueue.paging.totalPages"
+      [total]="makerQueue.paging.total"
+      [loading]="makerQueue.loading"
+      (previousRequested)="makerQueue.prevPage()"
+      (nextRequested)="makerQueue.nextPage()"
+    ></app-transaction-pagination>
+    <div class="tb-error tb-error--fit mt-2" role="alert" aria-live="polite" *ngIf="!makerQueue.loading && !makerQueue.sideFilteredItems.length && !makerQueue.error && makerQueue.emptyStateIsError">
+      {{ makerQueue.emptyStateMessage }}
+    </div>
+    <div class="tb-hint mt-2" *ngIf="!makerQueue.loading && !makerQueue.sideFilteredItems.length && !makerQueue.error && !makerQueue.emptyStateIsError">
+      {{ makerQueue.emptyStateMessage }}
+    </div>
+  </div>
+</section>

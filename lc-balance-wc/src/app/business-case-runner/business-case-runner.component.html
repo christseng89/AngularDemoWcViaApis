@@ -1,0 +1,71 @@
+<div class="container py-4">
+  <h1 class="h3 mb-1">Balance Component — Business Case Runner</h1>
+  <p class="text-muted">
+    Runs the complete Import/Export LC lifecycle suite against the real Balance Component microservice.
+    Run All finishes by retaining one eligible prerequisite each for manual A4, A6, and B4 testing.
+  </p>
+
+  <div *ngIf="loadError" class="alert alert-danger">{{ loadError }}</div>
+
+  <div class="card mb-4">
+    <div class="card-body">
+      <form [formGroup]="form">
+        <formly-form [form]="form" [fields]="fields" [model]="model"></formly-form>
+      </form>
+      <div class="d-flex gap-2">
+        <button class="btn btn-primary" (click)="run()" [disabled]="!model.caseId || running">
+          {{ running ? 'Running…' : 'Run Selected Case' }}
+        </button>
+        <button class="btn btn-outline-secondary" (click)="runAll()" [disabled]="runningAll || !cases.length">
+          {{ runningAll ? 'Running all…' : 'Run All Cases' }}
+        </button>
+        <button class="btn btn-outline-danger" (click)="resetDatabase()" [disabled]="resettingDatabase">
+          {{ resettingDatabase ? 'Cleaning up…' : 'Cleanup Database Tables' }}
+        </button>
+      </div>
+      <div class="alert alert-info mt-2" *ngIf="resetDatabaseMessage">{{ resetDatabaseMessage }}</div>
+    </div>
+  </div>
+
+  <div *ngIf="result" class="card mb-4">
+    <div class="card-body">
+      <h2 class="h5">{{ result.title }}</h2>
+      <p class="text-muted">{{ result.description }}</p>
+      <table class="table table-sm">
+        <caption class="visually-hidden">Step-by-step trace for {{ result.title }}</caption>
+        <thead>
+          <tr><th>Step</th><th>Label</th><th>Status</th><th>Detail</th></tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let step of result.trace" [class]="rowClass(step)">
+            <td>{{ step.functionCode || step.type }}</td>
+            <td>{{ step.label }}</td>
+            <td>{{ statusText(step) }}</td>
+            <td><pre class="step-detail">{{ detailText(step) }}</pre></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div *ngFor="let r of allResults" class="card mb-4">
+    <div class="card-body">
+      <h2 class="h5">{{ r.title }}</h2>
+      <p class="text-muted">{{ r.description }}</p>
+      <table class="table table-sm">
+        <caption class="visually-hidden">Step-by-step trace for {{ r.title }}</caption>
+        <thead>
+          <tr><th>Step</th><th>Label</th><th>Status</th><th>Detail</th></tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let step of r.trace" [class]="rowClass(step)">
+            <td>{{ step.functionCode || step.type }}</td>
+            <td>{{ step.label }}</td>
+            <td>{{ statusText(step) }}</td>
+            <td><pre class="step-detail">{{ detailText(step) }}</pre></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

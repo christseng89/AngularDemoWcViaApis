@@ -1,0 +1,1096 @@
+openapi: 3.0.3
+info:
+  title: Balance Component — Web/Mobile Channel API
+  description: >
+    The channel-facing API a bank's web/mobile origination front-end (or
+    any other channel client) calls to work the Balance Component's
+    approved named business functions — Import LC A1–A11 and Export
+    Confirmed LC B1–B7, exactly the set already implemented in
+    lc-balance-wc's own Transaction Builder UI
+    (src/app/transaction-builder/balance-component.model.ts's
+    IMPORT_FUNCTIONS/EXPORT_FUNCTIONS registry, which is this contract's
+    own source of truth for per-function field requirements — see
+    `GET /channel/functions`).
+
+
+    This is a thin façade over the Balance Component Microservice API
+    (balance-component-api.yaml, this same folder): every channel call maps
+    onto exactly the same one-movement primitives that service exposes.
+    This logical layer's job is to let a channel client work in named
+    business-function vocabulary (instrumentType/movementType/parent
+    resolution/currency all derived server-side from `functionCode`)
+    instead of the microservice's own lower-level, instrument-agnostic
+    vocabulary — it does not add transactional atomicity, batching, or any
+    business rule the microservice does not already enforce. The reference
+    Angular Transaction Builder currently calls the microservice adapter
+    directly rather than deploying this channel façade as a separate process;
+    where this
+    contract states a rule, the microservice enforces the same rule
+    independently as defense in depth (a client that bypassed this channel
+    and called the microservice directly could not evade it).
+
+
+    API design principle — `POST /channel/transactions` describes one logical
+    transaction leg. Several named business
+    functions are business-approved to require more than one linked
+    movement in a specific order — Document Arrival w/ Shipping Guarantee
+    (A3S, 2 legs), Confirmation Honour/Accept (B4, 2–4 legs depending on
+    Sight/Usance) — see each function's own `compoundLegs` entry in
+    `GET /channel/functions`. A deployed adapter must translate one approved
+    multi-leg business event to the microservice's existing atomic
+    `/balance-movements/compound*` endpoints; it must not recreate the former
+    non-atomic sequence of independent calls. `businessEventId` remains the
+    shared audit/correlation identity for every leg. `ChannelError.partialSuccess`
+    is retained only for compatibility with legacy adapters and is not the
+    expected result shape of an atomic compound command.
+
+
+    CURRENCY CODE — business rule (2026-08-16): for A1 (LC Issue) and B1
+    (Confirm LC) only, Currency Code is free caller (User) Input, and
+    becomes that new LC/Confirmation's own permanent Currency Code. For
+    every other function — A2–A9, B2–B5 — Currency Code is CARRIED FORWARD
+    from the originating A1/B1 record and PROTECTED (read-only): this
+    contract does not even accept a `currency` field on a
+    `ChannelDerivedTransactionRequest` (see the schema — submitting one is
+    a `400` schema-validation failure, not merely ignored), and the server
+    derives it from whichever existing/parent record the request resolves
+    to (see `GET /channel/functions`'s own `currencyMode` per function, and
+    the Balance Component Microservice API's own "CURRENCY DERIVATION"
+    section for the underlying data-model rule this ultimately rests on).
+    The server never trusts a channel client's own Currency Code claim for
+    any function other than A1/B1.
+
+
+    Maker/Checker: every function follows the same 4-eyes shape — a Maker
+    (`POST /channel/transactions`) creates a PENDING transaction; a Checker
+    then Releases (`.../release`) or Rejects (`.../reject`) it — a genuine
+    `PENDING -> RELEASED`/`REJECTED` transition, no exceptions (see v1.2.0
+    below: Present Docs/B3 used to be the one function whose Checker action
+    was a separate acknowledgment rather than a release; it is not any
+    more). A Maker may Cancel their own still-PENDING submission before a
+    Checker acts (`.../cancel`). This channel layer does not implement its
+    own authentication/authorization — `createdBy`/`releasedBy`/
+    `cancelledBy` are channel-session-supplied identity claims, matching
+    this prototype's own documented scope boundary (real channel
+    deployments must derive these server-side from a verified session,
+    never trust a request-body claim — see lc-balance-wc/CLAUDE.md's own
+    BAL-001 finding for the equivalent microservice-level gap).
+
+
+    Idempotency: identical to the microservice layer — `eventSeq` is
+    channel-client-supplied per transaction and, combined with the
+    resolved contract, makes retrying a `POST /channel/transactions` call
+    safe (resubmitting the same pair returns the existing transaction, 200,
+    rather than creating a duplicate).
+
+
+    v1.8.0 (2026-08-30, documentation synchronization; no endpoint-shape
+    change): corrects the scope text to A1–A11/B1–B7, records that this is a
+    logical/not-separately-deployed channel façade in the reference workspace,
+    and aligns compound-event guidance with Microservice OAS v1.37.0: A3S,
+    A6, B4 and B5 adapters must use atomic `/balance-movements/compound*`
+    operations. Transaction Index SG/IB/EB Amount and Tight LC Balance are UI
+    projections and therefore do not introduce channel response fields.
+
+
+    v1.1.0 (2026-08-16) — mirrors the Microservice API's own v1.1.0:
+    `ChannelTransaction.contingentAccountEntry` (new `ContingentAccountEntry`
+    schema, identical shape) passes through the underlying
+    `BalanceMovement.contingentAccountEntry` unchanged — see
+    balance-component-api.yaml's own v1.1.0 changelog entry for the full
+    rule. A channel client's "Account Entries" button/pop-up (the reference
+    Transaction Builder client's own UI pattern) reads this field directly;
+    it is never recomputed by this channel layer.
+
+
+    v1.2.0 (2026-08-18, business instruction "所有交易要RELEASE過後 才能根據流程走下一個交易" — every
+    transaction must genuinely RELEASE before the next step in the flow can act on it) — mirrors the
+    Microservice API's own v1.12.0. `POST /channel/transactions/{transactionId}/acknowledge` is REMOVED:
+    Present Docs (B3) is no longer the one function whose Checker action is a separate acknowledgment —
+    it now uses the standard `.../release` path directly, same as every other function, a genuine
+    `PENDING -> RELEASED` transition. `TransactionFunctionCatalogEntry.acknowledgeOnly` (which used to
+    flag B3 as this one exception) is REMOVED from `GET /channel/functions` — every catalog entry now
+    follows the identical release/reject shape, so the flag has nothing left to distinguish.
+    `ChannelTransaction.acknowledgedBy`/`acknowledgedAt` remain on the schema for historical rows only
+    (pre-2026-08-18 data) — nothing writes them any more. The underlying "consumed by B4" tracking this
+    change introduced server-side (`BalanceMovement.presentDocsConsumedAt`/`presentDocsConsumedBy` on the
+    Microservice API) is deliberately NOT mirrored here — same established precedent as
+    `makerSubmittedAt`/`eventSnapshot` before it (see the Microservice API's own "Persisted Event
+    Snapshot" decision-log entry, lc-balance-wc/CLAUDE.md): internal Maker/Checker bookkeeping, not a
+    channel-facing projection a channel client's own UI actually needs.
+
+
+    v1.3.0 (2026-08-25, F1 follow-through) — retroactive gap fix + new functionCodes. A10 (Import LC
+    Close) / B6 (Export Confirmed LC Close) were added to the underlying Microservice API back in its own
+    v1.16.0 but were never added to this channel contract's `functionCode` enum (every occurrence, now
+    fixed) — see balance-component-api.yaml's own v1.16.0 changelog for the full A10/B6 rule (hasParent:
+    false, currencyMode: CARRIED, amount server-derived from Confirmed Balance, not caller-typed). Added
+    in the SAME pass: `A11` (Import LC Reopen) / `B7` (Export Confirmed LC Reopen) — see the Microservice
+    API's own v1.19.0 changelog entry for the full REOPEN/REVERSAL mechanism this exposes. `ContractStatus`
+    (`ChannelContract.status`) gains `EXPIRED`, mirroring the Microservice API's own v1.19.0 addition.
+    Deliberately NOT added to this channel contract in this pass — the underlying Microservice API's own
+    `EXPIRE`/`CLOSE` AUTO CLOSE background-sweep mechanism, and the Extension-Amendment behavior of
+    `AMEND_EXPIRY_DATE` against an EXPIRED contract, plus `expiryDate` itself as an A1/B1 input field: all
+    are system-triggered or Phase-8-Angular-only additions with no channel-layer surface of their own yet
+    (AUTO EXPIRY/AUTO CLOSE are never reachable through this — or any — channel client, by design; a
+    channel-facing `expiryDate`/`AMEND_EXPIRY_DATE`/`REVERSAL` projection is left for a future pass, same
+    "not (yet) a running service" posture this whole document already carries per its own top-level
+    description).
+
+    v1.4.0 (2026-08-25, same day — REOPEN redesigned after live UAT, see the Microservice API's own
+    v1.20.0 changelog entry): A11/B7's own `help` text corrected — REOPEN no longer produces a linked
+    `REVERSAL` leg at Release; it now carries its own real restoration amount, computed server-side and
+    visible (as a real Account Entries pair) from the moment of Submit, for the Checker to review before
+    approving. No schema shape changed — `A11`/`B7` were already `amount`-free in this channel contract's
+    own `ChannelDerivedTransactionRequest` posture (Amount was never a channel-level concern to begin
+    with, same as every other server-derived function here).
+
+    v1.5.0 (2026-08-25, same day, F1 proposal §13.1 items 4/3(a), BA-ratified — see the Microservice API's
+    own v1.24.0 changelog entry): A10/B6/A11/B7's own `help` text updated — all four now REQUIRE a
+    caller-supplied `reasonCode` (the underlying Submit is rejected, 400, without one); the background
+    AUTO CLOSE sweep is unaffected (still supplies its own fixed value internally, never reaches this
+    channel contract). No schema shape changed here — `reasonCode` was already a generic passthrough field
+    on the Microservice API's own request shape, this pass only documents that it is now conditionally
+    mandatory for these four functionCodes specifically.
+
+    v1.6.0 (2026-08-27, Fix Pending/Delete Pending Phase — see the Microservice API's own v1.28.0
+    changelog entry for the full decision record): `/channel/transactions/{transactionId}/cancel` gained a
+    description note only — no request/response shape changed here. Both of the underlying microservice
+    endpoint's new side effects (an independent audit record per call; an A1/B1 root ISSUE cancellation
+    also freeing its LC Number for reuse) apply transitively through this passthrough proxy. This channel
+    layer does not expose the new `GET /delete-pending-audit`/`GET /delete-pending-audit/lc-catalog` audit
+    query surface — same "this channel layer does not implement its own Checker action, cancel() suffices
+    for the Maker side" posture already documented at the top of this file for `.../release`/`.../reject`.
+
+    v1.7.0 (2026-08-29, same day as the Microservice API's own v1.35.0): `ContractStatus`'s reserved
+    contract-versioning value removed from both enum inlines in this file — mirrors the Microservice API's
+    own `markSuperseded()` removal (zero call sites, same day). No other shape change.
+
+    v1.9.0 (2026-08-31, lifecycle documentation synchronization; no wire-shape
+    change): clarifies that cancel remains a one-transaction proxy. Linked
+    A3S/B4/B5 legs require ordered caller orchestration and are not an atomic
+    cancel batch. A4 Maker Submit withdrawal is a distinct microservice
+    operation and must not cancel its A3/A3S source. Transaction Processing
+    reset behavior and Maker Queue separation are reference-client concerns,
+    not new channel response fields.
+  version: "1.9.0"
+servers:
+  - url: https://channel-api.bank.example/balance-component/v1
+    description: Production-style contract root for a web/mobile origination channel. This prototype's own reference implementation is the Transaction Builder Angular app under lc-balance-wc/src/app/transaction-builder/, which today calls the Microservice API directly rather than through a built channel layer — this file specifies the intended channel contract for that same business capability, not (yet) a running service.
+tags:
+  - name: Functions
+    description: The named business-function catalog (A1–A11, B1–B7) and its own field-requirement metadata.
+  - name: Contracts
+    description: Resolve/search existing LC, Acceptance, Shipping Guarantee, and Export Confirmation records, and inquire their balance/history.
+  - name: Transactions
+    description: Maker submission and Checker/Maker lifecycle actions — one call, one movement, always.
+  - name: Checker
+    description: The Checker's own Pending Approvals queue.
+
+paths:
+
+  /channel/functions:
+    get:
+      tags: [Functions]
+      summary: List every named business function (A1–A11, B1–B7) and its own field-requirement metadata
+      description: >
+        The authoritative, machine-readable equivalent of
+        balance-component.model.ts's IMPORT_FUNCTIONS/EXPORT_FUNCTIONS
+        registry — a channel client should drive its own submission form
+        entirely from this response (which fields to show, which are
+        required, whether Currency Code is an input or carried/protected,
+        whether this function needs a Parent picker or a direct search,
+        how many linked legs it needs and in what order) rather than
+        hardcoding function-specific logic. Static per deployment; safe to
+        cache.
+      parameters:
+        - name: side
+          in: query
+          schema: { type: string, enum: [IMPORT, EXPORT] }
+          description: Filter to just the Import LC (A-series) or Export Confirmed LC (B-series) functions.
+      responses:
+        '200':
+          description: Every named business function this channel supports.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ChannelFunction' }
+              examples:
+                allFunctions: { $ref: '#/components/examples/AllChannelFunctions' }
+
+  /channel/contracts/lookup:
+    get:
+      tags: [Contracts]
+      summary: Resolve one existing contract by its natural key, with its live balance snapshot
+      description: >
+        "Look Up Current Balance" — resolves a specific LC/Acceptance/SG/
+        Confirmation by natural key and returns it together with its
+        current balance snapshot in one call, for a channel client's own
+        inquiry screen. 404 if the natural key does not resolve to any
+        contract yet.
+      parameters:
+        - name: instrumentType
+          in: query
+          required: true
+          schema: { $ref: '#/components/schemas/InstrumentType' }
+        - name: lcNumber
+          in: query
+          required: true
+          schema: { type: string }
+        - name: ibNumber
+          in: query
+          schema: { type: string }
+        - name: sgNumber
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Contract and its live balance.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  contract: { $ref: '#/components/schemas/ChannelContract' }
+                  balance: { $ref: '#/components/schemas/ChannelBalanceSnapshot' }
+        '404':
+          description: No contract exists yet for this natural key.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChannelError' }
+
+  /channel/contracts/catalog:
+    get:
+      tags: [Contracts]
+      summary: Paginated, searchable contract listing — backs the LC Index / Parent LC / IB-EB Index pickers
+      description: >
+        Same shape and purpose as the Microservice API's own
+        `GET /balance-contracts/catalog`; this channel endpoint passes the
+        call straight through and exists so a channel client never needs
+        to talk to the microservice layer directly.
+      parameters:
+        - name: instrumentType
+          in: query
+          required: true
+          schema: { $ref: '#/components/schemas/InstrumentType' }
+        - name: status
+          in: query
+          schema: { type: string, enum: [ACTIVE, CLOSED, CANCELLED, EXPIRED] }
+        - name: q
+          in: query
+          schema: { type: string }
+        - name: lcNumber
+          in: query
+          description: Exact lcNumber — scopes a Step-2 (IB/EB Index) picker to the LC/Confirmation picked in Step 1.
+          schema: { type: string }
+        - name: tenorFamily
+          in: query
+          schema: { type: string, enum: [SIGHT, USANCE] }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
+      responses:
+        '200':
+          description: One page of matching contracts.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total, page, pageSize]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/ChannelContract' }
+                  total: { type: integer }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+
+  /channel/contracts/{balanceContractId}/balance:
+    get:
+      tags: [Contracts]
+      summary: Current balance snapshot for one contract
+      parameters:
+        - name: balanceContractId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Balance snapshot.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChannelBalanceSnapshot' }
+        '404':
+          description: Contract not found.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChannelError' }
+
+  /channel/contracts/{balanceContractId}/movements:
+    get:
+      tags: [Contracts]
+      summary: Event Timeline — every transaction against one contract
+      parameters:
+        - name: balanceContractId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Every transaction against this contract, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ChannelTransaction' }
+
+  /channel/transactions:
+    post:
+      tags: [Transactions]
+      summary: Maker submits one transaction (one movement) for a named business function
+      description: >
+        Creates exactly one PENDING transaction. `functionCode` drives
+        every derivation this endpoint performs — instrumentType,
+        movementType (fixed, or resolved from `movementTypeChoice` for a
+        function whose own `GET /channel/functions` entry has a
+        `subChoice`, or, for A9's redemption amount, derived from whether
+        `amount` still equals the target's own live Available Balance),
+        and — critically — Currency Code (see CURRENCY CODE above). The
+        request body is one of two shapes (see the schema) depending on
+        whether `functionCode` is an origin function (A1/B1, Currency Code
+        required) or every other, derived function (Currency Code not
+        an accepted field at all).
+
+
+        A3 with no outstanding Shipping Guarantee reserving the LC's
+        capacity, and A3S (which explicitly matches one), are the same
+        underlying movementType (UTILIZE) exposed as two functionCodes for
+        exactly this reason — see `GET /channel/functions`'s own help text
+        per code for which to use when.
+
+
+        A4 (Sight Settlement) and B-series functions with no Maker-side
+        `submitsTransaction` (see `GET /channel/functions`) do not use this
+        endpoint at all — they resolve straight to an existing PENDING
+        transaction (via `GET /channel/contracts/{id}/movements` or the
+        Checker queue) and go directly to `.../release`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/ChannelOriginTransactionRequest'
+                - $ref: '#/components/schemas/ChannelDerivedTransactionRequest'
+            examples:
+              a1_lc_issue:
+                summary: A1 — LC Issue (Currency Code is User Input)
+                value:
+                  functionCode: A1
+                  naturalKey: { lcNumber: "LC00123" }
+                  amount: "100000.00"
+                  currency: "USD"
+                  tolerancePct: "10"
+                  tenorType: SIGHT
+                  eventSeq: 1
+                  createdBy: maker1
+              a2_lc_amendment:
+                summary: A2 — LC Amendment (Currency Code carried forward, not accepted here)
+                value:
+                  functionCode: A2
+                  naturalKey: { lcNumber: "LC00123" }
+                  movementTypeChoice: AMEND_INCREASE
+                  amount: "10000.00"
+                  secondaryRef: "AMD-01"
+                  eventSeq: 2
+                  createdBy: maker1
+              a8_sg_issue:
+                summary: A8 — Shipping Gtee Issue (hasParent function; Currency Code carried forward from the parent LC)
+                value:
+                  functionCode: A8
+                  parentNaturalKey: { lcNumber: "LC00123" }
+                  naturalKey: { lcNumber: "LC00123", sgNumber: "SG0001" }
+                  amount: "30000.00"
+                  eventSeq: 3
+                  createdBy: maker1
+      responses:
+        '201':
+          description: New PENDING transaction created.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChannelTransaction' }
+        '200':
+          description: Already exists — resubmission of the same (resolved contract, eventSeq) returned unchanged.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChannelTransaction' }
+        '400':
+          description: Request validation failed — includes submitting a `currency` field for a non-origin functionCode, an unknown/inapplicable functionCode, a missing required field for this specific function (per GET /channel/functions), or a downstream 400 from the microservice layer (e.g. parent/child tenor mismatch).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChannelError' }
+        '409':
+          description: Available Balance insufficient, the natural key already resolves to an existing contract for a creating function, or (should never happen through this channel, since currency is either caller-input-and-authoritative for A1/B1 or not accepted at all for every other function — surfaced only if a direct microservice caller bypassing this channel produced a genuinely conflicting record) a currency mismatch.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChannelError' }
+
+  /channel/transactions/{transactionId}:
+    get:
+      tags: [Transactions]
+      summary: Fetch one transaction
+      parameters:
+        - name: transactionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: The transaction.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChannelTransaction' }
+        '404':
+          description: Transaction not found.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChannelError' }
+
+  /channel/transactions/{transactionId}/release:
+    post:
+      tags: [Transactions]
+      summary: Checker releases a PENDING transaction (4-eyes) — one call, one movement
+      description: >
+        Same one-call-one-movement discipline as Maker submission. A named
+        business function whose approved design is "one Release click does
+        several things together" (A6, A3S, A7-under-A6's own compound,
+        B4) — see `GET /channel/functions`'s own `compoundLegs` — is
+        released by the Checker's channel client making that many separate
+        calls to this endpoint, in the documented order, one per linked
+        transaction sharing the original submission's `businessEventId`.
+        This channel layer does not collapse that into one call on the
+        Checker's behalf, for the same reason Maker submission does not:
+        no unnecessary batch/compound endpoint beyond what the approved
+        business design itself already treats as one user action, and
+        that action is still, mechanically, N one-movement releases.
+      parameters:
+        - name: transactionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [releasedBy]
+              properties:
+                releasedBy: { type: string }
+      responses:
+        '200':
+          description: Transaction released.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChannelTransaction' }
+        '404':
+          description: Transaction not found.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChannelError' }
+        '409':
+          description: Transaction is not PENDING.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChannelError' }
+
+  /channel/transactions/{transactionId}/reject:
+    post:
+      tags: [Transactions]
+      summary: Checker rejects a PENDING transaction (4-eyes)
+      parameters:
+        - name: transactionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [releasedBy, reasonCode]
+              properties:
+                releasedBy: { type: string }
+                reasonCode: { type: string }
+                remarks: { type: string }
+      responses:
+        '200':
+          description: Transaction rejected; earmark released.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChannelTransaction' }
+        '404':
+          description: Transaction not found.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChannelError' }
+        '409':
+          description: Transaction is not PENDING.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChannelError' }
+
+  /channel/transactions/{transactionId}/cancel:
+    post:
+      tags: [Transactions]
+      summary: Maker cancels their own still-PENDING (or already-REJECTED) submission
+      description: >
+        v1.6.0 — this channel endpoint proxies straight through to the microservice's own
+        `POST /balance-movements/{movementId}/cancel`, so both of that endpoint's v1.28.0 side effects
+        (see the microservice contract's own changelog) apply transitively here too: an independent audit
+        record is written for every call, and a Delete-Pending'd A1/B1 root ISSUE also frees its LC Number
+        for reuse. This channel layer exposes no separate query surface for that audit trail — a caller
+        needing it uses the microservice's own `GET /delete-pending-audit` directly.
+
+
+        v1.9.0 — one request cancels one transaction only. A caller handling
+        A3S/B4/B5 must cancel linked siblings first and the primary movement
+        last; this sequence is not an atomic channel operation. A4 is not a
+        cancel: the reference client calls the microservice's
+        `/balance-movements/{movementId}/withdraw-maker-submit` operation to
+        retain the source A3/A3S movement. Post-action screen reset and the
+        separation from Maker Queue/Fix Pending are client behavior.
+      parameters:
+        - name: transactionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cancelledBy]
+              properties:
+                cancelledBy: { type: string, minLength: 1 }
+                reasonCode: { type: string }
+                remarks: { type: string }
+      responses:
+        '200':
+          description: Transaction cancelled.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChannelTransaction' }
+        '404':
+          description: Transaction not found.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChannelError' }
+        '409':
+          description: Transaction is not cancellable (already RELEASED/CANCELLED).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChannelError' }
+
+  # REMOVED v1.2.0 (2026-08-18, "所有交易要RELEASE過後 才能根據流程走下一個交易") —
+  # /channel/transactions/{transactionId}/acknowledge, B3 (Present Docs)'s own former acknowledgment-
+  # only Checker action. B3 now uses the standard /release path directly, same as every other function
+  # — see the v1.2.0 changelog entry above and the Microservice API's own matching v1.12.0 entry.
+
+  /channel/checker/queue:
+    get:
+      tags: [Checker]
+      summary: Pending Approvals — every still-PENDING transaction against one contract
+      description: Backs the Checker's own "Pending Approvals" panel — search by natural key, list what a Checker can currently act on for that contract.
+      parameters:
+        - name: instrumentType
+          in: query
+          required: true
+          schema: { $ref: '#/components/schemas/InstrumentType' }
+        - name: lcNumber
+          in: query
+          required: true
+          schema: { type: string }
+        - name: ibNumber
+          in: query
+          schema: { type: string }
+        - name: sgNumber
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Still-PENDING transactions against the resolved contract.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ChannelTransaction' }
+        '404':
+          description: No contract exists yet for this natural key.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ChannelError' }
+
+components:
+  schemas:
+
+    InstrumentType:
+      type: string
+      description: Identical enum to the Microservice API's own InstrumentType — see balance-component-api.yaml. A channel client normally never needs to supply this directly; it is derived from functionCode. Exposed here only for the inquiry endpoints (lookup/catalog/checker queue), which are function-agnostic.
+      enum: [IPLC_LC, EPLC_LC, IPLC_ACCEPTANCE, EPLC_ACCEPTANCE, SHGT, EPLC_CONFIRMATION, EPLC_EXAMINATION, EPLC_DUE_FROM_ISSUING_BANK, EPLC_ACCEPTANCE_REIMB_RECEIVABLE, EPLC_EXPORT_BILLS_DISCOUNTED]
+
+    MonetaryAmount:
+      type: string
+      pattern: '^-?\d{1,18}(\.\d{1,3})?$'
+      description: Decimal-string only, never a binary float/JSON number — identical convention to the Microservice API.
+      example: "300000.00"
+
+    ChannelNaturalKey:
+      type: object
+      required: [lcNumber]
+      properties:
+        lcNumber: { type: string }
+        ibNumber: { type: string, nullable: true }
+        sgNumber: { type: string, nullable: true }
+
+    ChannelFunction:
+      type: object
+      description: One entry from the named business-function catalog — the channel-level mirror of TransactionFunction (balance-component.model.ts).
+      required: [code, label, side, instrumentType, hasParent, currencyMode, submitsTransaction, compoundLegs]
+      properties:
+        code: { type: string, enum: [A1, A2, A3, A3S, A4, A6, A7, A8, A9, A10, A11, B1, B2, B3, B4, B5, B6, B7] }
+        label: { type: string }
+        side: { type: string, enum: [IMPORT, EXPORT] }
+        help: { type: string }
+        instrumentType: { $ref: '#/components/schemas/InstrumentType' }
+        movementType:
+          type: string
+          nullable: true
+          description: Fixed movementType this function always submits, when it has one (null when movementTypeChoice below applies instead, or when this function never submits at all — see submitsTransaction).
+        movementTypeChoice:
+          type: object
+          nullable: true
+          description: Present when the Maker must choose between exactly two movementTypes for this function (A2 Increase/Decrease, A7 Full/Partial Settle) — the caller supplies the chosen value back as `movementTypeChoice` on ChannelOriginTransactionRequest/ChannelDerivedTransactionRequest.
+          properties:
+            label: { type: string }
+            options:
+              type: array
+              items:
+                type: object
+                properties:
+                  value: { type: string }
+                  label: { type: string }
+        secondaryRefLabel:
+          type: string
+          nullable: true
+          description: Display label for this function's own free-text secondary reference (Amendment No., IB Number, EB Number, …) — sent back as `secondaryRef`. Null for A1/B1 (nothing to reference yet) and for functions whose own natural key already carries an equivalent field (A8/A9 — SG Number is SHGT's own natural key, not a secondary reference).
+        tenorTypeOptions:
+          type: array
+          nullable: true
+          description: Present only for A1, B1, A6 — when set, Tenor Type is mandatory and limited to these options.
+          items:
+            type: object
+            properties:
+              value: { type: string }
+              label: { type: string }
+        hasParent:
+          type: boolean
+          description: True for A6/A7/A8/A9/B3/B5 — this function's own target hangs off a parent LC/Confirmation, resolved first via `parentNaturalKey`. False for A1/A2/A3/A3S/A4/B1/B2/B4, which resolve/create their own instrumentType's contract directly via `naturalKey`.
+        defaultParentInstrumentType:
+          allOf: [{ $ref: '#/components/schemas/InstrumentType' }]
+          nullable: true
+          description: Which instrumentType the parent picker should default to, when hasParent is true.
+        currencyMode:
+          type: string
+          enum: [INPUT, CARRIED]
+          description: INPUT only for A1/B1 — Currency Code is free caller input, required, and becomes the new record's own permanent Currency Code. CARRIED for every other function — Currency Code is derived server-side from the originating A1/B1 record (via the resolved existing contract, or via the parent for a hasParent creating function) and is not an accepted request field at all.
+        submitsTransaction:
+          type: boolean
+          description: False only for A4 (Sight Settlement) — A4 has no Maker submission step; it resolves directly to an existing PENDING UTILIZE transaction (created by A3/A3S) and the Checker acts on it via POST /channel/transactions/{id}/release directly. True for every other function.
+        # REMOVED v1.2.0 (2026-08-18) — `acknowledgeOnly` used to flag B3 (Present Docs) as the one
+        # function whose Checker action was POST .../acknowledge instead of .../release. B3 now uses the
+        # standard release path like every other function, so every catalog entry has the identical
+        # shape here — nothing left for this flag to distinguish.
+        compoundLegs:
+          type: array
+          description: >
+            The linked-movement legs this function's approved business
+            design requires, in order — length 1 for the great majority of
+            functions. A3S is length 2 (SG redemption, then the LC's own
+            Document Arrival). B4 is length 2 (Sight) or up to 4 (Usance —
+            Confirmation Accept, then the new Acceptance liability, then
+            its Reimbursement Receivable asset), chosen by the picked
+            Confirmation's own declared Tenor Type. Each leg after the
+            first is submitted as its OWN separate
+            `POST /channel/transactions` call once the prior leg's own
+            transaction exists, sharing the same `businessEventId` — see
+            this document's own top-level "ONE MOVEMENT, ONE LEG, ONE CALL"
+            principle.
+          items:
+            type: object
+            properties:
+              legInstrumentType: { $ref: '#/components/schemas/InstrumentType' }
+              legMovementType: { type: string }
+              description: { type: string }
+
+    ChannelContract:
+      type: object
+      description: Channel-facing projection of the Microservice API's own BalanceContract.
+      properties:
+        balanceContractId: { type: string, format: uuid }
+        logicalContractId: { type: string, format: uuid }
+        instrumentType: { $ref: '#/components/schemas/InstrumentType' }
+        naturalKey: { $ref: '#/components/schemas/ChannelNaturalKey' }
+        status: { type: string, enum: [ACTIVE, CLOSED, CANCELLED, EXPIRED] }
+        currency: { type: string, description: This contract's own authoritative Currency Code — the value every A2-A9/B2-B5 transaction against it, or created under it as parent, carries forward. }
+        tenorType: { type: string, nullable: true }
+        tenorDays: { type: integer, nullable: true }
+        tolerancePct: { type: string, nullable: true }
+        createdBy: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    ChannelBalanceSnapshot:
+      type: object
+      description: Channel-facing projection of the Microservice API's own BalanceSnapshot.
+      properties:
+        balanceContractId: { type: string, format: uuid }
+        currency: { type: string }
+        confirmedBalance: { $ref: '#/components/schemas/MonetaryAmount' }
+        availableBalance: { $ref: '#/components/schemas/MonetaryAmount' }
+        pendingEarmarkTotal: { $ref: '#/components/schemas/MonetaryAmount' }
+        offBalanceExposure: { allOf: [{ $ref: '#/components/schemas/MonetaryAmount' }], nullable: true }
+        tightAvailableBalance: { allOf: [{ $ref: '#/components/schemas/MonetaryAmount' }], nullable: true }
+        presentDocsEarmarkPending: { allOf: [{ $ref: '#/components/schemas/MonetaryAmount' }], nullable: true }
+        presentDocsEarmarkApproved: { allOf: [{ $ref: '#/components/schemas/MonetaryAmount' }], nullable: true }
+
+    ContingentAccountEntry:
+      type: object
+      description: Identical shape to the Microservice API's own ContingentAccountEntry (balance-component-api.yaml) — see that schema's own description for the full rule. This channel layer never derives or recomputes it; it is always a straight passthrough of the underlying BalanceMovement's own field.
+      required: [drAccount, crAccount, currency, amount]
+      properties:
+        drAccount: { type: string }
+        crAccount: { type: string }
+        currency: { type: string }
+        amount: { $ref: '#/components/schemas/MonetaryAmount' }
+
+    ChannelTransaction:
+      type: object
+      description: Channel-facing projection of the Microservice API's own BalanceMovement, plus the originating functionCode for display/audit.
+      properties:
+        transactionId: { type: string, format: uuid, description: Equal to the underlying movementId — this channel is a façade, not a separate identity space. }
+        functionCode: { type: string, enum: [A1, A2, A3, A3S, A4, A6, A7, A8, A9, A10, A11, B1, B2, B3, B4, B5, B6, B7] }
+        balanceContractId: { type: string, format: uuid }
+        businessEventId: { type: string, format: uuid, nullable: true }
+        instrumentType: { $ref: '#/components/schemas/InstrumentType' }
+        movementType: { type: string }
+        amount: { $ref: '#/components/schemas/MonetaryAmount' }
+        currency: { type: string, description: Always equal to the resolved contract's own currency — see CURRENCY CODE. }
+        secondaryRef: { type: string, nullable: true }
+        status: { type: string, enum: [PENDING, RELEASED, REJECTED, CANCELLED] }
+        eventSeq: { type: integer }
+        createdBy: { type: string }
+        createdAt: { type: string, format: date-time }
+        releasedBy: { type: string, nullable: true }
+        releasedAt: { type: string, format: date-time, nullable: true }
+        acknowledgedBy: { type: string, nullable: true, description: 'HISTORICAL FIELD, no longer written — v1.2.0 (2026-08-18) removed the B3-only acknowledge()-only Checker action; every function (B3 included) now uses the standard release path, which never sets this field. Present only on rows created before that date.' }
+        acknowledgedAt: { type: string, format: date-time, nullable: true, description: 'HISTORICAL FIELD, no longer written — see acknowledgedBy.' }
+        contingentAccountEntry:
+          allOf: [{ $ref: '#/components/schemas/ContingentAccountEntry' }]
+          nullable: true
+          description: v1.1.0 — see this document's own top-level v1.1.0 changelog entry. Null for functions whose underlying instrumentType is one of the three ON_BALANCE_ASSET instruments (EPLC_DUE_FROM_ISSUING_BANK/EPLC_ACCEPTANCE_REIMB_RECEIVABLE/EPLC_EXPORT_BILLS_DISCOUNTED — B4/B5's own asset-side legs).
+
+    ChannelOriginTransactionRequest:
+      type: object
+      description: >
+        Body shape for POST /channel/transactions when functionCode is A1
+        or B1 — the only two functions where Currency Code is caller
+        input. additionalProperties is false so a caller cannot smuggle in
+        fields this shape does not declare.
+      additionalProperties: false
+      required: [functionCode, naturalKey, amount, currency, eventSeq, createdBy]
+      properties:
+        functionCode: { type: string, enum: [A1, B1] }
+        naturalKey: { $ref: '#/components/schemas/ChannelNaturalKey' }
+        amount: { $ref: '#/components/schemas/MonetaryAmount' }
+        currency:
+          type: string
+          description: REQUIRED, freely typed — becomes this new LC/Confirmation's own permanent Currency Code, carried forward by every A2-A9/B2-B5 transaction against it or anything created under it as parent.
+        tolerancePct: { type: string, nullable: true }
+        tenorType: { type: string, nullable: true, enum: [SIGHT, SELLERS_USANCE, BUYERS_USANCE] }
+        eventSeq: { type: integer }
+        businessEventId: { type: string, format: uuid, nullable: true }
+        createdBy: { type: string }
+
+    ChannelDerivedTransactionRequest:
+      type: object
+      description: >
+        Body shape for POST /channel/transactions when functionCode is
+        anything other than A1/B1 — every function where Currency Code is
+        carried forward and protected. Deliberately has NO `currency`
+        property, and `additionalProperties: false` — submitting a
+        `currency` field against this shape is a schema-validation `400`,
+        not a value that gets silently accepted and overridden. This is
+        the API-level enforcement of "the server must derive and validate
+        the Currency Code from the originating A1/B1 record rather than
+        trusting user input" (see CURRENCY CODE, this document's top-level
+        description).
+      additionalProperties: false
+      required: [functionCode, amount, eventSeq, createdBy]
+      properties:
+        functionCode: { type: string, enum: [A2, A3, A3S, A4, A6, A7, A8, A9, A10, A11, B2, B3, B4, B5, B6, B7] }
+        naturalKey:
+          allOf: [{ $ref: '#/components/schemas/ChannelNaturalKey' }]
+          nullable: true
+          description: The target's own natural key. Required for non-hasParent functions resolving/creating their own instrumentType directly (A2/A3/A3S/B2/B4), and for a hasParent function's own new child natural key (A8's SG Number, A6's IB Number is instead carried from the picked Document Arrival — see GET /channel/functions). Omit when resolving purely by parentNaturalKey + a picked existing child (A7/A9/B5 via the Checker-visible catalog).
+        parentNaturalKey:
+          allOf: [{ $ref: '#/components/schemas/ChannelNaturalKey' }]
+          nullable: true
+          description: Required when GET /channel/functions reports hasParent:true for this functionCode (A6/A7/A8/A9/B3/B5) — the parent LC/Confirmation this transaction's own target hangs off, and the source CURRENCY CODE is carried forward from.
+        referencedTransactionId:
+          type: string
+          format: uuid
+          nullable: true
+          description: For a function that converts a specific still-PENDING prior transaction (A6/B4's settlesDocumentArrival — the Document Arrival / Present Docs record being converted) — that prior transaction's own transactionId, resolved via GET /channel/contracts/{id}/movements. Amount and secondaryRef are then carried and protected from it, mirroring currencyMode's own carry-and-protect shape for these specific fields.
+        movementTypeChoice:
+          type: string
+          nullable: true
+          description: Required when GET /channel/functions reports a non-null movementTypeChoice for this functionCode (A2 — AMEND_INCREASE/AMEND_DECREASE; A7 — FULL_SETTLE/PARTIAL_SETTLE). Ignored otherwise.
+        amount: { $ref: '#/components/schemas/MonetaryAmount' }
+        secondaryRef:
+          type: string
+          nullable: true
+          description: This function's own secondary reference — see GET /channel/functions's secondaryRefLabel for the display label, and NaturalKey semantics (A8/A9) for when this is the natural key's own sgNumber instead.
+        tenorType: { type: string, nullable: true, enum: [SIGHT, SELLERS_USANCE, BUYERS_USANCE], description: A6 only — carried and protected from the parent LC once picked; present here only so the resolved value can be echoed back for display before Submit. }
+        tenorDays: { type: integer, nullable: true, description: A6 only — same carry-and-protect shape as tenorType. }
+        eventSeq: { type: integer }
+        businessEventId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Required (and must match the first leg's own value) for the 2nd+ call of a multi-leg function (A3S, B4) — see compoundLegs on GET /channel/functions. Optional and self-generated by the server when omitted on a single-leg function's own only call.
+        createdBy: { type: string }
+
+    ChannelError:
+      type: object
+      required: [code, message]
+      description: >
+        `code` is one of `REQUEST_VALIDATION_FAILED` (400),
+        `INSUFFICIENT_AVAILABLE_BALANCE` (409),
+        `NATURAL_KEY_ALREADY_EXISTS` (409),
+        `ILLEGAL_STATE_TRANSITION` (409), `NOT_FOUND` (404),
+        `INTERNAL_ERROR` (500) — the same set the Microservice API returns,
+        passed through unchanged; this layer does not invent its own
+        parallel error taxonomy. `CURRENCY_MISMATCH` is intentionally not
+        reachable through this channel in ordinary use (see the 409
+        response note on POST /channel/transactions) but is included for
+        completeness since the underlying microservice can still raise it.
+      properties:
+        code: { type: string }
+        message: { type: string }
+        partialSuccess:
+          type: object
+          nullable: true
+          description: Present only when a multi-leg function's own 2nd (or later) call failed after an earlier leg already succeeded — names what already exists so the caller can decide how to compensate, exactly as the reference Transaction Builder client's own submitError messages already do (e.g. "Shipping Guarantee redemption reserved (PENDING), but the Document Arrival itself failed").
+          properties:
+            succeededTransactionIds:
+              type: array
+              items: { type: string, format: uuid }
+            failedLeg: { type: string }
+        details: { type: object, additionalProperties: true }
+
+  examples:
+    AllChannelFunctions:
+      value:
+        - code: A1
+          label: LC Issue
+          side: IMPORT
+          instrumentType: IPLC_LC
+          movementType: ISSUE
+          hasParent: false
+          currencyMode: INPUT
+          submitsTransaction: true
+          tenorTypeOptions: [{ value: SIGHT, label: Sight }, { value: SELLERS_USANCE, label: "Seller's Usance" }, { value: BUYERS_USANCE, label: "Buyer's Usance" }]
+          compoundLegs: [{ legInstrumentType: IPLC_LC, legMovementType: ISSUE, description: "Establish the new Import LC." }]
+        - code: A2
+          label: LC Amendment
+          side: IMPORT
+          instrumentType: IPLC_LC
+          hasParent: false
+          currencyMode: CARRIED
+          submitsTransaction: true
+          secondaryRefLabel: "Amendment No./Times"
+          movementTypeChoice: { label: Direction, options: [{ value: AMEND_INCREASE, label: Increase }, { value: AMEND_DECREASE, label: Decrease }] }
+          compoundLegs: [{ legInstrumentType: IPLC_LC, legMovementType: "AMEND_INCREASE | AMEND_DECREASE", description: "Amend the existing LC's own face amount." }]
+        - code: A3
+          label: Document Arrival
+          side: IMPORT
+          instrumentType: IPLC_LC
+          movementType: UTILIZE
+          hasParent: false
+          currencyMode: CARRIED
+          submitsTransaction: true
+          secondaryRefLabel: "IB Number"
+          compoundLegs: [{ legInstrumentType: IPLC_LC, legMovementType: UTILIZE, description: "Presentation earmark, any tenor." }]
+        - code: A3S
+          label: "Document Arrival w/ Shipping Gtee"
+          side: IMPORT
+          instrumentType: IPLC_LC
+          movementType: UTILIZE
+          hasParent: false
+          currencyMode: CARRIED
+          submitsTransaction: true
+          secondaryRefLabel: "IB Number"
+          compoundLegs:
+            - { legInstrumentType: SHGT, legMovementType: "FULL_REDEEM | PARTIAL_REDEEM", description: "Redeem the matched Shipping Guarantee first." }
+            - { legInstrumentType: IPLC_LC, legMovementType: UTILIZE, description: "Then the LC's own Document Arrival, for the same amount." }
+        - code: A4
+          label: Sight Settlement
+          side: IMPORT
+          instrumentType: IPLC_LC
+          movementType: UTILIZE
+          hasParent: false
+          currencyMode: CARRIED
+          submitsTransaction: false
+          compoundLegs: [{ legInstrumentType: IPLC_LC, legMovementType: UTILIZE, description: "No Maker submission — releases the existing PENDING Document Arrival A3 already created." }]
+        - code: A6
+          label: Acceptance (Usance)
+          side: IMPORT
+          instrumentType: IPLC_ACCEPTANCE
+          movementType: CREATE
+          hasParent: true
+          defaultParentInstrumentType: IPLC_LC
+          currencyMode: CARRIED
+          submitsTransaction: true
+          tenorTypeOptions: [{ value: SELLERS_USANCE, label: "Seller's Usance" }, { value: BUYERS_USANCE, label: "Buyer's Usance" }]
+          compoundLegs: [{ legInstrumentType: IPLC_ACCEPTANCE, legMovementType: CREATE, description: "New Acceptance; Checker Release also finalizes the referenced Document Arrival." }]
+        - code: A7
+          label: Acceptance Settlement
+          side: IMPORT
+          instrumentType: IPLC_ACCEPTANCE
+          hasParent: true
+          defaultParentInstrumentType: IPLC_LC
+          currencyMode: CARRIED
+          submitsTransaction: true
+          movementTypeChoice: { label: "Settlement type", options: [{ value: FULL_SETTLE, label: "Full Settle" }, { value: PARTIAL_SETTLE, label: "Partial Settle" }] }
+          compoundLegs: [{ legInstrumentType: IPLC_ACCEPTANCE, legMovementType: "FULL_SETTLE | PARTIAL_SETTLE", description: "Settlement Due Date — never touches the LC Balance itself." }]
+        - code: A8
+          label: "Shipping Gtee (Issue)"
+          side: IMPORT
+          instrumentType: SHGT
+          movementType: ISSUE
+          hasParent: true
+          defaultParentInstrumentType: IPLC_LC
+          currencyMode: CARRIED
+          submitsTransaction: true
+          compoundLegs: [{ legInstrumentType: SHGT, legMovementType: ISSUE, description: "Independent contingent liability against the LC as parent, capped at its Tight Available Balance." }]
+        - code: A9
+          label: "Shipping Gtee (Redemption)"
+          side: IMPORT
+          instrumentType: SHGT
+          hasParent: true
+          defaultParentInstrumentType: IPLC_LC
+          currencyMode: CARRIED
+          submitsTransaction: true
+          compoundLegs: [{ legInstrumentType: SHGT, legMovementType: "FULL_REDEEM | PARTIAL_REDEEM (server-derived from amount vs. Available Balance)", description: "Explicit, separate action — never auto-linked to a Document Arrival." }]
+        - code: B1
+          label: Confirm LC
+          side: EXPORT
+          instrumentType: EPLC_CONFIRMATION
+          movementType: ISSUE
+          hasParent: false
+          currencyMode: INPUT
+          submitsTransaction: true
+          tenorTypeOptions: [{ value: SIGHT, label: Sight }, { value: SELLERS_USANCE, label: Usance }]
+          compoundLegs: [{ legInstrumentType: EPLC_CONFIRMATION, legMovementType: ISSUE, description: "This bank's own confirmation — obligor = issuing bank." }]
+        - code: B2
+          label: Confirm LC Amendment
+          side: EXPORT
+          instrumentType: EPLC_CONFIRMATION
+          movementType: AMEND
+          hasParent: false
+          currencyMode: CARRIED
+          submitsTransaction: true
+          secondaryRefLabel: "Amendment No./Times"
+          compoundLegs: [{ legInstrumentType: EPLC_CONFIRMATION, legMovementType: AMEND, description: "Adjusts confirmed_amount only." }]
+        - code: B3
+          label: Present Docs
+          side: EXPORT
+          instrumentType: EPLC_EXAMINATION
+          movementType: CREATE
+          hasParent: true
+          defaultParentInstrumentType: EPLC_CONFIRMATION
+          currencyMode: CARRIED
+          submitsTransaction: true
+          compoundLegs: [{ legInstrumentType: EPLC_EXAMINATION, legMovementType: CREATE, description: "MEMO_ONLY earmark — physical event only, never touches the Confirmation's own balance." }]
+        - code: B4
+          label: Honour / Acceptance
+          side: EXPORT
+          instrumentType: EPLC_CONFIRMATION
+          movementType: "HONOUR | ACCEPT (server-derived from the Confirmation's own Tenor Type)"
+          hasParent: false
+          currencyMode: CARRIED
+          submitsTransaction: true
+          secondaryRefLabel: "EB Number"
+          compoundLegs:
+            - { legInstrumentType: EPLC_CONFIRMATION, legMovementType: "HONOUR | ACCEPT", description: "The legal event — releases the picked B3 record and the Confirmation contingent." }
+            - { legInstrumentType: EPLC_DUE_FROM_ISSUING_BANK, legMovementType: CREATE, description: "Sight only — the new receivable asset." }
+            - { legInstrumentType: EPLC_ACCEPTANCE, legMovementType: CREATE, description: "Usance only — the new Acceptance liability." }
+            - { legInstrumentType: EPLC_ACCEPTANCE_REIMB_RECEIVABLE, legMovementType: CREATE, description: "Usance only — its paired Reimbursement Receivable asset." }
+        - code: B5
+          label: "Settlement — Reimbursement / Maturity"
+          side: EXPORT
+          instrumentType: EPLC_ACCEPTANCE
+          movementType: FULL_SETTLE
+          hasParent: true
+          defaultParentInstrumentType: EPLC_CONFIRMATION
+          currencyMode: CARRIED
+          submitsTransaction: true
+          compoundLegs:
+            - { legInstrumentType: EPLC_ACCEPTANCE, legMovementType: FULL_SETTLE, description: "Usance held-to-maturity only — CNF_MATURE." }
+            - { legInstrumentType: EPLC_ACCEPTANCE_REIMB_RECEIVABLE, legMovementType: REIMBURSE, description: "Its matching Reimbursement Receivable, same amount, same Checker Release." }
+        - code: A10
+          label: LC Close
+          side: IMPORT
+          instrumentType: IPLC_LC
+          movementType: CLOSE
+          hasParent: false
+          currencyMode: CARRIED
+          submitsTransaction: true
+          help: "Amount is server-derived from the LC's own current Confirmed Balance, never caller-typed — see the Microservice API's own v1.16.0 changelog entry for the full eligibility rule."
+          compoundLegs: [{ legInstrumentType: IPLC_LC, legMovementType: CLOSE, description: "Writes off the remaining Confirmed Balance and retires the LC — eligible only once SG/Acceptance Confirmed Balance both = 0 and no open Event remains anywhere in the tree." }]
+        - code: B6
+          label: Confirmed LC Close
+          side: EXPORT
+          instrumentType: EPLC_CONFIRMATION
+          movementType: CLOSE
+          hasParent: false
+          currencyMode: CARRIED
+          submitsTransaction: true
+          help: "Amount is server-derived from the Confirmation's own current Confirmed Balance, never caller-typed — see the Microservice API's own v1.16.0 changelog entry for the full eligibility rule."
+          compoundLegs: [{ legInstrumentType: EPLC_CONFIRMATION, legMovementType: CLOSE, description: "Writes off the remaining Confirmed Balance and retires the Confirmation — eligible only once Acceptance Confirmed Balance = 0 and no open Event remains anywhere in the tree." }]
+        - code: A11
+          label: LC Reopen
+          side: IMPORT
+          instrumentType: IPLC_LC
+          movementType: REOPEN
+          hasParent: false
+          currencyMode: CARRIED
+          submitsTransaction: true
+          help: "F1, v1.20.0 — a non-routine, separately-entitled function (not A2's own movementTypeChoice) reopening a CLOSED LC. No Amount field — the server computes the real restoration amount at Submit from the contract's own not-yet-reversed EXPIRE/CLOSE history, generating a real Account Entries pair the Checker reviews before approving. See the Microservice API's own v1.20.0 changelog entry for the full mechanism."
+          compoundLegs: [{ legInstrumentType: IPLC_LC, legMovementType: REOPEN, description: "Restores ContractStatus to ACTIVE (or EXPIRED, if the original expiry date has since passed) — eligible only from CLOSED with no open Event remaining anywhere in the tree." }]
+        - code: B7
+          label: Confirmed LC Reopen
+          side: EXPORT
+          instrumentType: EPLC_CONFIRMATION
+          movementType: REOPEN
+          hasParent: false
+          currencyMode: CARRIED
+          submitsTransaction: true
+          help: "F1, v1.19.0 — Export-side symmetric counterpart of A11; same mechanism and eligibility rule."
+          compoundLegs: [{ legInstrumentType: EPLC_CONFIRMATION, legMovementType: REOPEN, description: "Restores ContractStatus to ACTIVE (or EXPIRED, if the original expiry date has since passed) — eligible only from CLOSED with no open Event remaining anywhere in the tree." }]

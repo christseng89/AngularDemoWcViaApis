@@ -1,0 +1,215 @@
+<!doctype html>
+<meta charset="utf-8" />
+<meta http-equiv="refresh" content="0; url=tabbed-workspace.preview.html" />
+<title>Opening styled LC Balance preview…</title>
+<script>
+  window.location.replace('./tabbed-workspace.preview.html');
+</script>
+<p>
+  This file is the Angular template reference. Opening the
+  <a href="tabbed-workspace.preview.html">styled interactive preview</a>…
+</p>
+
+<!--
+  Design sample only — not imported by the application.
+
+  Proposed state:
+  activeWorkspaceTab: 'PROCESSING' | 'INQUIRE' | 'MAKER_QUEUE' | 'DELETE_PENDING_AUDIT'
+  activeRoleTab: 'MAKER' | 'CHECKER'
+
+  Accessibility implementation must also support Left/Right arrow-key navigation and move focus to
+  the newly selected tab. Click handlers below intentionally show only the proposed component API.
+-->
+
+<main class="tb-tabbed-workspace">
+  <header class="tb-tabbed-workspace__header">
+    <div>
+      <p class="tb-eyebrow">LC Balance Component</p>
+      <h1 class="tb-page-title">Transaction Workspace</h1>
+    </div>
+
+    <div class="tb-workspace-tabs" role="tablist" aria-label="Balance Component screens">
+      <button
+        id="workspace-tab-processing"
+        type="button"
+        role="tab"
+        class="tb-workspace-tab"
+        [class.tb-workspace-tab--active]="activeWorkspaceTab === 'PROCESSING'"
+        [attr.aria-selected]="activeWorkspaceTab === 'PROCESSING'"
+        aria-controls="workspace-panel-processing"
+        tabindex="{{ activeWorkspaceTab === 'PROCESSING' ? 0 : -1 }}"
+        (click)="selectWorkspaceTab('PROCESSING')"
+      >
+        Transaction Processing
+      </button>
+
+      <button
+        id="workspace-tab-inquire"
+        type="button"
+        role="tab"
+        class="tb-workspace-tab"
+        [class.tb-workspace-tab--active]="activeWorkspaceTab === 'INQUIRE'"
+        [attr.aria-selected]="activeWorkspaceTab === 'INQUIRE'"
+        aria-controls="workspace-panel-inquire"
+        tabindex="{{ activeWorkspaceTab === 'INQUIRE' ? 0 : -1 }}"
+        (click)="selectWorkspaceTab('INQUIRE')"
+      >
+        Inquire Events
+      </button>
+
+      <button
+        id="workspace-tab-maker-queue"
+        type="button"
+        role="tab"
+        class="tb-workspace-tab"
+        [class.tb-workspace-tab--active]="activeWorkspaceTab === 'MAKER_QUEUE'"
+        [attr.aria-selected]="activeWorkspaceTab === 'MAKER_QUEUE'"
+        aria-controls="workspace-panel-maker-queue"
+        tabindex="{{ activeWorkspaceTab === 'MAKER_QUEUE' ? 0 : -1 }}"
+        (click)="selectWorkspaceTab('MAKER_QUEUE')"
+      >
+        Maker Queue
+        <span class="tb-tab-count" *ngIf="makerPendingCount">{{ makerPendingCount }}</span>
+      </button>
+
+      <button
+        id="workspace-tab-delete-audit"
+        type="button"
+        role="tab"
+        class="tb-workspace-tab"
+        [class.tb-workspace-tab--active]="activeWorkspaceTab === 'DELETE_PENDING_AUDIT'"
+        [attr.aria-selected]="activeWorkspaceTab === 'DELETE_PENDING_AUDIT'"
+        aria-controls="workspace-panel-delete-audit"
+        tabindex="{{ activeWorkspaceTab === 'DELETE_PENDING_AUDIT' ? 0 : -1 }}"
+        (click)="selectWorkspaceTab('DELETE_PENDING_AUDIT')"
+      >
+        Delete Pending Audit
+      </button>
+    </div>
+  </header>
+
+  <!-- TRANSACTION PROCESSING -->
+  <section
+    id="workspace-panel-processing"
+    role="tabpanel"
+    aria-labelledby="workspace-tab-processing"
+    *ngIf="activeWorkspaceTab === 'PROCESSING'"
+  >
+    <nav class="tb-function-navigation" aria-label="Transaction function selection">
+      <!-- Reuse the existing Import/Export and A1–A11/B1–B7 function controls here. -->
+      <app-transaction-function-picker
+        [selectedFunction]="selectedFunction"
+        (functionSelected)="selectFunction($event)"
+      />
+    </nav>
+
+    <div class="tb-empty-selection" role="status" *ngIf="!selectedFunction">
+      <h2>Select a transaction function</h2>
+      <p>Choose an Import LC or Export Confirmed function to open its Maker and Checker workspace.</p>
+    </div>
+
+    <ng-container *ngIf="selectedFunction">
+      <div class="tb-role-tabs" role="tablist" aria-label="Maker and Checker workflow">
+        <button
+          id="role-tab-maker"
+          type="button"
+          role="tab"
+          class="tb-role-tab tb-role-tab--maker"
+          [class.tb-role-tab--active]="activeRoleTab === 'MAKER'"
+          [attr.aria-selected]="activeRoleTab === 'MAKER'"
+          aria-controls="role-panel-maker"
+          (click)="selectRoleTab('MAKER')"
+        >
+          Maker
+        </button>
+
+        <button
+          id="role-tab-checker"
+          type="button"
+          role="tab"
+          class="tb-role-tab tb-role-tab--checker"
+          [class.tb-role-tab--active]="activeRoleTab === 'CHECKER'"
+          [attr.aria-selected]="activeRoleTab === 'CHECKER'"
+          aria-controls="role-panel-checker"
+          (click)="selectRoleTab('CHECKER')"
+        >
+          Checker
+          <span class="tb-tab-count tb-tab-count--warning" *ngIf="checkerPendingCount">{{ checkerPendingCount }}</span>
+        </button>
+      </div>
+
+      <div class="tb-processing-layout">
+        <div class="tb-processing-layout__main">
+          <section
+            id="role-panel-maker"
+            role="tabpanel"
+            aria-labelledby="role-tab-maker"
+            *ngIf="activeRoleTab === 'MAKER'"
+          >
+            <app-maker-panel
+              [selectedFunction]="selectedFunction"
+              (submitSucceeded)="onMakerSubmitSucceeded($event); selectRoleTab('CHECKER')"
+            />
+          </section>
+
+          <!--
+            Checker exists as soon as a Function is selected. It does not depend on Maker input,
+            selected contract, submitResult, or the current Maker session.
+          -->
+          <section
+            id="role-panel-checker"
+            role="tabpanel"
+            aria-labelledby="role-tab-checker"
+            *ngIf="activeRoleTab === 'CHECKER'"
+          >
+            <app-checker-panel
+              [selectedFunction]="selectedFunction"
+              [syncSignal]="checkerSyncSignal"
+              (movementPicked)="onCheckerMovementPicked($event)"
+            >
+              <app-checker-actions
+                [movement]="selectedCheckerMovement"
+                (approved)="approve($event)"
+                (rejected)="reject($event)"
+              />
+            </app-checker-panel>
+          </section>
+        </div>
+
+        <aside class="tb-processing-layout__balance" aria-label="Current balance">
+          <app-look-up-current-balance />
+        </aside>
+      </div>
+    </ng-container>
+  </section>
+
+  <!-- INQUIRE EVENTS -->
+  <section
+    id="workspace-panel-inquire"
+    role="tabpanel"
+    aria-labelledby="workspace-tab-inquire"
+    *ngIf="activeWorkspaceTab === 'INQUIRE'"
+  >
+    <app-inquire-events />
+  </section>
+
+  <!-- MAKER QUEUE -->
+  <section
+    id="workspace-panel-maker-queue"
+    role="tabpanel"
+    aria-labelledby="workspace-tab-maker-queue"
+    *ngIf="activeWorkspaceTab === 'MAKER_QUEUE'"
+  >
+    <app-maker-queue />
+  </section>
+
+  <!-- DELETE PENDING AUDIT -->
+  <section
+    id="workspace-panel-delete-audit"
+    role="tabpanel"
+    aria-labelledby="workspace-tab-delete-audit"
+    *ngIf="activeWorkspaceTab === 'DELETE_PENDING_AUDIT'"
+  >
+    <app-inquire-delete-pending />
+  </section>
+</main>

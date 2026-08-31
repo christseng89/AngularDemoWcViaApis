@@ -1,0 +1,177 @@
+import { Router } from 'express';
+import type { BalanceService } from '../service/balanceService';
+import type { CompoundMovementService } from '../service/compoundMovementService';
+import { RequestValidationError } from '../errors';
+import type { CreateMovementRequest, EditMovementRequest } from '../service/balanceService';
+import type { MovementStatus } from '../types';
+import { createMovementRequestSchema, editMovementRequestSchema, firstValidationMessage } from '../validation/requestSchema';
+
+export function balanceMovementsRouter(service: BalanceService, compound: CompoundMovementService): Router {
+  const router = Router();
+
+  // POST /balance-movements
+  router.post('/balance-movements', (req, res) => {
+    // Quality-report-balance.md BAL-116: was a sequence of hand-rolled `if` checks (presence, the
+    // MONETARY_AMOUNT_PATTERN shape, the currency-decimal-scale rule) — now one declarative schema. See
+    // requestSchema.ts's own doc comment for exactly what's validated here vs. passed through untouched
+    // (`.passthrough()` — every other CreateMovementRequest field is unchanged from before this fix).
+    const parsed = createMovementRequestSchema.safeParse(req.body);
+    if (!parsed.success) {
+      throw new RequestValidationError(firstValidationMessage(parsed.error));
+    }
+    const body = parsed.data as CreateMovementRequest;
+    const result = service.createMovement(body);
+    res.status(result.created ? 201 : 200).json(result.created ? result.movement : result.existing);
+  });
+
+  // A compound business event is one atomic command even when it spans several contracts/ledgers.
+  router.post('/balance-movements/compound', (req, res) => {
+    const body = req.body as { requests?: unknown[] };
+    if (!Array.isArray(body.requests)) throw new RequestValidationError('requests is required.');
+    const requests = body.requests.map((request) => {
+      const parsed = createMovementRequestSchema.safeParse(request);
+      if (!parsed.success) throw new RequestValidationError(firstValidationMessage(parsed.error));
+      return parsed.data as CreateMovementRequest;
+    });
+    res.status(201).json(compound.create(requests));
+  });
+
+  router.post('/balance-movements/compound-release', (req, res) => {
+    const { movementIds, releasedBy } = req.body as { movementIds?: unknown; releasedBy?: string };
+    if (!Array.isArray(movementIds) || !movementIds.every((id): id is string => typeof id === 'string') || !releasedBy) {
+      throw new RequestValidationError('movementIds and releasedBy are required.');
+    }
+    res.json(compound.release(movementIds, releasedBy));
+  });
+
+  router.post('/balance-movements/compound-actions', (req, res) => {
+    const { actions, actor } = req.body as { actions?: unknown; actor?: string };
+    const valid =
+      Array.isArray(actions) &&
+      actions.every(
+        (action): action is { kind: 'release' | 'acknowledge'; movementId: string } =>
+          !!action &&
+          typeof action === 'object' &&
+          ('kind' in action) &&
+          (action.kind === 'release' || action.kind === 'acknowledge') &&
+          ('movementId' in action) &&
+          typeof action.movementId === 'string',
+      );
+    if (!valid || !actor) throw new RequestValidationError('actions and actor are required.');
+    res.json(compound.execute(actions, actor));
+  });
+
+  // POST /balance-movements/:movementId/release
+  router.post('/balance-movements/:movementId/release', (req, res) => {
+    const { releasedBy } = req.body as { releasedBy?: string };
+    if (!releasedBy) throw new RequestValidationError('releasedBy is required.');
+    res.json(service.release(req.params.movementId, releasedBy));
+  });
+
+  // GET /balance-movements/:movementId/balance-as-of — snapshot right after this specific event (business instruction 2026-08-14)
+  router.get('/balance-movements/:movementId/balance-as-of', (req, res) => {
+    res.json(service.getBalanceSnapshotAsOfMovement(req.params.movementId));
+  });
+
+  // GET /balance-movements?businessEventId= — bug fixed 2026-08-16 (reviewer-reported, "A1 -> A8 ->
+  // A3S -> A4, the related SG entries was not shown"): lets a Checker session independently resolve
+  // the linked leg(s) of a compound submission (A3S's SG redemption, B5's Reimbursement Receivable)
+  // by their shared businessEventId, instead of requiring the Maker's own in-memory submitResult to
+  // still be present — see BalanceMovementStore.findByBusinessEventId's own doc comment.
+  // GET /balance-movements?createdBy=&status=&q= — Fix Pending/Delete Pending Phase 2 (analysis/
+  // Balance-Component-FixPending-DeletePending-Proposal-zh.md §2.1) — the Maker Queue's own "My Pending/
+  // My Rejected" worklist. A second, independent query shape on the same route (mutually exclusive with
+  // businessEventId above) rather than a new endpoint — same convention this route already establishes.
+  // `status` is a comma-separated list; defaults to PENDING,REJECTED when omitted. `q` (user-directed
+  // 2026-08-28, renamed from a prior `lcNumber` exact-match param — "支援 LIKE / Partial Match") is an
+  // optional substring filter — see BalanceMovementStore.listByCreatedByAndStatus()'s own doc comment
+  // for the sort/filter it drives, and why `page`/`pageSize` were removed from this query shape entirely.
+  router.get('/balance-movements', (req, res) => {
+    const { businessEventId, createdBy, status, q } = req.query as {
+      businessEventId?: string;
+      createdBy?: string;
+      status?: string;
+      q?: string;
+    };
+    if (businessEventId) {
+      res.json(service.findByBusinessEventId(businessEventId));
+      return;
+    }
+    if (createdBy) {
+      res.json(
+        service.listMyMovements({
+          createdBy,
+          statuses: status ? (status.split(',') as MovementStatus[]) : undefined,
+          q: q || undefined,
+        }),
+      );
+      return;
+    }
+    throw new RequestValidationError('businessEventId or createdBy query parameter is required.');
+  });
+
+  // POST /balance-movements/:movementId/reject
+  router.post('/balance-movements/:movementId/reject', (req, res) => {
+    const { releasedBy, reasonCode, remarks } = req.body as { releasedBy?: string; reasonCode?: string; remarks?: string };
+    if (!releasedBy || !reasonCode) throw new RequestValidationError('releasedBy and reasonCode are required.');
+    res.json(service.reject(req.params.movementId, releasedBy, reasonCode, remarks));
+  });
+
+  // POST /balance-movements/:movementId/cancel — Maker-initiated EC (Error Correction) on their own
+  // still-PENDING entry (business instruction 2026-08-15), distinct from /reject (a Checker's decline).
+  router.post('/balance-movements/:movementId/cancel', (req, res) => {
+    const { cancelledBy, reasonCode, remarks } = req.body as { cancelledBy?: string; reasonCode?: string; remarks?: string };
+    if (!cancelledBy) throw new RequestValidationError('cancelledBy is required.');
+    res.json(service.cancel(req.params.movementId, cancelledBy, reasonCode, remarks));
+  });
+
+  // POST /balance-movements/:movementId/edit — Fix Pending (analysis/Balance-Component-FixPending-
+  // DeletePending-Proposal-zh.md §2.2/§15/§19, 2026-08-27): corrects and resubmits a PENDING/REJECTED
+  // movement in place of a Delete Pending + full re-Submit, reusing the same eventSeq (see
+  // service.editPending()'s own doc comment for the full mechanism). editMovementRequestSchema is a
+  // `.strict()` allowlist — any locked field (naturalKey/currency/instrumentType/movementType/
+  // sourceTransactionRef/etc.) is rejected by zod itself, not by a hand-written check here.
+  router.post('/balance-movements/:movementId/edit', (req, res) => {
+    const parsed = editMovementRequestSchema.safeParse(req.body);
+    if (!parsed.success) {
+      throw new RequestValidationError(firstValidationMessage(parsed.error));
+    }
+    // Same cast-after-zod convention createMovementRequestSchema's own route uses just below —
+    // accountEntries' own shape (AccountEntry[]) isn't worth re-modeling in zod a second time here,
+    // same posture as .passthrough() there.
+    res.json(service.editPending(req.params.movementId, parsed.data as EditMovementRequest));
+  });
+
+  // POST /balance-movements/:movementId/acknowledge — B3's own former Checker acknowledgment-only path
+  // was removed 2026-08-18 (B3 now uses the standard /release route above). Restored 2026-08-20,
+  // re-purposed for A3/A3S instead (business instruction, "A3 A3S 交易 Approve 過後 不要再顯示") — sets
+  // acknowledgedBy/acknowledgedAt on the LC's own UTILIZE without touching status, so the Checker Queue
+  // can filter it out once approved (see service.acknowledgeArrival()'s own doc comment).
+  router.post('/balance-movements/:movementId/acknowledge', (req, res) => {
+    const { acknowledgedBy } = req.body as { acknowledgedBy?: string };
+    if (!acknowledgedBy) throw new RequestValidationError('acknowledgedBy is required.');
+    res.json(service.acknowledgeArrival(req.params.movementId, acknowledgedBy));
+  });
+
+  // POST /balance-movements/:movementId/maker-submit — A4's own real Maker Submit (business
+  // instruction 2026-08-16, "Add real Maker Submit, then have Checker to Release it. Exactly the
+  // same as A1."); IPLC_LC/UTILIZE only, never changes status (see service.submitByMaker()'s own
+  // doc comment).
+  router.post('/balance-movements/:movementId/maker-submit', (req, res) => {
+    const { makerSubmittedBy } = req.body as { makerSubmittedBy?: string };
+    if (!makerSubmittedBy) throw new RequestValidationError('makerSubmittedBy is required.');
+    res.json(service.submitByMaker(req.params.movementId, makerSubmittedBy));
+  });
+
+  // POST /balance-movements/:movementId/withdraw-maker-submit — business-confirmed 2026-08-27 ("做 A4
+  // 或 A6 DELETE PENDING 後 交易退回到 A4 或 A6 SUBMIT 前即可"), A4's own Delete Pending: undoes
+  // /maker-submit above without cancelling the underlying A3/A3S UTILIZE or its Checker acknowledgment
+  // (see service.withdrawMakerSubmit()'s own doc comment).
+  router.post('/balance-movements/:movementId/withdraw-maker-submit', (req, res) => {
+    const { withdrawnBy } = req.body as { withdrawnBy?: string };
+    if (!withdrawnBy) throw new RequestValidationError('withdrawnBy is required.');
+    res.json(service.withdrawMakerSubmit(req.params.movementId, withdrawnBy));
+  });
+
+  return router;
+}

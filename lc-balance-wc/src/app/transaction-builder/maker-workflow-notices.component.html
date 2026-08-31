@@ -1,0 +1,10 @@
+<div class="tb-success mb-2" *ngIf="releaseSuccessHint">{{ releaseSuccessHint }}</div>
+<div class="tb-fix-pending-banner mb-2" *ngIf="fixPendingMode" role="alert">
+  <strong>✎ FIX PENDING</strong> — editing the existing {{ functionCode }} record (movement {{ movementId }}).
+  LC Number / 2ndary Reference / Currency stay locked; correct the other fields below, then Save.
+</div>
+<div class="tb-delete-pending-review-banner mb-2" *ngIf="deletePendingReviewMode" role="alert">
+  <strong>🗑 DELETE PENDING — REVIEW</strong> — reviewing the existing {{ functionCode }} record (movement
+  {{ movementId }}) below before deleting it. All fields are protected — this is a review only. Confirm to
+  delete, or Cancel to leave it unchanged.
+</div>

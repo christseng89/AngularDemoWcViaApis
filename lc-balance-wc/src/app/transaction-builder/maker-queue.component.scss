@@ -1,0 +1,371 @@
+// Fix Pending/Delete Pending Phase 2 (analysis/Balance-Component-FixPending-DeletePending-Proposal-zh.md
+// §2.1) — disclosed, deliberate copy of the design-system atoms this component's own template needs
+// (same convention inquire-events.component.scss/account-entries-dialog.component.scss/balance-
+// snapshot-box.component.scss already use — Angular's per-component view encapsulation means a class
+// rule declared in one component's stylesheet never matches markup rendered by a DIFFERENT component's
+// own template). `.tb-spinner` is NOT copied — it already lives in the true global src/styles.scss.
+
+.tb-section {
+  background: var(--bg-surface);
+  border: 1px solid var(--gray-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.tb-section--maker {
+  border-top: 3px solid var(--blue);
+}
+
+.tb-section__body {
+  padding: 18px;
+}
+
+.tb-field {
+  margin-bottom: 14px;
+
+  &--inline {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 0;
+
+    .tb-input {
+      width: 120px;
+    }
+  }
+
+  &--search .tb-input {
+    width: 180px;
+  }
+}
+
+.tb-field__label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--gray-body);
+  margin-bottom: 4px;
+}
+
+.tb-input {
+  border: 1px solid var(--gray-input-border);
+  border-radius: var(--radius-md);
+  padding: 7px 10px;
+  font-size: 13px;
+  width: 100%;
+  box-sizing: border-box;
+  outline: none;
+  background: var(--bg-surface);
+  color: var(--gray-body);
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+
+  &:focus {
+    border-color: var(--blue);
+    box-shadow: 0 0 0 2px rgba(29, 78, 216, 0.12);
+  }
+
+  &:disabled {
+    background: var(--gray-readonly-bg);
+    color: var(--gray-disabled);
+  }
+}
+
+.tb-input--required {
+  border-left: 3px solid var(--blue);
+  background: var(--blue-bg-soft);
+
+  &:focus {
+    background: var(--bg-surface);
+  }
+}
+
+.tb-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--radius-md);
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    transform 80ms ease;
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 2px;
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+
+  &--outline {
+    background: var(--bg-surface);
+    border-color: var(--blue);
+    color: var(--blue);
+
+    &:hover:not(:disabled) {
+      background: var(--blue-bg);
+    }
+  }
+
+  &--tiny {
+    padding: 3px 9px;
+    font-size: 11px;
+    background: var(--bg-surface);
+    border-color: var(--blue-border);
+    color: var(--blue-dark);
+    box-shadow: none;
+
+    &:hover:not(:disabled) {
+      background: var(--blue-bg-soft);
+      border-color: var(--blue);
+    }
+
+    &:focus-visible {
+      outline-offset: 1px;
+    }
+  }
+
+  &--danger-outline {
+    background: var(--bg-surface);
+    border-color: var(--red);
+    color: var(--red);
+
+    &:hover:not(:disabled) {
+      background: var(--red-bg-soft);
+    }
+  }
+}
+
+.tb-hint {
+  font-size: 11px;
+  color: var(--gray-muted);
+  font-style: italic;
+}
+
+.tb-error {
+  font-size: 12px;
+  color: var(--red-dark);
+  background: var(--red-bg-soft);
+  border: 1px solid var(--red-border);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+
+  // "Not Found Message — UI Width" rule (business-directed) — see maker-panel.component.scss's own
+  // identical rule for the full rationale.
+  &--fit {
+    width: fit-content;
+  }
+}
+
+.tb-pagination {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.tb-table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+  scrollbar-width: thin;
+
+  &::-webkit-scrollbar {
+    height: 8px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: var(--gray-input-border);
+    border-radius: var(--radius-pill);
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+.tb-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  border: 1px solid var(--gray-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+
+  th {
+    text-align: left;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--gray-muted);
+    padding: 8px 10px;
+    background: var(--blue-bg-soft);
+    border-bottom: 1px solid var(--blue-border);
+  }
+
+  td {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--gray-border);
+    color: var(--gray-body);
+    vertical-align: middle;
+  }
+
+  tbody tr {
+    &:nth-child(even) {
+      background: var(--blue-bg-soft);
+    }
+
+    &:last-child td {
+      border-bottom: none;
+    }
+  }
+}
+
+.tb-table__amount {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--navy);
+  white-space: nowrap;
+  text-align: right;
+}
+
+.tb-table__ref {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.tb-table__time {
+  color: var(--gray-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.tb-table__status {
+  white-space: nowrap;
+}
+
+.tb-type-tag {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--blue-dark);
+  background: var(--blue-bg);
+  border: 1px solid var(--blue-border);
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+}
+
+.tb-status-badge {
+  display: inline-block;
+  white-space: nowrap;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 2px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--gray-bg);
+  color: var(--gray-body);
+
+  &--pending {
+    background: var(--amber-bg);
+    color: var(--amber-dark);
+  }
+
+  &--approved {
+    background: var(--green-bg);
+    color: var(--green-dark);
+  }
+
+  &--earmark {
+    background: var(--violet-bg);
+    color: var(--violet-dark);
+  }
+
+  &--negative {
+    background: var(--red-bg);
+    color: var(--red-dark);
+  }
+
+  &--neutral {
+    background: var(--gray-bg);
+    color: var(--gray-muted);
+  }
+}
+
+.tb-muted {
+  color: var(--gray-muted);
+}
+
+// Wraps the Action column's Fix Pending / Delete Pending buttons — `.tb-btn` is `inline-flex` with no
+// horizontal margin of its own, so two rendered side by side sat flush against each other with only
+// incidental HTML whitespace between them. Same gap convention as maker-panel.component.scss's own
+// `.tb-maker-result-actions`/`.tb-fix-pending-actions` and checker-panel.component.scss's own
+// `.tb-checker-actions`.
+.tb-maker-queue-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+// Import LC／Export Confirmed side tabs (user-directed 2026-08-28, "Maker Queue進口 出口 分開 (similar as
+// Inquire Events)") — same disclosed, deliberate copy this file's own top comment already explains;
+// verbatim from inquire-events.component.scss's own `.tb-tabs`/`.tb-tab`/`.tb-tabs--side` rules (the
+// `.tb-tabs--side .tb-tab` variant — larger font/padding than the plain `.tb-tabs` this project also uses
+// elsewhere, e.g. Inquire Delete Pending's own Function filter tabs — is the one this component needs).
+.tb-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  border-bottom: 1px solid var(--gray-border);
+  padding-bottom: 0;
+}
+
+.tb-tab {
+  border: none;
+  background: transparent;
+  color: var(--gray-muted);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast);
+
+  &:hover:not(.tb-tab--active) {
+    color: var(--blue);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: -2px;
+    border-radius: var(--radius-sm);
+  }
+
+  &--active {
+    color: var(--blue);
+    border-bottom-color: var(--blue);
+  }
+}
+
+.tb-tabs--side .tb-tab {
+  font-size: 14px;
+  padding: 8px 18px;
+}

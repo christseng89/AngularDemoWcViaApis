@@ -1,0 +1,146 @@
+// Design sample only. Tokens should come from the existing global theme.
+.tb-tabbed-workspace {
+  width: min(100%, 1440px);
+  margin-inline: auto;
+  padding: 20px;
+}
+
+.tb-tabbed-workspace__header {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.tb-eyebrow,
+.tb-page-title {
+  margin: 0;
+}
+
+.tb-eyebrow {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tb-page-title {
+  margin-top: 4px;
+  color: var(--text-primary);
+  font-size: clamp(22px, 3vw, 32px);
+}
+
+.tb-workspace-tabs,
+.tb-role-tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--gray-border);
+  scrollbar-width: thin;
+}
+
+.tb-workspace-tab,
+.tb-role-tab {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--text-primary);
+    background: color-mix(in srgb, var(--blue) 7%, transparent);
+  }
+
+  &:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--blue) 35%, transparent);
+    outline-offset: -3px;
+  }
+}
+
+.tb-workspace-tab--active,
+.tb-role-tab--active {
+  border-bottom-color: var(--blue);
+  color: var(--blue);
+}
+
+.tb-role-tab--checker.tb-role-tab--active {
+  border-bottom-color: var(--green);
+  color: var(--green);
+}
+
+.tb-tab-count {
+  min-width: 22px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--blue);
+  color: white;
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+}
+
+.tb-tab-count--warning {
+  background: var(--amber, #b7791f);
+}
+
+.tb-function-navigation,
+.tb-role-tabs {
+  margin-bottom: 16px;
+}
+
+.tb-empty-selection {
+  padding: 28px;
+  border: 1px dashed var(--gray-border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  text-align: center;
+}
+
+.tb-processing-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(320px, 2fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.tb-processing-layout__main,
+.tb-processing-layout__balance {
+  min-width: 0;
+}
+
+.tb-processing-layout__balance {
+  position: sticky;
+  top: 16px;
+}
+
+@media (max-width: 1100px) {
+  .tb-processing-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .tb-processing-layout__balance {
+    position: static;
+  }
+}
+
+@media (max-width: 640px) {
+  .tb-tabbed-workspace {
+    padding: 12px;
+  }
+
+  .tb-workspace-tab,
+  .tb-role-tab {
+    min-height: 48px;
+    padding-inline: 12px;
+  }
+}

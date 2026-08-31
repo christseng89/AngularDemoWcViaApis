@@ -1,0 +1,113 @@
+<!-- View Voucher pop-up. The parent controls whether this exists at all (`*ngIf="accountEntryDialogMovement"`
+     on the `<app-account-entries-dialog>` tag) — `movement` is never actually null while alive, but every
+     binding below still guards on it (`movement as m`) to stay type-safe against the nullable @Input(). -->
+<div class="tb-dialog-overlay" *ngIf="movement as m" (click)="closed.emit()">
+  <div class="tb-dialog" role="dialog" aria-modal="true" aria-label="View Voucher" (click)="$event.stopPropagation()">
+    <div class="tb-dialog__header">
+      <h3 class="tb-dialog__title">View Voucher</h3>
+      <button type="button" class="tb-dialog__close" (click)="closed.emit()" aria-label="Close">×</button>
+    </div>
+    <div class="tb-dialog__meta">
+      <span class="tb-type-tag">{{ displayMovementType() }}</span>
+      <span class="tb-muted">{{ m.sourceTransactionRef || 'eventSeq ' + m.eventSeq }}</span>
+      <app-transaction-status-badge
+        [status]="m.status"
+        [instrumentType]="instrumentType"
+        [movementType]="m.movementType"
+        [phase]="phase"
+        [acknowledgedAt]="m.acknowledgedAt"
+      ></app-transaction-status-badge>
+    </div>
+    <!-- Set label only appears once a second set exists (linkedMovement) — a plain single-set event stays
+         exactly as before, no "Set" heading. Derived from movement's own movementType, not a hardcoded
+         "Acceptance Entries" — see accountingSetLabel()'s own doc comment for the orientation bug this fixes
+         (B4 viewed from the Checker's own screen has the ACCEPT leg as primary, not the CREATE leg). Each
+         set's own status badge (business-confirmed 2026-08-28, "A3S 一套帳是 EARMARKING/EARMARKED... 一套帳
+         是 PENDING/APPROVED" — the two sets can be on genuinely different lifecycles, never assume they
+         match) — the primary set's badge reuses the SAME real, top-level status already shown above. -->
+    <div class="tb-hint mt-2" *ngIf="linkedMovement">
+      <strong>{{ primarySetLabel }}</strong>
+      <app-transaction-status-badge
+        [status]="m.status"
+        [instrumentType]="instrumentType"
+        [movementType]="m.movementType"
+        [phase]="phase"
+        [acknowledgedAt]="m.acknowledgedAt"
+        extraClass="ms-2"
+      ></app-transaction-status-badge>
+    </div>
+    <table class="tb-table tb-table--static mt-2" *ngIf="m.contingentAccountEntry as entry">
+      <caption class="visually-hidden">
+        Contingent liability account entries for
+        {{
+          displayMovementType()
+        }}
+      </caption>
+      <thead>
+        <tr>
+          <th>Dr/Cr</th>
+          <th>Account Name</th>
+          <th>Currency</th>
+          <th>Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="tb-drcr-tag tb-drcr-tag--dr">Dr</span></td>
+          <td>{{ entry.drAccount }}</td>
+          <td>{{ entry.currency }}</td>
+          <td class="tb-table__amount">{{ entry.amount | monetaryAmount: entry.currency }}</td>
+        </tr>
+        <tr>
+          <td><span class="tb-drcr-tag tb-drcr-tag--cr">Cr</span></td>
+          <td>{{ entry.crAccount }}</td>
+          <td>{{ entry.currency }}</td>
+          <td class="tb-table__amount">{{ entry.amount | monetaryAmount: entry.currency }}</td>
+        </tr>
+      </tbody>
+    </table>
+    <!-- Whole-row click can open this dialog for an event with no contingentAccountEntry at all (e.g.
+         B3/EPLC_EXAMINATION, out of contingent-liability scope) — this hint covers that case. -->
+    <p class="tb-hint mt-2" *ngIf="!m.contingentAccountEntry">No voucher entries recorded for this event.</p>
+
+    <!-- Second set — A6/B4's own linked "LC Balance"/"Confirmed LC Balance Entries" (A6/B4 Accounting
+         Event Ownership Rule, business-confirmed 2026-08-27/28, see CLAUDE.md). Same Dr/Cr shape, a
+         second, independent contingentAccountEntry belonging to the SAME business event. -->
+    <ng-container *ngIf="linkedMovement as lm">
+      <div class="tb-hint mt-2">
+        <strong>{{ linkedSetLabel }}</strong>
+        <span class="tb-status-badge ms-2" [ngClass]="linkedSetStatusBadgeClass"
+          ><app-tb-icon [name]="linkedSetStatusIcon"></app-tb-icon>{{ linkedSetStatus }}</span
+        >
+      </div>
+      <table class="tb-table tb-table--static mt-2" *ngIf="lm.contingentAccountEntry as linkedEntry">
+        <caption class="visually-hidden">{{ linkedSetLabel }} for this event's own linked record</caption>
+        <thead>
+          <tr>
+            <th>Dr/Cr</th>
+            <th>Account Name</th>
+            <th>Currency</th>
+            <th>Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="tb-drcr-tag tb-drcr-tag--dr">Dr</span></td>
+            <td>{{ linkedEntry.drAccount }}</td>
+            <td>{{ linkedEntry.currency }}</td>
+            <td class="tb-table__amount">{{ linkedEntry.amount | monetaryAmount: linkedEntry.currency }}</td>
+          </tr>
+          <tr>
+            <td><span class="tb-drcr-tag tb-drcr-tag--cr">Cr</span></td>
+            <td>{{ linkedEntry.crAccount }}</td>
+            <td>{{ linkedEntry.currency }}</td>
+            <td class="tb-table__amount">{{ linkedEntry.amount | monetaryAmount: linkedEntry.currency }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </ng-container>
+
+    <p class="tb-hint mt-2" *ngIf="m.contingentAccountEntry">Historical entries recorded with this event — never recalculated from the current balance.</p>
+    <button type="button" class="tb-btn tb-btn--outline mt-2" (click)="closed.emit()">Close</button>
+  </div>
+</div>

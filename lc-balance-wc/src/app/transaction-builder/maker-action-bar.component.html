@@ -1,0 +1,27 @@
+<div class="tb-submit-actions mt-2" *ngIf="view.showA4Submit || view.showA4Cancel">
+  <button class="tb-btn tb-btn--primary" *ngIf="view.showA4Submit" (click)="submitA4.emit()" [disabled]="view.a4SubmitDisabled">
+    <span class="tb-spinner" aria-hidden="true" *ngIf="state.submitting"></span>{{ state.submitting ? 'Submitting…' : 'Submit A4' }}
+  </button>
+  <button class="tb-btn tb-btn--outline" *ngIf="view.showA4Cancel" (click)="cancelSelection.emit()" [disabled]="state.submitting">Cancel</button>
+</div>
+
+<div class="tb-submit-actions" *ngIf="view.showGenericSubmit || view.showGenericCancel">
+  <button class="tb-btn tb-btn--primary" *ngIf="view.showGenericSubmit" (click)="submitTransaction.emit()" [disabled]="view.genericSubmitDisabled">
+    <span class="tb-spinner" aria-hidden="true" *ngIf="state.submitting"></span>{{ view.genericSubmitLabel }}
+  </button>
+  <button class="tb-btn tb-btn--outline" *ngIf="view.showGenericCancel" (click)="cancelSelection.emit()" [disabled]="state.submitting">Cancel</button>
+</div>
+
+<div class="tb-action-group mt-2" *ngIf="view.showFixPendingActions">
+  <button class="tb-btn tb-btn--primary" (click)="saveFixPending.emit()" [disabled]="view.fixPendingSaveDisabled">
+    <span class="tb-spinner" aria-hidden="true" *ngIf="state.actionBusy"></span>{{ state.actionBusy ? 'Working…' : 'Save Fix Pending' }}
+  </button>
+  <button class="tb-btn tb-btn--outline" (click)="cancelFixPending.emit()" [disabled]="state.actionBusy">Cancel</button>
+</div>
+
+<div class="tb-action-group mt-2" *ngIf="view.showDeletePendingActions">
+  <button class="tb-btn tb-btn--danger-outline" (click)="confirmDeletePending.emit()" [disabled]="state.actionBusy">
+    <span class="tb-spinner" aria-hidden="true" *ngIf="state.actionBusy"></span>{{ state.actionBusy ? 'Working…' : 'Confirm Delete Pending' }}
+  </button>
+  <button class="tb-btn tb-btn--outline" (click)="cancelDeletePending.emit()" [disabled]="state.actionBusy">Cancel</button>
+</div>

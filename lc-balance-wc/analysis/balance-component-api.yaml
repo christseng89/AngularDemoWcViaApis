@@ -1,0 +1,3054 @@
+openapi: 3.0.3
+info:
+  title: Balance Component Service API
+  description: >
+    OpenAPI contract for the Balance Component microservice — the
+    contingent / off-balance-sheet exposure ledger for LC-related trade
+    finance instruments (LC Balance, Acceptance, Shipping Guarantee, Export
+    Confirmation). Originally extracted from
+    analysis/COMMON-BalanceComponent-Design-zh.md and
+    analysis/COMMON-BalanceComponent-Cross-Reference.md; from v1.0.0 onward
+    this file is re-grounded directly against the real, currently-running
+    implementation under microservices/balance-component/src/ — where an
+    earlier draft version of this file described an endpoint or field that
+    was never actually built, it has been removed here rather than left as
+    aspirational documentation. Where the design documents and the shipped
+    implementation disagree, this file follows the implementation and notes
+    the discrepancy inline.
+
+
+    Explicitly OUT OF SCOPE: IBL/EBL and any actual funded/discounted
+    exposure (Loan Component's domain, fronting the external eLoan system —
+    see Design doc §1 and Cross-Reference Finding 3b), interest/accrual
+    calculation (also Loan Component's domain), and GL account mapping
+    (Balance Component only carries caller-supplied accountEntries through
+    to a downstream accounting component — see §2/§3.3 "GL Ownership").
+
+
+    Core model (Design doc §3): a `BalanceContract` is one immutable
+    version-snapshot of a `logicalContractId` (the stable business identity
+    of one LC, one Acceptance, one Shipping Guarantee, or one Export
+    Confirmation). At most one version per logicalContractId is ever
+    `ACTIVE`. A `BalanceMovement` is an append-only, never-deleted record
+    of one exposure-amount change against one specific contract version.
+
+
+    API design principle — a single-leg command uses the single-movement
+    endpoints, while one approved multi-leg business event uses the
+    `/balance-movements/compound*` endpoints. Compound create, release, and
+    mixed release/acknowledge actions execute inside one SQLite transaction:
+    every requested movement succeeds, or all writes and side effects are
+    rolled back. Sibling create requests must carry one identical,
+    caller-supplied `businessEventId`, which is both their audit correlation
+    key and the identity checked at the compound transaction boundary.
+
+
+    BUSINESS FLOW ROUTING (business-confirmed 2026-08-29):
+      - Import: A3 (Document Arrival) or A3S (Document Arrival with Shipping
+        Guarantee) creates the source `IPLC_LC`/`UTILIZE` earmark. The parent
+        LC's tenor then determines the only valid continuation: `SIGHT` → A4
+        (Sight Settlement), while `SELLERS_USANCE` or `BUYERS_USANCE` → A6
+        (Acceptance). A4 Maker-Submits and finalizes that existing UTILIZE in
+        place; A6 creates an `IPLC_ACCEPTANCE`/`CREATE` referencing it and the
+        Checker command atomically releases the still-PENDING source plus the
+        Acceptance.
+      - Export: B3 (Present Docs) creates and independently releases the
+        `EPLC_EXAMINATION`/`CREATE` source before B4 can select it. B4 always
+        references and consumes that B3 record. The Confirmation tenor chooses
+        the B4 shape: `SIGHT` → `EPLC_CONFIRMATION`/`HONOUR` plus Due From
+        Issuing Bank; `SELLERS_USANCE` or `BUYERS_USANCE` →
+        `EPLC_CONFIRMATION`/`ACCEPT` plus Acceptance and Reimbursement
+        Receivable legs. B4's own newly-created legs are one atomic compound
+        business event; the already-RELEASED B3 source is not released again.
+
+
+    v1.37.0 (2026-08-30, documentation synchronization; no wire-shape
+    change): records the completed SOLID refactor in which `BalanceService`
+    remains the route-facing compatibility façade while query, snapshot,
+    contract resolution, request validation, release policy/side effects and
+    lifecycle responsibilities are delegated to focused services. Reaffirms
+    that A3S/A6/B4/B5 multi-leg writes use the existing atomic
+    `/balance-movements/compound*` endpoints. Also documents the retained
+    Run-All prerequisites (A4-ready Sight A3, A6-ready Usance A3 and B4-ready
+    released B3) and clarifies that Transaction Index columns such as SG/IB/EB
+    Amount and Tight LC Balance are UI projections of existing contract,
+    movement and `BalanceSnapshot` fields, not new API properties.
+
+
+    v1.38.0 (2026-08-30, Remarks-only Fix Pending; no wire-shape change):
+    A4, A6, A7, A9, B4 and B5 use the existing `REMARKS_ONLY` edit mode.
+    The amount must remain identical and only Remarks is persisted; Balance,
+    Account Entries and compound sibling movements remain untouched.
+
+
+    v1.39.0 (2026-08-30, Transaction Index amount display; no wire-shape
+    change): every A-series and B-series Transaction Index amount projection,
+    including Tight LC Balance and SG/IB/EB Amount, is rendered with thousands
+    separators and the selected currency's ISO minor-unit scale. API monetary
+    values remain unformatted decimal strings.
+
+
+    v1.40.0 (2026-08-30, Remarks-only Fix Pending validation): Remarks is
+    mandatory and must contain at least one non-whitespace character for A4,
+    A6, A7, A9, B4 and B5. The UI disables Save until Remarks differs from
+    the stored value; the API independently rejects missing or blank Remarks.
+
+
+    v1.41.0 (2026-08-31, Maker Result Delete Pending synchronization; no
+    wire-shape change): all A1-A11/B1-B7 Transaction Processing flows may
+    offer Delete Pending immediately after a successful Maker Submit. A1/B1
+    return to a fresh natural-key input after cancellation; every other
+    function returns to its Transaction Index. This is client navigation,
+    not a new service endpoint. A4 calls the existing
+    `/balance-movements/{movementId}/withdraw-maker-submit` operation so its
+    A3/A3S source is preserved. Other functions call `/cancel`; A3S/B4/B5
+    cancel their linked legs sibling-first and the primary leg last. Those
+    calls remain independent and are not an atomic batch cancellation.
+    Maker Queue/Fix Pending is a separate entry flow and is unchanged.
+
+
+    v1.42.0 (2026-08-31, inquiry transport-error synchronization; no
+    successful-response wire-shape change): the catalog reads used by Maker
+    Queue, Inquire Events and Inquire Delete Pending now document their
+    possible 500 Error response. The reference UI preserves the original HTTP
+    status and presents transport/5xx failures as service unavailability;
+    BAL-UI-UNEXPECTED remains reserved for unclassified client failures.
+
+
+    CURRENCY CONSISTENCY (v1.0.0, business-requested 2026-08-16; validation
+    scope narrowed 2026-08-24 — see note below): `currency` is a REQUIRED
+    field on every request (see `BalanceMovementCreateRequest.required`),
+    but the server now also validates it server-side rather than trusting
+    the caller blindly:
+      1. If the request resolves (via `balanceContractId`, or via
+         `naturalKey` matching an existing ACTIVE `BalanceContract`) to an
+         EXISTING contract, the supplied `currency` must match that
+         contract's own stored `currency` exactly — a mismatch is rejected
+         (`409 CURRENCY_MISMATCH`).
+      2. Else, if the request is creating a brand-new child Logical
+         Contract (a creating movementType — ISSUE/CREATE — with no
+         existing resolution) AND `parentLogicalContractId` is supplied,
+         the supplied `currency` must match the PARENT's own current
+         `currency` exactly (same rejection rule). This covers every
+         "carried from the parent LC/Confirmation" function — a new
+         Acceptance, Shipping Guarantee, or Present Docs earmark must
+         declare the same Currency as the LC/Confirmation it is created
+         under.
+      3. When creating a genuinely ROOT new Logical Contract — a creating
+         movementType with no existing resolution AND no
+         `parentLogicalContractId` (i.e. `IPLC_LC`/`EPLC_CONFIRMATION`
+         `ISSUE`) — the supplied `currency` becomes this new Logical
+         Contract's own authoritative Currency Code for every future
+         movement against it or anything created under it; there is
+         nothing to validate it against.
+    This mirrors, at the data-model level, the channel-facing business
+    rule ("A1/B1 Currency Code = User Input; every other function = Carried
+    forward + Protected") without this service needing to know about named
+    business-function codes at all — it only needs to know whether a
+    request resolves to an existing contract, or a parent, or neither.
+
+    Note (2026-08-24): an earlier design additionally made `currency`
+    OPTIONAL for cases 1/2 above (server-derived when omitted, not just
+    validated when supplied) — that broader change was reverted along with
+    unrelated work and is not part of this contract. `currency` remains
+    required on every request; only the consistency check described above
+    is currently implemented.
+
+
+    v0.1.0 (draft, 2026-08-14): initial extraction from the design
+    documents.
+
+
+    v0.2.0 (draft, 2026-08-14): added the off-balance-sheet exposure
+    two-tier WARNING/ERROR check (Design doc §6.1), later hardened to a
+    single ERROR tier — see v0.7.0/v1.0.0 below.
+
+
+    v0.3.0 (draft, 2026-08-14): added Tolerance conversion for
+    IPLC_LC/EPLC_LC face-amount movements (Design doc §6.2).
+    `BalanceContract.tolerancePct` and `BalanceMovement.ceilingAmount` are
+    new; for ISSUE/AMEND_INCREASE/AMEND_DECREASE, `amount` is the
+    caller-typed face-level delta and `ceilingAmount = amount ×
+    (1+tolerancePct/100)` is what the server actually applies against
+    Confirmed Balance and checks AMEND_DECREASE sufficiency against.
+
+
+    v0.4.0 (draft, 2026-08-14): SHGT's `REDEEM` movementType is replaced by
+    `PARTIAL_REDEEM`/`FULL_REDEEM` (Design doc §5, v0.6) — a redemption may
+    now release less than the SG's full outstanding balance. Redemption
+    amount is NEVER auto-derived from a UTILIZE/Document-Arrival amount,
+    even when they happen to match — the caller must submit the redemption
+    explicitly.
+
+
+    v0.5.0 / v0.6.0 (draft, 2026-08-14): SG `ISSUE` is hard-capped at its
+    parent LC's current Tight Available Balance (Available Balance minus
+    the LC's own other outstanding SG exposure), checked at Maker
+    submission — `409 InsufficientBalanceError`, not merely a warning. The
+    original LMTS-Available-Limit-based design is superseded for this
+    check (the LMTS integration mechanism itself remains untraced and
+    unused — represented only as an opaque `lmtsReservationId` passthrough
+    field).
+
+
+    v0.7.0 (draft, 2026-08-14): the §6.1 off-balance-sheet exposure check
+    on a UTILIZE (Document Arrival) is a hard `409 InsufficientBalanceError`,
+    same tier as exceeding plain Available Balance — no longer a
+    non-blocking warning. A caller deliberately consuming a specific
+    outstanding Shipping Guarantee's reserved capacity creates that SG's
+    own `FULL_REDEEM`/`PARTIAL_REDEEM` (still PENDING) BEFORE calling
+    `POST /balance-movements` for the UTILIZE — the exposure computation
+    already counts a PENDING redemption the same as a RELEASED one, so its
+    contribution is already netted out by the time the UTILIZE's own check
+    runs. Purely a client-side call-ordering pattern (`businessEventId`
+    links the two calls for audit/query only, not atomicity).
+
+
+    v0.8.0 (2026-08-16): catches this contract up to the implemented Export
+    Confirmation (保兌) side. `InstrumentType` gains `EPLC_EXAMINATION`
+    (Present Docs — MEMO_ONLY, CREATE-only memo earmark that never moves
+    the parent Confirmation's own balance, per cs-tf-balance-knowhow Design
+    Principle D3), plus the three ON_BALANCE_ASSET instruments a
+    Confirmation's own HONOUR/ACCEPT transforms into:
+    `EPLC_DUE_FROM_ISSUING_BANK` (Sight), `EPLC_ACCEPTANCE_REIMB_RECEIVABLE`
+    (Usance, paired with `EPLC_ACCEPTANCE`'s own DPU liability),
+    `EPLC_EXPORT_BILLS_DISCOUNTED` (Nego'd Usance — reclass target only, no
+    consuming endpoint). New `POST /balance-movements/{movementId}/acknowledge`
+    and `BalanceMovement.acknowledgedBy`/`acknowledgedAt` — a Checker's
+    acknowledgment of a still-PENDING `EPLC_EXAMINATION` CREATE, distinct
+    from `/release`: sets acknowledgedBy/acknowledgedAt but deliberately
+    never transitions `status`, so a later Honour/Accept step can still
+    find and consume it. Backs `BalanceSnapshot.presentDocsEarmarkPending`/
+    `presentDocsEarmarkApproved` (EPLC_CONFIRMATION only). Scope correction:
+    `EPLC_DUE_FROM_ISSUING_BANK` (Sight) is a pure receivable with no
+    paired liability and no settling endpoint in this contract — a
+    deliberate, permanent scope boundary ("Balance Component 只負責
+    Contingent Liability"), not a gap.
+
+
+    v1.0.0 (2026-08-16) — re-grounded against the real implementation,
+    correcting several points where this file had drifted from what was
+    actually shipped, and adding the currency-derivation rule above:
+      - REMOVED (never implemented, no route/service method exists):
+        `GET /balance-contracts/{logicalContractId}/history`,
+        `POST /balance-contracts/{logicalContractId}/versions` (contract
+        supersession/amendment), `PATCH /balance-movements/{movementId}`
+        (edit-in-place — the underlying status-transition table has an
+        `EDIT` action defined for exactly this, but no route ever invokes
+        it), and `POST /balance-movements/{movementId}/reversal`. All four
+        remain legitimate future work per the design docs, but describing
+        them here as live was inaccurate; they will be re-added to this
+        contract if/when actually built.
+      - CORRECTED: `DELETE /balance-movements/{movementId}?reasonCode=`
+        never existed — the real, implemented cancel operation is
+        `POST /balance-movements/{movementId}/cancel` with a JSON body
+        (`cancelledBy` required), not a query-param DELETE.
+      - ADDED (real, previously undocumented): `GET /balance-contracts/catalog`
+        (paginated/searchable contract listing — backs every picker UI),
+        `GET /balance-movements/{movementId}/balance-as-of` (the balance
+        snapshot as of a specific movement's own event, distinct from
+        the calendar-date `asOf` query param on the contract balance
+        endpoint).
+      - CORRECTED: `ExposureNature` is missing a real, in-use value —
+        `MEMO` (a Present Docs / EPLC_EXAMINATION earmark is `MEMO`, never
+        `CONTINGENT`/`ACTUAL`; the server forces `accountEntries: null`
+        whenever `exposureNature` is `MEMO`).
+      - REMOVED: the §6.1 off-balance-sheet exposure "soft WARNING" tier
+        and the `BalanceMovement.warnings`/`MovementWarning` schema —
+        superseded by v0.7.0's hardening to a single ERROR tier; nothing
+        in the current implementation ever populates a warning, so
+        documenting the field as live was misleading.
+      - ADDED, movement-creation business rules previously undocumented:
+        (a) `409 NATURAL_KEY_ALREADY_EXISTS` — a creating movementType
+        (ISSUE/CREATE) against a natural key that already resolves to an
+        ACTIVE contract is rejected outright, never silently versioned;
+        (b) `400` if an Acceptance (`IPLC_ACCEPTANCE`/`EPLC_ACCEPTANCE`)
+        CREATE is attempted under a Sight-tenor parent LC, or if the
+        child's own `tenorType` does not match the parent's; (c) SHGT
+        `ISSUE` and `EPLC_EXAMINATION` CREATE both require
+        `parentLogicalContractId` (`400` if missing) and are checked for
+        sufficiency against the parent's own Tight Available /
+        earmark-adjusted Available Balance, not an unconstrained figure;
+        (d) `sourceTransactionRef` must be unique per contract — reusing
+        one against the same `balanceContractId` is `400`.
+      - ADDED to `BalanceMovementCreateRequest`: `parentLogicalContractId`,
+        `tenorType`, `tenorDays`, `maturityDate`, `exposureNature`,
+        `tolerancePct` — all real, already-accepted fields this file had
+        never documented.
+      - REMOVED `GET /balance-contracts/{balanceContractId}/movements`'s
+        query filters (`status`/`legRef`/`businessEventId`/`businessDate`)
+        — the real endpoint takes none; every filter currently happens
+        client-side on the full result set.
+
+
+    v1.1.0 (2026-08-16, business-requested — "implement the related
+    contingent liability account entries across A1-A9/B1-B5... persist the
+    generated Dr/Cr account entries as part of that event/movement"): ADDED
+    `BalanceMovement.contingentAccountEntry` (new `ContingentAccountEntry`
+    schema) — a single, server-derived Dr/Cr contingent-liability account
+    pair (`drAccount`/`crAccount`/`currency`/`amount`), computed once at
+    movement creation from `(instrumentType, movementType, amount's own
+    sign, the resolved contract's tenorType)` per
+    analysis/contingent-liability-ledger.html, and persisted immutably with
+    the movement — never recalculated from the current balance, including
+    when the same movement is later fetched via the Event Timeline
+    (`GET .../movements`). Null for the three ON_BALANCE_ASSET instruments
+    (`EPLC_DUE_FROM_ISSUING_BANK`/`EPLC_ACCEPTANCE_REIMB_RECEIVABLE`/
+    `EPLC_EXPORT_BILLS_DISCOUNTED`) and for any unrecognized movementType —
+    on-balance-sheet liability stays out of scope for this field, same
+    boundary as the rest of this contract. Deliberately a DIFFERENT concept
+    from the pre-existing `accountEntries`/`AccountEntry` array (a
+    caller-supplied, downstream-accounting-owned Dr/Cr leg list this
+    service only stores/passes through, per §3.3 "GL Ownership") —
+    `contingentAccountEntry` is server-derived, contingent-ledger-specific,
+    and always exactly zero-or-one pair, never caller-supplied and never an
+    array.
+
+
+    v1.2.0 (2026-08-16, bug fixed, reviewer-reported — "A1 -> A8 -> A3S -> A4, the related SG entries
+    was not shown"): ADDED `GET /balance-movements?businessEventId=`. Root cause: the reference Angular
+    Transaction Builder client's own Checker Release for a linked-movement submission (A3S's SG
+    redemption + LC UTILIZE, B5's Acceptance settle + Reimbursement Receivable REIMBURSE) used to
+    resolve the linked leg's own movementId purely from the Maker's own in-memory client state —
+    correct only when the SAME browser session that submitted also performs the release, never true
+    for a genuinely separate Checker session (the whole point of Maker/Checker 4-eyes separation). This
+    endpoint gives any caller a server-side way to resolve that correlation independently, via the
+    businessEventId every linked-movement submission already shared but was never queryable by. No
+    change to `POST /balance-movements` itself — `businessEventId` was already an accepted request
+    field. At v1.2.0 it was correlation only; v1.36.0 later made a shared businessEventId mandatory for
+    atomic compound create while retaining this query behavior.
+
+
+    v1.3.0 (2026-08-16, bug fixed, reviewer-directed — "A6/B4 也修一下" i.e. "fix A6/B4 too", extending
+    v1.2.0's fix to the two named business functions it explicitly left out of scope): ADDED
+    `BalanceMovementCreateRequest.referencedTransactionId` / `BalanceMovement.referencedTransactionId`.
+    v1.2.0's `businessEventId` lookup only resolves movements CREATED TOGETHER in one submission — A6
+    (Acceptance, Usance) and B4 (Honour/Acceptance) instead convert a PRE-EXISTING record (A3's own
+    Document Arrival, or B3's own Present Docs) picked at submission time from an EARLIER, separate
+    submission, which never shares a businessEventId with the new one at all. `referencedTransactionId`
+    is the direct, unambiguous correlation businessEventId can't provide for this shape — the new
+    movement simply carries the source record's own movementId. Same passthrough posture as
+    businessEventId/sourceTransactionRef: accepted and persisted, never validated to resolve to a real
+    movement. `A6`/`B4`'s downstream legs CREATED alongside the new primary (B4's own Acceptance
+    liability + Reimbursement Receivable, or the Due from Issuing Bank asset) still resolve via v1.2.0's
+    `businessEventId` lookup — only the "source record predates this submission" correlation needed a
+    new mechanism.
+
+
+    v1.4.0 (2026-08-16, business-directed — "Add real Maker Submit, then have Checker to Release it.
+    Exactly the same as A1."): ADDED `POST /balance-movements/{movementId}/maker-submit` and
+    `BalanceMovement.makerSubmittedBy`/`makerSubmittedAt`. A4 (Sight Settlement) has no movement of its
+    own to create at Submit time — it settles the PRE-EXISTING UTILIZE A3/A3S already earmarked (and
+    already gave its own contingentAccountEntry at that earlier stage) — so there was no
+    `createMovement()` call to stand in as "the Maker submitted," leaving A4 as the only function where
+    a Checker could act before any Maker had done anything at all. This endpoint is that missing,
+    genuinely backend-persisted Maker action: same shape as v0.8.0's own `/acknowledge` (IPLC_LC/UTILIZE
+    only here rather than EPLC_EXAMINATION/CREATE; 400 otherwise), and — same posture as `/acknowledge`
+    — deliberately does NOT transition status; the movement stays PENDING throughout (`/release` is
+    still the real PENDING -> RELEASED transition). Deliberately NOT enforced as a precondition inside
+    `/release` itself — the reference Business Case Runner client releases a UTILIZE directly with no
+    separate maker-submit call (an already-working, separately-tested orchestrated flow this feature was
+    never meant to constrain); the reference Angular Transaction Builder client enforces the gate itself,
+    client-side, before ever calling `/release` for an unsubmitted A4 item.
+
+
+    v1.5.0 (2026-08-17, Quality-report-balance.md BAL-123, reviewer-found): the v1.4.0 gate above is now
+    ALSO enforced server-side, inside `POST /balance-movements/{id}/release` itself — see that
+    endpoint's own updated description for the exact scoping (Sight-tenor IPLC_LC/UTILIZE only, checked
+    via the movement's own parent contract `tenorType`, never just instrumentType/movementType) and why
+    it cannot affect a Usance LC's own UTILIZE (A6's own compound release, which never calls
+    `/maker-submit`). Closes the gap the v1.4.0 changelog entry above explicitly named as a deliberate,
+    disclosed trade-off ("the reference Angular Transaction Builder client enforces the gate itself,
+    client-side") — any caller can now be relied upon to hit this same 409 if it skips
+    `/maker-submit`, not just the one reference UI.
+
+
+    v1.6.0 (2026-08-17, business instruction, "建議把交易當時(PENDING XOR APPROVED) 交易時的Current
+    Balance 存檔 VIEW EVENTS時 直接抓取為EVENT SNAPSHOT" / "只存PENDING 或 APPROVED 其中一個"): new
+    `BalanceMovement.eventSnapshot` — the same `BalanceSnapshot` shape
+    `GET /balance-movements/{id}/balance-as-of` computes on demand, now ALSO captured once at
+    `POST /balance-movements` (PENDING) and overwritten at `POST /balance-movements/{id}/release`
+    (RELEASED), so a caller already holding the movement (e.g. from the Event Timeline) can read it
+    directly with no extra request. `balance-as-of` itself is unchanged and remains the correct source
+    for movements predating this field (null `eventSnapshot`).
+
+
+    v1.7.0 (2026-08-17, same day, business-reported gap then simplified — "REFER TO DB S01" showed a
+    child-ledger movement's `eventSnapshot` (e.g. a Shipping Guarantee's own) has no way to surface the
+    PARENT LC/Confirmation's own balance impact, which some callers also need; final instruction "不複雜
+    就是交易處理時 Look Up Current Balance 的SNAPSHOT (PENDING OR APPROVED) SAVED TO DB == EVENT BALANCE
+    SNAPSHOT"): new `BalanceMovement.rootEventSnapshot` — ADDITIONAL to `eventSnapshot` (never a
+    replacement — `eventSnapshot` stays this movement's own contract's own balance, unchanged from
+    v1.6.0), populated only for a child-ledger movement (SHGT, IPLC_ACCEPTANCE, EPLC_ACCEPTANCE,
+    EPLC_EXAMINATION): the parent LC/Confirmation's own plain `BalanceSnapshot` at that same moment —
+    exactly what `GET /balance-contracts/{id}/balance` would return for the parent if queried live right
+    then, no before/after decoration. Null for a root-level movement (nothing to redirect to) and for
+    movements predating this field.
+
+
+    v1.8.0 (2026-08-17, same day, business-reported gap — live example, LC S02's 3rd event: a plain A3
+    Document Arrival UTILIZE on the LC itself, no direct SG movement, with SG G01 already issued —
+    "the CURRENT EVENT BALANCE SNAPSHOT should be [both LC Balance AND SG Balance]"; final instruction
+    "就是交易當時LC所有的BALANCE的拍照存檔"): new `BalanceMovement.acceptanceEventSnapshot`/
+    `sgEventSnapshot` — ADDITIONAL to `eventSnapshot`/`rootEventSnapshot` above, never a replacement.
+    Populated whenever exactly ONE Acceptance/Shipping Guarantee contract exists under this movement's
+    own root LC/Confirmation (two or more is ambiguous — left null), excluding when this movement's own
+    contract already IS that type (`eventSnapshot` already covers it). Each is the sibling's own CURRENT
+    plain balance, captured server-side at `POST /balance-movements`/`POST /balance-movements/{id}/release`
+    time — a deliberate correction from an initial same-day implementation that fetched this live when
+    later viewed; business-confirmed it must be captured/persisted AT TRANSACTION TIME instead, matching
+    every other snapshot field in this contract. `sgEventSnapshot` is Import-side only (Shipping
+    Guarantee has no Export equivalent). Null for movements predating this field.
+
+
+    v1.9.0 (2026-08-18, business instruction, "做完A4 A3 的EVENT SNAPSHOT應該跟當初A3交易時一樣 不應改變"
+    — after A4 finalizes a Sight Document Arrival, A3's own Event Snapshot must stay exactly as it was
+    at A3's own transaction time, unchanged): new `BalanceMovement.finalizeEventSnapshot`. For every
+    movement type EXCEPT one, `eventSnapshot` still behaves exactly as v1.6.0 described (captured PENDING
+    at Create, OVERWRITTEN RELEASED at Release) — unchanged. The ONE exception: `POST
+    /balance-movements/{id}/release` finalizing a Sight-tenor `IPLC_LC`/`UTILIZE` (the v1.4.0/v1.5.0 gate's
+    own scoping — A4/Sight Settlement completing an EXISTING A3/A3S Document Arrival rather than creating
+    a new movement) now leaves `eventSnapshot` UNTOUCHED — frozen at whatever the original `POST
+    /balance-movements` call captured — and instead writes the release-time figures into this new
+    `finalizeEventSnapshot` field. Null for every other movement (the vast majority) and for movements
+    predating this field.
+
+
+    v1.10.0 (2026-08-18, same day, business instruction "SNAP SHOT保留當時 LC, SG, ACCEPTANCE BALANCE
+    不會因為後續交易而改變" then "SAME AS EXPORT CONFIRMED LC" — the snapshot preservation guarantee
+    extended beyond just `eventSnapshot`/A4): new `BalanceMovement.finalizeAcceptanceEventSnapshot`/
+    `finalizeSgEventSnapshot` — the v1.9.0-style release-time counterparts to `acceptanceEventSnapshot`/
+    `sgEventSnapshot`, written ONLY for the same Sight-tenor `IPLC_LC`/`UTILIZE` finalize case (A4);
+    `acceptanceEventSnapshot`/`sgEventSnapshot` themselves stay frozen at Create-time for that one case,
+    exactly mirroring `eventSnapshot`/`finalizeEventSnapshot`'s own v1.9.0 split. Separately, `POST
+    /balance-movements/{id}/release` finalizing an `EPLC_EXAMINATION`/`CREATE` movement (B3's own Present
+    Docs earmark, always finalized for real by B4's own compound release — the Export-side counterpart to
+    A4) now leaves that movement's `eventSnapshot`/`rootEventSnapshot`/`acceptanceEventSnapshot` entirely
+    UNTOUCHED too — no new field needed for this case, since B4 always creates its own separate movement
+    with its own correctly-timed figures, so B3's own row simply needs to stay frozen with no "finalize"
+    counterpart to read.
+
+
+    v1.11.0 (2026-08-18, same day, user-requested — "For the Import LC, there is a Tight Available
+    Balance. Would it be possible to have the same field for the Export Confirmed LC?"):
+    `BalanceSnapshot.tightAvailableBalance` is now ALSO populated for `EPLC_CONFIRMATION`, not just
+    `IPLC_LC`/`EPLC_LC`. NOT the same computation as the Import case (`EPLC_CONFIRMATION` has no sibling
+    SHGT exposure to net out — SHGT is always a child of `IPLC_LC`) — it reuses the genuine Export-side
+    analog instead: `availableBalance` minus the COMBINED `presentDocsEarmarkPending` +
+    `presentDocsEarmarkApproved`, the exact figure `POST /balance-movements`' own B3 Present Docs
+    sufficiency check already nets internally at creation time (`domain/offBalanceExposure.ts`'s
+    `computePresentDocsEarmark`) — this only surfaces that same figure as a persisted/queryable
+    `BalanceSnapshot` field, the same way it was already surfaced for Import. `offBalanceExposure`
+    itself remains null for `EPLC_CONFIRMATION` (unchanged) — only `tightAvailableBalance` gains this
+    second, differently-computed population case.
+
+
+    v1.12.0 (2026-08-18, same day, business instruction "所有交易要RELEASE過後 才能根據流程走下一個交易" —
+    every transaction must genuinely RELEASE before the next step in the flow can act on it) — REMOVES
+    `POST /balance-movements/{movementId}/acknowledge` (added v0.8.0) and supersedes the design it
+    implemented. B3's own Checker action on an `EPLC_EXAMINATION`/`CREATE` (Present Docs earmark) is now
+    the standard `POST /balance-movements/{movementId}/release` — a genuine `PENDING` -> `RELEASED`
+    transition, exactly like every other function's own Checker Release — not a separate acknowledgment
+    that left `status` at `PENDING` forever. `BalanceMovement.acknowledgedBy`/`acknowledgedAt` remain on
+    the schema for historical rows only (pre-2026-08-18 data); nothing writes them any more. New
+    `BalanceMovement.presentDocsConsumedAt`/`presentDocsConsumedBy` — set as a SIDE EFFECT of `/release`
+    on the Confirmation's own linked `HONOUR`/`ACCEPT` movement (identified via that movement's own
+    `referencedTransactionId` pointing back at the `EPLC_EXAMINATION` `CREATE`), i.e. the moment B4
+    actually consumes the presentation — replacing `acknowledgedAt` as the basis for
+    `BalanceSnapshot.presentDocsEarmarkPending`/`presentDocsEarmarkApproved`: **Pending** = still-`PENDING`
+    CREATEs; **Approved** = `RELEASED` CREATEs not yet consumed (`presentDocsConsumedAt` still null) — a
+    presentation now continues to occupy Present Docs Earmark capacity through its own genuine Release,
+    dropping out only once B4 truly consumes it, preserving the original v0.8.0 commitment-control intent
+    (E01+E02+...+En must never exceed the Confirmation's real Available Balance) across this now-real
+    `PENDING`->`RELEASED` transition. B4's own compound Release (client-orchestrated, per this file's own
+    "one movement, one leg, one call" principle) correspondingly drops its former "release the B3 record
+    first" leg — the B3 record is already `RELEASED` by the time B4 acts, and re-releasing it would now
+    be a `409 ILLEGAL_STATE_TRANSITION` — B4 releases only its own linked `HONOUR`/`ACCEPT` and any
+    secondary leg(s); the consume side effect above happens automatically as part of that same call.
+
+
+    v1.13.0 (2026-08-20, business instructions — "Tight Available Balance 應該用 Confirmed LC Balance 減
+    其他金額, 因為 APPROVED 才可以動用" / "A3 A3S 交易 Approve 過後 不要再顯示"): TWO changes. (1)
+    `BalanceSnapshot.tightAvailableBalance` now derives from `confirmedBalance`, not `availableBalance` —
+    a still-PENDING increase (ISSUE/AMEND_INCREASE/`EPLC_CONFIRMATION` `AMEND` with a positive amount) no
+    longer raises it until genuinely Released, while a still-PENDING decrease still occupies it
+    immediately (unchanged from before) — same rule now applied consistently inside the SG Issue and
+    Present Docs sufficiency checks at `POST /balance-movements` too, not just the persisted snapshot
+    field. Also closes a related gap: `EPLC_CONFIRMATION`'s own `AMEND` movementType (B2, direction riding
+    the sign of `amount`) previously ran NO sufficiency check at all in its Decrease direction, unlike
+    `IPLC_LC`'s own `AMEND_DECREASE` — now shares that same floor check. (2) RESTORES
+    `POST /balance-movements/{movementId}/acknowledge` (removed v1.12.0 for B3) — re-purposed for A3/A3S's
+    own `IPLC_LC`/`UTILIZE` instead: the Checker's "Approve" step on a Document Arrival is deliberately
+    acknowledgment-only under the hood — it still never transitions `status` (A4/A6 remains the sole real
+    finalization), but
+    is now genuinely persisted again (`acknowledgedBy`/`acknowledgedAt`, no longer historical-only) so a
+    Checker Queue listing can filter an already-approved item out instead of it reappearing as PENDING
+    forever.
+
+
+    v1.14.0 (2026-08-20, same day, business instruction "交易要有 SUBMIT DATETIME/USER, EC DATETIME/USER
+    (optional) AND APPROVE DATETIME/USER"): new `BalanceMovement.cancelledBy`/`cancelledAt`. `POST
+    /balance-movements/{movementId}/cancel` (Maker EC) previously wrote its actor/time into
+    `releasedBy`/`releasedAt` — the same fields `/release` (Approve) writes — disambiguated only by
+    `status === 'CANCELLED'` vs `'RELEASED'`. Now writes this dedicated pair instead, so a caller can
+    read Submit (`createdBy`/`createdAt`), EC (`cancelledBy`/`cancelledAt`, populated only once
+    `status === 'CANCELLED'`), and Approve (`releasedBy`/`releasedAt`, populated only once `status ===
+    'RELEASED'`) as three independent facts with no status-based inference required. `/reject` is
+    unaffected — a REJECTED movement still reuses `releasedBy`/`releasedAt`, no dedicated
+    `rejectedBy`/`rejectedAt` pair was requested.
+
+
+    v1.15.0 (2026-08-20, same day, two business-reported premature-release gaps, both closed by the
+    same "increases counted late, decreases counted early" ("增加從嚴，占用從寬") principle already
+    established for other checks in v1.13.0): (1) `BalanceSnapshot.offBalanceExposure`
+    (`GET .../balance`, `BalanceMovement.eventSnapshot`, etc.) previously netted a
+    `PARTIAL_REDEEM`/`FULL_REDEEM` the moment it was Maker-submitted (`PENDING`), the same as once
+    genuinely `RELEASED` — a standalone SHGT redemption submitted but not yet Checker-approved could let
+    a SECOND, unrelated submission (a new SG Issue, or a new Document Arrival) pass against capacity that
+    was never really freed; if the Checker later rejected that redemption, the bank ended up over its
+    real LC capacity. Now only nets a redemption once genuinely `RELEASED`, **except** a redemption
+    sharing a still-PENDING `UTILIZE`'s own `businessEventId` on the SAME LC (Document Arrival w/
+    Shipping Gtee's own matched compound pair — both legs are always released, or both auto-rolled-back,
+    together, so there is no cross-transaction leakage risk in netting that ONE case from Submit). (2)
+    The Export-side analog: `BalanceSnapshot.presentDocsEarmarkApproved` previously kept counting an
+    already-`RELEASED` `EPLC_EXAMINATION`/`CREATE` in full even while a Confirmation's own `HONOUR`/
+    `ACCEPT` that *references it* (`referencedTransactionId`) was already Maker-submitted, `PENDING` —
+    that consumption is a foregone, self-balancing conclusion once Submitted (unlike a genuinely separate
+    later Checker decision), so it now nets provisionally from that Submit onward too, purely for display
+    (`presentDocsConsumedAt` itself is still only genuinely written at the referencing movement's own
+    `/release`, unchanged). Both exceptions are scoped identically: they apply ONLY to the persisted/live
+    balance display, never to a genuinely separate, independent transaction's own sufficiency check — a
+    NEW SG Issue, a NEW Document Arrival, a NEW Present Docs presentation, or an AMEND_DECREASE (A2/B2's
+    own Decrease direction) are all still checked against the un-netted, strict figure. Also corrects two
+    property descriptions this document itself had left stale since v1.13.0: `tightAvailableBalance`
+    (both the IPLC_LC/EPLC_LC and EPLC_CONFIRMATION cases) is derived from `confirmedBalance`, not
+    `availableBalance`, as v1.13.0's own changelog entry above already stated but this schema's own field
+    description never caught up to reflect; and `POST /balance-movements`' own AMEND_DECREASE sufficiency
+    check (and the parallel `EPLC_CONFIRMATION` `AMEND`-Decrease check) compares against Tight Available
+    Balance, not plain Available Balance, same correction.
+
+
+    v1.16.0 (2026-08-21) — re-grounded against the real implementation again: catches this contract up to
+    A10 (Import LC Close) / B6 (Export Confirmed LC Close), and two smaller previously-undocumented query
+    parameters found in the same pass.
+      - ADDED: `movementType: 'CLOSE'` on `IPLC_LC`/`EPLC_LC`/`EPLC_CONFIRMATION` only — writes off
+        whatever Confirmed Balance remains and retires the Logical Contract (`ContractStatus.CLOSED`,
+        reserved in this schema since the original design but never previously reachable through any
+        endpoint — it is now, exclusively via this movementType). Modelled on cs-tf-balance-knowhow
+        §3.9/§7.7's "cancellation before expiry" — same write-off entry as a natural expiry, but
+        Maker/Checker-triggered rather than date-triggered. Same direction as AMEND_DECREASE/UTILIZE (`-1`).
+      - ADDED business rules for CLOSE, checked identically at Maker Submit (`POST /balance-movements`)
+        and again at Checker Release (`POST /balance-movements/{id}/release`, since eligibility can move in
+        the window between the two): (a) only a root `IPLC_LC`/`EPLC_LC`/`EPLC_CONFIRMATION` is eligible —
+        `400` for any other instrumentType; (b) eligibility requires the contract not already CLOSED, its
+        own Shipping Guarantee AND Acceptance Confirmed Balance both exactly 0, and no open (PENDING, or a
+        RELEASED-but-not-yet-consumed `EPLC_EXAMINATION`) Event anywhere in its whole event tree (root plus
+        every SG/Acceptance/Examination child) — `409 INSUFFICIENT_AVAILABLE_BALANCE` at Submit if not met,
+        `409 ILLEGAL_STATE_TRANSITION` at Release if it stopped holding since Submit; (c) `amount` must
+        exactly equal the contract's own current Confirmed Balance at Submit time (may legitimately be
+        zero for an already fully-utilized LC, but never negative) — re-verified byte-for-byte unchanged at
+        Release, `409 ILLEGAL_STATE_TRANSITION` otherwise (the caller must cancel and resubmit with the
+        current figure, never auto-recomputed server-side).
+      - ADDED `GET /balance-contracts/close-eligible` — paginated Step-1 picker hint listing every ACTIVE
+        root contract of one instrumentType currently eligible for Close (same eligibility rule as above,
+        evaluated in memory over one batched fetch per instrumentType — a real N+1 query fix, not a
+        behavioral change; see `analysis/Balance-Component-DB-Optimization-Analysis.md` P2).
+      - ADDED query parameters, both previously live but undocumented: `GET /balance-contracts` gains
+        `legSeq` (already a `NaturalKey` field, used for Mixed Tenor LC leg resolution — Design doc §7.1,
+        also now added to the `NaturalKey` schema below) and `includeAnyStatus` (opt-in, default false;
+        inquiry-only callers — Look Up Current Balance, Inquire Events — pass `true` so a CLOSED contract
+        stays resolvable for inquiry even though it is no longer selectable to act on; every
+        transaction-creating caller omits it, unchanged ACTIVE-only behavior). `GET /balance-contracts/catalog`
+        gains `requireIssueReleased` (opt-in; excludes a candidate whose own root ISSUE is still PENDING —
+        used by every Maker-ACTION picker, omitted by inquiry-only contexts and B4's own Present Docs search).
+
+    v1.17.0 (2026-08-24, two same-day fixes found during a post-revert audit — see the top-level revert
+    note this session's own decision log carries):
+      - CHANGED: CURRENCY CONSISTENCY (formerly CURRENCY DERIVATION) — `currency` is now genuinely
+        REQUIRED on every request again (added back to `BalanceMovementCreateRequest.required`), not
+        optional/server-derived. A broader "omit it, the server derives it" design was proposed once and
+        reverted along with unrelated work; only the missing consistency VALIDATION was re-added — a
+        supplied `currency` that disagrees with the resolved contract's (or, for a new child contract,
+        its parent's) own stored currency is still rejected (`409 CURRENCY_MISMATCH`), but omitting it
+        is no longer accepted anywhere.
+      - ADDED: `MAKER_CHECKER_CONFLICT` (409) — business-confirmed genuine 4-eyes separation. The same
+        user who created a movement (`createdBy`) can no longer also Release (`POST
+        /balance-movements/{id}/release`), Reject (`.../reject`), or acknowledge (`.../acknowledge`, A3/
+        A3S's own Checker step) it. Checked before the legal-transition check, so a same-user attempt on
+        an already-RELEASED movement still reports the conflict, not a misleading illegal-transition
+        error. `POST /balance-movements/{id}/cancel` is deliberately UNCHANGED — a Maker's own Error
+        Correction on their own still-PENDING entry is the expected, correct case (`createdBy ===
+        cancelledBy` there is normal), not a Maker/Checker conflict.
+
+    v1.18.0 (2026-08-24, same day — "A9 Full-Redeem-only 目前只在 Angular UI 層鎖定, API MAKER & CHECKER也要"):
+      - CHANGED: A9 (standalone Shipping Guarantee Redemption, `SHGT` `PARTIAL_REDEEM` with no
+        `businessEventId`) is now rejected server-side (`409 INSUFFICIENT_AVAILABLE_BALANCE`) at BOTH
+        `POST /balance-movements` (Maker Submit) and `POST /balance-movements/{id}/release` (Checker
+        Release, defense-in-depth for a movement that reached PENDING some other way) — BA-confirmed
+        2026-08-21 (TF_Balance_Component_Mapping Rule #1, "SG discharge is instrument-based, not
+        amount-based") was previously enforced ONLY client-side (the Angular A9 screen locks the Amount
+        field and hardcodes `movementType: 'FULL_REDEEM'`); any other caller could still submit a
+        standalone Partial Redeem directly. A3S's own matched SG redemption leg is UNCHANGED and still
+        accepts Partial Redeem — the distinguishing signal is `businessEventId` (set on every A3S-shaped
+        call, linking it to the paired Document Arrival), not the `PARTIAL_REDEEM`/`FULL_REDEEM`
+        movementType string alone, since A3S's own MIN(Bill, SG Outstanding) match can legitimately equal
+        the SG's full outstanding balance too. A standalone `FULL_REDEEM` (no `businessEventId`) is
+        unaffected either way.
+
+    v1.19.0 (2026-08-25, F1 — external BA review, UCP 600 Art.16(f) auto-release mechanism, full scope
+    per `analysis/Balance-Component-F1-Expire-Proposal-zh.md` §7–§11): AUTO EXPIRY + AUTO CLOSE background
+    sweep, a new `REVERSAL` movementType, Expiry Extension Amendment, and A11/B7 Reopen. Every balance-
+    changing addition below is reached through the existing generic `POST /balance-movements` /
+    `POST /balance-movements/{id}/release` pair, same "one movement, one leg, one call" principle as the
+    rest of this contract — the one new endpoint is `GET /balance-contracts/reopen-eligible` (see below),
+    a Step-1 picker hint mirroring the existing `close-eligible` endpoint's own shape, not a new mutation.
+      - ADDED: `movementType: 'EXPIRE'` on `IPLC_LC`/`EPLC_LC`/`EPLC_CONFIRMATION` only — a date-triggered
+        analog of CLOSE (same `-1` write-off direction), but with its own, DELIBERATELY NARROWER
+        eligibility: contract status ACTIVE, `expiryDate + mailFloatGraceDays` already elapsed, and no
+        open Event anywhere in the contract's own event tree. Unlike CLOSE, EXPIRE does NOT require SG/
+        Acceptance Confirmed Balance to be zero — a still-utilized LC/Confirmation must still expire on its
+        own contractual date. Triggered only by a background sweep (`AUTO_EXPIRY_ENABLED` feature flag),
+        never by a human caller, via two configured system-actor identifiers acting as Maker/Checker
+        (genuine 4-eyes preserved, `assertMakerCheckerSeparation()` unmodified) — sets
+        `ContractStatus.EXPIRED` (new, below) as its own Release side effect.
+      - ADDED: `ContractStatus.EXPIRED` — see the `ContractStatus` schema entry below.
+      - ADDED: two new `BalanceContract` fields — `expiryDate` (LC's own UCP 600 Art.6(d) expiry/validity
+        date; independent of the pre-existing, business-logic-inert `maturityDate`, which is the Usance/
+        Acceptance's own due date, a different concept) and `mailFloatGraceDays` (captured once, from
+        config, at ISSUE time — see the `BalanceContract` schema entries below).
+      - ADDED: `movementType: 'CLOSE'` reused, unmodified, as the AUTO CLOSE batch's own mechanism — a
+        second, independent background sweep (`AUTO_CLOSE_ENABLED` feature flag) scans `EXPIRED` contracts
+        and calls the exact same `evaluateCloseEligibility()`/`createMovement()`/`release()` path a human
+        A10/B6 Close already uses, via the same two system-actor identifiers as AUTO EXPIRY. Both flags are
+        independently toggleable — AUTO EXPIRY carries real accounting/exposure impact and is intended to
+        roll out first and be observed before AUTO CLOSE (pure status finalization, no amount impact) is
+        enabled.
+      - ADDED: `movementType: 'REVERSAL'` — genuinely new infrastructure (the `reversalOfMovementId` field
+        existed on the schema since v1.0.0 but was never populated by any endpoint; it now is). Its
+        direction is NOT a fixed value in the movementType direction table — it is the negation of
+        whatever movement it points at via `reversalOfMovementId`, resolved dynamically. Always created
+        already-linked via `businessEventId` to the compound action that produced it (Extension Amendment
+        or Reopen, below) and released together with it in one Checker action, same compound-leg convention
+        as A3S/B4.
+      - ADDED: `movementType: 'AMEND_EXPIRY_DATE'` on `IPLC_LC`/`EPLC_LC`/`EPLC_CONFIRMATION` — a
+        zero-balance-effect movement (like REOPEN, below) that updates `expiryDate`. Two behaviors depending
+        on the contract's current status at Release time: against an `ACTIVE` contract it is a plain expiry
+        date amendment; against an `EXPIRED` contract (resolved via a dedicated EXPIRED-only natural-key
+        lookup, since the normal ACTIVE-only resolution can no longer find it) it is the Expiry Extension
+        Amendment — Checker Release additionally requires the new `expiryDate` to be in the future, restores
+        `ContractStatus.ACTIVE`, and generates+releases one linked `REVERSAL` of the contract's own EXPIRE
+        movement, restoring the Confirmed Balance EXPIRE had written off. Carries a new `newExpiryDate`
+        request/response field (see the `BalanceMovement` schema entry below).
+      - ADDED: `movementType: 'REOPEN'` on `IPLC_LC`/`EPLC_LC`/`EPLC_CONFIRMATION` only — a zero-balance-
+        effect movement resolved via a dedicated CLOSED-only natural-key lookup (mirrors
+        AMEND_EXPIRY_DATE's own EXPIRED-only lookup). Eligibility: contract status CLOSED, no open Event
+        anywhere in the tree. Checker Release generates+releases one linked `REVERSAL` PER not-yet-reversed
+        EXPIRE/CLOSE movement in the contract's own history (a contract can reach CLOSED via a single human
+        CLOSE, or via AUTO EXPIRY followed by AUTO CLOSE — the latter path's own CLOSE amount is already
+        zero, so reversing only the last movement would restore zero instead of the real historic balance;
+        every not-yet-reversed write-off in the chain is reversed). Not reachable through A2/B2 — a
+        dedicated named business function (A11 for `IPLC_LC`, B7 for `EPLC_CONFIRMATION`) at the Channel
+        API layer (see `balance-component-channel-api.yaml`'s own changelog), reflecting its own higher
+        risk/entitlement tier versus routine Increase/Decrease/Extend.
+      - ADDED `GET /balance-contracts/reopen-eligible` — A11/B7's own Step-1 picker hint, mirroring
+        `GET /balance-contracts/close-eligible`'s own shape (see that endpoint's own description) but
+        filtered to CLOSED contracts with no open Event, deliberately WITHOUT close-eligible's SG/
+        Acceptance-zero condition — see the endpoint's own description below for the full rule. The one
+        genuinely new REST surface this release adds; every other addition reuses the existing generic
+        movement endpoints.
+      - Amount handling: `assertValidAmount()`'s existing CLOSE zero-amount exception now also covers
+        EXPIRE (an already fully-utilized LC's own remaining Confirmed Balance at expiry may legitimately
+        be zero); REOPEN and AMEND_EXPIRY_DATE are both fixed at `'0'` by construction (their own balance
+        effect, if any, comes entirely from a linked REVERSAL leg, never their own signed amount).
+      - Deliberately NOT done this pass, recorded here rather than silently omitted (see `TODO.md`): no
+        sweep "round-splitting" (AUTO CLOSE may process a contract within the SAME sweep cycle it just
+        turned EXPIRED in, leaving zero Extension-Amendment reopen window for a never-utilized LC); no
+        consent-gating on Expiry Extension Amendment or Reopen; existing CLOSE (incl. A10/B6) `reasonCode`
+        stays optional, unchanged — REOPEN's own eligibility check tolerates a null `reasonCode` on the
+        CLOSE(s) it reverses rather than requiring one.
+
+    v1.20.0 (2026-08-25, same day, live UAT on A11/B7 — "REOPEN Submit 出 Account Entries (Pending)...
+    不應該有兩筆" / "Checker要看交易出的帳 再決定 APPROVE 或 REJECT"): REOPEN redesigned. The v1.19.0
+    shape above (a zero-amount REOPEN plus one or more separately-generated, separately-visible `REVERSAL`
+    legs as a Release-time side effect) meant a Checker approving REOPEN saw an empty, zero-entry movement
+    — the real restoration only became visible AFTER approval, with no chance to review the actual Dr/Cr
+    impact first, and Inquire Events/Look Up showed two rows for what is conceptually one business event.
+      - CHANGED: `movementType: 'REOPEN'` now carries its OWN real, positive restoration amount directly —
+        computed server-side at Maker Submit (never caller-typed; the Channel client sends no Amount field
+        for A11/B7 at all) as the sum of the contract's own trailing run of not-yet-reversed RELEASED
+        `EXPIRE`/`CLOSE` movements, walking backward from the most recent movement until the first one
+        that is neither (still correctly handles the §9.7 two-movement EXPIRE→CLOSE chain, restoring their
+        SUM). A real `contingentAccountEntry` is generated at the SAME Submit call, so the Checker reviews
+        the actual account entries and amount BEFORE approving — same "PENDING with a real entry, RELEASED
+        updates the balance" shape every other movementType already has. `MOVEMENT_DIRECTION.REOPEN`
+        changed from `0` to `1` (same "establish/increase" direction as ISSUE/AMEND_INCREASE) accordingly.
+      - REMOVED: REOPEN no longer generates any linked `REVERSAL` movement(s) as a Release-time side
+        effect — Inquire Events/Look Up now show exactly ONE row per Reopen. `movementType: 'REVERSAL'`
+        itself is UNCHANGED and still exists — Expiry Extension Amendment (`AMEND_EXPIRY_DATE` against an
+        `EXPIRED` contract) still uses it exactly as documented under v1.19.0 above; only REOPEN's own use
+        of it was removed.
+      - Amount handling: REOPEN's exact rule updated from "fixed at `'0'`" (v1.19.0 above, `assertValidAmount()`)
+        to "server-computed, non-negative" — grouped with CLOSE/EXPIRE's own zero-exception rule (0 is a
+        legitimate figure, e.g. reopening a CLOSE whose own write-off amount was already 0). Whatever
+        `amount` value a caller submits is silently discarded and overwritten. `AMEND_EXPIRY_DATE` is
+        UNCHANGED — still fixed at exactly `'0'` by construction, this section applied to REOPEN only.
+
+    v1.21.0 (2026-08-25, same day, live UAT — "Auto Close 時必須把REOPEN狀態交易排除 不然才REOPEN 下一秒就被
+    AUTO CLOSE掉了" / "還有AUTO EXPIRE 也把REOPEN狀態交易排除"): AUTO EXPIRY/AUTO CLOSE now each skip a
+    contract still within one sweep interval of its own most recent RELEASED `REOPEN` — narrows the §8.5
+    "no sweep round-splitting" gap recorded under v1.19.0 above: that gap remains for a contract that
+    transitions to `EXPIRED` via a genuine `EXPIRE` (AUTO EXPIRY still immediately hands an already-
+    zero-exposure contract to AUTO CLOSE in the SAME cycle — unchanged, still deliberately deferred), but a
+    contract a human just Reopened (§9.2 Option A, reactivating to `EXPIRED` when the original `expiryDate`
+    had already passed) is no longer immediately swept back to `CLOSED` before there's any chance to follow
+    up (e.g. an Extension Amendment). Time-bounded, not a permanent exclusion: once the grace interval
+    elapses — or any other movement lands on the contract first — normal sweep eligibility resumes, so a
+    REOPEN-to-`ACTIVE` contract whose (still-future-at-the-time) `expiryDate` genuinely arrives later is
+    unaffected and still auto-expires on schedule.
+
+    v1.22.0 (2026-08-25, same day, user-reported — "A2 B2 extension不牽涉金額 不需要出ACCOUNT ENTRIES"):
+    `movementType: 'AMEND_EXPIRY_DATE'` no longer generates a `contingentAccountEntry` — previously
+    returned a spurious zero-amount Dr/Cr pair (an artifact of `MOVEMENT_DIRECTION`'s generic derivation
+    logic, not a deliberate design choice) instead of `null`. Now explicitly `null`, same treatment as
+    `EPLC_EXAMINATION`/`CREATE` (B3 Present Docs) — neither the plain-amendment mode nor the Expiry
+    Extension Amendment mode ever has a real balance/GL effect of its own; Extension's own restoration
+    remains its separately-generated linked `REVERSAL` movement's own real entry, unaffected by this fix.
+
+    v1.23.0 (2026-08-25, same day, user-reported live-testing bug — "IMPORT S01 EXTEND後 無法做後續作業" /
+    "這整個有問題 CLOSE時 餘額10000 REOPEN回復10000 為什麼REVERSAL又回復一次 變成20000餘額?"): FIXED a real
+    double-restoration in the Expiry Extension Amendment path, introduced by the v1.20.0 REOPEN redesign
+    above. A contract can reach `EXPIRED` two ways: a genuine `EXPIRE`, or A11/B7 Reopen reactivating it
+    back to `EXPIRED` (§9.2 Option A, when the original `expiryDate` had already passed) — the latter
+    restores the balance DIRECTLY on REOPEN's own signed amount (v1.20.0), leaving no `REVERSAL` trace.
+    Extension Amendment's own Checker-Release restoration logic still assumed the OLD "REOPEN always
+    leaves a REVERSAL behind" invariant — it kept finding that same already-restored `EXPIRE` (no
+    `REVERSAL` row ever pointed at it) and reversed it a SECOND time, silently double-crediting the
+    balance (a live-reproduced 10,000 → 20,000). Fixed: Extension's own restoration check now looks at
+    whether the contract's own MOST RECENT movement (excluding this Amendment itself) is a RELEASED
+    `EXPIRE` — if so, that is the one genuine thing left to reverse; if it's anything else (most commonly
+    a prior REOPEN), a prior action already restored the balance and Extension generates no `REVERSAL` at
+    all. (Sound by construction: `EXPIRE` can never chain with itself — its own Release side effect
+    immediately clears the `ACTIVE` status AUTO EXPIRY requires — and `CLOSE` can never precede an
+    `EXPIRED` contract, so the trailing run relevant to Extension is always exactly 0 or 1 movement, never
+    a multi-item chain the way REOPEN's own §9.7 case can be.)
+
+    v1.24.0 (2026-08-25, same day — implements four of the items
+    `analysis/Balance-Component-F1-Expire-Proposal-zh.md` §13 formally ratified after the F1 feature
+    above shipped, superseding their earlier "維持待決" status; see that document and `TODO.md`'s own F1
+    §11.4 entry for the full decision record):
+      - FIXED (§13.7): `reactivate()`'s own contract-level side effect for A11/B7 Reopen reactivating a
+        `CLOSED` contract back to `EXPIRED` (§9.2 Option A) now stamps `effectiveTo` with the REOPEN's
+        own Release timestamp, instead of leaving it `NULL`. `NULL` previously read as "still current"
+        on an `EXPIRED` row and gave the new Auto Close Grace Period below no anchor to compute from;
+        reactivating to `ACTIVE` is unaffected — `effectiveTo` still clears to `NULL` there, unchanged.
+      - ADDED (§13.5) — Auto Close Grace Period: AUTO CLOSE now additionally requires
+        `Business Date > effectiveTo + N bank BUSINESS days` (a new fixed config constant,
+        `AUTO_CLOSE_GRACE_PERIOD_BUSINESS_DAYS`) before picking up an `EXPIRED` contract — deliberately
+        independent of the existing calendar-day `mail_float_grace_days` (that one gates AUTO EXPIRY
+        itself, off `expiryDate`; this one gates AUTO CLOSE, off `effectiveTo` — never conflated).
+        Business-day math is a same-repo Phase 1 "weekend-only" mock standing in for the not-yet-built
+        "Standing" microservice BA's proposal envisions for Phase 2. This closes the ORIGINAL §8.5 gap
+        (a freshly-EXPIRED, already-fully-settled contract going straight to `CLOSED` in the SAME sweep
+        cycle) for the general case, not just the REOPEN-originated one v1.21.0 already covered — the
+        v1.21.0 `isRecentlyReopened()` mechanism is UNCHANGED and kept running alongside this as an
+        interim safeguard (see §13.8 in the proposal document for the reconciliation note).
+      - ADDED (§13.1 item 4 / item 3(a)) — `movementType: 'CLOSE'` and `movementType: 'REOPEN'` both now
+        REQUIRE a caller-supplied `reasonCode`; a Submit with none is rejected (400). AUTO CLOSE satisfies
+        this by always supplying a fixed internal value (`NATURAL_EXPIRY_ALL_BALANCES_CLEARED`) rather
+        than being exempted from the check — a human A10/B6/A11/B7 submission must supply its own. Every
+        other movementType is unaffected; `reasonCode` stays optional there, unchanged.
+      - ADDED (§13.1 item 2) — three new optional passthrough fields on the create-movement request,
+        relevant to `AMEND_EXPIRY_DATE`/`REOPEN`: `amendmentApproved` (boolean), `amendmentEffective`
+        (string), `consentStatus` (enum `NOT_REQUIRED`/`OBTAINED`). This service does NOT judge whether
+        consent was actually obtained — per BA's own decision, that determination stays entirely
+        upstream (Channel API/front-office); this service only accepts, shape-validates (`consentStatus`
+        against the fixed enum — an invalid value is rejected, 400), and persists all three for audit.
+        Harmlessly accepted (and stored) on every other movementType too, same posture as `reasonCode`.
+
+    v1.25.0 (2026-08-26, user-directed — "A1 B1 Expiry Date 是必輸欄位... 不然AUTO EXPIRY無法處理"):
+      - CHANGED (breaking for callers relying on the old optional behavior): `expiryDate` is now REQUIRED
+        (400 if absent) for `movementType: 'ISSUE'` against a root instrumentType (`IPLC_LC`/`EPLC_LC`/
+        `EPLC_CONFIRMATION`) — previously optional since v1.19.0. Without this, a contract ISSUEd with no
+        `expiryDate` could never be picked up by the AUTO EXPIRY sweep (it only scans contracts whose
+        `expiry_date` column is non-null), silently defeating the whole F1 auto-release mechanism for that
+        contract. Unaffected: every other `movementType` (still optional/passthrough, unchanged), and
+        every child instrumentType (`SHGT`/`IPLC_ACCEPTANCE`/`EPLC_EXAMINATION`/`EPLC_ACCEPTANCE`), for
+        which `expiryDate` remains structurally inert regardless of what's sent (createContract() already
+        nulled it out for those). Same three-layer enforcement convention as `reasonCode` (v1.24.0):
+        Angular Maker Submit form (required, blocks Submit), submit-rules.ts's own client-side guard, and
+        BalanceService.assertExpiryDateRequired() server-side.
+
+    v1.26.0 (2026-08-26, same day, user-directed — "UI必輸欄位 API也是必輸欄位 三者一體... API包括 MAKER
+    CHECKER"): audited every field the Angular client already treats as mandatory and closed 5 more
+    server-side gaps, all previously enforced ONLY client-side (a direct API caller could bypass every one
+    of them). Each is checked at BOTH the Maker's `POST /balance-movements` AND (defense-in-depth) the
+    Checker's own `.../release` — same posture `expiryDate`/`reasonCode` already established, mirroring
+    the identical `assertValidAmount()` re-check `release()` has always done.
+      - ADDED: `naturalKey.lcNumber` REQUIRED (400 if blank) whenever `naturalKey` is supplied on an
+        `ISSUE`/`CREATE` movement — previously an empty string silently created a contract with a blank
+        LC Number.
+      - ADDED: `naturalKey.ibNumber` REQUIRED additionally for `IPLC_ACCEPTANCE`/`EPLC_ACCEPTANCE`/
+        `EPLC_EXAMINATION`/`EPLC_DUE_FROM_ISSUING_BANK`/`EPLC_ACCEPTANCE_REIMB_RECEIVABLE`/
+        `EPLC_EXPORT_BILLS_DISCOUNTED`; `naturalKey.sgNumber` REQUIRED additionally for `SHGT` — on
+        `ISSUE`/`CREATE` only, mirroring `NATURAL_KEY_FIELDS_BY_INSTRUMENT` client-side.
+      - ADDED: `sourceTransactionRef` REQUIRED (400 if absent) for `movementType` ∈
+        {`AMEND_INCREASE`, `AMEND_DECREASE`, `AMEND`, `AMEND_EXPIRY_DATE`, `UTILIZE`, `HONOUR`, `ACCEPT`}
+        — the Amendment No./Times or IB/EB Number every one of A2/A3/A3S/B2/B4 already requires as a
+        typed field client-side. Every other `movementType` (ISSUE/CREATE/CLOSE/REOPEN/EXPIRE/REVERSAL/
+        the two-field-search-resolved ones) is unaffected — `sourceTransactionRef` stays optional there,
+        unchanged.
+      - ADDED: `tenorType` REQUIRED for `ISSUE` against `IPLC_LC`/`EPLC_CONFIRMATION` (A1/B1) and `CREATE`
+        against `IPLC_ACCEPTANCE` (A6) — the 3 (instrumentType, movementType) pairs the client ever shows
+        a Tenor Type picker for. Additionally, for `IPLC_LC`'s own `ISSUE` (A1) specifically, `tenorDays`
+        must be a positive integer whenever `tenorType` isn't `SIGHT` — mirrors submit-rules.ts's own
+        A1-only backstop; deliberately NOT extended to B1/A6, which have no equivalent client-side
+        backstop today (only builder-fields.ts's own live reactive expression) — this changelog entry
+        documents an existing rule server-side, not a new client-side one.
+
+    v1.27.0 (2026-08-26, same day, user-directed — "Expiry Date也不可以是本國的假日或周末... 加一道檢查FOR
+    A1 B1... UI API都需要"): `expiryDate` on `ISSUE` against a root instrumentType (`IPLC_LC`/
+    `EPLC_CONFIRMATION` — A1/B1) must now also fall on a genuine domestic (Taiwan) business day, not a
+    Saturday/Sunday or a known public holiday — same scope as `assertExpiryDateRequired()` (v1.25.0).
+    New `domain/domesticCalendar.ts` (a same-repo copy of the illustrative 2026-2028 calendar data already
+    used for the F1 §13.5 Auto Close Grace Period reference material — see that module's own top doc
+    comment for why a year outside 2026-2028 is treated as "unknown", not rejected, and why this is a copy
+    rather than a shared import). Enforced at BOTH the Maker's `POST /balance-movements`
+    (`assertExpiryDateIsBusinessDay()`) and the Checker's own `.../release` (defense-in-depth re-check
+    against the already-persisted contract), plus a client-side mirror in submit-rules.ts — same
+    three-layer convention as `expiryDate`/`reasonCode` (v1.24.0/v1.25.0).
+
+    v1.28.0 (2026-08-27, Fix Pending/Delete Pending Phase — `analysis/Balance-Component-
+    FixPending-DeletePending-Proposal-zh.md`, multiple rounds of BA/business review and live
+    verification; see that document's §9-§13 for the full decision record):
+      - CHANGED: `POST /balance-movements/{movementId}/cancel` (Delete Pending / Maker EC) gained two
+        always-on side effects — (1) writes one independent, append-only `DeletePendingAuditRecord`
+        per call (a compound function's own cascade, e.g. A3S/B4/B5, naturally produces one per leg);
+        (2) when the cancelled movement is the root ISSUE of `IPLC_LC`/`EPLC_LC`/`EPLC_CONFIRMATION`
+        (A1/B1 only), the owning contract is ALSO marked `ContractStatus.CANCELLED` — genuinely reachable
+        now, not merely reserved — freeing the natural key (`lcNumber`) for the same Maker to re-Submit
+        under. See `ContractStatus`'s own description for the full safety argument
+        (`assertRootIssueReleased()`'s existing guarantee is what makes this safe).
+      - ADDED: `GET /delete-pending-audit` — Inquire Delete Pending's own audit query, filtered by
+        lcNumber/deletedBy/date range, paginated. Independent of Inquire Events, which now EXCLUDES every
+        CANCELLED movement from its own merged Events timeline (a CANCELLED movement never had any real
+        RELEASED impact, so surfacing it there was pure noise) — Delete Pending history lives exclusively
+        in this new endpoint.
+      - ADDED: `GET /delete-pending-audit/lc-catalog` — the LC Catalog step backing Inquire Delete
+        Pending's own two-layer Import/Export -> LC Catalog -> drill-down navigation (mirroring Inquire
+        Events' own UX). Unlike `GET /balance-contracts/catalog`, returns only DISTINCT LC Numbers that
+        have at least one Delete Pending record, deduplicated even across A1/B1's own multi-contract
+        Resubmit chains (§1 above) — the representative row is always the MOST RECENT cycle.
+      - ADDED: `GET /balance-contracts/{balanceContractId}` — resolves a contract directly by ID, no
+        natural key required (a `DeletePendingAuditRecord` only ever carries `balanceContractId`).
+      - ADDED: `GET /balance-contracts/catalog` gained `excludeCancelled` (opt-in) — excludes a
+        Delete-Pending'd root contract from Inquire Events' own LC Master Records Index; every other
+        existing caller is unaffected (omits the new parameter, unchanged default `false`).
+      - CHANGED: `GET /balance-movements` gained a second, mutually-exclusive query shape —
+        `createdBy`/`status`/`page`/`pageSize` (Maker Queue, Fix Pending/Delete Pending Phase 2) alongside
+        the existing `businessEventId` shape. One of the two is now required (400 if neither is supplied,
+        previously only `businessEventId` was ever accepted and required).
+      - ADDED: `DeletePendingAuditRecord` schema (always returned already-joined with its own contract's
+        natural key — see the schema's own description).
+
+
+    v1.29.0 (2026-08-27, business-confirmed — "A6 必須... 承接並正式轉換 A3/A3S 的 EARMARKED exposure";
+    see `lc-balance/CLAUDE.md`'s own "Design Principle — Earmarking vs. Final-Processing Functions" entry
+    for the full accounting rationale): A3/A3S's own Usance earmark (`IPLC_LC`/`UTILIZE`) is a Balance
+    Component-internal Balance Reservation only — it never reaches Accounting on its own (Design doc §5.x)
+    — but was never actually CONVERTED into a real, second Account Entries set once A6 later Approved,
+    leaving it EARMARKED forever even after the Acceptance it supposedly became was fully posted. Fixed
+    with a genuine cascade, both directions:
+      - CHANGED: `POST /balance-movements` — a new `IPLC_ACCEPTANCE`/`CREATE` (A6) whose
+        `referencedTransactionId` points at a still-PENDING, already-acknowledged, not-yet-Maker-Submitted
+        `IPLC_LC`/`UTILIZE` now ALSO sets that referenced UTILIZE's own `makerSubmittedBy`/`makerSubmittedAt`
+        as a side effect of THIS call — mirroring what `POST .../maker-submit` does explicitly for A4, since
+        A6 (unlike A4) has no separate "Maker Submit" step of its own to hang this on. Best-effort/silent
+        no-op for any other shape (e.g. a raw caller supplying an unrelated or already-submitted
+        `referencedTransactionId`) — never a validation error.
+      - CHANGED: `POST /balance-movements/{movementId}/release` — releasing that same A6 `CREATE`
+        recursively releases the referenced UTILIZE too (an internal call to this same endpoint's own
+        logic) — converting A3/A3S's own earmark into a SECOND, genuinely posted, independently-postable
+        Account Entries set (the LC's own `contingentAccountEntry`, Cr side — releasing the LC's own
+        contingent) alongside the Acceptance's own new set (Dr side — establishing the Acceptance's own
+        contingent). Both reach RELEASED together, from one Checker action, matching the same "one Release
+        click does BOTH" shape this document's own top-level description already established for other
+        compound functions.
+      - CHANGED: the v1.5.0 Maker-Submit gate (`POST .../release` returns `409` for an un-Maker-Submitted
+        `IPLC_LC`/`UTILIZE`) is WIDENED from Sight-tenor-only to ANY explicit `tenorType` — a Usance LC's
+        own UTILIZE (A6) now also requires `makerSubmittedAt` before release, automatically satisfied by
+        the CREATE-time side effect above. **Corrects v1.5.0's own changelog claim** ("why it cannot
+        affect a Usance LC's own UTILIZE... which never calls `/maker-submit`") — that was true before
+        this version; it is no longer true after it. A contract with no explicit `tenorType` at all (the
+        pre-existing backward-compatibility carve-out, e.g. the reference Business Case Runner's own older
+        cases) remains unaffected either way.
+      - CHANGED: `BalanceMovement.referencedTransactionId` — no longer universally "passthrough only,
+        never validated to resolve to a real movement" for the A6 shape specifically; see that field's own
+        corrected description below.
+
+
+    v1.30.0 (2026-08-28, business-confirmed — "都只有一筆... 掛帳也掛在同一筆EVENT上"): a REAL regression
+    in v1.29.0 above, found live the same review pass that formalized the A6/B4 Accounting Event Ownership
+    Rule (display-layer only — see `lc-balance/CLAUDE.md`'s own entry of that name; not otherwise
+    reflected in this contract) — cancelling A6's own `CREATE` left the referenced UTILIZE permanently
+    stranded with `makerSubmittedAt` still set from v1.29.0's own side effect, even though the A6 attempt
+    that set it had just been withdrawn.
+      - CHANGED: `POST /balance-movements/{movementId}/cancel` — cancelling an `IPLC_ACCEPTANCE`/`CREATE`
+        (A6) whose `referencedTransactionId` points at a still-PENDING `IPLC_LC`/`UTILIZE` with
+        `makerSubmittedAt` set (i.e. set by v1.29.0's own CREATE-time side effect) now ALSO clears that
+        UTILIZE's own `makerSubmittedBy`/`makerSubmittedAt` — "revert to before A6 Submit," the exact same
+        state `POST .../withdraw-maker-submit` restores for A4. Deliberately does NOT write a second
+        `DeletePendingAuditRecord` for the reverted UTILIZE — the one row this call already writes for
+        A6's own cancelled `CREATE` is the single audit record of this whole two-record business event; a
+        second row would reintroduce the identical "two records for one event" duplication the Design
+        Principle above exists to prevent, on the Delete Pending audit trail instead of the Event Timeline.
+
+
+    v1.31.0 (2026-08-28, user-directed — "A1 B1 A2 B2, LC Balance = Amount * (1 + Tolerance%) 帳務是用LC
+    Balance出帳"): `BalanceMovement.contingentAccountEntry.amount` was booking the caller's own face-level
+    `amount` for every movementType, including A1/B1 (`ISSUE`) and A2/B2 (`AMEND_INCREASE`/`AMEND_DECREASE`/
+    `AMEND`) — the exact four where Tolerance conversion applies (`ceilingAmount = amount × (1 +
+    tolerancePct/100)`, already the figure Confirmed/Available Balance are derived from) — so the generated
+    Dr/Cr voucher's own amount could silently disagree with the balance the SAME movement was actually
+    posted against whenever `tolerancePct` was non-null. Every other movementType (SHGT/Acceptance, which
+    Tolerance never applies to) is unaffected — `ceilingAmount` already equals `amount` unchanged there.
+      - CHANGED: `BalanceMovement.contingentAccountEntry.amount` — now the movement's own `ceilingAmount`
+        (already returned alongside it on the same movement), not the face-level `amount`, for A1/B1/A2/B2;
+        a true no-op everywhere else. Sign is preserved (B2's own negative-amount-as-Decrease convention
+        still resolves the same Dr/Cr direction). Same fix applied to `POST .../edit` (Fix Pending).
+
+    v1.32.0 (2026-08-28, user-directed — "A10 and A11 if Tight Available Balance = 0 then no entries
+    should be generated. Refer to S01 for Import"): `CLOSE`/`EXPIRE`/`REOPEN` are the only movementTypes
+    where a genuinely zero amount is legitimate (an already-fully-utilized/EXPIRED/CLOSED contract with
+    nothing left to write off or restore) — previously still generated a zero-value `contingentAccountEntry`
+    Dr/Cr pair, carrying no real accounting information. Eligibility itself is unaffected — S01-shaped LCs
+    (Confirmed/Tight Available Balance already 0) remain fully selectable in A10's own picker, Close, appear
+    in A11's own Reopen picker once CLOSED, and Reopen back to ACTIVE exactly as before; only the generated
+    voucher changes.
+      - CHANGED: `BalanceMovement.contingentAccountEntry` — now `null` (not a zero-value pair) whenever the
+        movement's own `ceilingAmount` is exactly `"0"` for `CLOSE`/`EXPIRE`/`REOPEN`. Every other
+        movementType is unaffected — `assertValidAmount()` already rejects a zero amount for all of them,
+        so this can never mask a genuinely non-zero figure elsewhere.
+
+    v1.34.0 (2026-08-29): Fix Pending §19 redesigned — `POST /balance-movements/{movementId}/edit`
+    now corrects the movement's row IN PLACE (same `movementId`/`eventSeq`) instead of marking the old row
+    with an internal revision marker and inserting a replacement. That marker conflated a Business Status
+    with a technical revision concept, and could leak into raw API responses (`GET
+    /balance-contracts/{id}/movements`, `GET /balance-movements?businessEventId=`) unfiltered. The pre-edit
+    content is preserved separately (no new endpoint yet — the microservice's own
+    `FixPendingAuditStore`/`fix_pending_audit` table).
+      - CHANGED: `MovementStatus` enum — the internal revision-marker value removed (4 legal values now).
+      - CHANGED: `POST .../edit` — response is now the SAME movement (same `movementId`), corrected;
+        previously a NEW movement with a `supersededByMovementId` pointer to the (now-nonexistent)
+        predecessor. `editedBy`/`editedAt` are unaffected — still set on the live row.
+
+    v1.35.0 (2026-08-29): broadened cleanup, same day as v1.34.0 — `ContractStatus`'s own reserved
+    contract-versioning mechanism (`markSuperseded()`, a separate, unrelated design from Fix Pending's own
+    v1.34.0 change above) is removed too: zero endpoints ever transitioned a contract through it, confirmed
+    via a zero-call-site audit. `BalanceMovement.supersededMovementId` (a separate, pre-existing,
+    never-written reserved field predating Fix Pending) is removed for the same reason.
+      - CHANGED: `ContractStatus` enum — the reserved contract-versioning value removed (4 legal values now).
+      - REMOVED: `BalanceMovement.supersededMovementId` — reserved since v1.0.0, never populated by any
+        endpoint in this contract.
+
+    v1.36.0 (2026-08-29): multi-leg business events now have server-owned SQLite transaction boundaries.
+      - ADDED: `POST /balance-movements/compound` atomically creates two or more sibling movements sharing
+        one non-null `businessEventId`.
+      - ADDED: `POST /balance-movements/compound-release` atomically releases two or more distinct movements.
+      - ADDED: `POST /balance-movements/compound-actions` atomically executes two or more ordered Release or
+        Acknowledge actions with one actor. This supports compound workflows whose legs require different
+        state transitions while preserving all-or-nothing behavior.
+      - CLARIFIED: the existing single-movement create/release endpoints remain valid for single-leg commands;
+        callers no longer need client-side compensation for an approved multi-leg command.
+      - DOCUMENTED business routing: Import A3/A3S continues to A4 for Sight or A6 for Seller's/Buyer's
+        Usance; Export B3 continues to B4, whose HONOUR/ACCEPT compound shape is selected by Sight/Usance.
+  version: "1.42.0"
+servers:
+  - url: https://api.bank.example/balance-component/v1
+    description: Production-style contract root. This prototype's own dev proxy (lc-balance-wc/proxy.conf.json) strips the /balance-component prefix entirely and forwards bare paths to the service's actual :4100 listener — there is no live /v1 segment in dev today; this server URL documents the intended production shape.
+tags:
+  - name: BalanceContracts
+    description: Logical contract resolution, catalog search, and balance/movement queries.
+  - name: BalanceMovements
+    description: Exposure-amount changes — Earmark (PENDING), Maker/Checker release lifecycle.
+  - name: Balances
+    description: Confirmed/Available balance and movement queries, including as-of historical queries.
+
+paths:
+
+  /balance-contracts:
+    get:
+      tags: [BalanceContracts]
+      summary: Resolve a Logical Contract by natural key, returning its current ACTIVE version
+      description: >
+        Design doc §3.1/§3.3 "呼叫端的實際使用方式" — callers never manage
+        logicalContractId/balanceContractId directly; they always resolve
+        through the natural key (lcNumber, plus ibNumber/sgNumber
+        depending on instrumentType — see the natural-key table in §3.1).
+        Returns 404 if no Logical Contract exists yet for this natural key
+        (the caller should then submit an ISSUE/CREATE movement instead).
+
+
+        v1.16.0 — `includeAnyStatus` (default false, opt-in) resolves regardless of `ContractStatus`, not
+        just `ACTIVE`: inquiry-only callers (Look Up Current Balance, Inquire Events) pass `true` so a
+        CLOSED (A10/B6) contract stays resolvable for inquiry even though it is no longer selectable to
+        act on; every transaction-creating caller omits it, unchanged ACTIVE-only behavior. When both an
+        ACTIVE and a CLOSED row exist for the same natural key (a re-ISSUE after a prior Close), the ACTIVE
+        one wins.
+      parameters:
+        - name: instrumentType
+          in: query
+          required: true
+          schema: { $ref: '#/components/schemas/InstrumentType' }
+        - name: lcNumber
+          in: query
+          required: true
+          schema: { type: string }
+        - name: ibNumber
+          in: query
+          schema: { type: string }
+          description: Required when instrumentType is IPLC_ACCEPTANCE/EPLC_ACCEPTANCE/EPLC_EXAMINATION/EPLC_DUE_FROM_ISSUING_BANK/EPLC_ACCEPTANCE_REIMB_RECEIVABLE/EPLC_EXPORT_BILLS_DISCOUNTED.
+        - name: sgNumber
+          in: query
+          schema: { type: string }
+          description: Required when instrumentType is SHGT.
+        - name: legSeq
+          in: query
+          schema: { type: string }
+          description: v1.16.0 — Mixed Tenor LC leg discriminator (Design doc §7.1). Not required by any currently-implemented flow; carried through for future leg-level LC support, same posture as BalanceMovement.legRef.
+        - name: includeAnyStatus
+          in: query
+          schema: { type: boolean, default: false }
+          description: v1.16.0 — see this endpoint's own description above.
+      responses:
+        '200':
+          description: Logical Contract found — its current ACTIVE version is returned.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BalanceContract' }
+        '404':
+          description: No Logical Contract exists yet for this natural key.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /balance-contracts/catalog:
+    get:
+      tags: [BalanceContracts]
+      summary: Paginated, searchable listing of contracts — backs every "pick an existing LC/Acceptance/SG/Confirmation" UI
+      description: >
+        v1.0.0 — real, previously-undocumented endpoint. Every picker in the
+        channel-facing UI (flat Catalog / LC Index, Parent LC picker, IB/EB
+        Index) is backed by this one listing endpoint, parameterized
+        differently per picker. Results are ordered by natural-key
+        reference ascending (business instruction: "pickup 時 Order by
+        Reference").
+      parameters:
+        - name: instrumentType
+          in: query
+          required: true
+          schema: { $ref: '#/components/schemas/InstrumentType' }
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/ContractStatus' }
+        - name: q
+          in: query
+          description: Free-text substring filter against lcNumber (and ibNumber/sgNumber where applicable).
+          schema: { type: string }
+        - name: lcNumber
+          in: query
+          description: Exact lcNumber filter — used by a Parent-picked-first cascading picker (Step 2's IB/EB Index) to scope to exactly one LC.
+          schema: { type: string }
+        - name: tenorFamily
+          in: query
+          description: Restricts to contracts whose own declared tenorType matches this family — SIGHT means tenorType=SIGHT exactly; USANCE means any Usance-family tenorType. Contracts with no recorded tenorType are never filtered out.
+          schema: { type: string, enum: [SIGHT, USANCE] }
+        - name: requireIssueReleased
+          in: query
+          description: v1.16.0 — opt-in, previously live but undocumented (business-reported gap 2026-08-18, "S10 still shown in A4 function which is wrong" — S10's own ISSUE was still PENDING). Excludes a candidate whose own root ISSUE/CREATE is not yet RELEASED. Applied by every Maker-ACTION picker; omitted by inquiry-only contexts and B4's own Present Docs search, whose candidates are legitimately PENDING.
+          schema: { type: boolean, default: false }
+        - name: excludeCancelled
+          in: query
+          description: v1.28.0 — opt-in (business-reported gap, "CANCELLED 不應該顯示在 INQUIRE EVENTS CATALOG 上"). Excludes a contract whose root ISSUE was Delete-Pending'd (see `ContractStatus`'s own description). Inquire Events' own LC Master Records Index passes `true`; every other caller (including this endpoint's own Maker-ACTION pickers, which already imply this via their default `status=ACTIVE`) omits it. Deliberately NOT applied by `GET /delete-pending-audit/lc-catalog` below, whose entire purpose is surfacing exactly this kind of contract.
+          schema: { type: boolean, default: false }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
+      responses:
+        '200':
+          description: One page of matching contracts.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total, page, pageSize]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/BalanceContract' }
+                  total: { type: integer }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+
+        '500':
+          description: The service could not complete the catalog query.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /balance-contracts/close-eligible:
+    get:
+      tags: [BalanceContracts]
+      summary: A10 (Import LC Close) / B6 (Export Confirmed LC Close) — Step-1 picker hint
+      description: >
+        v1.16.0 — real, previously-undocumented endpoint. Every ACTIVE root contract of one instrumentType
+        (`IPLC_LC`/`EPLC_LC`/`EPLC_CONFIRMATION` only — `400` for any other instrumentType) currently
+        eligible to Close: not already CLOSED, its own Shipping Guarantee AND Acceptance Confirmed Balance
+        both exactly 0, and no open Event anywhere in its whole event tree (root plus every SG/Acceptance/
+        Examination child — a still-PENDING movement, or a RELEASED-but-not-yet-consumed
+        `EPLC_EXAMINATION` CREATE, both block eligibility). The SAME eligibility rule
+        `POST /balance-movements` re-checks at Maker Submit and `POST /balance-movements/{id}/release`
+        re-checks at Checker Approve — a candidate that stops qualifying between the two is caught by
+        those endpoints, not silently allowed through. Distinct from `GET /balance-contracts/catalog`'s own
+        `requireIssueReleased` flag — eligibility here spans multiple tables/instrument types per
+        candidate, not expressible as a single WHERE clause.
+      parameters:
+        - name: instrumentType
+          in: query
+          required: true
+          schema: { $ref: '#/components/schemas/InstrumentType' }
+        - name: lcNumber
+          in: query
+          description: Exact lcNumber filter, same convention as GET /balance-contracts/catalog.
+          schema: { type: string }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
+      responses:
+        '200':
+          description: One page of ACTIVE root contracts of this instrumentType currently eligible for Close.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total, page, pageSize]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/BalanceContract' }
+                  total: { type: integer }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+        '400':
+          description: instrumentType is missing, or is not one of IPLC_LC/EPLC_LC/EPLC_CONFIRMATION.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /balance-contracts/reopen-eligible:
+    get:
+      tags: [BalanceContracts]
+      summary: A11 (Import LC Reopen) / B7 (Export Confirmed LC Reopen) — Step-1 picker hint
+      description: >
+        v1.19.0, F1 §9.6/§11 — mirrors `GET /balance-contracts/close-eligible` above exactly (same
+        batched-per-instrumentType query shape, same aggregate-not-per-candidate approach), but the
+        eligibility rule is deliberately NARROWER, not the same one: every CLOSED root contract of one
+        instrumentType (`IPLC_LC`/`EPLC_LC`/`EPLC_CONFIRMATION` only — `400` for any other instrumentType)
+        with no open Event anywhere in its whole event tree. Unlike close-eligible, this endpoint does
+        NOT require SG/Acceptance Confirmed Balance to be zero — REOPEN has no such condition of its own
+        (§9.8), only a genuinely CLOSED status plus no open Event. The SAME eligibility rule
+        `POST /balance-movements` re-checks at Maker Submit (`movementType: 'REOPEN'`) and
+        `POST /balance-movements/{id}/release` re-checks at Checker Approve.
+      parameters:
+        - name: instrumentType
+          in: query
+          required: true
+          schema: { $ref: '#/components/schemas/InstrumentType' }
+        - name: lcNumber
+          in: query
+          description: Exact lcNumber filter, same convention as GET /balance-contracts/catalog.
+          schema: { type: string }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
+      responses:
+        '200':
+          description: One page of CLOSED root contracts of this instrumentType currently eligible for Reopen.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total, page, pageSize]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/BalanceContract' }
+                  total: { type: integer }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+        '400':
+          description: instrumentType is missing, or is not one of IPLC_LC/EPLC_LC/EPLC_CONFIRMATION.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /balance-contracts/{balanceContractId}:
+    get:
+      tags: [BalanceContracts]
+      summary: Resolve one contract version directly by ID — no natural key required
+      description: >
+        v1.28.0 — Inquire Delete Pending's own View action (Fix Pending/
+        Delete Pending Phase). A `delete_pending_audit` record (see
+        `GET /delete-pending-audit` below) only ever carries
+        `balanceContractId`, not the natural key `GET /balance-contracts`
+        (the plain, no-path-param form) requires — this endpoint resolves
+        directly by ID instead. Registered server-side AFTER `/catalog`,
+        `/close-eligible`, `/reopen-eligible` (this single-segment path would
+        otherwise shadow those more specific ones).
+      parameters:
+        - name: balanceContractId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: The contract version, whatever its current status (ACTIVE/CLOSED/CANCELLED/EXPIRED — no status filter, unlike the natural-key form's own ACTIVE-only default).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BalanceContract' }
+        '404':
+          description: No contract with this balanceContractId.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /balance-contracts/{balanceContractId}/balance:
+    get:
+      tags: [Balances]
+      summary: Confirmed / Available balance for one contract version
+      description: >
+        Design doc §3.3 "查詢用的兩個衍生數字" — Confirmed Balance = sum of
+        RELEASED movements; Available Balance = Confirmed Balance minus/plus
+        the net of currently-PENDING earmarks. Design doc §11 (query API
+        requirements, item c) — the `asOf` parameter answers "what was the
+        balance as of a given COB business date", filtering on
+        BalanceMovement.businessDate rather than the system createdAt
+        timestamp. For "what was the balance immediately after one specific
+        movement's own event" instead of a calendar date, use
+        `GET /balance-movements/{movementId}/balance-as-of`.
+      parameters:
+        - name: balanceContractId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: asOf
+          in: query
+          description: Business date (COB) to compute the historical balance as of. Omit for the live balance.
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Balance snapshot.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BalanceSnapshot' }
+        '404':
+          description: Contract version not found.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /balance-contracts/{balanceContractId}/movements:
+    get:
+      tags: [Balances]
+      summary: List every movement against one contract version (Event Timeline)
+      description: >
+        Design doc §11 (query API requirements, item a/d) — required so
+        that REJECTED/PENDING records can be manually investigated instead
+        of relying on an automatic timeout (business decision, §11 —
+        REJECTED timeout was explicitly rejected in favor of always-
+        available query capability). Returns the full movement history for
+        this contract version, newest first; there are no server-side
+        filters — a caller wanting a subset (by status, by businessEventId,
+        etc.) filters the returned array itself.
+      parameters:
+        - name: balanceContractId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Every movement against this contract version, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/BalanceMovement' }
+
+  /balance-movements:
+    post:
+      tags: [BalanceMovements]
+      summary: Create a movement (Earmark) — PENDING, pending Checker Release
+      description: >
+        Design doc §6 — single atomic operation, lock scoped to the
+        resolved balanceContractId only (different contracts never block
+        each other): compute Available Balance, reject immediately with 409
+        if insufficient for a balance-decreasing movementType (no PENDING
+        record created), otherwise create the PENDING record and earmark
+        the amount out of Available Balance. ISSUE/CREATE-type movements
+        against a natural key that does not yet resolve to a Logical
+        Contract implicitly create the Logical Contract (version 1, ACTIVE)
+        as part of this same call — but see the `NATURAL_KEY_ALREADY_EXISTS`
+        rule below: this only happens when no ACTIVE contract already
+        exists for that natural key.
+
+
+        See CURRENCY CONSISTENCY in this document's top-level description
+        for the full rule — in short, `currency` is always required, and
+        for every case other than a genuinely root new Logical Contract
+        (no existing resolution, no `parentLogicalContractId`) the
+        supplied value must match the resolved contract's or parent's own
+        currency, rejecting a mismatch with `409 CURRENCY_MISMATCH`.
+
+
+        Idempotent on (balanceContractId, eventSeq) — Design doc §8:
+        resubmitting the same pair returns the existing record (200)
+        instead of erroring or double-counting; `eventSeq` is caller-
+        supplied specifically to make retries safe.
+
+
+        `409 NATURAL_KEY_ALREADY_EXISTS` — a creating movementType
+        (ISSUE/CREATE) whose natural key already resolves to an ACTIVE
+        contract is rejected outright; the caller should submit a
+        non-creating movementType against the existing contract instead
+        (or, for a genuine contractual term change, that is out of scope
+        for this endpoint entirely — see the v1.0.0 changelog note on the
+        removed contract-versioning endpoint).
+
+
+        `400` — creating an `IPLC_ACCEPTANCE`/`EPLC_ACCEPTANCE` under a
+        Sight-tenor parent LC, or where the child's own `tenorType` does
+        not match the parent's own declared tenor, is rejected as a
+        request validation failure, not a balance-sufficiency one.
+
+
+        `parentLogicalContractId` is REQUIRED (400 if missing) for SHGT
+        `ISSUE` and `EPLC_EXAMINATION` `CREATE` — both are checked for
+        sufficiency against the PARENT's own Tight Available Balance /
+        earmark-adjusted Available Balance (Design doc §6.1/§6.8), not an
+        unconstrained figure. For a UTILIZE movement against IPLC_LC/
+        EPLC_LC specifically, the same §6.1 off-balance-sheet check is a
+        hard `409 InsufficientBalanceError` if the amount exceeds Available
+        Balance minus the LC's own outstanding SHGT exposure (v0.7.0 —
+        superseded the earlier non-blocking warning tier entirely).
+
+
+        `400 sourceTransactionRef already used` — this natural-language
+        reference must be unique per `balanceContractId`; resubmitting the
+        same one against the same contract (with a genuinely new
+        eventSeq — a same-eventSeq resubmission is the idempotent-replay
+        case above, not this one) is rejected.
+
+
+        For IPLC_LC/EPLC_LC ISSUE/AMEND_INCREASE/AMEND_DECREASE, `amount`
+        is the caller-typed face-level delta; the server derives
+        `ceilingAmount = amount × (1+tolerancePct/100)` and — for
+        AMEND_DECREASE specifically (and, symmetrically, `EPLC_CONFIRMATION`'s
+        own `AMEND` in its Decrease direction) — checks *that* derived figure
+        against **Tight** Available Balance, not plain Available Balance and
+        not the raw `amount` (Design doc §6.2, v0.3.0; basis corrected to
+        Tight in v1.13.0/v1.15.0 — see the top-level changelog).
+
+
+        v1.16.0 — `movementType: 'CLOSE'` (A10/B6, IPLC_LC/EPLC_LC/EPLC_CONFIRMATION only, `400` for any
+        other instrumentType) writes off the contract's remaining Confirmed Balance and, once Released,
+        retires it (`ContractStatus.CLOSED`). Eligibility (not already CLOSED, zero SG/Acceptance Confirmed
+        Balance, no open Event anywhere in the event tree) is a `409 INSUFFICIENT_AVAILABLE_BALANCE` if not
+        met at Submit — see `GET /balance-contracts/close-eligible` for a way to list candidates that
+        already qualify. `amount` must exactly equal the contract's own current Confirmed Balance (may be
+        zero, never negative); the same eligibility and exact-amount checks are re-run at
+        `POST /balance-movements/{id}/release` before actually flipping status — see that endpoint's own
+        description.
+
+
+        v1.29.0 — a new `IPLC_ACCEPTANCE`/`CREATE` (A6) whose own `referencedTransactionId` points at a
+        still-PENDING, already-acknowledged, not-yet-Maker-Submitted `IPLC_LC`/`UTILIZE` (A3/A3S's own
+        earmark) ALSO sets that referenced UTILIZE's own `makerSubmittedBy`/`makerSubmittedAt` as a side
+        effect of THIS call — see `BalanceMovement.makerSubmittedBy`'s own description for the full
+        mechanism and why (A6 has no separate "Maker Submit" step of its own to set it from otherwise).
+        Best-effort/silent — an unrelated or already-submitted `referencedTransactionId` (e.g. from a raw
+        API caller) is simply ignored, never a validation error.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BalanceMovementCreateRequest' }
+      responses:
+        '201':
+          description: New PENDING movement created (new eventSeq).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BalanceMovement' }
+        '200':
+          description: Already exists — resubmission of the same (balanceContractId, eventSeq) returned unchanged.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BalanceMovement' }
+        '400':
+          description: Request validation failed — includes malformed fields, the Acceptance/parent-tenor consistency check, a missing required parentLogicalContractId, and a reused sourceTransactionRef.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: Available Balance insufficient for this movementType (INSUFFICIENT_AVAILABLE_BALANCE), the natural key already resolves to an ACTIVE contract for a creating movementType (NATURAL_KEY_ALREADY_EXISTS), or the caller-supplied currency does not match the derived one (CURRENCY_MISMATCH). No record is created in any case.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+    get:
+      tags: [BalanceMovements]
+      summary: Either (a) every movement sharing a businessEventId, across contracts, or (b) one Maker's own worklist by createdBy/status — two mutually exclusive query shapes on one path
+      description: >
+        Shape (a), v1.2.0 — bug fixed 2026-08-16, reviewer-reported ("A1 -> A8 -> A3S -> A4, the related SG
+        entries was not shown"): lets a caller independently resolve the linked leg(s) of a compound
+        submission (A3S's SG redemption + LC UTILIZE, B5's Acceptance settle + Reimbursement
+        Receivable REIMBURSE) by their shared businessEventId, without needing to have been the same
+        caller/session that originally submitted them — the whole point of Maker/Checker 4-eyes
+        separation being genuinely two different actors. Cross-contract by design (the SG's own
+        balanceContractId differs from the LC's) — businessEventId is the only correlation the two
+        linked legs actually share server-side. Returns every movement carrying this businessEventId,
+        oldest first (creation order), or an empty array if none do — never 404.
+
+
+        Shape (b), v1.28.0 — Maker Queue (Fix Pending/Delete Pending Phase 2): a Maker's own cross-session
+        "My Pending/My Rejected" worklist, since Delete Pending after Checker Reject only stays reachable
+        via the SAME browser session's own in-memory Submit result otherwise. Returns each movement paired
+        with its own owning contract (unlike shape (a)'s bare movement array) so a caller can derive
+        Function/LC Number/Secondary Reference client-side without a second round trip, same posture as
+        `GET /delete-pending-audit` below. `createdBy` is required to select this shape; `businessEventId`
+        and `createdBy` are mutually exclusive — supplying neither is a `400`.
+
+
+        Shape (b)'s own PENDING/REJECTED result additionally excludes two kinds of row that would
+        otherwise be technically-PENDING noise, not genuinely actionable work items:
+        (1) an `IPLC_LC`/`UTILIZE` that is PENDING, already-acknowledged, but not yet Maker-Submitted (a
+        plain EARMARKED A3/A3S record with nothing outstanding for THIS Maker until they begin A4/A6);
+        (2) v1.28.0/v1.30.0 — any movement that is currently the target of another, still-live (non-
+        CANCELLED) movement's own `referencedTransactionId` — i.e. an A3/A3S UTILIZE already superseded by
+        its own A6's separate `CREATE` (business-confirmed 2026-08-27, "應該是一個 U01 B01" — without this,
+        the SAME A6 business event appeared as two independent worklist rows). If that superseding A6
+        `CREATE` is later Delete-Pending'd (v1.30.0), the underlying UTILIZE correctly reverts to case (1)
+        above and stays excluded — it does NOT reappear as its own row (the withdrawn A6 attempt reverted
+        it to a genuinely not-yet-actionable state, not a newly-actionable one).
+      parameters:
+        - name: businessEventId
+          in: query
+          description: Selects shape (a). Mutually exclusive with createdBy.
+          schema: { type: string, format: uuid }
+        - name: createdBy
+          in: query
+          description: Selects shape (b) — the Maker whose own worklist to return. Mutually exclusive with businessEventId.
+          schema: { type: string }
+        - name: status
+          in: query
+          description: "Shape (b) only. Comma-separated MovementStatus values, e.g. \"PENDING,REJECTED\". Defaults to PENDING,REJECTED when omitted."
+          schema: { type: string }
+        - name: page
+          in: query
+          description: Shape (b) only.
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          description: Shape (b) only.
+          schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
+      responses:
+        '200':
+          description: Shape (a) — every movement sharing this businessEventId, oldest first (possibly empty). Shape (b) — one page of {movement, contract} pairs, newest createdAt first.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: array
+                    items: { $ref: '#/components/schemas/BalanceMovement' }
+                  - type: object
+                    required: [items, total, page, pageSize]
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          required: [movement, contract]
+                          properties:
+                            movement: { $ref: '#/components/schemas/BalanceMovement' }
+                            contract: { $ref: '#/components/schemas/BalanceContract' }
+                      total: { type: integer }
+                      page: { type: integer }
+                      pageSize: { type: integer }
+        '400':
+          description: Neither businessEventId nor createdBy was supplied.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '500':
+          description: The service could not complete the movement worklist query.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /balance-movements/compound:
+    post:
+      tags: [BalanceMovements]
+      summary: Atomically create every movement leg of one business event
+      description: >
+        Creates at least two new PENDING movements inside one SQLite transaction. Every request is
+        validated by the same rules as `POST /balance-movements`; additionally, every request must carry
+        the same non-null `businessEventId`. Idempotent replay is deliberately not accepted here: if any
+        leg's `(balanceContractId, eventSeq)` already exists, the whole command fails with 400 and no new
+        movement, contract, audit field, or balance side effect is committed. The response order matches
+        the request order. Relevant routed flows include B4's Sight HONOUR + Due From Issuing Bank legs
+        and B4's Usance ACCEPT + Acceptance + Reimbursement Receivable legs. Import A6 itself creates one
+        new Acceptance movement and therefore continues to use the single-movement create endpoint; its
+        multi-record transition occurs at Checker approval.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CompoundMovementCreateRequest' }
+      responses:
+        '201':
+          description: Every movement was created and committed atomically.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/BalanceMovement' }
+        '400':
+          description: Missing/invalid requests, fewer than two legs, inconsistent or missing businessEventId, invalid leg data, or an existing compound leg. Nothing is committed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: A domain conflict such as insufficient balance, currency mismatch, or an existing natural key occurred in any leg. Nothing is committed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /balance-movements/compound-release:
+    post:
+      tags: [BalanceMovements]
+      summary: Atomically release several PENDING movements
+      description: >
+        Releases at least two distinct movement IDs, in the supplied order, inside one SQLite transaction.
+        Each movement uses the same authoritative release rules and side effects as
+        `POST /balance-movements/{movementId}/release`. If any release fails, every preceding release and
+        side effect from this command is rolled back. The response order matches `movementIds`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CompoundMovementReleaseRequest' }
+      responses:
+        '200':
+          description: Every movement was released and committed atomically.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/BalanceMovement' }
+        '400':
+          description: Missing/invalid fields, fewer than two movement IDs, or duplicate movement IDs. Nothing is committed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: At least one movement was not found. Nothing is committed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: At least one movement cannot transition to RELEASED or violates a release-time domain rule. Nothing is committed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /balance-movements/compound-actions:
+    post:
+      tags: [BalanceMovements]
+      summary: Atomically execute ordered Release/Acknowledge actions
+      description: >
+        Executes at least two ordered actions inside one SQLite transaction using one actor. `release`
+        delegates to the normal release behavior; `acknowledge` delegates to the A3/A3S arrival
+        acknowledgment behavior. This endpoint is intended for a single business command whose legs need
+        different transitions. If any action fails, all earlier actions and side effects are rolled back.
+        The response order matches `actions`. In the Import Usance flow, A6 uses this boundary to release
+        the still-PENDING A3/A3S source UTILIZE and its referencing Acceptance as one Checker command. B4
+        does not release B3 here because B3 is already independently RELEASED before B4 selection; only
+        B4's newly-created Sight or Usance legs belong to its compound approval.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CompoundMovementActionsRequest' }
+      responses:
+        '200':
+          description: Every action completed and was committed atomically.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/BalanceMovement' }
+        '400':
+          description: Missing/invalid fields, fewer than two actions, or an unsupported action kind. Nothing is committed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: At least one movement was not found. Nothing is committed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: At least one action violates its state transition, Maker/Checker separation, or another domain rule. Nothing is committed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /balance-movements/{movementId}/balance-as-of:
+    get:
+      tags: [Balances]
+      summary: Balance snapshot as of one specific movement's own event
+      description: >
+        v1.0.0 — real, previously-undocumented endpoint. Distinct from the
+        calendar-date `asOf` query parameter on
+        `GET /balance-contracts/{balanceContractId}/balance`: this answers
+        "what did the balance look like immediately after (or including)
+        this specific movement's own event", independent of business date.
+      parameters:
+        - name: movementId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Balance snapshot as of this movement's event.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BalanceSnapshot' }
+        '404':
+          description: Movement not found.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /balance-movements/{movementId}/release:
+    post:
+      tags: [BalanceMovements]
+      summary: Checker releases a PENDING movement (4-eyes)
+      description: >
+        Design doc §4/§9. On success: PENDING → RELEASED, the earmark
+        becomes a permanent Confirmed Balance change, and accountEntries
+        (if present on the movement) become available for a downstream
+        accounting component to consume (§2/§3.3 — this service never
+        posts GL itself). This endpoint releases exactly one movement. An
+        approved multi-leg Checker command must use `/balance-movements/
+        compound-release` when every leg is a Release, or `/balance-movements/
+        compound-actions` when Release and Acknowledge transitions are mixed,
+        so all legs and their side effects commit or roll back together.
+
+
+        v1.5.0 (2026-08-17, Quality-report-balance.md BAL-123, reviewer-found):
+        for a Sight-tenor IPLC_LC's own UTILIZE movement specifically (A4 —
+        Sight Settlement — the only function that plain-releases this
+        combination, AT THAT TIME — see the v1.29.0 correction below), this call now requires
+        `makerSubmittedAt` to already be set — i.e.
+        `POST /balance-movements/{id}/maker-submit` must be called first —
+        returning 409 otherwise. This closes a real 4-eyes integrity gap:
+        the Maker/Checker separation for A4 used to be enforced only by the
+        reference Transaction Builder client, never here, so any other
+        caller could release an A4-type UTILIZE that was never
+        Maker-submitted. Scoped narrowly by the movement's own parent
+        contract `tenorType === 'SIGHT'`, not just
+        instrumentType/movementType — **this Sight-only scoping, and the claim two paragraphs below that a
+        Usance LC's own UTILIZE is "completely unaffected," were both SUPERSEDED by v1.29.0** (a Usance
+        LC's own UTILIZE now requires `makerSubmittedAt` too, automatically satisfied by A6's own CREATE-time
+        side effect — see that changelog entry). A movement whose parent contract never declared an
+        explicit `tenorType` at all (e.g. an older caller that predates `tenorType` being required) remains
+        unaffected either way, so this is still purely additive for genuine Sight/Usance LCs, never a
+        behavior change for anything that isn't one.
+
+
+        v1.12.0 (2026-08-18): this endpoint is now B3's own genuine Checker
+        Release path for a Present Docs earmark (`EPLC_EXAMINATION`/`CREATE`)
+        — supersedes the removed `/acknowledge` endpoint, see this file's own
+        changelog. Separately, when the RELEASED movement's own
+        `referencedTransactionId` points at an `EPLC_EXAMINATION`/`CREATE`
+        movement (B4's own linked `HONOUR`/`ACCEPT`), this call also marks
+        that referenced Present Docs earmark "consumed"
+        (`presentDocsConsumedAt`/`presentDocsConsumedBy`) as a side effect —
+        it does NOT re-release it (already `RELEASED` by then; attempting to
+        would 409 — see the response below).
+
+
+        v1.29.0 (2026-08-27, business-confirmed, "A6 必須... 承接並正式轉換 A3/A3S 的 EARMARKED exposure"):
+        when the RELEASED movement is instead an `IPLC_ACCEPTANCE`/`CREATE` (A6) whose own
+        `referencedTransactionId` points at a still-PENDING `IPLC_LC`/`UTILIZE`, this call ALSO
+        recursively releases that referenced UTILIZE (an internal call to this same endpoint's own logic,
+        not a re-implementation) — converting A3/A3S's own Balance Reservation-only earmark into a SECOND,
+        genuinely posted Account Entries set at the exact moment the Acceptance's own liability is
+        approved, both from the ONE Checker action on the A6 `CREATE` alone (the underlying UTILIZE is
+        never separately targeted by the caller). See `referencedTransactionId`'s and
+        `makerSubmittedBy`'s own schema descriptions for the full mechanism, and
+        `POST /balance-movements/{id}/cancel`'s own v1.30.0 entry for how this is cleanly reversed if the
+        A6 `CREATE` is instead Delete-Pending'd before Release.
+
+
+        v1.16.0 (A10/B6 Close): releasing a `CLOSE` movement re-runs the SAME eligibility check
+        `POST /balance-movements` ran at Submit, against the THEN-current state — `409
+        ILLEGAL_STATE_TRANSITION` if it no longer holds, or if the contract's own Confirmed Balance has
+        changed since Submit (the movement's own frozen `ceilingAmount` no longer matches — the caller
+        must cancel and resubmit with the current figure, never auto-recomputed here). On success, this
+        call's own side effect retires the contract (`ContractStatus.CLOSED`, `effectiveTo` set) — the
+        movement itself is RELEASED exactly like any other.
+      parameters:
+        - name: movementId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [releasedBy]
+              properties:
+                releasedBy: { type: string }
+      responses:
+        '200':
+          description: Movement released.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BalanceMovement' }
+        '404':
+          description: Movement not found.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: >-
+            Movement is not PENDING — illegal state transition, rejected
+            explicitly rather than silently accepted (Design doc §8). Also
+            returned (v1.5.0, widened v1.29.0 from Sight-only to any explicit
+            tenorType) for an IPLC_LC's own UTILIZE that has not yet been
+            Maker-submitted — explicitly via
+            `POST /balance-movements/{id}/maker-submit` (A4), or implicitly by
+            an A6 `CREATE` referencing it never having been Submitted either
+            (see `POST /balance-movements`'s own v1.29.0 entry) — and
+            (v1.16.0) for a `CLOSE` movement whose eligibility no longer holds
+            or whose own frozen amount no longer matches the contract's
+            current Confirmed Balance — see this endpoint's own description
+            above.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /balance-movements/{movementId}/maker-submit:
+    post:
+      tags: [BalanceMovements]
+      summary: A4 (Sight Settlement)'s own real Maker Submit on a pre-existing IPLC_LC UTILIZE
+      description: >
+        v1.4.0 — A4 has no movement of its own to create at Submit time; it
+        settles the PRE-EXISTING UTILIZE A3/A3S already earmarked. This is
+        the genuine, backend-persisted Maker action standing in for the
+        createMovement()-as-Submit step every other function has, gating
+        the Checker's own /release the same way. Deliberately does NOT
+        transition status — the movement stays PENDING throughout (same
+        posture as /acknowledge above, on the Maker side instead of the
+        Checker side).
+
+
+        400 if the movement's instrumentType is not IPLC_LC or its
+        movementType is not UTILIZE. 409 if the movement is not currently
+        PENDING, or if it was already submitted (makerSubmittedAt already
+        set).
+      parameters:
+        - name: movementId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [makerSubmittedBy]
+              properties:
+                makerSubmittedBy: { type: string }
+      responses:
+        '200':
+          description: Movement submitted by Maker; status unchanged (still PENDING).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BalanceMovement' }
+        '400':
+          description: Not an IPLC_LC UTILIZE movement.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Movement not found.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: Movement is not PENDING, or was already submitted.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /balance-movements/{movementId}/withdraw-maker-submit:
+    post:
+      tags: [BalanceMovements]
+      summary: Withdraw A4 Maker Submit without cancelling its A3/A3S source
+      description: >
+        Clears `makerSubmittedBy` and `makerSubmittedAt` on a PENDING
+        IPLC_LC/UTILIZE so the transaction returns to the state immediately
+        before A4 Submit. Document Arrival identity, Checker acknowledgment
+        and balance remain unchanged. v1.41.0 clarifies that this is also the
+        service operation used by Transaction Processing's same-session A4
+        Delete Pending action; cancelling the underlying A3/A3S movement
+        would be the wrong business operation.
+      parameters:
+        - name: movementId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [withdrawnBy]
+              properties:
+                withdrawnBy: { type: string, minLength: 1 }
+      responses:
+        '200':
+          description: Maker Submit withdrawn; movement remains PENDING.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BalanceMovement' }
+        '400':
+          description: Missing actor or target is not an IPLC_LC/UTILIZE.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Movement not found.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: Movement is not PENDING/REJECTED or has no Maker Submit to withdraw.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /balance-movements/{movementId}/edit:
+    post:
+      tags: [BalanceMovements]
+      summary: Fix Pending by correcting the same movement in place
+      description: >
+        Corrects a PENDING or REJECTED movement while preserving movementId,
+        eventSeq and business identity, and appends a Fix Pending audit record.
+        The strict allowlist rejects locked identity fields. REMARKS_ONLY is
+        used by A4, A6, A7, A9, B4 and B5; it requires a non-blank Remarks,
+        and accepts only the unchanged amount, editor and Remarks. It never recalculates balance, accounting
+        or sibling movements. A4 applies the Remark to its underlying A3/A3S
+        movement because A4 finalizes that existing movement in place.
+      parameters:
+        - name: movementId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EditMovementRequest' }
+      responses:
+        '200':
+          description: Corrected movement with the same movementId.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BalanceMovement' }
+        '400':
+          description: Invalid or locked field, amount scale, or Remarks-only violation.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Movement or owning contract not found.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: Illegal state, Maker/Checker violation, duplicate reference or insufficient balance.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /balance-movements/{movementId}/acknowledge:
+    post:
+      tags: [BalanceMovements]
+      summary: A3/A3S (Document Arrival)'s own Checker acknowledgment-only step
+      description: >
+        REMOVED v1.12.0 for B3 (superseded by a genuine `/release`); RESTORED
+        v1.13.0, re-purposed for A3/A3S's own `IPLC_LC`/`UTILIZE` instead —
+        the Checker's own confirmation that a Document Arrival is accepted,
+        WITHOUT genuinely finalizing it (A4/A6 remains the sole real
+        `PENDING` -> `RELEASED` transition for this same movement, later).
+        Deliberately does NOT transition status — the movement stays PENDING
+        throughout (same posture as `/maker-submit` above, on the Checker
+        side instead of the Maker side). Sets
+        `acknowledgedBy`/`acknowledgedAt`, read by the Checker Queue to filter
+        an already-acknowledged item out (see
+        `BalanceMovement.acknowledgedBy`'s own schema description).
+
+
+        400 if the movement's instrumentType is not IPLC_LC or its
+        movementType is not UTILIZE. 409 if the movement is not currently
+        PENDING, or if it was already acknowledged (acknowledgedAt already
+        set).
+      parameters:
+        - name: movementId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [acknowledgedBy]
+              properties:
+                acknowledgedBy: { type: string }
+      responses:
+        '200':
+          description: Movement acknowledged by Checker; status unchanged (still PENDING).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BalanceMovement' }
+        '400':
+          description: Not an IPLC_LC UTILIZE movement.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Movement not found.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: Movement is not PENDING, or was already acknowledged.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /balance-movements/{movementId}/reject:
+    post:
+      tags: [BalanceMovements]
+      summary: Checker rejects a PENDING movement (4-eyes)
+      description: >
+        Design doc §4 — the earmark is released immediately on reject, not
+        deferred to whatever the Maker does next. reasonCode is required so
+        the Maker's subsequent Cancel-or-resubmit decision has something to
+        act on. One call rejects exactly one movement — same "caller
+        sequences linked calls itself" principle as /release above.
+      parameters:
+        - name: movementId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [releasedBy, reasonCode]
+              properties:
+                releasedBy: { type: string, description: "The Checker performing the reject — field name kept as releasedBy for symmetry with /release's own body, not a copy/paste error." }
+                reasonCode: { type: string }
+                remarks: { type: string }
+      responses:
+        '200':
+          description: Movement rejected; earmark released.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BalanceMovement' }
+        '404':
+          description: Movement not found.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: Movement is not PENDING.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /balance-movements/{movementId}/cancel:
+    post:
+      tags: [BalanceMovements]
+      summary: Maker cancels their own still-PENDING (or already-REJECTED) movement
+      description: >
+        Design doc §4/§6 "Maker Delete Pending" (business instruction
+        2026-08-15, "ensure the DB design is working properly for all
+        functions") — releases the earmark (a no-op if the movement is
+        already REJECTED, since Reject already released it) and transitions
+        to CANCELLED. Never a physical delete — CANCELLED rows are retained
+        for audit. v1.0.0 correction: this is a `POST .../cancel` with a
+        JSON body, not the `DELETE .../{movementId}?reasonCode=` shape an
+        earlier draft of this file described — that shape was never
+        implemented.
+
+
+        v1.28.0 — two additional, always-on side effects (Fix Pending/Delete
+        Pending Phase, `analysis/Balance-Component-FixPending-DeletePending-
+        Proposal-zh.md`): (1) every call writes one independent, append-only
+        `delete_pending_audit` record — see `GET /delete-pending-audit`
+        below; a compound function's own cascade (A3S/B4/B5, each leg
+        cancelled via its own separate call to this endpoint) naturally
+        produces one audit row per leg, no special-casing needed. (2) when
+        the cancelled movement is a "creating" movementType (`ISSUE` or
+        `CREATE`) AND it is the ONLY movement its own `BalanceContract` has
+        ever had (no sibling movement of any status remains), that contract
+        is ALSO marked `CANCELLED` — see `ContractStatus`'s own description
+        for the safety argument and why this frees the natural key for
+        reuse. **CORRECTION, same day**: this was originally scoped to "the
+        root ISSUE of `IPLC_LC`/`EPLC_LC`/`EPLC_CONFIRMATION` (A1/B1) only" —
+        business-confirmed the same day that the identical gap existed for
+        every OTHER creating movementType's own secondary Natural Key too
+        ("這個問題不要只針對 A3 hard-code。應檢查 A1–A11 / B1–B7 所有具有
+        Natural Key / Secondary Reference uniqueness validation 的功能") —
+        A6 (`IPLC_ACCEPTANCE`/`CREATE`), A8 (`SHGT`/`ISSUE`), B3
+        (`EPLC_EXAMINATION`/`CREATE`) all had the same bug for their own
+        IB/SG Number, permanently blocking a re-Submit under the same
+        secondary reference. The rule shipped is the general, always-safe
+        one above (any creating movementType, any instrumentType, gated only
+        by "no sibling movement exists") — the A1/B1-only, root-contract-only
+        wording never actually matched what was implemented, in any version.
+
+
+        v1.30.0 (2026-08-28, business-confirmed, "都只有一筆... 掛帳也掛在同一筆EVENT上"): cancelling an
+        `IPLC_ACCEPTANCE`/`CREATE` (A6) whose own `referencedTransactionId` points at a still-PENDING
+        `IPLC_LC`/`UTILIZE` with `makerSubmittedAt` already set (by `POST /balance-movements`'s own
+        v1.29.0 side effect) now ALSO clears that UTILIZE's own `makerSubmittedBy`/`makerSubmittedAt` —
+        "revert to before A6 Submit," the same end state `POST .../withdraw-maker-submit` restores for A4.
+        Deliberately does NOT write a second `delete_pending_audit` record for the reverted UTILIZE — the
+        one row this call already writes for A6's own cancelled `CREATE` (side effect (1) above) remains
+        the single audit record of the whole two-record business event.
+
+
+        v1.41.0 (2026-08-31) — one call still cancels exactly one movement.
+        Transaction Processing may expose this operation immediately after
+        any A1-A11/B1-B7 Maker Submit. For A3S/B4/B5, the client uses its
+        function strategy to cancel linked sibling movements first and the
+        primary movement last, producing one audit record per cancelled leg.
+        This ordered sequence is not an atomic batch operation: if a call
+        fails, the client must stop, preserve the screen and report the
+        actual error/state. A4 is the exception and uses
+        `/withdraw-maker-submit` instead, preserving its A3/A3S source.
+        A1/B1 versus Index-screen reset is client navigation only. Maker
+        Queue/Fix Pending remains a separate UI entry flow and does not alter
+        this endpoint contract.
+      parameters:
+        - name: movementId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BalanceMovementCancelRequest' }
+      responses:
+        '200':
+          description: Movement cancelled.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BalanceMovement' }
+        '404':
+          description: Movement not found.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: Movement is not in a cancellable state (already RELEASED/CANCELLED).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /delete-pending-audit:
+    get:
+      tags: [BalanceMovements]
+      summary: Inquire Delete Pending — every Delete Pending action ever recorded, filtered/paginated
+      description: >
+        v1.28.0, Fix Pending/Delete Pending Phase — a dedicated, read-only audit query surface over
+        `delete_pending_audit`, independent of Inquire Events (a CANCELLED movement is deliberately
+        excluded from every merged-events view this contract exposes — Delete Pending history is queried
+        exclusively here). All query parameters are optional filters. Function (A1-A11/B1-B7) is
+        deliberately NOT a filter parameter — it has no column of its own; it is a display-layer concept a
+        caller derives client-side from `instrumentType`+`movementType` (same convention already used for
+        the Maker Queue shape of `GET /balance-movements` above).
+      parameters:
+        - name: lcNumber
+          in: query
+          schema: { type: string }
+        - name: deletedBy
+          in: query
+          schema: { type: string }
+        - name: from
+          in: query
+          description: Inclusive lower bound on cancelledAt.
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          description: Inclusive upper bound on cancelledAt.
+          schema: { type: string, format: date-time }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
+      responses:
+        '200':
+          description: One page of matching Delete Pending audit records.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total, page, pageSize]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/DeletePendingAuditRecord' }
+                  total: { type: integer }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+
+        '500':
+          description: The service could not complete the Delete Pending audit query.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /delete-pending-audit/lc-catalog:
+    get:
+      tags: [BalanceContracts]
+      summary: Inquire Delete Pending's own LC Catalog step — only LC Numbers with at least one Delete Pending record
+      description: >
+        v1.28.0, Fix Pending/Delete Pending Phase (business-directed, "只有被 DELETE PENDING 過的才顯示")
+        — unlike `GET /balance-contracts/catalog`, which lists every contract of the given instrumentType,
+        this returns exactly one row per DISTINCT LC Number that has ≥1 `delete_pending_audit` record,
+        ordered by LC Number ascending. A1/B1's own LC-reuse side effect (see `ContractStatus`'s CANCELLED
+        description) means one LC Number can span multiple `balance_contracts` rows over time — the
+        representative row returned for each LC Number is the one tied to its MOST RECENT Delete Pending
+        action, so Tenor Type/Currency reflect that latest incarnation rather than an arbitrary one.
+      parameters:
+        - name: instrumentType
+          in: query
+          required: true
+          schema: { $ref: '#/components/schemas/InstrumentType' }
+        - name: q
+          in: query
+          description: Free-text substring filter against lcNumber, same convention as GET /balance-contracts/catalog.
+          schema: { type: string }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
+      responses:
+        '200':
+          description: One page of distinct LC Numbers with Delete Pending history.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total, page, pageSize]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/BalanceContract' }
+                  total: { type: integer }
+                  page: { type: integer }
+                  pageSize: { type: integer }
+        '400':
+          description: instrumentType is missing.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '500':
+          description: The service could not complete the Delete Pending LC catalog query.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+components:
+  schemas:
+
+    InstrumentType:
+      type: string
+      description: >
+        Design doc §1/§3.1. IBL/EBL are deliberately absent — out of scope,
+        Loan Component's domain (Cross-Reference Finding 3b).
+
+
+        `EPLC_EXAMINATION` is Present Docs' own MEMO_ONLY earmark — CREATE
+        only, never moves EPLC_CONFIRMATION's own balance. `EPLC_DUE_FROM_
+        ISSUING_BANK`/`EPLC_ACCEPTANCE_REIMB_RECEIVABLE`/`EPLC_EXPORT_BILLS_
+        DISCOUNTED` are the ON_BALANCE_ASSET instruments a Confirmation's own
+        HONOUR/ACCEPT transforms into (Sight/Usance/Nego'd respectively) —
+        `EPLC_DUE_FROM_ISSUING_BANK` is created but deliberately has no
+        settling endpoint in this contract; `EPLC_ACCEPTANCE_REIMB_RECEIVABLE`
+        settles paired with `EPLC_ACCEPTANCE`'s own FULL_SETTLE/PARTIAL_SETTLE;
+        `EPLC_EXPORT_BILLS_DISCOUNTED` is a reclass target only, no consuming
+        endpoint yet.
+      enum: [IPLC_LC, EPLC_LC, IPLC_ACCEPTANCE, EPLC_ACCEPTANCE, SHGT, EPLC_CONFIRMATION, EPLC_EXAMINATION, EPLC_DUE_FROM_ISSUING_BANK, EPLC_ACCEPTANCE_REIMB_RECEIVABLE, EPLC_EXPORT_BILLS_DISCOUNTED]
+
+    ContractStatus:
+      type: string
+      description: >
+        Design doc §3.1 — a completely separate state machine from
+        MovementStatus. (v1.35.0 — the reserved contract-versioning value and
+        its own `markSuperseded()` mechanism are removed: zero endpoints ever
+        transitioned a contract through it.) CLOSED (v1.16.0)
+        IS now reachable: a root IPLC_LC/EPLC_LC/EPLC_CONFIRMATION
+        transitions into it as a side effect of
+        POST /balance-movements/{movementId}/release on that contract's own
+        CLOSE movement — see A10/B6 Close in the top-level changelog and
+        that endpoint's own description. EXPIRED (v1.19.0) is a genuinely
+        separate terminal-ish state from CLOSED — reached only via the
+        AUTO EXPIRY background sweep's own EXPIRE movement (date-triggered,
+        `expiryDate + mailFloatGraceDays`), never via a human action —
+        kept distinct from CLOSED (human/Maker-Checker-triggered Close) so
+        audit/reporting can tell the two legally-different events apart.
+        An EXPIRED contract may transition onward to CLOSED (AUTO CLOSE,
+        once genuinely eligible) or back to ACTIVE (Expiry Extension
+        Amendment, `movementType: 'AMEND_EXPIRY_DATE'`); a CLOSED contract
+        may transition back to ACTIVE or EXPIRED via Reopen
+        (`movementType: 'REOPEN'`, A11/B7) — see the v1.19.0/v1.20.0
+        changelog entries for the full mechanism.
+
+
+        CANCELLED (v1.28.0) is likewise now genuinely reachable, not merely
+        reserved: a side effect of `POST /balance-movements/{movementId}/
+        cancel` (Delete Pending / Maker EC) ONLY when the cancelled movement
+        is the root ISSUE of `IPLC_LC`/`EPLC_LC`/`EPLC_CONFIRMATION` — i.e.
+        A1/B1's own opening ISSUE, never a child CREATE/ISSUE (SHGT/
+        Acceptance/Present Docs) even though those share the same
+        `movementType: 'ISSUE'` string. `assertRootIssueReleased()`'s own
+        existing guarantee (no other movement can exist on a root contract
+        while its own ISSUE is un-Released) is what makes this safe: a
+        Delete-Pending'd root ISSUE, by construction, means this contract
+        version never became real, so retiring it frees the natural key
+        (`lcNumber`) for the same Maker to re-Submit under — see
+        `GET /balance-contracts/catalog`'s own `excludeCancelled` param and
+        `GET /delete-pending-audit/lc-catalog` below for how a CANCELLED
+        contract stays queryable without polluting normal LC browsing.
+      enum: [ACTIVE, CLOSED, CANCELLED, EXPIRED]
+
+    MovementStatus:
+      type: string
+      description: >
+        Design doc §4 — Maker/Checker lifecycle. `POST .../edit` (Fix Pending §19) corrects a
+        PENDING/REJECTED movement's row in place (same movementId/eventSeq) rather than transitioning
+        it through a distinct status of its own — it always lands back at PENDING.
+      enum: [PENDING, RELEASED, REJECTED, CANCELLED]
+
+    ExposureNature:
+      type: string
+      description: >
+        Design doc §1 — CONTINGENT (undrawn LC/Shipping Guarantee) vs.
+        ACTUAL (Acceptance, Export Confirmation liability once it exists).
+        v1.0.0 correction: `MEMO` was missing from earlier drafts of this
+        file despite being real and in use — a Present Docs
+        (EPLC_EXAMINATION CREATE) earmark is always `MEMO`, per
+        cs-tf-balance-knowhow Design Principle D3 ("documents arriving is a
+        physical event... only legal events move balances"); the server
+        forces `BalanceMovement.accountEntries` to null whenever
+        `exposureNature` is `MEMO`, since a memo earmark never posts GL.
+        Never ACTUAL-funded/discounted exposure — that's Loan Component's
+        ACTUAL, a different concept, out of this service's scope.
+      enum: [CONTINGENT, ACTUAL, MEMO]
+
+    TenorType:
+      type: string
+      description: Design doc §7 — corresponds to legacy CPYT_C_SDA_FLAG. Only meaningful on leg-level and Acceptance contracts.
+      enum: [SIGHT, BUYERS_USANCE, SELLERS_USANCE, DP, DA]
+
+    MonetaryAmount:
+      type: string
+      pattern: '^-?\d{1,18}(\.\d{1,3})?$'
+      description: >
+        Decimal-string only, never a binary float/JSON number; server-side
+        arithmetic MUST use decimal/BigDecimal. Scale (max fractional
+        digits actually accepted) is currency-driven — the server validates
+        `amount` against the resolved/derived currency's own configured
+        decimal-place count (e.g. JPY allows none, most currencies allow
+        two, BHD/KWD/OMR allow three) and rejects a request whose amount
+        has more fractional digits than that currency allows with `400`.
+        This is the wire representation and MUST NOT contain thousands
+        separators. UI display layers format the same value with separators
+        and exactly the currency's minor-unit digits (for example USD
+        `71,000.00`, JPY `71,000`, and KWD `71,000.000`).
+      example: "300000.00"
+
+    NaturalKey:
+      type: object
+      description: Design doc §3.1 natural-key table. Which fields are required depends on instrumentType — see the per-endpoint parameter descriptions.
+      required: [lcNumber]
+      properties:
+        lcNumber: { type: string, description: "C_MAIN_REF of the underlying LC." }
+        ibNumber: { type: string, description: "Required for IPLC_ACCEPTANCE/EPLC_ACCEPTANCE/EPLC_EXAMINATION/EPLC_DUE_FROM_ISSUING_BANK/EPLC_ACCEPTANCE_REIMB_RECEIVABLE/EPLC_EXPORT_BILLS_DISCOUNTED — the presentation/bill reference." }
+        sgNumber: { type: string, description: "Required for SHGT." }
+        legSeq: { type: string, description: "v1.16.0 — Mixed Tenor LC leg discriminator (Design doc §7.1). Not required by any currently-implemented flow." }
+
+    AccountEntry:
+      type: object
+      description: >
+        Design doc §3.3 "GL Ownership" — one leg of a Dr/Cr pair. Balance
+        Component stores and passes these through on RELEASE; it never
+        interprets accountRef or decides drCr itself (config-driven,
+        downstream-owned). Always null on a `MEMO`-exposureNature movement
+        (server-enforced) — a memo earmark never posts GL.
+      required: [accountRef, drCr, amount]
+      properties:
+        accountRef: { type: string }
+        drCr: { type: string, enum: [D, C] }
+        amount: { $ref: '#/components/schemas/MonetaryAmount' }
+
+    ContingentAccountEntry:
+      type: object
+      description: >
+        v1.1.0 — analysis/contingent-liability-ledger.html's Dr/Cr
+        contingent-liability account pair, derived server-side once at
+        movement creation (domain/contingentAccountEntry.ts) and persisted
+        immutably on the movement. Exactly one Dr/Cr pair per movement
+        (never a caller-supplied array like `AccountEntry`/`accountEntries`
+        above) — `drAccount`/`crAccount` already carry any applicable tenor
+        suffix (e.g. "Documentary Credits Outstanding — Sight") baked in,
+        so no separate tenor field is needed on this schema. v1.31.0 —
+        `amount` is the movement's own `ceilingAmount` (Tolerance-converted
+        LC Balance), not the caller's face-level `amount`, for A1/B1
+        (`ISSUE`) and A2/B2 (`AMEND_INCREASE`/`AMEND_DECREASE`/`AMEND`); a
+        true no-op for every other movementType, where `ceilingAmount`
+        already equals `amount` unchanged.
+      required: [drAccount, crAccount, currency, amount]
+      properties:
+        drAccount: { type: string }
+        crAccount: { type: string }
+        currency: { type: string }
+        amount: { $ref: '#/components/schemas/MonetaryAmount' }
+
+    BalanceContract:
+      type: object
+      description: Design doc §3.1 — one immutable version snapshot of a Logical Contract.
+      properties:
+        balanceContractId: { type: string, format: uuid }
+        logicalContractId: { type: string, format: uuid }
+        contractVersion: { type: integer }
+        instrumentType: { $ref: '#/components/schemas/InstrumentType' }
+        naturalKey: { $ref: '#/components/schemas/NaturalKey' }
+        parentLogicalContractId:
+          type: string
+          format: uuid
+          nullable: true
+          description: SHGT/Acceptance/Examination's underlying LC-or-Confirmation's logicalContractId. Set at creation via BalanceMovementCreateRequest.parentLogicalContractId — required for SHGT ISSUE and EPLC_EXAMINATION CREATE, and used both for the parent-sufficiency check at creation time AND for the CURRENCY CONSISTENCY check (see this document's top-level description).
+        status: { $ref: '#/components/schemas/ContractStatus' }
+        currency:
+          type: string
+          description: This contract version's own authoritative Currency Code — always caller-supplied at creation time, validated against the parent's own currency for a new child contract (see CURRENCY CONSISTENCY). Every subsequent movement against this contract must supply this same value; it is never re-typed.
+        tolerancePct:
+          type: string
+          nullable: true
+          description: >
+            Design doc §6.2 (v0.3.0) — positive tolerance percentage (e.g.
+            UCP600 "about"/"approximately" terms), IPLC_LC/EPLC_LC only.
+            Used to derive BalanceMovement.ceilingAmount from a caller-typed
+            face-level amount. Treated as fixed within a contract version;
+            not expected to change via ordinary movements.
+        tenorType: { allOf: [{ $ref: '#/components/schemas/TenorType' }], nullable: true }
+        tenorDays: { type: integer, nullable: true }
+        maturityDate: { type: string, format: date, nullable: true }
+        expiryDate:
+          type: string
+          format: date
+          nullable: true
+          description: >
+            v1.19.0, F1 — LC's own UCP 600 Art.6(d) expiry/validity date, IPLC_LC/EPLC_LC/
+            EPLC_CONFIRMATION only. A genuinely separate concept from maturityDate above (the Usance/
+            Acceptance's own due date) — set at ISSUE, amendable via `movementType: 'AMEND_EXPIRY_DATE'`
+            (A2/B2's third amendment option). Drives the AUTO EXPIRY background sweep together with
+            mailFloatGraceDays below. v1.25.0 — mandatory at ISSUE against those three instrumentTypes
+            (the request-side field is `nullable: true` only because it's harmlessly passed through for
+            every OTHER movementType too; ISSUE itself rejects a request with none, 400 — see
+            CreateMovementRequest.expiryDate's own description).
+        mailFloatGraceDays:
+          type: integer
+          nullable: true
+          description: >
+            v1.19.0, F1 — number of grace days added to expiryDate before the AUTO EXPIRY sweep will act
+            on this contract, captured from server-side config ONCE at ISSUE time and fixed thereafter
+            (same "captured, not re-read live" convention as tolerancePct) — a later change to the config
+            default does not retroactively shift the auto-release timing of an already-issued LC. Import
+            and Export sides may configure a different default.
+        openingBalance: { $ref: '#/components/schemas/MonetaryAmount' }
+        sourceAmendmentNo: { type: integer, nullable: true }
+        effectiveFrom: { type: string, format: date-time }
+        effectiveTo:
+          type: string
+          format: date-time
+          nullable: true
+          description: >
+            `NULL` while this contract version is current (ACTIVE, or EXPIRED via v1.24.0's §13.7 fix
+            below). Stamped when CLOSED (A10/B6/AUTO CLOSE), or EXPIRED (AUTO EXPIRY, or
+            A11/B7 Reopen reactivating a CLOSED contract back to EXPIRED — v1.24.0, F1 proposal §13.7 —
+            this case previously left it `NULL`, which the new Auto Close Grace Period below could not
+            use as a "became EXPIRED at" anchor; reactivating all the way to ACTIVE still clears it to
+            `NULL`, unchanged). AUTO CLOSE's own Grace Period (v1.24.0) computes off this field.
+        createdBy: { type: string }
+        createdAt: { type: string, format: date-time }
+
+    BalanceMovement:
+      type: object
+      description: Design doc §3.2/§3.3 — append-only, never physically deleted.
+      properties:
+        movementId: { type: string, format: uuid }
+        balanceContractId: { type: string, format: uuid }
+        eventSeq: { type: integer }
+        businessEventId: { type: string, nullable: true, description: Caller-defined correlation identifier; the service does not require UUID syntax. }
+        movementType: { type: string, description: "Legal values depend on instrumentType (Design doc §5) — this service does not itself enforce a per-instrumentType allowlist server-side; that legality mapping is owned by the caller (see the companion Web/Mobile Channel API, which derives instrumentType+movementType from a named business function rather than accepting either as free caller input). The server does group every accepted movementType into one of a small number of behavioral buckets for its own balance-direction/sufficiency math — see Design doc §5's direction table." }
+        exposureNature: { $ref: '#/components/schemas/ExposureNature' }
+        amount:
+          allOf: [{ $ref: '#/components/schemas/MonetaryAmount' }]
+          description: >
+            For IPLC_LC/EPLC_LC ISSUE/AMEND_INCREASE/AMEND_DECREASE, this is
+            the caller-typed face-level delta — see ceilingAmount (Design
+            doc §6.2, v0.3.0) for the tolerance-adjusted figure actually
+            applied against Confirmed Balance. For every other
+            movementType/instrumentType, amount and ceilingAmount are
+            identical.
+        ceilingAmount:
+          allOf: [{ $ref: '#/components/schemas/MonetaryAmount' }]
+          nullable: true
+          description: >
+            Design doc §6.2 (v0.3.0) — amount × (1 + tolerancePct/100) for
+            IPLC_LC/EPLC_LC ISSUE/AMEND_INCREASE/AMEND_DECREASE; equal to
+            amount for every other case. AMEND_DECREASE sufficiency
+            (compared against Tight Available Balance since v1.13.0 — see
+            the top-level changelog) always uses this field, never the raw
+            amount.
+        currency:
+          type: string
+          description: Always equal to the resolved contract's own currency at the time this movement was created (validated, not derived — see CURRENCY CONSISTENCY).
+        legRef: { type: string, nullable: true, description: "Mixed Tenor LC leg's logicalContractId — Design doc §7.1. Reserved for future leg-level LC support; not currently populated by any implemented flow." }
+        accountEntries:
+          type: array
+          nullable: true
+          items: { $ref: '#/components/schemas/AccountEntry' }
+        contingentAccountEntry:
+          allOf: [{ $ref: '#/components/schemas/ContingentAccountEntry' }]
+          nullable: true
+          description: >
+            v1.1.0 — see this document's top-level v1.1.0 changelog entry.
+            Server-derived at creation, persisted immutably; null for the
+            three ON_BALANCE_ASSET instruments, for any unrecognized
+            movementType, for `EPLC_EXAMINATION`/`CREATE` (B3 Present Docs —
+            never actually posts to the books, Design Principle D3), and for
+            `movementType: 'AMEND_EXPIRY_DATE'` (v1.22.0, F1 — never has a
+            real balance/GL effect of its own; the Expiry Extension
+            Amendment's own restoration is its separately-generated linked
+            `REVERSAL` movement's own entry, not this one's).
+        lmtsReservationId:
+          type: string
+          nullable: true
+          description: >
+            SHGT only (Design doc §5/§10) — opaque reference to the LMTS-side
+            reservation, required for the Reserve/Confirm/Release
+            compensation pattern across the Balance Component / LMTS system
+            boundary. The actual LMTS call mechanism is not yet traced
+            against source — this field is a placeholder passthrough.
+        status: { $ref: '#/components/schemas/MovementStatus' }
+        reversalOfMovementId:
+          type: string
+          format: uuid
+          nullable: true
+          description: >
+            v1.19.0, F1 — the movementId of the EXPIRE movement this `REVERSAL` movement negates. Reserved
+            on the schema since v1.0.0 but never populated by any endpoint until this release; now set on
+            every `movementType: 'REVERSAL'` movement, generated internally by Expiry Extension Amendment
+            only (never caller-supplied directly) — REOPEN was redesigned in v1.20.0 to carry its own
+            restoration amount directly and no longer uses REVERSAL at all. Determines REVERSAL's own
+            dynamic direction — the negation of whatever movement it points at, not a fixed value.
+        newExpiryDate:
+          type: string
+          format: date
+          nullable: true
+          description: >
+            v1.19.0, F1 — request/response field on `movementType: 'AMEND_EXPIRY_DATE'` only, the new
+            expiryDate value to apply to the contract. When the target contract is currently EXPIRED
+            (Expiry Extension Amendment), Checker Release additionally requires this date to be strictly
+            in the future.
+        reasonCode:
+          type: string
+          nullable: true
+          description: >
+            Optional/passthrough for every movementType EXCEPT `CLOSE` and `REOPEN` (v1.24.0, F1 proposal
+            §13.1 item 4 / item 3(a), BA-ratified) — those two now REQUIRE a caller-supplied value (400 on
+            a bare Submit). AUTO CLOSE satisfies this internally with a fixed value
+            (`NATURAL_EXPIRY_ALL_BALANCES_CLEARED`) rather than being exempted from the check.
+        amendmentApproved:
+          type: boolean
+          nullable: true
+          description: >
+            v1.24.0, F1 proposal §13.1 item 2 (BA-ratified) — upstream consent passthrough, relevant to
+            `AMEND_EXPIRY_DATE`/`REOPEN`. This service does NOT judge whether consent was actually
+            obtained (that determination stays entirely upstream, per BA's own decision) — it only
+            accepts and persists this for audit. Harmlessly accepted on every other movementType too.
+        amendmentEffective:
+          type: string
+          nullable: true
+          description: v1.24.0, F1 proposal §13.1 item 2 — companion to amendmentApproved/consentStatus, same posture. Non-empty string when present; no further date-format validation.
+        consentStatus:
+          type: string
+          nullable: true
+          enum: [NOT_REQUIRED, OBTAINED]
+          description: v1.24.0, F1 proposal §13.1 item 2 — the one field of the three with a real bounded value set; an out-of-enum value is rejected (400). Same "accepted, never judged" posture as amendmentApproved/amendmentEffective above.
+        remarks: { type: string, nullable: true }
+        transactionDate: { type: string, format: date, nullable: true }
+        businessDate: { type: string, format: date, nullable: true }
+        valueDate: { type: string, format: date, nullable: true }
+        sourceModule: { type: string, nullable: true }
+        sourceFunction: { type: string, nullable: true }
+        sourceTransactionRef: { type: string, nullable: true, description: "Unique per balanceContractId (server-enforced, 400 on reuse against the same contract with a new eventSeq)." }
+        referencedTransactionId:
+          type: string
+          format: uuid
+          nullable: true
+          description: >
+            v1.3.0 — the movementId of a pre-existing record (created by an earlier, separate
+            submission) this movement converts/finalizes — A6/B4's own "still-PENDING source Document
+            Arrival/Present Docs" picked at submission time. Distinct from businessEventId (which only
+            ever links movements created TOGETHER in the same submission): the source record here
+            predates this one and never shares a businessEventId with it, so this field is the only
+            server-side correlation between them.
+
+
+            B4's own reference (an already-RELEASED `EPLC_EXAMINATION`/`CREATE` — B3 self-releases before
+            B4 ever picks it) stays passthrough only, same posture as sourceTransactionRef/businessEventId
+            — never validated to resolve to a real movement, beyond the one existing side effect of
+            marking that B3 record's own `presentDocsConsumedAt`/`presentDocsConsumedBy` (v1.12.0).
+
+
+            v1.29.0 — A6's own reference is DIFFERENT and genuinely NOT passthrough-only: when this field
+            points at a still-PENDING `IPLC_LC`/`UTILIZE`, both `POST /balance-movements` (this
+            record's own creation) and `POST /balance-movements/{id}/release` (this record's own release)
+            actively resolve it and act on it as a real side effect — see those two endpoints' own
+            descriptions, and `makerSubmittedBy`/`makerSubmittedAt` below, for the full mechanism. This
+            is the one shape where `referencedTransactionId` drives real backend behavior rather than
+            existing purely for the caller's own correlation/audit convenience.
+        balanceBefore: { allOf: [{ $ref: '#/components/schemas/MonetaryAmount' }], nullable: true }
+        balanceAfter: { allOf: [{ $ref: '#/components/schemas/MonetaryAmount' }], nullable: true }
+        createdBy: { type: string }
+        releasedBy: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        releasedAt: { type: string, format: date-time, nullable: true }
+        cancelledBy:
+          type: string
+          nullable: true
+          description: >
+            v1.14.0 (2026-08-20) — the Maker's own POST /balance-movements/{id}/cancel (EC) actor, split
+            out from releasedBy (which cancel() used to reuse, disambiguated only by status ===
+            'CANCELLED'). Null unless status === 'CANCELLED'. /reject still reuses releasedBy/releasedAt
+            for a REJECTED movement — no dedicated rejectedBy/rejectedAt pair exists.
+        cancelledAt: { type: string, format: date-time, nullable: true, description: "Paired with cancelledBy above." }
+        acknowledgedBy:
+          type: string
+          nullable: true
+          description: >
+            v0.8.0, EPLC_EXAMINATION only. HISTORICAL FIELD — superseded
+            v1.12.0 (2026-08-18): POST /balance-movements/{id}/acknowledge
+            was removed; a Checker's own Present Docs Release is now the
+            standard POST /balance-movements/{id}/release (a genuine
+            PENDING -> RELEASED transition). Kept on the schema purely so a
+            pre-2026-08-18 row's own historical value still round-trips;
+            nothing writes it any more — see presentDocsConsumedAt/By below
+            for what backs BalanceSnapshot.presentDocsEarmarkApproved now.
+        acknowledgedAt: { type: string, format: date-time, nullable: true, description: "HISTORICAL FIELD — see acknowledgedBy's own description above." }
+        presentDocsConsumedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: >
+            v1.12.0 (2026-08-18), EPLC_EXAMINATION/CREATE only — set as a SIDE EFFECT of
+            POST /balance-movements/{id}/release on the Confirmation's own linked HONOUR/ACCEPT
+            movement (identified via that movement's own referencedTransactionId pointing back at this
+            EPLC_EXAMINATION CREATE), i.e. the moment B4 actually consumes this presentation — NOT when
+            B3 itself is Released (status/releasedAt already cover that, independently). Backs
+            BalanceSnapshot.presentDocsEarmarkApproved: a presentation with status RELEASED and this
+            field still null continues to occupy Present Docs Earmark capacity; it drops out only once
+            this is set. Null for movements predating this field.
+        presentDocsConsumedBy: { type: string, nullable: true, description: "Audit metadata only, paired with presentDocsConsumedAt above — the checkerId who released the consuming HONOUR/ACCEPT." }
+        makerSubmittedBy:
+          type: string
+          nullable: true
+          description: >
+            v1.4.0, IPLC_LC/UTILIZE only. Set TWO different ways, both meaning the same real-world fact
+            ("this UTILIZE's own A4-or-A6 Maker action has happened") — a reader must not assume it only
+            ever came from the explicit endpoint:
+
+
+            (1) POST /balance-movements/{id}/maker-submit — A4 (Sight Settlement)'s own real Maker
+            action on the PRE-EXISTING UTILIZE A3/A3S already earmarked (A4 creates no movement of its
+            own).
+
+
+            (2) v1.29.0 — as a SIDE EFFECT of POST /balance-movements creating a NEW `IPLC_ACCEPTANCE`/
+            `CREATE` (A6) whose own `referencedTransactionId` points at this UTILIZE — A6 has no separate
+            "Maker Submit" step of its own to call (1) from, so its own createMovement() call sets this
+            directly instead. Reversed (v1.30.0) by POST /balance-movements/{id}/cancel when that SAME A6
+            CREATE is later Delete-Pending'd — see `referencedTransactionId`'s own description for the
+            full mechanism.
+
+
+            Distinct from createdBy (the ORIGINAL A3/A3S submission) and from releasedBy/releasedAt:
+            submitting never transitions status — the movement stays PENDING until the Checker's own
+            /release (which, for shape (2), is itself triggered as a cascade from releasing the A6
+            CREATE — see POST .../release's own description).
+        makerSubmittedAt: { type: string, format: date-time, nullable: true }
+        eventSnapshot:
+          allOf: [{ $ref: '#/components/schemas/BalanceSnapshot' }]
+          nullable: true
+          description: >
+            v1.6.0, business instruction 2026-08-17 ("PENDING XOR APPROVED... 只存PENDING 或 APPROVED
+            其中一個") — the same BalanceSnapshot shape GET /balance-movements/{id}/balance-as-of
+            computes on demand, captured once server-side and persisted here instead: written at
+            POST /balance-movements (reflecting this movement's own still-PENDING contribution) and
+            OVERWRITTEN at POST /balance-movements/{id}/release (reflecting the finalized/RELEASED
+            state) — never both at once, always the snapshot as of this movement's CURRENT status.
+            Left untouched by reject()/cancel() (out of scope). Null for movements created before this
+            field existed. Callers should prefer this field over a separate balance-as-of call when
+            already holding the movement (e.g. from the Event Timeline); balance-as-of remains the
+            correct fallback for pre-existing movements with a null eventSnapshot. ALWAYS this
+            movement's own contract's own balance — never the parent's (see rootEventSnapshot below).
+        rootEventSnapshot:
+          allOf: [{ $ref: '#/components/schemas/BalanceSnapshot' }]
+          nullable: true
+          description: >
+            v1.7.0, business instruction 2026-08-17 ("REFER TO DB S01", then simplified — "不複雜 就是
+            交易處理時 Look Up Current Balance 的SNAPSHOT (PENDING OR APPROVED) SAVED TO DB == EVENT
+            BALANCE SNAPSHOT") — populated ONLY for a child-ledger movement (SHGT, IPLC_ACCEPTANCE,
+            EPLC_ACCEPTANCE, EPLC_EXAMINATION): the PARENT LC/Confirmation's own plain BalanceSnapshot,
+            captured at the same PENDING/RELEASED moment as eventSnapshot above — exactly what
+            GET /balance-contracts/{id}/balance would return for the parent if queried live right then.
+            ADDITIONAL to eventSnapshot, never a replacement. Null for a root-level movement (nothing to
+            redirect to) and for movements predating this field.
+        acceptanceEventSnapshot:
+          allOf: [{ $ref: '#/components/schemas/BalanceSnapshot' }]
+          nullable: true
+          description: >
+            v1.8.0, business instruction 2026-08-17 ("就是交易當時LC所有的BALANCE的拍照存檔") — the ONE
+            Acceptance contract's own CURRENT plain BalanceSnapshot under this movement's own root LC/
+            Confirmation, captured server-side ONLY when exactly one such contract exists (two or more is
+            ambiguous — left null). Null when this movement's own contract already IS an Acceptance
+            (eventSnapshot already covers it), when none/multiple exist, or for movements predating this
+            field. ADDITIONAL to eventSnapshot/rootEventSnapshot, never a replacement.
+        sgEventSnapshot:
+          allOf: [{ $ref: '#/components/schemas/BalanceSnapshot' }]
+          nullable: true
+          description: >
+            v1.8.0 — same rule as acceptanceEventSnapshot above, for the ONE Shipping Guarantee contract
+            instead. Import-side only (Shipping Guarantee has no Export equivalent).
+        finalizeEventSnapshot:
+          allOf: [{ $ref: '#/components/schemas/BalanceSnapshot' }]
+          nullable: true
+          description: >
+            v1.9.0, business instruction 2026-08-18 ("做完A4 A3 的EVENT SNAPSHOT應該跟當初A3交易時一樣
+            不應改變") — set ONLY when POST /balance-movements/{id}/release finalizes a Sight-tenor
+            IPLC_LC/UTILIZE (A4/Sight Settlement completing an EXISTING A3/A3S Document Arrival): the
+            release-time BalanceSnapshot, WITHOUT overwriting eventSnapshot above, which instead stays
+            frozen at whatever POST /balance-movements originally captured. Null for every other movement
+            and for movements predating this field.
+        finalizeAcceptanceEventSnapshot:
+          allOf: [{ $ref: '#/components/schemas/BalanceSnapshot' }]
+          nullable: true
+          description: >
+            v1.10.0, business instruction 2026-08-18 ("SNAP SHOT保留當時 LC, SG, ACCEPTANCE BALANCE
+            不會因為後續交易而改變") — the release-time counterpart to acceptanceEventSnapshot above, same
+            exception finalizeEventSnapshot established for eventSnapshot itself: set ONLY when release()
+            finalizes a Sight-tenor IPLC_LC/UTILIZE. acceptanceEventSnapshot/sgEventSnapshot themselves
+            stay frozen at Create-time for that case. Null for every other movement and for movements
+            predating this field.
+        finalizeSgEventSnapshot:
+          allOf: [{ $ref: '#/components/schemas/BalanceSnapshot' }]
+          nullable: true
+          description: >
+            v1.10.0 — same rule as finalizeAcceptanceEventSnapshot above, for the ONE Shipping Guarantee
+            contract instead. Import-side only (Shipping Guarantee has no Export equivalent).
+
+    EditMovementRequest:
+      type: object
+      additionalProperties: false
+      required: [amount, editedBy]
+      properties:
+        amount: { $ref: '#/components/schemas/MonetaryAmount' }
+        editedBy: { type: string, minLength: 1 }
+        editMode: { type: string, enum: [STANDARD, REMARKS_ONLY], default: STANDARD }
+        remarks: { type: string, minLength: 1, maxLength: 500, pattern: '.*\S.*', nullable: true, description: "Required and non-blank when editMode is REMARKS_ONLY; optional otherwise." }
+        legRef: { type: string, nullable: true }
+        accountEntries:
+          type: array
+          nullable: true
+          items: { $ref: '#/components/schemas/AccountEntry' }
+        businessEventId: { type: string, nullable: true }
+        exposureNature: { $ref: '#/components/schemas/ExposureNature' }
+        newExpiryDate: { type: string, format: date, nullable: true }
+        transactionDate: { type: string, format: date, nullable: true }
+        businessDate: { type: string, format: date, nullable: true }
+        valueDate: { type: string, format: date, nullable: true }
+        sourceModule: { type: string, nullable: true }
+        sourceFunction: { type: string, nullable: true }
+        referencedTransactionId: { type: string, format: uuid, nullable: true }
+        reasonCode: { type: string, nullable: true }
+        amendmentApproved: { type: boolean, nullable: true }
+        amendmentEffective: { type: string, nullable: true }
+        consentStatus: { type: string, enum: [NOT_REQUIRED, OBTAINED], nullable: true }
+        tolerancePct: { type: string, nullable: true }
+        tenorType: { $ref: '#/components/schemas/TenorType' }
+        tenorDays: { type: integer, nullable: true }
+        expiryDate: { type: string, format: date, nullable: true }
+        mailFloatGraceDays: { type: integer, nullable: true }
+      description: >
+        Strict Fix Pending allowlist. naturalKey, balanceContractId,
+        instrumentType, movementType, currency, eventSeq, createdBy and
+        sourceTransactionRef are locked and rejected when supplied. In
+        REMARKS_ONLY mode, amount must equal the stored amount, remarks is
+        required and must be non-blank, and every property other than amount,
+        editedBy, editMode and remarks is rejected.
+
+    BalanceMovementCreateRequest:
+      type: object
+      description: >
+        Body for POST /balance-movements. Either `naturalKey` (resolves or,
+        for a creating movementType, creates the Logical Contract) or an
+        explicit `balanceContractId` must be supplied — not both. See
+        CURRENCY CONSISTENCY (this document's top-level description) for
+        how `currency` is validated server-side once resolved.
+      required: [instrumentType, movementType, eventSeq, amount, currency, createdBy]
+      properties:
+        instrumentType: { $ref: '#/components/schemas/InstrumentType' }
+        naturalKey: { $ref: '#/components/schemas/NaturalKey' }
+        balanceContractId: { type: string, format: uuid, nullable: true }
+        parentLogicalContractId:
+          type: string
+          format: uuid
+          nullable: true
+          description: >
+            Required for SHGT ISSUE and EPLC_EXAMINATION CREATE (400 if
+            missing) — the parent LC/Confirmation this new child contract
+            hangs off of. Used both for the parent-sufficiency check at
+            creation time and, per CURRENCY CONSISTENCY, to validate this
+            new child contract's own supplied currency against it.
+        movementType: { type: string }
+        eventSeq:
+          type: integer
+          description: Caller-supplied, scoped to the resolved balanceContractId. Design doc §8 — the idempotency key is (balanceContractId, eventSeq); resubmitting the same pair is safe.
+        amount: { $ref: '#/components/schemas/MonetaryAmount' }
+        currency:
+          type: string
+          description: >
+            Always required. When the request resolves to an existing
+            contract, or creates a new child contract under a supplied
+            parentLogicalContractId, the value must match that contract's
+            (or parent's) own stored currency exactly — a mismatch is
+            rejected (409 CURRENCY_MISMATCH). For a genuinely root new
+            Logical Contract there is nothing to validate against, and this
+            value becomes that contract's own authoritative Currency Code.
+            See CURRENCY CONSISTENCY above for the full rule.
+        exposureNature:
+          allOf: [{ $ref: '#/components/schemas/ExposureNature' }]
+          nullable: true
+          description: Defaults per instrumentType/movementType when omitted (CONTINGENT for LC/SHGT earmarks, ACTUAL for Acceptance/Confirmation liabilities, MEMO for EPLC_EXAMINATION) — only needs to be supplied explicitly to override that default.
+        tolerancePct:
+          type: string
+          nullable: true
+          description: IPLC_LC/EPLC_LC ISSUE only (Design doc §6.2) — becomes the new contract's own BalanceContract.tolerancePct.
+        tenorType: { allOf: [{ $ref: '#/components/schemas/TenorType' }], nullable: true, description: IPLC_LC/EPLC_CONFIRMATION ISSUE, or IPLC_ACCEPTANCE/EPLC_ACCEPTANCE CREATE (checked for consistency against the parent's own tenorType — 400 on mismatch, and 400 if the parent is Sight). }
+        tenorDays: { type: integer, nullable: true }
+        maturityDate: { type: string, format: date, nullable: true }
+        expiryDate: { type: string, format: date, nullable: true, description: "v1.19.0, F1 — IPLC_LC/EPLC_LC/EPLC_CONFIRMATION ISSUE only. v1.25.0: REQUIRED (400 if absent) for ISSUE against those three instrumentTypes — a contract issued with none could never be picked up by the AUTO EXPIRY sweep. See BalanceContract.expiryDate's own description." }
+        mailFloatGraceDays: { type: integer, nullable: true, description: "v1.19.0, F1 — optional override of the per-side config default (captured onto the contract at ISSUE, fixed thereafter); omit to use the config default." }
+        newExpiryDate: { type: string, format: date, nullable: true, description: "v1.19.0, F1 — movementType 'AMEND_EXPIRY_DATE' only. See BalanceMovement.newExpiryDate's own description." }
+        legRef: { type: string, nullable: true }
+        accountEntries:
+          type: array
+          nullable: true
+          items: { $ref: '#/components/schemas/AccountEntry' }
+        businessEventId: { type: string, nullable: true, description: Correlates sibling movements from the same named business function; UUID syntax is not required. Required and identical across every request in POST /balance-movements/compound, where it identifies the legs governed by one atomic transaction boundary; optional correlation metadata on the single-movement endpoint. }
+        reasonCode: { type: string, nullable: true, description: "v1.24.0 — REQUIRED (400 if absent) for movementType 'CLOSE'/'REOPEN'; optional/passthrough otherwise. See BalanceMovement.reasonCode's own description." }
+        amendmentApproved: { type: boolean, nullable: true, description: "v1.24.0, F1 proposal §13.1 item 2. See BalanceMovement.amendmentApproved's own description." }
+        amendmentEffective: { type: string, nullable: true, description: "v1.24.0, F1 proposal §13.1 item 2. See BalanceMovement.amendmentEffective's own description." }
+        consentStatus: { type: string, nullable: true, enum: [NOT_REQUIRED, OBTAINED], description: "v1.24.0, F1 proposal §13.1 item 2. See BalanceMovement.consentStatus's own description." }
+        transactionDate: { type: string, format: date, nullable: true }
+        businessDate: { type: string, format: date, nullable: true }
+        valueDate: { type: string, format: date, nullable: true }
+        sourceModule: { type: string, nullable: true }
+        sourceFunction: { type: string, nullable: true }
+        sourceTransactionRef: { type: string, nullable: true, description: Must be unique per resolved balanceContractId (400 on reuse). }
+        referencedTransactionId: { type: string, format: uuid, nullable: true, description: "v1.3.0 — A6/B4 only: the movementId of the pre-existing source Document Arrival/Present Docs record this movement converts/finalizes. See BalanceMovement.referencedTransactionId's own description for the full rule." }
+        createdBy: { type: string }
+
+    CompoundMovementCreateRequest:
+      type: object
+      required: [requests]
+      properties:
+        requests:
+          type: array
+          minItems: 2
+          description: Two or more movement requests. Every item must carry the same non-null businessEventId.
+          items: { $ref: '#/components/schemas/BalanceMovementCreateRequest' }
+
+    CompoundMovementReleaseRequest:
+      type: object
+      required: [movementIds, releasedBy]
+      properties:
+        movementIds:
+          type: array
+          minItems: 2
+          uniqueItems: true
+          items: { type: string }
+        releasedBy:
+          type: string
+          minLength: 1
+
+    CompoundMovementAction:
+      type: object
+      required: [kind, movementId]
+      properties:
+        kind:
+          type: string
+          enum: [release, acknowledge]
+        movementId: { type: string }
+
+    CompoundMovementActionsRequest:
+      type: object
+      required: [actions, actor]
+      properties:
+        actions:
+          type: array
+          minItems: 2
+          items: { $ref: '#/components/schemas/CompoundMovementAction' }
+        actor:
+          type: string
+          minLength: 1
+
+    BalanceMovementCancelRequest:
+      type: object
+      description: >
+        Body for POST /balance-movements/{movementId}/cancel (v1.0.0 — real
+        shape, correcting an earlier draft's DELETE+query-param description).
+        The endpoint acts on one movement only; linked-leg ordering is a
+        caller responsibility and is not atomic. Do not use this body for A4
+        Maker Submit withdrawal, which has its own endpoint and request body.
+      required: [cancelledBy]
+      properties:
+        cancelledBy: { type: string, minLength: 1 }
+        reasonCode: { type: string, nullable: true }
+        remarks: { type: string, nullable: true }
+
+    DeletePendingAuditRecord:
+      type: object
+      description: >
+        v1.28.0, Fix Pending/Delete Pending Phase — one independent, append-only record of a single
+        Delete Pending action, written as a side effect of every `POST /balance-movements/{movementId}/
+        cancel` call across all A1-A11/B1-B7 (see that endpoint's own description). Deliberately NOT a
+        replacement for `BalanceMovement.cancelledBy`/`cancelledAt` (those stay, unchanged on the movement
+        itself) — this is an ADDITIONAL, purpose-built audit trail so "every Delete Pending that ever
+        happened" is queryable in one place, and so the same natural key can be traced across repeated
+        Delete Pending -> Resubmit cycles even though each cycle is a genuinely separate
+        `BalanceMovement` row (and, for A1/B1, a genuinely separate `BalanceContract` row too — see
+        `deleteSeq` below). No update/delete operation exists for this record type; it is insert-only.
+        Always returned already-joined with the owning contract's own natural key
+        (instrumentType/lcNumber/ibNumber/sgNumber below) — every endpoint returning this shape does the
+        join server-side so a caller never needs a second round trip just to derive Function/Secondary
+        Reference client-side.
+      properties:
+        auditId: { type: string, format: uuid }
+        deleteSeq:
+          type: integer
+          description: >
+            System-generated, 1-based sequence — NOT caller-supplied. Grouped by the owning contract's
+            own natural key (instrumentType + lcNumber + ibNumber + sgNumber), deliberately NOT by
+            balanceContractId: A1/B1's own LC-reuse side effect (see `ContractStatus`'s CANCELLED
+            description) means every Resubmit-after-Delete-Pending cycle gets a brand new
+            balanceContractId while the natural key stays constant — grouping by contract id would
+            incorrectly reset every such cycle back to 1 instead of counting the true chain (1, 2, 3, ...).
+        movementId: { type: string, format: uuid }
+        balanceContractId: { type: string, format: uuid }
+        eventSeq: { type: integer }
+        movementType: { type: string }
+        sourceTransactionRef: { type: string, nullable: true }
+        statusBefore:
+          type: string
+          enum: [PENDING, REJECTED]
+          description: The movement's own status immediately before this Delete Pending — Phase 1 widened Delete Pending to cover both, not just PENDING.
+        cancelledBy: { type: string }
+        cancelledAt: { type: string, format: date-time }
+        reasonCode: { type: string, nullable: true }
+        remarks: { type: string, nullable: true }
+        instrumentType: { $ref: '#/components/schemas/InstrumentType' }
+        lcNumber: { type: string }
+        ibNumber: { type: string, nullable: true }
+        sgNumber: { type: string, nullable: true }
+
+    BalanceSnapshot:
+      type: object
+      description: >
+        Design doc §3.3 — the derived balance numbers, never stored
+        directly. offBalanceExposure (Design doc §6.1) applies only to
+        IPLC_LC/EPLC_LC contracts that may have an SHGT issued against
+        them — null for any other instrumentType. tightAvailableBalance
+        (v1.11.0; basis corrected to confirmedBalance-based in v1.13.0 — see
+        its own field description below) is populated for IPLC_LC/EPLC_LC
+        AND for EPLC_CONFIRMATION (a genuinely different deduction — see its
+        own field description); null for every other instrumentType.
+        presentDocsEarmarkPending/presentDocsEarmarkApproved (v0.8.0,
+        EPLC_CONFIRMATION only) are null for any other instrumentType.
+      properties:
+        balanceContractId: { type: string, format: uuid }
+        logicalContractId: { type: string, format: uuid }
+        currency: { type: string }
+        confirmedBalance: { $ref: '#/components/schemas/MonetaryAmount' }
+        availableBalance: { $ref: '#/components/schemas/MonetaryAmount' }
+        pendingEarmarkTotal: { $ref: '#/components/schemas/MonetaryAmount' }
+        offBalanceExposure:
+          allOf: [{ $ref: '#/components/schemas/MonetaryAmount' }]
+          nullable: true
+          description: >
+            Design doc §6.1 — sum of PENDING+RELEASED SHGT `ISSUE` net of SHGT `PARTIAL_REDEEM`/
+            `FULL_REDEEM`, for SHGT contracts whose parentLogicalContractId matches this LC. A
+            redemption only counts once genuinely RELEASED (v1.15.0 — a still-PENDING one no longer
+            nets), **except** one sharing a still-PENDING `UTILIZE`'s own `businessEventId` on the SAME
+            LC (Document Arrival w/ Shipping Gtee's own matched compound pair, which nets from Submit —
+            see the top-level v1.15.0 changelog entry). An `ISSUE` always counts from PENDING, both
+            before and after v1.15.0 — only the REDEEM side's timing changed. Null for instrumentTypes
+            other than IPLC_LC/EPLC_LC.
+        tightAvailableBalance:
+          allOf: [{ $ref: '#/components/schemas/MonetaryAmount' }]
+          nullable: true
+          description: >
+            CURRENT formula (since v1.13.0 — this field description was not updated at the time; v1.15.0
+            corrects it here): `confirmedBalance` minus **Pending Decrease Total** (the sum of
+            still-PENDING movements' own `ceilingAmount` on THIS contract whose signed direction is a
+            decrease — e.g. AMEND_DECREASE/UTILIZE/the Export Confirmation's own AMEND-Decrease — never
+            netted against a PENDING increase on the same contract; not a separately-exposed
+            `BalanceSnapshot` field) minus, for IPLC_LC/EPLC_LC, `offBalanceExposure`, or for
+            EPLC_CONFIRMATION, the COMBINED `presentDocsEarmarkPending` + `presentDocsEarmarkApproved`. A
+            still-PENDING **increase** (ISSUE/AMEND_INCREASE/the Confirmation's own AMEND-Increase) is
+            invisible to this figure until genuinely Released ("增加從嚴") — a still-PENDING **decrease**
+            occupies it immediately at Submit ("占用從寬"), same as before. This is the threshold a
+            UTILIZE amount, an SHGT ISSUE against this LC as parent, a Present Docs (EPLC_EXAMINATION
+            CREATE) submission, and an AMEND_DECREASE/Confirmation-AMEND-Decrease are all checked
+            against. v1.0.0 — hard 409 on both sides, not a soft warning (see the removed
+            MovementWarning schema note below). v1.11.0 (2026-08-18) — also populated for
+            EPLC_CONFIRMATION (previously IPLC_LC/EPLC_LC only), a genuinely different deduction from
+            the Import case (no sibling SHGT exposure to net — SHGT is always a child of IPLC_LC), same
+            PURPOSE (true remaining capacity before the next event) via a different source figure. Both
+            deductions (`offBalanceExposure` and the combined Present Docs earmark) can themselves read
+            provisionally lower than their own strict definitions from v1.15.0 onward for a still-PENDING
+            matched/referencing transaction — see their own field descriptions and the top-level v1.15.0
+            changelog entry.
+
+            Null for every other instrumentType.
+        presentDocsEarmarkPending:
+          allOf: [{ $ref: '#/components/schemas/MonetaryAmount' }]
+          nullable: true
+          description: >
+            v0.8.0, EPLC_CONFIRMATION only — sum of still-PENDING (not yet
+            genuinely Checker-Released) EPLC_EXAMINATION CREATE amounts
+            under this Confirmation. Basis changed v1.12.0: previously
+            "not-yet-Checker-acknowledged"; B3's own acknowledge()-only
+            path was removed, so this is now simply status === PENDING.
+            v1.15.0 — also excludes any record a still-PENDING HONOUR/ACCEPT already provisionally
+            references via referencedTransactionId (see presentDocsEarmarkApproved's own v1.15.0 note
+            below); in practice this exclusion never actually changes this particular field's own value,
+            since a still-PENDING EPLC_EXAMINATION record can never itself be referenced yet (HONOUR/
+            ACCEPT only ever picks an already-RELEASED one) — the exclusion is applied here purely for
+            implementation symmetry with presentDocsEarmarkApproved.
+            Null for every other instrumentType.
+        presentDocsEarmarkApproved:
+          allOf: [{ $ref: '#/components/schemas/MonetaryAmount' }]
+          nullable: true
+          description: >
+            v0.8.0, EPLC_CONFIRMATION only — sum of genuinely RELEASED but
+            not-yet-consumed-by-B4 (presentDocsConsumedAt still null)
+            EPLC_EXAMINATION CREATE amounts under this Confirmation. Basis
+            changed v1.12.0 ("所有交易要RELEASE過後 才能根據流程走下一個交易"):
+            previously "Checker-acknowledged (acknowledgedAt set) but still
+            PENDING" — B3 now genuinely Releases on its own (status RELEASED),
+            and stays counted here until B4 actually consumes it (see
+            BalanceMovement.presentDocsConsumedAt) — preserving the original
+            commitment-control intent across that now-real PENDING->RELEASED
+            transition. v1.15.0 (business-reported live gap, "B4 U02 也有類似問題") — a record this
+            Confirmation's own still-PENDING (Maker-submitted, not yet Checker-Released) HONOUR/ACCEPT
+            already references via `referencedTransactionId` is now ALSO excluded here, purely for
+            display, from that HONOUR/ACCEPT's own Submit onward — its eventual consumption is a
+            foregone, self-balancing conclusion once Submitted, unlike a genuinely separate later Checker
+            decision (`presentDocsConsumedAt` itself is still only genuinely written at that HONOUR/
+            ACCEPT's own `/release`; reversed automatically, with no write, if that movement is instead
+            rejected/cancelled). This exception applies ONLY at the persisted/live balance display — a
+            genuinely NEW, independent Present Docs (B3) submission's own sufficiency check, and an
+            AMEND_DECREASE/Confirmation-AMEND-Decrease's own sufficiency check, both still compare against
+            the un-netted, strict figure (see the top-level v1.15.0 changelog entry). A Present Docs
+            submission's own sufficiency check nets Pending and Approved together against **Tight**
+            Available Balance (confirmedBalance-based since v1.13.0 — see tightAvailableBalance's own
+            description), not plain availableBalance.
+            Null for every other instrumentType.
+        asOf: { type: string, format: date, nullable: true, description: Echoes the request's asOf parameter (GET .../balance only); null means this is the live balance or a balance-as-of-movement query. }
+
+    Error:
+      type: object
+      required: [code, message]
+      description: >
+        `code` is one of: `REQUEST_VALIDATION_FAILED` (400),
+        `INSUFFICIENT_AVAILABLE_BALANCE` (409),
+        `NATURAL_KEY_ALREADY_EXISTS` (409, v1.0.0),
+        `CURRENCY_MISMATCH` (409, v1.0.0 — see CURRENCY CONSISTENCY),
+        `MAKER_CHECKER_CONFLICT` (409, business-confirmed 2026-08-24 — the
+        same user who created a movement cannot also Release/Reject/
+        acknowledge it; CANCEL is unaffected, a Maker's own Error Correction
+        on their own still-PENDING entry),
+        `ILLEGAL_STATE_TRANSITION` (409),
+        `NOT_FOUND` (404),
+        `INTERNAL_ERROR` (500 — the response body always carries a fixed,
+        generic message; the real error detail is logged server-side only,
+        never echoed to the client).
+      properties:
+        code: { type: string }
+        message: { type: string }
+        details: { type: object, additionalProperties: true }

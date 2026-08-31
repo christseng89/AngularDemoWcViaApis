@@ -1,0 +1,61 @@
+// Disclosed, deliberate copy of transaction-builder.component.scss's own design-system atoms this box
+// needs (.tb-balance-box*/.tb-balance-row*/.tb-muted) — same convention account-entries-dialog.component.scss
+// already established (see that file's own doc comment, and transaction-builder.component.scss's own
+// comment immediately above its .tb-muted rule) for why these are copied rather than shared/imported: each
+// component's own compiled style budget is independent, and Angular has no cross-component SCSS import that
+// wouldn't just re-duplicate the same bytes into every consumer anyway. The `--asof` variant that used to
+// sit alongside `--current` here was dead code (zero template usages anywhere in this app) and was dropped,
+// not carried over.
+.tb-balance-box {
+  background: var(--blue-bg);
+  border: 1px solid var(--blue-border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  color: var(--navy);
+
+  &--current {
+    background: var(--gray-bg);
+    border-color: var(--gray-border);
+    color: var(--gray-body);
+  }
+
+  &__title {
+    font-family: var(--font-sans);
+    font-weight: 700;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 6px;
+  }
+}
+
+.tb-balance-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding: 3px 0;
+  font-size: 12px;
+  border-bottom: 1px dashed var(--gray-border);
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.tb-balance-row__label {
+  color: var(--gray-muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.tb-balance-row__value {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: inherit;
+  text-align: right;
+}
+
+.tb-muted {
+  color: var(--gray-muted);
+}

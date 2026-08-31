@@ -1,0 +1,540 @@
+<div class="tb-page">
+  <header class="tb-header">
+    <h1 class="tb-title">Balance Component — Transaction Builder</h1>
+    <p class="tb-subtitle">
+      Pick a named business function below (Import A-series / Export B-series — Design doc §5), then fill in only what that function needs. For fixed end-to-end
+      scenarios, use the Business Case Runner instead.
+    </p>
+  </header>
+
+  <!-- Inquire Events (2026-08-17, user-requested, "使用OOD Design Patterns 新增 Inquire Events 功能") — a
+       top-level mode toggle sibling to the Import/Export function-side tabs below, reachable without first
+       picking a business function (see transaction-builder.component.ts's own activeMode doc comment).
+       `mb-4` (2026-08-17, user-requested — clearer visual separation from whichever section renders
+       below, added here rather than on the shared `.tb-tabs--side` class since that class is also reused
+       by several OTHER tab bars on this page — Look Up panel's LC/Acceptance/SG tabs, the Import/Export
+       function-side tabs, Inquire Events' own Import LC/Export Confirmed side tabs — that don't need it
+       and shouldn't be affected. Reuses the same Bootstrap spacing utility (`mt-2`/`mt-3`/etc.) already
+       used throughout this template, no new CSS. -->
+  <div class="tb-tabs tb-tabs--side mb-4">
+    <button type="button" class="tb-tab" [class.tb-tab--active]="activeMode === 'PROCESSING'" (click)="selectMode('PROCESSING')">Transaction Processing</button>
+    <!-- Fix Pending/Delete Pending Phase 2 (analysis/Balance-Component-FixPending-DeletePending-
+       Proposal-zh.md §2.1) — the Maker's own "My Pending/My Rejected" worklist, mirroring Inquire
+       Events' own top-level mode-tab convention. User-requested tab order swap: Maker Queue before
+       Inquire Events. -->
+    <button type="button" class="tb-tab" [class.tb-tab--active]="activeMode === 'MAKER_QUEUE'" (click)="selectMode('MAKER_QUEUE')">Maker Queue</button>
+    <button type="button" class="tb-tab" [class.tb-tab--active]="activeMode === 'INQUIRE'" (click)="selectMode('INQUIRE')">Inquire Events</button>
+    <!-- Inquire Delete Pending (analysis/Balance-Component-FixPending-DeletePending-Proposal-zh.md §11,
+       BA & business-directed 2026-08-27) — a dedicated, independent audit query, deliberately separate
+       from Inquire Events ("只查所有曾經發生過的 Delete Pending 操作，不混入 Resubmit/Fix/Approve/
+       Reject"). -->
+    <button type="button" class="tb-tab" [class.tb-tab--active]="activeMode === 'DELETE_PENDING_AUDIT'" (click)="selectMode('DELETE_PENDING_AUDIT')">Inquire Delete Pending</button>
+  </div>
+
+  <ng-container *ngIf="activeMode === 'PROCESSING'">
+    <!-- Business instruction 2026-08-15 ("A1-A9 B1-B5 should be horizental instead of vertical... the function
+       input should be more important than the menu... Tab Import => A1...A9 horizontal, Tab Export B1...B5
+       horizontal") — Import/Export is now a tab switch (one function row visible at a time, horizontal chips)
+       instead of two always-visible vertical lists, so the vertical space goes to the picked function's own
+       Maker/Checker panels below, not the menu itself. -->
+    <div class="tb-function-picker">
+      <div class="tb-tabs tb-tabs--side">
+        <button type="button" class="tb-tab" [class.tb-tab--active]="activeFunctionSide === 'IMPORT'" (click)="selectFunctionSide('IMPORT')">Import LC</button>
+        <!-- Business instruction 2026-08-15 ("EBL does not include in the Balance Component Scope,
+           therefore the Export LC without confirmation should be removed from the Export") — renamed
+           from "Export LC" to make explicit that this side only ever models Confirmed Export LC;
+           EBL/Nego financing and plain (unconfirmed) advising are out of Balance Component scope. -->
+        <button type="button" class="tb-tab" [class.tb-tab--active]="activeFunctionSide === 'EXPORT'" (click)="selectFunctionSide('EXPORT')">
+          Export Confirmed
+        </button>
+      </div>
+      <div class="tb-function-chips">
+        <button
+          type="button"
+          *ngFor="let fn of activeFunctionSide === 'IMPORT' ? importFunctions : exportFunctions"
+          class="tb-function-chip"
+          [class.tb-function-chip--active]="selectedFunction?.code === fn.code"
+          [title]="fn.help"
+          (click)="selectFunction(fn)"
+        >
+          <app-tb-icon [name]="functionActionIcon(fn.code)"></app-tb-icon>
+          <span class="tb-function-chip__code">{{ fn.code }}</span>
+          <span class="tb-function-chip__label">{{ fn.label }}</span>
+        </button>
+      </div>
+      <p class="tb-function-help" *ngIf="selectedFunction && selectedFunction.side === activeFunctionSide">{{ selectedFunction.help }}</p>
+    </div>
+
+    <div class="tb-workspace" *ngIf="selectedFunction && selectedFunction.side === activeFunctionSide">
+      <div class="tb-main">
+        <app-maker-panel
+          [selectedFunction]="selectedFunction"
+          [activeFunctionSide]="activeFunctionSide"
+          [resetTrigger]="checkerResetNonce"
+          [externalCheckerOutcome]="makerOutcomeSignal"
+          [externalFixPendingRequest]="externalFixPendingRequest"
+          [externalDeletePendingReviewRequest]="externalDeletePendingReviewRequest"
+          [refreshRequested]="refreshNonce"
+          [actionBusy]="actionBusy"
+          [releaseSuccessHint]="releaseSuccessHint"
+          (contextChanged)="onMakerContextChanged($event)"
+          (syncRequested)="onMakerSyncRequested($event)"
+          (openAccountEntries)="onMakerOpenAccountEntries($event)"
+          (fixPendingRequested)="fixPending($event)"
+          (fixPendingCancelled)="onFixPendingCancelled()"
+          (deletePendingReviewConfirmed)="onDeletePendingReviewConfirmed()"
+          (deletePendingReviewCancelled)="onDeletePendingReviewCancelled()"
+          (makerResultDeletePendingConfirmed)="onMakerResultDeletePendingConfirmed($event)"
+        ></app-maker-panel>
+
+        <!-- ══════════════════════════ CHECKER ══════════════════════════ -->
+        <!-- Business instruction 2026-08-15 ("Seperate Maker and Checker for each functions... there is no way to
+           Approve pending. Would it be possible to have separate option in Amendment function to release those
+           pending events? Same requirement for all other functions.") — a genuinely SEPARATE, standalone LC
+           search (searchCheckerLc()), not a passive follower of whatever the Maker's own Direction/Parent-picker/
+           natural-key flow happens to have resolved. Auto-fills from that context as a convenience
+           (syncCheckerToContext(), fired after a Submit or a contract pick) but works entirely on its own too —
+           a Checker can search LC S001 here and act on it without ever touching the Maker form above.
+
+           Bug fixed 2026-08-16, then superseded the SAME day (reviewer-reported — "A4 SUBMIT THEN
+           RELEASE Get error message => Cannot RELEASE a movement currently in status RELEASED"): the
+           root cause was A4 having TWO independent, unsynced release paths — its own dedicated
+           "Pay (Release)" button above, plus this generic panel. The first fix hid this panel for A4
+           entirely, which stopped the error but left A4 as the one function with no real Maker/Checker
+           (4-eyes) separation — a single actor's own button both submitted intent and released it.
+           Per explicit business instruction the same day ("A4 Need Maker and Checker feature (4 eyes
+           principle) i.e. Submit by Maker, then Release by Checker" / "A1-A9 B1-B5 all functions need
+           maker and checker features as standard Trade Finance business requirement"), A4's own button
+           was removed instead (see A4's subcard above) so THIS panel is now A4's only release path —
+           the same standard pattern every other function already uses, with no dual-path trap possible
+           since there is only one path. -->
+        <!-- BAL-003 "Feature Components + Facade" pilot #2 (2026-08-19, desiger-comments.md) — the
+           search box + PENDING-queue picker above moved into CheckerPanelComponent; the Release/Reject
+           action block below is projected INTO it (ng-content), since it's gated by the SAME
+           checkerContractId condition the child now owns internally — see checker-panel.component.ts's
+           own class doc comment for why the action layer itself stayed here. -->
+        <!-- Hidden during Maker Queue's own Delete Pending review (2026-08-28, "DELETE PENDING 交易畫面
+           不需要CHECKER") — this screen is a pure review-then-confirm/cancel action, not a Maker/Checker
+           workflow interaction; pendingMakerQueueDeleteRow is non-null for exactly the review's own
+           window (set by onMakerQueueDeletePendingReview(), cleared by onDeletePendingReviewConfirmed()'s
+           own settle callback / onDeletePendingReviewCancelled()). -->
+        <app-checker-panel
+          #checkerPanelEl
+          *ngIf="!pendingMakerQueueDeleteRow"
+          [selectedFunction]="selectedFunction"
+          [syncSignal]="checkerSyncSignal"
+          [resetTrigger]="checkerResetNonce"
+          [queueRefreshTrigger]="checkerQueueRefreshNonce"
+          (movementPicked)="onCheckerMovementPicked($event)"
+          (queueReloaded)="onCheckerQueueReloaded()"
+          (queueLoadSucceeded)="onCheckerQueueLoadSucceeded()"
+        >
+          <!-- A3/A3S (deferSettlement), matching whichever movementType deferSettlementMovementType
+             names (default UTILIZE), and NOT this Maker session's own A3S/A6 compound submission
+             (isCheckerCompoundOwnSubmission — business instruction 2026-08-15 bugfix:
+             "S001 B04 was settled, but the SG B04 still in Pending", A3S's compound release() was
+             unreachable before this check was added) — Release here is acknowledgment-only
+             (checkerAct() -> acknowledgeArrival()), never the real release API, so A4/A6 still find it
+             PENDING. acknowledgedAt is genuinely persisted again since 2026-08-20 ("A3 A3S 交易 Approve
+             過後 不要再顯示") — this hint (and the button below) fires off it, so re-searching an
+             already-acknowledged A3/A3S item correctly shows it as already approved instead of offering
+             a second attempt that would 409; in normal flow the item is gone from the queue entirely by
+             then (see checkerQueueRefreshNonce), this is defense-in-depth for a stale/unrefreshed list.
+             Shows who/when when that persisted field is the reason (this session's own click already
+             says so via the ✓ wording alone). -->
+          <div
+            class="tb-hint tb-hint--ok"
+            *ngIf="
+              selectedCheckerMovement &&
+              selectedFunctionStrategy?.checkerRelease?.deferSettlement &&
+              selectedCheckerMovement.movementType === (selectedFunction.deferSettlementMovementType || 'UTILIZE') &&
+              !isCheckerCompoundOwnSubmission &&
+              arrivalAlreadyApproved
+            "
+          >
+            ✓ {{ selectedFunction.deferSettlementLabel || 'Document Arrival' }} approved<span
+              *ngIf="!arrivalApproved && selectedCheckerMovement.acknowledgedAt"
+            >
+              — by {{ selectedCheckerMovement.acknowledgedBy }} at {{ selectedCheckerMovement.acknowledgedAt | date: 'short' }}</span
+            >. Balance stays <strong>Pending</strong> — go to
+            {{ selectedFunction.deferSettlementNextStepHint || 'A4 (Sight Settlement) or A6 (Acceptance)' }} to actually finalize it.
+          </div>
+
+          <div class="tb-checker-actions" *ngIf="selectedCheckerMovement">
+            <div class="tb-field tb-field--inline">
+              <label class="tb-field__label">Checker ID</label>
+              <input class="tb-input tb-input--required" [(ngModel)]="checkerId" />
+            </div>
+            <!-- Business instruction 2026-08-15 ("按Submit, Release, Reject後 Button 直接灰掉 不要重複提交
+               ... 二選一後兩個都灰掉") — both buttons now share checkerActionInFlight (component.ts),
+               so clicking either immediately disables both, for every function including the
+               compound ones (A3S/A6/B3-HONOUR/B4) that release()/reject() (not checkerAct() directly). -->
+            <button
+              class="tb-btn tb-btn--success"
+              (click)="checkerAct('release')"
+              [disabled]="
+                checkerActionInFlight ||
+                (selectedFunctionStrategy?.checkerRelease?.deferSettlement &&
+                  selectedCheckerMovement.movementType === (selectedFunction.deferSettlementMovementType || 'UTILIZE') &&
+                  !isCheckerCompoundOwnSubmission &&
+                  arrivalAlreadyApproved)
+              "
+            >
+              <span class="tb-spinner" aria-hidden="true" *ngIf="checkerActionInFlight"></span>{{
+                checkerActionInFlight
+                  ? 'Working…'
+                  : selectedFunctionStrategy?.checkerRelease?.deferSettlement &&
+                      selectedCheckerMovement.movementType === (selectedFunction.deferSettlementMovementType || 'UTILIZE') &&
+                      !isCheckerCompoundOwnSubmission
+                    ? 'Approve'
+                    : 'Release'
+              }}
+            </button>
+            <button class="tb-btn tb-btn--danger-outline" (click)="checkerAct('reject')" [disabled]="checkerActionInFlight">Reject</button>
+            <!-- F1 proposal §14.4 (BA code review, 2026-08-25) — the whole point of the 2026-08-25 REOPEN
+               redesign was "Checker要看交易出的帳 再決定 APPROVE或REJECT", but the Checker's own Release/
+               Reject screen had no way to actually view Account Entries before deciding — Maker's result
+               panel and Inquire Events both already had this button, this screen was the one gap. Same
+               button, same shared dialog (openAccountEntryDialog(), already parent-owned — see this
+               component's own class doc comment for why the action layer stays here, not on
+               CheckerPanelComponent), gated the same way Maker's own button is (contingentAccountEntry
+               present — null for an out-of-contingent-scope instrumentType). -->
+            <button type="button" class="tb-btn tb-btn--outline" *ngIf="selectedCheckerMovement?.contingentAccountEntry" (click)="openCheckerAccountEntryDialog()">
+              Account Entries
+            </button>
+          </div>
+          <app-feedback-message *ngIf="checkerFeedback as feedback" [message]="feedback"></app-feedback-message>
+        </app-checker-panel>
+      </div>
+
+      <div class="tb-side">
+        <section class="tb-section tb-section--lookup">
+          <div class="tb-section__header">
+            <app-tb-icon name="lookup"></app-tb-icon>
+            <h2 class="tb-section__title">Look Up Current Balance</h2>
+          </div>
+          <div class="tb-section__body">
+            <!-- Manual override/fallback (e.g. to look up an unrelated LC) — MakerPanelComponent's own
+               emitCheckerAndLookupSync()/TransactionBuilderComponent.refreshLookUpForLastMakerContext()
+               already keep these in sync with whatever LC is in context, so re-typing is rarely needed. -->
+            <div class="tb-grid-lookup">
+              <!-- Business instruction 2026-08-15: EPLC_LC (Unconfirmed Export LC) removed from this
+                 list — Export Confirmed-only scope, no function creates one anymore (see the
+                 EXPORT_FUNCTIONS module note in balance-component.model.ts). Only Import LC-side
+                 (IPLC_LC/IPLC_ACCEPTANCE/SHGT) and Export Confirmed-side (EPLC_CONFIRMATION/
+                 EPLC_ACCEPTANCE) instruments remain lookup-able. Business instruction 2026-08-15
+                 ("Import LC 不須出現 Export LC。Export Confirmed 不須出現 Import LC") — the option list
+                 itself is now filtered to the active tab's own side, so switching tabs never leaves a
+                 stale cross-side option visible/selectable. -->
+              <!-- Business instruction 2026-08-16 ("Dropdown是不需要的 因為Sight只處理Confirmed Balance
+                 Usance只處理Confirmed Balance與Acceptance Balance") — Export side, EPLC_CONFIRMATION is
+                 the only genuine top-level lookup entry point: Acceptance Balance is always reachable
+                 from it via the "Acceptance Balance" tab below (lookupIsUsanceLc), never a separate
+                 instrumentType selection — same reasoning as removing B3's redundant single-option
+                 Parent LC dropdown. Business instruction 2026-08-16 ("Same as Export Confirmed in Import
+                 LC... Sight 或 Usance都可以直接顯示有關的餘額") — Import gets the identical treatment: IPLC_LC
+                 is the only genuine top-level lookup entry point, IPLC_ACCEPTANCE/SHGT are always reached
+                 via the existing "Acceptance Balance"/"SG Balance" tabs below instead. Neither side's own
+                 dropdown exists anymore — lookup.instrumentType stays fixed at IPLC_LC/EPLC_CONFIRMATION
+                 (set by selectFunctionSide()/selectFunction()), never user-editable here. -->
+              <!-- Business instruction 2026-08-16: the IB#/EB#/SG# fields that used to sit alongside this
+                 (paired with the now-removed instrumentType dropdown, to look up an Acceptance/SG
+                 directly) are gone too — genuinely vestigial now that instrumentType is permanently fixed
+                 to IPLC_LC/EPLC_CONFIRMATION here (their own natural key is lcNumber alone). Worse than
+                 just unused: findActiveByNaturalKey()'s own match is strict (`ib_number IS ?`) — an
+                 LC-level contract's stored ib_number is always NULL, so typing anything into a leftover
+                 IB#/SG# field would 404 a genuinely-existing LC. The Acceptance Balance/SG Balance tabs
+                 below already auto-list every Acceptance/SG under the picked LC (selectLookupAcceptance()/
+                 selectLookupSg(), auto-picking the one if there's exactly one) — no separate top-level
+                 field was ever needed to narrow to a specific one. -->
+              <input class="tb-input" placeholder="LC Number" [(ngModel)]="lookUp.lookup.lcNumber" />
+            </div>
+            <button class="tb-btn tb-btn--outline mt-2" (click)="onLookUpClick()">Look Up</button>
+            <div class="tb-error mt-2" role="alert" *ngIf="lookUp.lookupError">{{ lookUp.lookupError }}</div>
+
+            <!-- Business instruction 2026-08-14 ("two tabs for Sight LC i.e. LC Balance SG Balance, for Usance LC
+               ... three tabs, LC Balance, Acceptance Balance, and SG Balance") — Acceptance only for Usance
+               (Design doc §7); SG for either tenor (Import IPLC_LC only). Neither shown for a non-LC lookup
+               (e.g. looking up an Acceptance/Confirmation/SG directly). -->
+            <div class="tb-tabs mt-2" *ngIf="lookUp.lookupResult && (lookUp.lookupIsUsanceLc || lookUp.lookupHasSg)">
+              <button type="button" class="tb-tab" [class.tb-tab--active]="lookUp.lookupTab === 'LC'" (click)="lookUp.selectLookupTab('LC')">LC Balance</button>
+              <button
+                type="button"
+                class="tb-tab"
+                *ngIf="lookUp.lookupIsUsanceLc"
+                [class.tb-tab--active]="lookUp.lookupTab === 'ACCEPTANCE'"
+                (click)="lookUp.selectLookupTab('ACCEPTANCE')"
+              >
+                {{ lookUp.acceptanceBalanceLabel }}
+              </button>
+              <button
+                type="button"
+                class="tb-tab"
+                *ngIf="lookUp.lookupHasSg"
+                [class.tb-tab--active]="lookUp.lookupTab === 'SG'"
+                (click)="lookUp.selectLookupTab('SG')"
+              >
+                SG Balance
+              </button>
+            </div>
+
+            <!-- UX enhancement (2026-08-18, "SG Balance — Inquiry Catalog Design": "there is no need to
+               create separate G01 and G02 catalog/cards after selecting SG Balance... one unified
+               Inquiry Catalog, with each SG identified by its Secondary Reference... avoids duplicating
+               the Secondary Reference as another selection layer") — each candidate row is now a
+               self-describing catalog entry (LC Number — Secondary Reference — Balance Type — Status,
+               e.g. "LC S01 — Secondary Ref. G02 / SG Balance — Active"), not a bare "G02 — ACTIVE" that
+               only becomes meaningful once you already know which tab/LC you're under. Same rule applied
+               to the Acceptance picker immediately above (Import "Acceptance Balance" / Export "Confirmed
+               LC Acceptance Balance" — reusing the SAME acceptanceInstrumentTypeFor()-driven side check
+               InquireEventsService already uses for the identical label, rather than a second hardcoded
+               copy). Selecting a row still reveals that SG's/Acceptance's own Event Timeline below,
+               unchanged — this is a row-content enrichment only, not a behavior change. -->
+            <div class="mt-2" *ngIf="lookUp.lookupResult && lookUp.lookupIsUsanceLc && lookUp.lookupTab === 'ACCEPTANCE'">
+              <app-index-picker
+                *ngIf="lookUp.acceptancesUnderLookup.length > 1"
+                [items]="lookUp.acceptancesUnderLookup"
+                [selectedId]="lookUp.selectedLookupAcceptance?.balanceContractId ?? null"
+                (pick)="lookUp.selectLookupAcceptance($event)"
+              >
+                <ng-template let-a>
+                  <span class="tb-row-primary">LC {{ a.naturalKey.lcNumber }} — Secondary Ref. {{ a.naturalKey.ibNumber }}</span>
+                  <span class="tb-row-badge">{{ lookUp.acceptanceBalanceLabel }} — {{ a.status }}</span>
+                </ng-template>
+              </app-index-picker>
+              <div class="tb-hint" *ngIf="!lookUp.acceptancesUnderLookup.length">No Acceptance carved out under this LC yet — use A6 first.</div>
+            </div>
+
+            <div class="mt-2" *ngIf="lookUp.lookupResult && lookUp.lookupHasSg && lookUp.lookupTab === 'SG'">
+              <app-index-picker
+                *ngIf="lookUp.sgsUnderLookup.length > 1"
+                [items]="lookUp.sgsUnderLookup"
+                [selectedId]="lookUp.selectedLookupSg?.balanceContractId ?? null"
+                (pick)="lookUp.selectLookupSg($event)"
+              >
+                <ng-template let-sg>
+                  <span class="tb-row-primary">LC {{ sg.naturalKey.lcNumber }} — Secondary Ref. {{ sg.naturalKey.sgNumber }}</span>
+                  <span class="tb-row-badge">SG Balance — {{ sg.status }}</span>
+                </ng-template>
+              </app-index-picker>
+              <div class="tb-hint" *ngIf="!lookUp.sgsUnderLookup.length">No Shipping Guarantee issued under this LC yet — use A8 first.</div>
+            </div>
+
+            <!-- Event timeline (business instruction 2026-08-14): every movement, in eventSeq (time) order.
+               Click one to see the balance right after THAT event, not the current live balance.
+               Business instruction 2026-08-14 ("don't show the JSON, start with Event Timeline") — this is
+               the FIRST thing shown for a lookup result, ahead of the Current Balance summary below. -->
+            <div class="mt-3" *ngIf="lookUp.lookupResult">
+              <h3 class="tb-subheading">Event Timeline — {{ lookUp.activeLookupLabel }}</h3>
+              <!-- Bug fix (reviewer-reported 2026-08-17, "Time column truncated for A1-A9/B1-B5") — the
+                 ancestor .tb-section's own overflow:hidden (kept for its rounded-corner header background)
+                 was silently CLIPPING this table's Time column instead of letting it scroll: .tb-table__time
+                 is white-space:nowrap, so table-layout:auto refuses to shrink it below its content width,
+                 and with no scroll container of its own the overflow had nowhere to go but clipped. This
+                 wrapper gives that overflow a dedicated horizontal-scroll surface instead. -->
+              <div class="tb-table-scroll" *ngIf="lookUp.activeLookupMovements.length">
+                <!-- 2026-08-19 (60/40 split, requirement #5) — tb-table--lookup-timeline tightens this
+                 specific table's own cell padding/font-size (transaction-builder.component.scss) so its
+                 columns fit the now-narrower 40% Look Up Current Balance panel without truncation. -->
+                <table class="tb-table tb-table--lookup-timeline">
+                  <caption class="visually-hidden">
+                    Event Timeline —
+                    {{
+                      lookUp.activeLookupLabel
+                    }}
+                  </caption>
+                  <!-- Business instruction 2026-08-15 ("the # does not have business meaning") — eventSeq
+                   (Design doc §8's idempotency key part, currently just Date.now()) dropped from the
+                   visible table; rows stay in the same eventSeq/time order, just not labeled by it. -->
+                  <!-- UX enhancement (2026-08-19, "Look Up Current Balance → Event Timeline" gains a FUNCTION
+                   column that "must use the same Function mapping as Inquire Events... Do not implement
+                   a separate Function mapping") — lookUp.functionFor() delegates to the SAME
+                   functionForEvent() free function InquireEventsService.functionFor() itself now
+                   delegates to (inquire-events.service.ts), so both screens resolve every row's own
+                   Function badge identically by construction. Markup mirrors Inquire Events' own Function
+                   column exactly (same .tb-type-tag/tb-muted shapes, same "—" fallback for legacy data). -->
+                  <thead>
+                    <tr>
+                      <th>Function</th>
+                      <th>Amount</th>
+                      <th>Reference</th>
+                      <th>Secondary Ref.</th>
+                      <th>Status</th>
+                      <th>Balance After</th>
+                      <th>Time</th>
+                      <th>Audit Trail</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <!-- Business instruction 2026-08-14 "Lookup should show the 2ndary reference number" — sourceTransactionRef
+                     (Amendment No./Times, IB/EB Number, …); ISSUE/CREATE have none, shown as an em dash.
+                     Business instruction 2026-08-16 ("Event Timeline 上一行已經顯示了 不需再多選取") — Balance
+                     After (the movement's own balanceAfter, set once it's RELEASED — see release()'s own
+                     before/after computation) is a plain column here, so the earlier separate click-to-fetch
+                     "Balance as of event" panel (selectEvent()) stays removed.
+                     UX enhancement (2026-08-18, "Event Timeline — View Voucher... clicking an Event should
+                     open the corresponding View Voucher pop-up") — supersedes the 2026-08-16 design this
+                     comment used to describe (a separate "Entries" column button, deliberately NOT
+                     whole-row-clickable): the whole row now dispatches openAccountEntryDialog(m) directly,
+                     same "row itself is the pickable surface" convention Inquire Events' own merged Events
+                     table already uses (.tb-table's own tbody tr already carries cursor:pointer + hover-
+                     highlight styling, so no new CSS was needed) — reused here rather than reinvented. The
+                     dedicated "Entries" column/button is gone; the dialog itself (below) now shows a plain
+                     "No voucher entries" hint instead of a Dr/Cr table when the clicked event has none,
+                     closing the same "—" case the removed button's own empty state used to cover. -->
+                    <!-- 2026-08-18, user-requested ("Look Up Current Balance's own Event Timeline should use
+                     the SAME status/display logic as Inquire Events — must not maintain its own
+                     independent STATUS mapping"): iterates InquiredEvent rows (the SAME toEventRows()
+                     split Inquire Events uses), not the raw BalanceMovement[] this table bound before.
+                     row.eventStatus (not row.movement.status) is required for correct EARMARKING/
+                     EARMARKED-vs-PENDING/APPROVED display; row.eventStatus is now the movement's own
+                     real, current status on every row including 'create' (business-mandated 2026-08-18 —
+                     see toEventRows()'s own doc comment, inquire-events.service.ts, for the full
+                     reversal of an earlier same-day design that forced 'create' to show a stale PENDING).
+                     Balance After likewise reads row.movement.balanceAfter unconditionally now — no more
+                     blanking for a 'create' row, same reasoning. -->
+                    <!-- Type column removed (user-confirmed, 2026-08-21) — Account Entries (the row-click
+                     voucher pop-up) already reconstructs the full Dr/Cr detail per event; this table's
+                     own job is overview/navigation, not carrying full audit-trail responsibility itself,
+                     so the redundant per-row movementType badge was dropped. -->
+                    <tr *ngFor="let row of lookUp.pagedLookupMovements" (click)="openAccountEntryDialog(row.movement, row.contract.instrumentType, row.phase, row.linkedMovement)">
+                      <td>
+                        <span class="tb-type-tag" *ngIf="lookUp.functionFor(row) as fn">{{ fn.code }} · {{ fn.label }}</span>
+                        <span class="tb-muted" *ngIf="!lookUp.functionFor(row) && lookUp.systemLabelFor(row) as sysLabel">{{ sysLabel }}</span>
+                        <span class="tb-muted" *ngIf="!lookUp.functionFor(row) && !lookUp.systemLabelFor(row)">—</span>
+                      </td>
+                      <td class="tb-table__amount">
+                        {{ displayMovementAmount(row.contract.instrumentType, row.movement.movementType, row.movement.amount) | monetaryAmount: row.movement.currency }}
+                        <span class="tb-muted" *ngIf="row.movement.ceilingAmount !== row.movement.amount"
+                          >(ceiling {{ displayMovementAmount(row.contract.instrumentType, row.movement.movementType, row.movement.ceilingAmount) | monetaryAmount: row.movement.currency }})</span
+                        >
+                      </td>
+                      <td class="tb-table__ref">{{ lookUp.primaryReferenceFor(row) }}</td>
+                      <td class="tb-table__ref">{{ lookUp.secondaryReferenceFor(row) }}</td>
+                      <td class="tb-table__status">
+                        <span
+                          class="tb-status-badge"
+                          [ngClass]="statusBadgeClass(row.eventStatus, row.contract.instrumentType, row.movement.movementType, row.phase, row.movement.acknowledgedAt)"
+                          ><app-tb-icon [name]="statusBadgeIcon(statusBadgeClass(row.eventStatus, row.contract.instrumentType, row.movement.movementType, row.phase, row.movement.acknowledgedAt))"></app-tb-icon
+                          >{{ displayStatus(row.eventStatus, row.contract.instrumentType, row.movement.movementType, row.phase, row.movement.acknowledgedAt) }}</span
+                        >
+                      </td>
+                      <td class="tb-table__amount">{{ row.movement.balanceAfter === null || row.movement.balanceAfter === undefined ? '—' : (row.movement.balanceAfter | monetaryAmount: row.movement.currency) }}</td>
+                      <td class="tb-table__time">{{ row.eventTime | date: 'short' }}</td>
+                      <!-- Submit/EC/Approve audit trail (business instruction 2026-08-20). EC/Approve are
+                       mutually exclusive per row, gated on the movement's own real status — see the
+                       Original Transaction Screen panel below for the same rule, and the microservice's
+                       own types.ts BalanceMovement.cancelledAt doc comment for why EC no longer reuses
+                       releasedBy/releasedAt. -->
+                      <td class="tb-table__audit-trail">
+                        <div>S: {{ row.movement.createdBy }} · {{ row.movement.createdAt | date: 'short' }}</div>
+                        <div *ngIf="row.eventStatus === 'RELEASED' && row.movement.releasedBy">
+                          A: {{ row.movement.releasedBy }} · {{ row.movement.releasedAt | date: 'short' }}
+                        </div>
+                        <div *ngIf="row.eventStatus === 'REJECTED' && row.movement.releasedBy">
+                          Rej: {{ row.movement.releasedBy }} · {{ row.movement.releasedAt | date: 'short' }}
+                        </div>
+                        <div *ngIf="row.eventStatus === 'CANCELLED' && row.movement.cancelledBy">
+                          EC: {{ row.movement.cancelledBy }} · {{ row.movement.cancelledAt | date: 'short' }}
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <!-- UX enhancement (2026-08-19, "+ Event Timeline 使用PAGE BY PAGE PATTERN") — same Prev/Next +
+                 "Page X / Y (Z total)" control shape Inquire Events' own merged Events table already uses
+                 (InquireEventsService.eventsPaging), reused verbatim rather than a new design. -->
+              <div class="tb-pagination" *ngIf="lookUp.lookupMovementsPaging.totalPages > 1">
+                <button
+                  type="button"
+                  class="tb-btn tb-btn--tiny tb-btn--outline"
+                  [disabled]="lookUp.lookupMovementsPaging.page <= 1"
+                  (click)="lookUp.prevLookupMovementsPage()"
+                >
+                  ‹ Prev
+                </button>
+                <span class="tb-muted"
+                  >Page {{ lookUp.lookupMovementsPaging.page }} / {{ lookUp.lookupMovementsPaging.totalPages }} ({{
+                    lookUp.lookupMovementsPaging.total
+                  }}
+                  total)</span
+                >
+                <button
+                  type="button"
+                  class="tb-btn tb-btn--tiny tb-btn--outline"
+                  [disabled]="lookUp.lookupMovementsPaging.page >= lookUp.lookupMovementsPaging.totalPages"
+                  (click)="lookUp.nextLookupMovementsPage()"
+                >
+                  Next ›
+                </button>
+              </div>
+              <div class="tb-hint" *ngIf="!lookUp.activeLookupMovements.length">No movements yet.</div>
+
+              <!-- Current Balance — no raw JSON dump (business instruction 2026-08-14). One field per line
+                 (business instruction 2026-08-15 — was a wrapping flex row before, hard to scan).
+                 Inquire Events (2026-08-17): this box is a shared component (app-balance-snapshot-box,
+                 own file since the 2026-08-21 Part B pass) so Transaction Processing (here) and Event
+                 Inquiry (InquireEventsComponent, below) render an identical box from one canonical
+                 template, not two copies. `impact` deliberately omitted here — see that component's own
+                 doc comment for why (only Inquire Events passes one). -->
+              <app-balance-snapshot-box
+                [title]="'Current Balance — ' + lookUp.activeLookupLabel"
+                [status]="lookUp.activeLookupContract?.status"
+                [snapshot]="lookUp.activeLookupSnapshot"
+              ></app-balance-snapshot-box>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </ng-container>
+
+  <!-- ══════════════════════════ INQUIRE EVENTS (2026-08-17) ══════════════════════════
+       Extracted into its own standalone InquireEventsComponent 2026-08-21 (Part B tech-debt pass, actioned
+       at user request — "Part B 也一起做吧,開始extract InquireEventsComponent") — see that component's own
+       class doc comment for the full rationale (own anyComponentStyle production-build budget, separate
+       from this parent's). `inquireEvents` (InquireEventsService) stays constructed/owned right here,
+       unchanged from before this pass — only the VIEW layer moved, passed down as a plain @Input(). The
+       Account Entries dialog it can open stays parent-owned (also opened from the Maker Result panel and
+       the Look Up panel's own Event Timeline), so it bubbles the request up via (openAccountEntries)
+       instead of managing accountEntryDialog* state itself. -->
+  <app-inquire-events
+    *ngIf="activeMode === 'INQUIRE'"
+    [inquireEvents]="inquireEvents"
+    (openAccountEntries)="onInquireOpenAccountEntries($event)"
+  ></app-inquire-events>
+
+  <!-- ══════════════════════════ MAKER QUEUE (Fix Pending/Delete Pending Phase 2) ══════════════════════════ -->
+  <app-maker-queue
+    *ngIf="activeMode === 'MAKER_QUEUE'"
+    [makerQueue]="makerQueue"
+    (fixPendingRequested)="onMakerQueueFixPending($event)"
+    (deletePendingRequested)="onMakerQueueDeletePendingReview($event)"
+  ></app-maker-queue>
+
+  <!-- ══════════════════════════ INQUIRE DELETE PENDING (§11) ══════════════════════════ -->
+  <app-inquire-delete-pending *ngIf="activeMode === 'DELETE_PENDING_AUDIT'" [service]="inquireDeletePending"></app-inquire-delete-pending>
+
+  <!-- ══════ View Voucher pop-up (business-requested 2026-08-16, analysis/contingent-liability-ledger.html;
+       retitled 2026-08-18 per "Event Timeline — View Voucher" UX enhancement) ══════
+       Opened from the Maker Result panel (right after Submit), an Inquire Events row's own "Original
+       Transaction Screen" panel, or a whole Look Up Current Balance Event Timeline row click; all pass
+       in the exact BalanceMovement object already returned by the API, so this dialog only ever
+       displays the historical entries stored WITH that event, never a recalculation against the current
+       balance. Extracted into its own standalone AccountEntriesDialogComponent 2026-08-19 (BAL-003
+       pilot, desiger-comments.md — this session's own first genuine child-component extraction, chosen
+       specifically because this dialog is purely presentational, unlike the pickers' own Maker-flow-
+       entangled selection handlers) — this component still decides WHETHER the dialog exists at all
+       (the *ngIf below), exactly as the inline `<div>` version did; the child owns only its own display
+       and emits `closed` when the backdrop/×/Close button fires. -->
+  <app-account-entries-dialog
+    *ngIf="accountEntryDialogMovement"
+    [movement]="accountEntryDialogMovement"
+    [instrumentType]="accountEntryDialogInstrumentType"
+    [phase]="accountEntryDialogPhase"
+    [linkedMovement]="accountEntryDialogLinkedMovement"
+    (closed)="closeAccountEntryDialog()"
+  ></app-account-entries-dialog>
+
+</div>

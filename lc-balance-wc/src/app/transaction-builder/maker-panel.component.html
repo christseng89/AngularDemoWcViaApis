@@ -1,0 +1,830 @@
+<!-- ══════════════════════════ MAKER ══════════════════════════ -->
+<section class="tb-section tb-section--maker">
+  <div class="tb-section__header">
+    <app-tb-icon name="amend"></app-tb-icon>
+    <span class="tb-role-badge tb-role-badge--maker">Maker</span>
+    <h2 class="tb-section__title">{{ selectedFunction?.code }} — {{ selectedFunction?.label }}</h2>
+  </div>
+
+  <div class="tb-section__body">
+    <!-- Business instruction 2026-08-17 ("After Release is successfully completed, the system
+               should automatically return to the same transaction function and reset the screen for a
+               new transaction") — release() re-invokes selectFunction() with the same function on
+               success, which clears releaseSuccessHint too; this brief visible confirmation is set right
+               AFTER that reset call so it survives it, and disappears the moment any other action
+               (switching functions, a fresh Submit, etc.) touches state again. -->
+    <app-maker-workflow-notices
+      [releaseSuccessHint]="releaseSuccessHint"
+      [fixPendingMode]="fixPendingMode"
+      [deletePendingReviewMode]="deletePendingReviewMode"
+      [functionCode]="selectedFunction?.code ?? null"
+      [movementId]="submitResult?.movementId ?? null"
+    ></app-maker-workflow-notices>
+
+    <app-protected-transaction-identity
+      [visible]="naturalKeyLocked"
+      [items]="protectedIdentityItems"
+    ></app-protected-transaction-identity>
+    <!-- 2026-08-20: unified — B2 now shares this exact block via subChoice.key === 'amendDirection'
+                 (see SubChoice's own doc comment) instead of a bespoke, separately-hand-rolled Direction
+                 <select>. [disabled] on formLocked, matching every other field's own "no changes after a
+                 successful Submit" rule, previously only applied to B2's own bespoke block — A2/A7 were
+                 missing it until this unification, a real gap this pass also closes.
+
+                 Stays VISIBLE (not hidden) through Fix Pending／Delete Pending review — user-directed
+                 2026-08-28, "Direction * 顯示出來當初選的 不可以改" (an explicit correction of an earlier,
+                 wrong "hide it entirely" instruction the same day) — showing the originally-selected
+                 Direction is itself useful review context (matches the "review the real record before
+                 acting" principle the Delete Pending review screen exists for), it just must never be
+                 CHANGEABLE. `[disabled]="formLocked"` already covers that (`formLocked = !!submitResult`,
+                 true throughout both review modes) — Direction determines movementType itself
+                 (Increase/Decrease/Expiry Date are three genuinely different movementTypes, not a value
+                 within one), which `FixPendingEditableField` already excludes from ever being
+                 Fix-Pending-editable (same "wrong target means Delete Pending + a fresh Submit, not fixing
+                 it in place" posture LC Number/2ndary Number already have — see naturalKeyLocked's own doc
+                 comment); disabling it here is what actually enforces that, not the `*ngIf` below, which
+                 exists only for functions that have no Direction at all.
+
+                 Emphasized during Fix Pending／Delete Pending review only (2026-08-28, "Direction 字體
+                 放大加粗鮮明") — same `.tb-natural-key--emphasized` class and same `isExternalReviewMode`
+                 trigger `secondaryRef`'s own review-mode emphasis already uses (builder-fields.ts's
+                 `isReviewMode(ctx)`), not a new rule: Direction has become a protected, review-only field
+                 by this point (see the paragraph above), same footing as LC Number/2ndary Number. Bound
+                 directly here (not via a Formly `className`) since this `<select>` is raw template markup
+                 in THIS component, not a `ngx-formly`-rendered field — no ViewEncapsulation crossing to
+                 work around, unlike `secondaryRef`'s own fix (see that class's own doc comment in
+                 src/styles.scss for why THAT one had to move to the global stylesheet). -->
+    <div class="tb-field" *ngIf="selectedFunction?.subChoice">
+      <label class="tb-field__label">{{ selectedFunction?.subChoice?.label }} <span class="tb-required-mark">*</span></label>
+      <select
+        class="tb-select tb-select--required"
+        [class.tb-natural-key--emphasized]="isExternalReviewMode"
+        [(ngModel)]="subChoiceValue"
+        (change)="onSubChoice()"
+        [disabled]="formLocked"
+      >
+        <option value="">— select —</option>
+        <option *ngFor="let o of selectedFunction?.subChoice?.options" [value]="o.value">{{ o.label }}</option>
+      </select>
+    </div>
+
+    <ng-container *ngIf="ready">
+      <div class="tb-field" *ngIf="usesCombinedTransactionIndex && !naturalKeyLocked">
+        <app-index-picker
+          label="Transaction Index — select LC Number + {{ selectedFunction?.transactionIndexSecondaryRefLabel }}"
+          [items]="pagedTransactionIndexRows"
+          [columnHeaders]="[
+            'Catalog',
+            'Ref',
+            selectedFunction?.transactionIndexSecondaryRefLabel || '2nd Ref',
+            selectedFunction?.transactionIndexAmountLabel || 'Amount',
+            'Status',
+          ]"
+          [loading]="eligiblePickersLoading"
+          [selectedId]="
+            selectedFunction?.code === 'A3S'
+              ? pickerSelection.selectedArrivalSg?.balanceContractId || null
+              : pickerSelection.selectedPayMovement?.movementId || null
+          "
+          [searchable]="true"
+          [(searchValue)]="transactionIndexSearch"
+          searchPlaceholder="Search LC Number or {{ selectedFunction?.transactionIndexSecondaryRefLabel }}…"
+          (search)="onTransactionIndexSearch()"
+          emptyText="No eligible transaction found."
+          [page]="transactionIndexPage"
+          [totalPages]="transactionIndexTotalPages"
+          [total]="allTransactionIndexRows.length"
+          (pick)="!formLocked && onSelectTransactionIndex($event)"
+          (prevPage)="transactionIndexPrevPage()"
+          (nextPage)="transactionIndexNextPage()"
+        >
+          <ng-template let-row>
+            <span>{{ selectedFunction?.pendingItemSourceCode || selectedFunction?.code }}</span>
+            <span class="tb-row-primary">{{ row.root.naturalKey.lcNumber }}</span>
+            <span>{{ row.secondaryRef }}</span>
+            <span>{{ row.amount | monetaryAmount: row.currency }} {{ row.currency }}</span>
+            <span class="tb-row-badge">{{ row.status }}</span>
+          </ng-template>
+        </app-index-picker>
+      </div>
+
+      <!-- Parent LC (business instruction 2026-08-14): for A6/B4 (Acceptance) and A8 (Shipping Gtee Issue),
+                 the LC Number is NOT freely typed — an Acceptance/SG can only ever be created under an LC that
+                 already exists, so it must be THE SAME LC picked here, not a second independent text field that
+                 could drift from it. Shown first so the natural-key section below can source lcNumber from it. -->
+      <div class="tb-field" *ngIf="hasParent && !usesTwoFieldSearch && !naturalKeyLocked && !usesCombinedTransactionIndex">
+        <!-- Business instruction 2026-08-15 ("B3 左側不需要" — Parent LC dropdown/label is redundant):
+                   every InstrumentType's own PARENT_INSTRUMENT_OPTIONS list has at most one entry, and
+                   whenever hasParent is true, defaultParentInstrumentType already auto-selects it on
+                   function pick (business instruction 2026-08-15, "Parent LC 是 Default 條件 不需要再選") —
+                   so the "— none — / single option" <select> was pure clutter, never a real choice. Only
+                   render it back if a future InstrumentType genuinely has >1 parent option. -->
+        <ng-container *ngIf="parentOptions.length > 1; else parentAutoSelected">
+          <label class="tb-field__label">Parent LC (Design doc §3.1 parentLogicalContractId)</label>
+          <div class="tb-grid-2">
+            <select class="tb-select tb-select--required" [(ngModel)]="parentInstrumentType" (change)="onParentInstrumentTypeChange()">
+              <option value="">— none —</option>
+              <option *ngFor="let p of parentOptions" [value]="p">{{ p }}</option>
+            </select>
+            <div *ngIf="parentInstrumentType">
+              <app-index-picker
+                label="LC Index — Existing Contract"
+                [items]="pagedFilteredParentCatalog"
+                [columnHeaders]="['Catalog', 'Ref', 'Tight LC Balance', 'Status']"
+                [loading]="parentPicker.loading"
+                [selectedId]="selectedParent?.balanceContractId ?? null"
+                [searchable]="true"
+                [(searchValue)]="parentPicker.search"
+                searchPlaceholder="Search LC Number…"
+                (search)="onParentSearch()"
+                emptyText="No eligible parent {{ parentInstrumentType }} contracts (Tenor Type / 0-balance filtered)."
+                [page]="parentPicker.page"
+                [totalPages]="parentPicker.totalPages"
+                [total]="parentPicker.total"
+                (pick)="!formLocked && onSelectParent($event)"
+                (prevPage)="parentPrevPage()"
+                (nextPage)="parentNextPage()"
+              >
+                <ng-template let-c>
+                  <span>{{ c.instrumentType }}</span>
+                  <span class="tb-row-primary">{{ c.naturalKey.lcNumber }}</span>
+                  <span>{{ parentTightLcBalance(c) }}</span>
+                  <span class="tb-row-badge">{{ c.status }}</span>
+                </ng-template>
+              </app-index-picker>
+            </div>
+          </div>
+        </ng-container>
+        <!-- Business instruction 2026-08-15 ("Index LC and 2ndary Number should be the same style") —
+                   one shared IndexPicker shell for every LC/IB/SG picker on this screen. Label matches
+                   the flat Catalog picker's own "LC Index — Existing Contract" wording below (business
+                   instruction 2026-08-15, "LC Index — Existing Contract then EB Index - Existing Contract
+                   (from B3)") — same picker, same naming, just no dropdown/label wrapper above it since
+                   there's only ever one parent instrumentType to pick from. -->
+        <ng-template #parentAutoSelected>
+          <div *ngIf="parentInstrumentType">
+            <app-index-picker
+              label="LC Index — Existing Contract"
+              [items]="pagedFilteredParentCatalog"
+              [columnHeaders]="['Catalog', 'Ref', 'Tight LC Balance', 'Status']"
+              [loading]="parentPicker.loading"
+              [selectedId]="selectedParent?.balanceContractId ?? null"
+              [searchable]="true"
+              [(searchValue)]="parentPicker.search"
+              searchPlaceholder="Search LC Number…"
+              (search)="onParentSearch()"
+              emptyText="No eligible parent {{ parentInstrumentType }} contracts on this page (Tenor Type / 0-balance filtered)."
+              [page]="parentPicker.page"
+              [totalPages]="parentPicker.totalPages"
+              [total]="parentPicker.total"
+              (pick)="!formLocked && onSelectParent($event)"
+              (prevPage)="parentPrevPage()"
+              (nextPage)="parentNextPage()"
+            >
+              <ng-template let-c>
+                <span>{{ c.instrumentType }}</span>
+                <span class="tb-row-primary">{{ c.naturalKey.lcNumber }}</span>
+                <span>{{ parentTightLcBalance(c) }}</span>
+                <span class="tb-row-badge">{{ c.status }}</span>
+              </ng-template>
+            </app-index-picker>
+          </div>
+        </ng-template>
+        <!-- Business instruction 2026-08-15: exposureNature select removed — EPLC_LC (Unconfirmed,
+                   MEMO) is no longer a selectable parent, so every EPLC_ACCEPTANCE is ACTUAL. The
+                   component still sends exposureNature: 'ACTUAL' on submit (transaction-builder.component.ts). -->
+
+        <!-- Business instruction 2026-08-14 ("A6 => Approved LC Balance and Create Acceptance Balance"),
+                   generalized 2026-08-15 for B4 ("B4 should index records from B3") via pendingItemLabel/
+                   pendingItemSourceHint (default "Document Arrival"/"use A3 (Document Arrival) first") —
+                   Step 2: pick the still-PENDING record to convert. Submitting below releases it (finalizes
+                   the source Balance) AND creates the new Acceptance in one Checker action. -->
+        <!-- Business instruction 2026-08-15 ("Index Search") — same search box every other picker
+                   on this screen already has; filteredPayableMovements (component.ts) filters client-side
+                   by IB/EB Number since payableMovements is already fully loaded/unpaginated. -->
+        <!-- Business instruction 2026-08-15 ("LC Index — Existing Contract then EB Index - Existing
+                   Contract (from B3)") — label matches Step 1's "LC Index — Existing Contract" naming
+                   pattern; ibNumberLabel already reads "IB Number"/"EB Number" per instrumentType, so its
+                   first word gives "IB"/"EB" here. -->
+        <div class="tb-field mt-2" *ngIf="selectedFunctionStrategy?.checkerRelease?.settlesDocumentArrival && selectedParent">
+          <app-index-picker
+            label="{{ ibNumberLabel.split(' ')[0] }} Index — Existing Contract (from {{ selectedFunction?.pendingItemSourceCode || 'A3' }})"
+            [items]="pickerSelection.pagedFilteredPayableMovements"
+            [columnHeaders]="[
+              'Catalog',
+              'Ref',
+              selectedFunction?.transactionIndexSecondaryRefLabel || '2nd Ref',
+              selectedFunction?.transactionIndexAmountLabel || 'Amount',
+              'Status',
+            ]"
+            [loading]="pickerSelection.payableMovementsLoading"
+            [selectedId]="pickerSelection.selectedPayMovement?.movementId ?? null"
+            [searchable]="true"
+            [searchValue]="pickerSelection.payableMovementSearch"
+            (searchValueChange)="onPayableMovementSearchChange($event)"
+            searchPlaceholder="Search {{ ibNumberLabel }}…"
+            emptyText="No PENDING {{ selectedFunction?.pendingItemLabel || 'Document Arrival' }} under this LC — {{
+              selectedFunction?.pendingItemSourceHint || 'use A3 (Document Arrival) first'
+            }}."
+            autoPickedHint="Only one PENDING {{ selectedFunction?.pendingItemLabel || 'Document Arrival' }} under this LC — picked automatically."
+            [page]="pickerSelection.payableMovementsPaging.page"
+            [totalPages]="pickerSelection.payableMovementsPaging.totalPages"
+            [total]="pickerSelection.payableMovementsPaging.total"
+            (pick)="!formLocked && onSelectPayMovement($event)"
+            (prevPage)="payableMovementsPrevPage()"
+            (nextPage)="payableMovementsNextPage()"
+          >
+            <ng-template let-m>
+              <span>{{ selectedFunction?.pendingItemSourceCode || 'A3' }}</span>
+              <span class="tb-row-primary">{{ selectedParent.naturalKey.lcNumber || '—' }}</span>
+              <span>{{ m.sourceTransactionRef || '—' }}</span>
+              <span>{{ m.amount | monetaryAmount: m.currency }} {{ m.currency }}</span>
+              <span class="tb-row-badge">{{ m.acknowledgedAt ? 'EARMARKED' : m.status }}</span>
+            </ng-template>
+          </app-index-picker>
+          <div class="tb-hint tb-hint--ok" *ngIf="pickerSelection.selectedPayMovement">
+            {{ ibNumberLabel }} and Amount below have been filled in from this record — still editable if genuinely different.
+          </div>
+        </div>
+      </div>
+
+      <!-- Natural key: creating (ISSUE/CREATE) functions get free-text (except LC Number when
+                 lcNumberFromParent — see above); IPLC_ACCEPTANCE/EPLC_ACCEPTANCE/SHGT existing-contract lookups
+                 search by LC+IB(EB)/LC+SG (business instruction 2026-08-14); everything else (IPLC_LC/EPLC_LC/
+                 EPLC_CONFIRMATION, natural key = lcNumber alone) browses the flat Catalog. -->
+      <!-- 2026-08-28, "A6 IB Number是INDEX選交易後帶入的 不是輸入的 要顯示但PROTECTED" → "A6頁面欄位也應該是
+                 配置的" — settlesDocumentArrival (A6 only, since this exclusion is itself scoped to
+                 isCreatingMovement — see the guard below) never lets the Maker freely type LC Number/IB
+                 Number here: both are always carried from the Parent LC pick / the picked Document Arrival
+                 (PickerSelectionService.selectPayMovement()'s own naturalKeyIbNumber assignment,
+                 applyPayMovementOutcome() below writes it into naturalKey.ibNumber) — this ENTIRE "New
+                 Reference — Natural Key" block was a bespoke duplicate of the protected LC Number/2ndary
+                 readout card above (live-reported: both rendered simultaneously once the target was
+                 resolved, one genuinely protected, the other still an editable-looking "IB Number *"
+                 input for the SAME value) — removed for this shape entirely rather than merely disabled,
+                 since the protected card above already covers both fields once resolved and there is
+                 nothing else in this cell for A6 to ever type. A8/B3 (the only other hasParent creating
+                 functions reaching this block) are genuinely unaffected — their own IB/SG Number really is
+                 fresh-typed, no carried value exists to protect.
+
+                 Real bug fixed 2026-08-29 (live-reported, "B4 選EARMARKED交易" — turned out to mean B4 had
+                 NO way to select an LC at all): the ORIGINAL fix above put this exclusion on the OUTER div,
+                 which also wraps the `else existingContract` branch below — B4 is `isCreatingMovement:
+                 false` (it operates on an EXISTING EPLC_CONFIRMATION), so B4 takes exactly that
+                 `existingContract` branch, including its own `flatCatalogPicker` fallback — B4's own ONLY
+                 Step-1 LC picker. Hiding the whole div for every `settlesDocumentArrival` function (not
+                 just the `isCreatingMovement` ones) silently removed B4's own picker entirely — the
+                 "B4 never reaches isCreatingMovement at all, so this is a no-op" reasoning the original fix
+                 recorded was backwards: `!settlesDocumentArrival` becoming `false` for B4 hides the OUTER
+                 div regardless of which inner branch B4 would have taken, it doesn't matter that B4 never
+                 evaluates the `isCreatingMovement`-true branch specifically. Scoped the exclusion to
+                 `isCreatingMovement && settlesDocumentArrival` (exactly A6's own shape) instead, so B4
+                 (isCreatingMovement false) always renders this div and correctly falls through to
+                 `existingContract`. -->
+      <div class="tb-field" *ngIf="!(isCreatingMovement && selectedFunctionStrategy?.checkerRelease?.settlesDocumentArrival)">
+        <ng-container *ngIf="isCreatingMovement; else existingContract">
+          <label class="tb-field__label" *ngIf="!lcNumberFromParent">New Logical Contract — Natural Key</label>
+          <!-- Business instruction 2026-08-17 ("the primary key and 2ndary key are mandatory field...
+                     after Submit those key fields need to be protected as well") — LC Number is the
+                     Primary Key, IB/SG Number the 2ndary Key, for every A1-A9/B1-B5 natural-key entry;
+                     mandatory was already enforced at Submit time (validateSubmit(), submit-rules.ts), this
+                     adds the missing other half: once formLocked (a movement now exists — same flag the
+                     Formly-driven fields already lock on), these plain inputs (outside buildFields()'s own
+                     Formly array, so formLocked's displayFields() rewrite never reached them) grey out via
+                     the same .tb-input:disabled styling every other locked field already uses. -->
+          <div class="tb-grid-3">
+            <!-- Business instruction 2026-08-19 ("LC Number must be a mandatory field for both A1
+                       and B1, with the same mandatory-field validation and visual indication (*) as the
+                       Amount field") — validation already existed (validateSubmit() rejects a blank LC
+                       Number, see the doc comment above); this closes the missing VISUAL half. A1/B1's own
+                       LC Number is the only input in this grid cell whenever !lcNumberFromParent is true
+                       (that branch is unreachable with a non-empty requiredNaturalKeyFields — every
+                       hasParent creating function that DOES need ibNumber/sgNumber, e.g. A8/B3, always has
+                       lcNumberFromParent true instead), so adding a real label here can't misalign the
+                       grid against a sibling IB/SG Number cell that would need the same treatment. -->
+            <div *ngIf="!lcNumberFromParent">
+              <label class="tb-field__label">LC Number <span class="tb-required-mark">*</span></label>
+              <!-- Business instruction 2026-08-19 ("leave LC Number blank and press Tab... no red
+                         validation box... Amount... immediately highlighted with a red validation box") —
+                         Amount's own red-on-blur comes from ngx-formly-bootstrap's FieldType applying
+                         [class.is-invalid] the instant its own Angular FormControl (required: true) becomes
+                         touched+invalid (input.type.mjs). LC Number is a plain ngModel outside that Formly
+                         FormGroup, so it never had an Angular validator/touched-tracking to drive the same
+                         behavior — `required` gives it Angular's own RequiredValidator (same mechanism
+                         Amount's own `props.required: true` compiles down to), `#lcNumberCtrl="ngModel"`
+                         exposes .invalid/.touched, and tb-input--invalid (below) is this app's own
+                         non-Bootstrap-scoped equivalent of is-invalid (LC Number isn't a .form-control, so
+                         Bootstrap's own is-invalid selector wouldn't match it). -->
+              <!-- 2026-08-28, "A1 B1 輸入LC NUMBER時也加粗放大" — A1/B1's own LC Number is the one Natural
+                         Key that's genuinely TYPED, not picked (they create a brand-new LC/Confirmation
+                         each time — see naturalKeyLocked's own doc comment), so the same bold/enlarged
+                         emphasis the protected readout above gives every OTHER function's own already-
+                         resolved LC Number applies here too, unconditionally (not gated on any lock state
+                         — it's the same field before and after formLocked, just disabled once locked). -->
+              <input
+                class="tb-input tb-input--required tb-natural-key--emphasized"
+                [class.tb-input--invalid]="lcNumberCtrl.invalid && lcNumberCtrl.touched"
+                placeholder="LC Number"
+                name="lcNumberA1B1"
+                required
+                [(ngModel)]="naturalKey.lcNumber"
+                #lcNumberCtrl="ngModel"
+                [disabled]="formLocked"
+                [attr.aria-describedby]="lcNumberCtrl.invalid && lcNumberCtrl.touched ? 'lcNumberA1B1Error' : null"
+              />
+              <div id="lcNumberA1B1Error" class="tb-error mt-1" role="alert" *ngIf="lcNumberCtrl.invalid && lcNumberCtrl.touched">LC Number is mandatory.</div>
+            </div>
+            <!-- 2026-08-28, same pass as the protected-card SG/EB Number exclusion above — once
+                       naturalKeyLocked engages (Parent LC picked), the protected card's own LC Number line
+                       already shows this exact value; hidden here to avoid the identical duplicate-LC-Number
+                       symptom the user reported (echoed live: "LC Number / U01" at top AND "New Reference —
+                       Natural Key / U01" below, same value twice). Before naturalKeyLocked (no Parent picked
+                       yet), still renders with its own "Pick the Parent LC above first." hint. -->
+            <!-- Business instruction 2026-08-19 ("A8 SG Number / B3 EB Number" — same mandatory +
+                       blur-validation requirement as LC Number above, "不得各自實作不同的驗證方式" — must
+                       not each implement a different validation mechanism) — identical pattern: a real
+                       label with the red asterisk, `required` + `#ctrl="ngModel"` for Angular's own
+                       RequiredValidator/touched-tracking, tb-input--invalid + an inline error message on
+                       blur-while-empty. These two fields are the ONLY ones ever shown in this specific
+                       grid cell (requiredNaturalKeyFields.includes('ibNumber')/'sgNumber' are mutually
+                       exclusive across every registered function — no function needs both), so there is
+                       no risk of two labels rendering in the same cell simultaneously. -->
+            <!-- 2026-08-28, "SG Number 沒有加大加粗明顯" — this cell only ever renders for A8/B3 (the two
+                       creating+hasParent functions whose 2ndary key is genuinely free-typed, never carried),
+                       same footing as A1/B1's own LC Number just above: the one Natural Key field on this
+                       screen that's genuinely TYPED, not picked — gets the same unconditional
+                       tb-natural-key--emphasized treatment, not gated on Fix Pending/review mode. -->
+            <div *ngIf="requiredNaturalKeyFields.includes('ibNumber')">
+              <label class="tb-field__label">{{ ibNumberLabel }} <span class="tb-required-mark">*</span></label>
+              <input
+                class="tb-input tb-input--required tb-natural-key--emphasized"
+                [class.tb-input--invalid]="ibNumberCtrl.invalid && ibNumberCtrl.touched"
+                [placeholder]="ibNumberLabel"
+                name="naturalKeyIbNumber"
+                required
+                [(ngModel)]="naturalKey.ibNumber"
+                #ibNumberCtrl="ngModel"
+                [disabled]="formLocked"
+                [attr.aria-describedby]="ibNumberCtrl.invalid && ibNumberCtrl.touched ? 'naturalKeyIbNumberError' : null"
+              />
+              <div id="naturalKeyIbNumberError" class="tb-error mt-1" role="alert" *ngIf="ibNumberCtrl.invalid && ibNumberCtrl.touched">{{ ibNumberLabel }} is mandatory.</div>
+            </div>
+            <div *ngIf="requiredNaturalKeyFields.includes('sgNumber')">
+              <label class="tb-field__label">SG Number <span class="tb-required-mark">*</span></label>
+              <input
+                class="tb-input tb-input--required tb-natural-key--emphasized"
+                [class.tb-input--invalid]="sgNumberCtrl.invalid && sgNumberCtrl.touched"
+                placeholder="SG Number"
+                name="naturalKeySgNumber"
+                required
+                [(ngModel)]="naturalKey.sgNumber"
+                #sgNumberCtrl="ngModel"
+                [disabled]="formLocked"
+                [attr.aria-describedby]="sgNumberCtrl.invalid && sgNumberCtrl.touched ? 'naturalKeySgNumberError' : null"
+              />
+              <div id="naturalKeySgNumberError" class="tb-error mt-1" role="alert" *ngIf="sgNumberCtrl.invalid && sgNumberCtrl.touched">SG Number is mandatory.</div>
+            </div>
+          </div>
+        </ng-container>
+        <ng-template #existingContract>
+          <!-- 2026-08-28, "A2 - A11 B2-B7 無須再選LC NUMBER AND 2NDARY REF" — the whole Step 1/Step 2
+                     picker + free-text fallback below is hidden during Fix Pending/Delete Pending review
+                     (isExternalReviewMode); the protected LC Number/2ndary readout above already shows
+                     the same information, and every one of these pickers' own (pick) handlers is already
+                     neutralized by formLocked regardless, so showing them here would only invite a
+                     confusing, inert re-search. -->
+          <ng-container *ngIf="!naturalKeyLocked">
+          <ng-container *ngIf="usesTwoFieldSearch; else flatCatalogPicker">
+            <!-- Reordered 2026-08-24 (business-reported UX gap, "index LC NUMBER, index 2ndary reference,
+                       THEN the related transaction LC Number and 2ndary reference") — this block (Step 2 per
+                       the doc comment below: "search LC Index, then the IB Index... to pick up the LC Number
+                       and IB Number") used to render BELOW the free-text "Search Existing Contract" fallback,
+                       contradicting its own "Step 2" framing and this project's own "index pickers first, free
+                       text is the fallback" convention every other picker on this screen already follows (see
+                       the LC Index/Parent LC section above). Purely a DOM-order move — neither block's own
+                       *ngIf condition changed, so this has zero effect on when either renders or what it does. -->
+            <!-- Business instruction 2026-08-14 "search LC Index, then the IB Index (page by page for both)
+                       to pick up the LC Number and IB Number" — Step 2. Once an LC is picked in the Parent LC
+                       section above (Step 1 / "LC Index"), pick the specific IB/SG Number here instead of typing
+                       it; selecting a row sets the contract directly, no Search click needed. The free-text
+                       fields below (+ Search) remain as a manual fallback. B5 excluded — single-instrumentType
+                       (model.instrumentType only), would silently miss the Usance/EPLC_ACCEPTANCE half; B5 gets
+                       its own cross-instrumentType "EB Index" below instead. -->
+            <div class="mt-2">
+              <app-index-picker
+                label="Transaction Index — select LC Number + 2nd Ref"
+                [items]="pagedFilteredIbIndexCatalog"
+                [columnHeaders]="[
+                  'Catalog',
+                  'Ref',
+                  selectedFunction?.transactionIndexSecondaryRefLabel || '2nd Ref',
+                  selectedFunction?.transactionIndexAmountLabel || 'Amount',
+                  'Status',
+                ]"
+                [loading]="ibIndexPicker.loading"
+                [selectedId]="selectedContract?.balanceContractId ?? null"
+                [searchable]="true"
+                [(searchValue)]="ibIndexPicker.search"
+                searchPlaceholder="Search LC Number or 2nd Ref…"
+                (search)="onCombinedIndexSearch()"
+                emptyText="{{
+                  ibIndexPicker.contracts.length
+                    ? 'All ' + ibIndexPicker.contracts.length + ' candidate(s) under this LC are 0-balance (already fully settled/redeemed).'
+                    : 'No eligible ' + model.instrumentType + ' transactions found.'
+                }}"
+                [page]="ibIndexPicker.page"
+                [totalPages]="ibIndexPicker.totalPages"
+                [total]="ibIndexPicker.total"
+                (pick)="!formLocked && onSelectIbIndex($event)"
+                (prevPage)="ibIndexPrevPage()"
+                (nextPage)="ibIndexNextPage()"
+              >
+                <ng-template let-c>
+                  <span>{{ c.instrumentType }}</span>
+                  <span class="tb-row-primary">{{ c.naturalKey.lcNumber }}</span>
+                  <span>{{ requiredNaturalKeyFields.includes('sgNumber') ? c.naturalKey.sgNumber : c.naturalKey.ibNumber }}</span>
+                  <span>{{ transactionContractAmount(c) }}</span>
+                  <span class="tb-row-badge">{{ c.status }}</span>
+                </ng-template>
+              </app-index-picker>
+            </div>
+
+            <!-- Business instruction 2026-08-16 ("B6 要有類似B5[B4]的LC Index — Existing Contract & EB
+                       Index — Existing Contract (from B3) 選擇 those EB records with Acceptance Balance") — B5
+                       only. Same Step 1/Step 2 shape as above, but merges candidates across BOTH of B5's own
+                       possible instrumentTypes (Sight EPLC_DUE_FROM_ISSUING_BANK, Usance EPLC_ACCEPTANCE) since
+                       the Maker doesn't know in advance which tenor a given EB Number was. Reordered 2026-08-24
+                       alongside the shared 2ndary Index block above — same "index pickers before the free-text
+                       fallback" fix, same zero-effect-on-*ngIf-conditions caveat. -->
+            <!-- Business instruction 2026-08-18 ("除了A1 B1允許輸入 LC NUMBER 其他都應該是帶入的" — except
+                       A1/B1, LC Number should be carried in, not freely typed) — once Search resolves a
+                       contract, these fields lock immediately (same timing as Currency's own carriedCurrency
+                       protection: locks the moment selectedContract/selectedParent resolves, not just at
+                       Submit) rather than staying editable until formLocked. Switching function (which already
+                       clears selectedContract/searchNaturalKey via selectFunction()'s own reset) is the only
+                       way to search again — same "no undo, pick a different function to restart" convention
+                       the flat Catalog picker's own selectedContract already uses. -->
+            <!-- 2026-08-28, "Search LC NUMBER SG NUMBER 加大加粗明顯" — same tb-natural-key--emphasized
+                       treatment every other natural-key input on this screen already has (A1/B1's own LC
+                       Number, the protected readout card, A6's own carried IB Number above); this free-text
+                       fallback search was the one remaining natural-key entry point still plain-styled. -->
+            <!-- LC Number and 2nd Ref form one selectable transaction key; no second drill-down or
+                 duplicate free-text lookup is rendered. -->
+          </ng-container>
+          </ng-container>
+        </ng-template>
+        <ng-template #flatCatalogPicker>
+          <ng-container *ngIf="!usesCombinedTransactionIndex">
+          <app-index-picker
+            *ngIf="selectedFunctionStrategy?.checkerRelease?.releasesExistingMovementInPlace"
+            label="Transaction Index — select LC Number + {{ selectedFunction?.transactionIndexSecondaryRefLabel || '2nd Ref' }}"
+            [items]="flattenedPayableRows"
+            [columnHeaders]="[
+              'Catalog',
+              'Ref',
+              selectedFunction?.transactionIndexSecondaryRefLabel || '2nd Ref',
+              selectedFunction?.transactionIndexAmountLabel || 'Amount',
+              'Status',
+            ]"
+            [loading]="eligiblePickersLoading"
+            [selectedId]="pickerSelection.selectedPayMovement?.movementId ?? null"
+            [searchable]="true"
+            [(searchValue)]="catalogPicker.search"
+            searchPlaceholder="Search LC Number or {{ selectedFunction?.transactionIndexSecondaryRefLabel || '2nd Ref' }}…"
+            (search)="onCatalogSearch()"
+            emptyText="No eligible pending transaction found."
+            [page]="catalogPicker.page"
+            [totalPages]="catalogPicker.totalPages"
+            [total]="catalogPicker.total"
+            (pick)="!formLocked && onSelectFlattenedPayableMovement($event)"
+            (prevPage)="catalogPrevPage()"
+            (nextPage)="catalogNextPage()"
+          >
+            <ng-template let-row>
+              <span>A3</span>
+              <span class="tb-row-primary">{{ row.contract.naturalKey.lcNumber }}</span>
+              <span>{{ row.movement.sourceTransactionRef || '—' }}</span>
+              <span>{{ row.movement.amount | monetaryAmount: row.movement.currency }} {{ row.movement.currency }}</span>
+              <span class="tb-row-badge">{{ row.movement.acknowledgedAt ? 'EARMARKED' : row.movement.status }}</span>
+            </ng-template>
+          </app-index-picker>
+
+          <app-index-picker
+            *ngIf="!selectedFunctionStrategy?.checkerRelease?.releasesExistingMovementInPlace"
+            label="{{
+              selectedFunctionStrategy?.checkerRelease?.releasesExistingMovementInPlace
+                ? 'LC Index — pick the LC to pay against'
+                : 'LC Index — Existing Contract'
+            }}"
+            [items]="pagedFilteredCatalogContracts"
+            [columnHeaders]="['Catalog', 'Ref', 'Tight LC Balance', 'Status']"
+            [loading]="catalogPicker.loading"
+            [selectedId]="selectedContract?.balanceContractId ?? null"
+            [searchable]="true"
+            [(searchValue)]="catalogPicker.search"
+            searchPlaceholder="Search LC Number…"
+            (search)="onCatalogSearch()"
+            emptyText="{{
+              catalogPicker.contracts.length
+                ? 'All ' + catalogPicker.contracts.length + ' candidate(s) under this filter are 0-balance — nothing left to act on.'
+                : 'No ACTIVE ' + model.instrumentType + ' contracts yet — use A1/B1 (Issue) first.'
+            }}"
+            [page]="catalogPicker.page"
+            [totalPages]="catalogPicker.totalPages"
+            [total]="catalogPicker.total"
+            (pick)="!formLocked && onSelectContract($event)"
+            (prevPage)="catalogPrevPage()"
+            (nextPage)="catalogNextPage()"
+          >
+            <ng-template let-c>
+              <span>{{ c.instrumentType }}</span>
+              <span class="tb-row-primary">{{ c.naturalKey.lcNumber }}</span>
+              <span>{{ catalogTightLcBalance(c) }}</span>
+              <span class="tb-row-badge">{{ c.status }}{{ catalogPendingHint(c) }}</span>
+            </ng-template>
+          </app-index-picker>
+          </ng-container>
+
+        </ng-template>
+
+        <!-- Reviewer-reported gap (2026-08-14): show live balance BEFORE the amount is typed, so a user can't
+                   accidentally submit the entire Available Balance thinking it's a partial amount. -->
+        <!-- Business instruction 2026-08-15 ("B3 不須選 Sight/Usance 因為交易本身已經有此訊息了 — 登記
+                   B1 時已經有此訊息了") — B3 no longer asks Sight/Usance via subChoice; it's read from the
+                   picked Confirmation's own Tenor Type (declared at B1) via onSelectContract()
+                   (component.ts). This just surfaces that derived decision so the Maker can see it before
+                   Submit, since it's no longer something they explicitly picked themselves. -->
+        <div class="tb-hint tb-hint--ok mt-2" *ngIf="selectedFunctionStrategy?.movementDerivation?.derivesMovementTypeFromTenor && selectedContract">
+          Confirmation Tenor Type: <strong>{{ selectedContract.tenorType || '(none recorded)' }}</strong> → this will
+          <strong>{{ model.movementType === 'HONOUR' ? 'Honour (Sight)' : 'Accept (Usance)' }}</strong
+          >.
+        </div>
+
+        <div class="mt-2" *ngIf="selectedContract">
+          <div class="tb-hint" *ngIf="snapshotLoading" role="status" aria-live="polite" aria-busy="true">
+            <span class="tb-spinner" aria-hidden="true"></span>Loading balance…
+          </div>
+          <app-balance-snapshot-box
+            *ngIf="!snapshotLoading && selectedContractSnapshot"
+            [snapshot]="selectedContractSnapshot"
+            variant="compact"
+            appearance="default"
+          >
+            <!-- 2026-08-18, user-requested ("the same [Tight Available Balance] field for the Export
+                       Confirmed LC") — this used to be nested inside the offBalanceExposure ngIf above,
+                       which is IPLC_LC/EPLC_LC-only; EPLC_CONFIRMATION's own tightAvailableBalance (netting
+                       the Present Docs earmark instead of SHGT exposure) is now populated with
+                       offBalanceExposure staying null, so the two rows must gate independently. -->
+            <app-maker-balance-warnings [messages]="balanceWarningMessages"></app-maker-balance-warnings>
+          </app-balance-snapshot-box>
+        </div>
+      </div>
+
+      <!-- Business instruction 2026-08-15 ("SG redemption should support partial redemption... Bill
+                 Amount = actual Document Arrival amount [free-typed]... SG Redemption Amount = system-calculated
+                 MIN(Bill Amount, SG Outstanding)") — reverses the prior full-match-only design (Bill Amount used
+                 to be locked to the SG's outstanding). A3S only. Step 2: pick which of the LC's own outstanding
+                 Shipping Guarantees this arrival is matched against; the Formly form below still shows normally
+                 (unlike A4's payExistingUtilize, A3S DOES create new movements via Submit) — Amount there is now
+                 the real Bill Amount, freely typed; this box shows the derived SG-side numbers alongside it. -->
+      <div
+        class="tb-subcard"
+        *ngIf="selectedFunctionStrategy?.compoundSubmission?.possibleShapes?.includes('documentArrivalWithSg') && selectedContract && !usesCombinedTransactionIndex"
+      >
+        <app-index-picker
+          *ngIf="!naturalKeyLocked"
+          label="2ndary Index — outstanding Shipping Guarantees under LC {{ selectedContract.naturalKey.lcNumber }}"
+          [items]="pickerSelection.pagedSgsForArrival"
+          [columnHeaders]="[
+            'Catalog',
+            'Ref',
+            selectedFunction?.transactionIndexSecondaryRefLabel || '2nd Ref',
+            selectedFunction?.transactionIndexAmountLabel || 'Amount',
+            'Status',
+          ]"
+          [loading]="pickerSelection.sgsForArrivalLoading"
+          [selectedId]="pickerSelection.selectedArrivalSg?.balanceContractId ?? null"
+          emptyText="No outstanding Shipping Guarantee under this LC (none issued yet, or all already fully redeemed) — use A8 (Shipping Gtee Issue) first, or use a plain A3 if none is expected."
+          autoPickedHint="Only one Shipping Guarantee under this LC — picked automatically."
+          [page]="pickerSelection.arrivalSgPaging.page"
+          [totalPages]="pickerSelection.arrivalSgPaging.totalPages"
+          [total]="pickerSelection.arrivalSgPaging.total"
+          (pick)="!formLocked && onSelectArrivalSg($event)"
+          (prevPage)="arrivalSgPrevPage()"
+          (nextPage)="arrivalSgNextPage()"
+        >
+          <ng-template let-sg>
+            <span>{{ sg.instrumentType }}</span>
+            <span class="tb-row-primary">{{ sg.naturalKey.lcNumber }}</span>
+            <span>{{ sg.naturalKey.sgNumber || '—' }}</span>
+            <span>{{ arrivalSgIndexAmount(sg) }}</span>
+            <span class="tb-row-badge">{{ sg.status }}</span>
+          </ng-template>
+        </app-index-picker>
+        <div class="tb-balance-box mt-2" *ngIf="pickerSelection.selectedArrivalSg && pickerSelection.arrivalSgSnapshot">
+          <div class="tb-balance-row">
+            <span class="tb-balance-row__label">SG Number</span
+            ><span class="tb-balance-row__value">{{ pickerSelection.selectedArrivalSg.naturalKey.sgNumber }}</span>
+          </div>
+          <div class="tb-balance-row">
+            <span class="tb-balance-row__label">SG Outstanding</span
+            ><span class="tb-balance-row__value"
+              >{{ pickerSelection.arrivalSgSnapshot.confirmedBalance | monetaryAmount: pickerSelection.selectedArrivalSg.currency }} {{ pickerSelection.selectedArrivalSg.currency }}</span
+            >
+          </div>
+          <ng-container *ngIf="arrivalSgRedeemAmount">
+            <div class="tb-balance-row">
+              <span class="tb-balance-row__label">SG Redemption Amount (MIN of Bill Amount, SG Outstanding) — {{ arrivalSgRedeemType }}</span
+              ><span class="tb-balance-row__value">{{ arrivalSgRedeemAmount | monetaryAmount: pickerSelection.selectedArrivalSg.currency }} {{ pickerSelection.selectedArrivalSg.currency }}</span>
+            </div>
+            <div class="tb-balance-row">
+              <span class="tb-balance-row__label">SG Remaining After This Redemption</span
+              ><span class="tb-balance-row__value">{{ arrivalSgRemaining | monetaryAmount: pickerSelection.selectedArrivalSg.currency }} {{ pickerSelection.selectedArrivalSg.currency }}</span>
+            </div>
+          </ng-container>
+          <div class="tb-hint mt-2" *ngIf="model.amount && +model.amount > +pickerSelection.arrivalSgSnapshot.confirmedBalance">
+            Bill Amount exceeds this SG's Outstanding — the excess ({{ +model.amount - +pickerSelection.arrivalSgSnapshot.confirmedBalance }}
+            {{ pickerSelection.selectedArrivalSg.currency }}) is ordinary incremental LC exposure, checked against Tight Available Balance as usual (Design doc
+            §6.1).
+          </div>
+        </div>
+      </div>
+
+      <!-- Business instruction 2026-08-15 ("B4 B5 B6除了先選LC NUMBER，還要再選B3輸入的EB NUMBER") — B4's
+                 own settlesDocumentArrival 2ndary Index used to live only inside the hasParent-gated Parent
+                 LC section above, so it never rendered for B4: hasParent is false for EPLC_CONFIRMATION (B4
+                 resolves its LC via the flat Catalog picker just above, into selectedContract — not a Parent
+                 LC into selectedParent). Mirrors A4's own payExistingUtilize subcard immediately below, just
+                 for the cross-contract (B4 -> B3's EPLC_EXAMINATION) case instead of same-contract (A4 -> A3). -->
+      <div class="tb-subcard" *ngIf="selectedFunctionStrategy?.checkerRelease?.settlesDocumentArrival && !hasParent && selectedContract">
+        <app-index-picker
+          *ngIf="!naturalKeyLocked"
+          label="{{ ibNumberLabel.split(' ')[0] }} Index — Existing Contract (from {{ selectedFunction?.pendingItemSourceCode || 'A3' }})"
+          [items]="pickerSelection.pagedFilteredPayableMovements"
+          [columnHeaders]="[
+            'Catalog',
+            'Ref',
+            selectedFunction?.transactionIndexSecondaryRefLabel || '2nd Ref',
+            selectedFunction?.transactionIndexAmountLabel || 'Amount',
+            'Status',
+          ]"
+          [loading]="pickerSelection.payableMovementsLoading"
+          [selectedId]="pickerSelection.selectedPayMovement?.movementId ?? null"
+          [searchable]="true"
+          [searchValue]="pickerSelection.payableMovementSearch"
+          (searchValueChange)="onPayableMovementSearchChange($event)"
+          searchPlaceholder="Search {{ ibNumberLabel }}…"
+          emptyText="No Approved (Checker-acknowledged) {{ selectedFunction?.pendingItemLabel || 'Document Arrival' }} under this LC — {{
+            selectedFunction?.pendingItemSourceHint || 'use A3 (Document Arrival) first'
+          }}, then Release it in B3's own Checker panel."
+          autoPickedHint="Only one Approved {{ selectedFunction?.pendingItemLabel || 'Document Arrival' }} under this LC — picked automatically."
+          [page]="pickerSelection.payableMovementsPaging.page"
+          [totalPages]="pickerSelection.payableMovementsPaging.totalPages"
+          [total]="pickerSelection.payableMovementsPaging.total"
+          (pick)="!formLocked && onSelectPayMovement($event)"
+          (prevPage)="payableMovementsPrevPage()"
+          (nextPage)="payableMovementsNextPage()"
+        >
+          <ng-template let-m>
+            <span>{{ selectedFunction?.pendingItemSourceCode || 'B3' }}</span>
+            <span class="tb-row-primary">{{ selectedContract.naturalKey.lcNumber || '—' }}</span>
+            <span>{{ m.sourceTransactionRef || '—' }}</span>
+            <span>{{ m.amount | monetaryAmount: m.currency }} {{ m.currency }}</span>
+            <span class="tb-row-badge">{{ m.status }}</span>
+          </ng-template>
+        </app-index-picker>
+        <div class="tb-hint tb-hint--ok" *ngIf="pickerSelection.selectedPayMovement">
+          {{ ibNumberLabel }} and Amount below have been filled in from this record — still editable if genuinely different.
+        </div>
+      </div>
+
+      <!-- Business instruction 2026-08-14 ("pickup LC then pickup IB Number... Amount will be captured...
+                 without further input") — A4 (Sight Settlement) only. Amount is never typed here: it's
+                 whatever A3 (Document Arrival (Sight)) already recorded on the picked PENDING movement.
+                 2026-08-28 ("A4 銀幕改成配置方式"／"A4 顯示LC NUMBER & 2NDARY NUMBER (PROTECTED)") — the
+                 picker itself now hides once `naturalKeyLocked` (mirrors every other Function's own
+                 Step 1/Step 2 pickers), and the IB Number／Amount readout this subcard used to duplicate
+                 in its own bespoke `tb-balance-box` has been removed entirely: IB Number now shows in the
+                 shared protected-natural-key card above, and Amount now shows via the generic Amount
+                 Formly field below (`builder-fields.ts`'s own `amountFromDocArrival`, widened the same day
+                 to cover `releasesExistingMovementInPlace` alongside A6/B4's own `settlesDocumentArrival`)
+                 — the SAME config-driven mechanism A1/A2/A6 already use, not a second, independently
+                 hand-rolled display. -->
+      <div class="tb-subcard" *ngIf="selectedFunctionStrategy?.checkerRelease?.releasesExistingMovementInPlace && selectedContract">
+        <app-index-picker
+          *ngIf="!naturalKeyLocked"
+          label="2ndary Index — still-PENDING Document Arrivals under LC {{ selectedContract.naturalKey.lcNumber }}"
+          [items]="pickerSelection.pagedFilteredPayableMovements"
+          [columnHeaders]="[
+            'Catalog',
+            'Ref',
+            selectedFunction?.transactionIndexSecondaryRefLabel || '2nd Ref',
+            selectedFunction?.transactionIndexAmountLabel || 'Amount',
+            'Status',
+          ]"
+          [loading]="pickerSelection.payableMovementsLoading"
+          [selectedId]="pickerSelection.selectedPayMovement?.movementId ?? null"
+          emptyText="No PENDING Document Arrival under this LC — use A3 (Document Arrival (Sight)) first."
+          autoPickedHint="Only one PENDING Document Arrival under this LC — picked automatically."
+          [page]="pickerSelection.payableMovementsPaging.page"
+          [totalPages]="pickerSelection.payableMovementsPaging.totalPages"
+          [total]="pickerSelection.payableMovementsPaging.total"
+          (pick)="!formLocked && onSelectPayMovement($event)"
+          (prevPage)="payableMovementsPrevPage()"
+          (nextPage)="payableMovementsNextPage()"
+        >
+          <ng-template let-m>
+            <span>A3</span>
+            <span class="tb-row-primary">{{ selectedContract.naturalKey.lcNumber || '—' }}</span>
+            <span>{{ m.sourceTransactionRef || '—' }}</span>
+            <span>{{ m.amount | monetaryAmount: m.currency }} {{ m.currency }}</span>
+            <span class="tb-row-badge">{{ m.acknowledgedAt ? 'EARMARKED' : m.status }}</span>
+          </ng-template>
+        </app-index-picker>
+      </div>
+
+      <!-- Business requirement 2026-08-19 ("A2–A9 / B2–B5 — No Eligible Records"), narrowed 2026-08-29
+                 ("No Eligible Transaction — UI Requirement"): the genuinely-zero-candidates case no longer
+                 gets its own outer "⚠ No eligible records available" warning — every picker above already
+                 shows its own `emptyText` inline in the Selection Area itself (same reasoning A4/
+                 releasesExistingMovementInPlace was already excluded here for, now applied uniformly:
+                 the outer message only ever duplicated what the picker itself already says), so the
+                 Selection Area is left to speak for itself, no separate warning stacked below it. The
+                 "candidates exist, none picked yet" hint is unaffected — that is guidance, not a warning. -->
+      <ng-container *ngIf="!selectedFunctionStrategy?.checkerRelease?.releasesExistingMovementInPlace">
+        <div class="tb-hint mt-2" *ngIf="noEligibleRecordsMessage && eligibleCandidateCount !== 0">{{ noEligibleRecordsMessage }}</div>
+      </ng-container>
+
+      <!-- 2026-08-28 ("A4 銀幕改成配置方式"／"A4交易 再多加一各幣別金額欄位") — the generic Formly field
+                 array (Amount／Currency／Tolerance %／etc.) now renders for EVERY function including A4,
+                 not just the ones with their own generic Submit button below. Previously this whole
+                 `<form>` sat inside the SAME `*ngIf="!releasesExistingMovementInPlace"` guard as the
+                 generic Submit button — a structural leftover from A4's own screen never having used
+                 `buildFields()`'s carried/protected-field mechanism at all (its Amount used to be a bespoke
+                 readout, see the tb-subcard above); once that readout was replaced with the real,
+                 config-driven Amount field (`amountFromDocArrival` widened to cover
+                 `releasesExistingMovementInPlace`), the field itself was computed correctly but never
+                 actually reached the DOM, since this whole block was still gated off for A4 — found live
+                 ("A4 沒抓到2ndary number" turned out to be this, not a data problem: `model.secondaryRef`/
+                 `model.amount`/`model.currency` were all already correct, the FORM itself just never
+                 rendered). Pulled out of the exclusion; the generic SUBMIT button and Fix Pending/Delete
+                 Pending action buttons below stay excluded for A4 — those still route through `submit()`/
+                 `confirmFixPending()`, never `submitA4()`. -->
+      <!-- "Transaction Selection and Navigation Flow" rule (business-directed) — the Transaction Input
+                 Screen (this form) must not render until a Transaction/Event has actually been selected;
+                 before that, only the Selection Screen (the pickers above) should show. Real gap found live
+                 testing this same rule's own Cancel-button feature: this `<form>` had no gate at all, so
+                 Amendment No./Amount etc. rendered simultaneously with the LC Index picker, before any row
+                 was picked. `!requiresEligibleTarget` covers A1/B1 (no prior selection to wait for);
+                 `naturalKeyLocked` covers every other Function once a target is actually selected (or
+                 during Fix Pending/Delete Pending review, via its own isExternalReviewMode half). -->
+      <form [formGroup]="form" *ngIf="!requiresEligibleTarget || naturalKeyLocked">
+        <formly-form [form]="form" [fields]="displayFields" [model]="model"></formly-form>
+      </form>
+
+      <div class="tb-error mt-2" role="alert" *ngIf="amountDecimalMismatch">
+        ⚠ Amount ({{ model.amount }}) has more decimal places than {{ model.currency }} allows ({{ currencyDecimalPlaces }}) — this will be rejected.
+      </div>
+
+      <!-- A4's own Submit action — moved here 2026-08-28 ("A4 Submit A4 放到欄位顯示之後") so the Maker
+                 sees what's actually being submitted (the protected Amount/Currency/etc. fields just above)
+                 BEFORE the action button, same "fields first, action last" reading order every other
+                 Function's own generic Submit button already has below. Business instruction 2026-08-16
+                 ("Add real Maker Submit, then have Checker to Release it. Exactly the same as A1.") — A4's
+                 own dedicated "Pay (Release)" button (which called payExisting(), a direct single-actor
+                 release) was removed by an earlier same-day change in favor of a browse-only picker with
+                 no Maker action at all; per that explicit follow-up instruction, A4 gets a REAL Submit
+                 button (submitA4()), a genuine backend maker-submit action distinct from A3's own earlier
+                 createMovement(), so the same two-actor Submit/Release shape every other function has
+                 (A1-A9/B1-B5) applies here too. Disabled-once-submitResult-set convention matches the
+                 generic Submit button below exactly (business instruction 2026-08-15, "按Submit...後
+                 Button 直接灰掉"). -->
+      <app-maker-action-bar
+        [state]="actionBarState"
+        (submitA4)="submitA4()"
+        (submitTransaction)="submit()"
+        (cancelSelection)="cancelSelection()"
+        (saveFixPending)="confirmFixPending()"
+        (cancelFixPending)="cancelFixPending()"
+        (confirmDeletePending)="confirmDeletePendingReview()"
+        (cancelDeletePending)="cancelDeletePendingReview()"
+      ></app-maker-action-bar>
+    </ng-container>
+  </div>
+</section>
+
+<app-maker-result-panel
+  [result]="submitResult"
+  [error]="submitError"
+  [instrumentType]="model.instrumentType ?? null"
+  [resultPhase]="resultPhase"
+  [compoundLegs]="compoundLegs"
+  [fixPendingSupported]="fixPendingSupported"
+  [deletePendingSupported]="makerResultDeletePendingSupported"
+  [fixPendingMode]="fixPendingMode"
+  [deletePendingReviewMode]="deletePendingReviewMode"
+  [actionBusy]="actionBusy"
+  (openAccountEntries)="openAccountEntries.emit($event)"
+  (fixPending)="startFixPending()"
+  (deletePending)="startMakerResultDeletePendingReview()"
+></app-maker-result-panel>

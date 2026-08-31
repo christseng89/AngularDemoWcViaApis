@@ -1,0 +1,399 @@
+@use 'styles/transaction-controls';
+@use 'styles/feedback';
+
+/**
+ * Design tokens — matched to lc-payment-wc's established banking palette
+ * (business instruction 2026-08-15: "UI for Functions Import LC, Export LC
+ * then functions should be similar as lc-payment-wc"), so both sibling apps
+ * read as one system rather than two independently-styled tools. Traced
+ * from lc-payment-wc's own web-components/shared.ts (FIELD_STYLE/LBL_STYLE,
+ * card/badge colors) and payment-component/business-case-runner.component.scss
+ * (case-btn/verdict-badge/confirmed-badge/section-label) — not invented here.
+ */
+:root {
+  --navy: #1e3a5f;
+  --blue: #1d4ed8;
+  --blue-dark: #1e40af;
+  --blue-bg: #eff6ff;
+  --blue-bg-soft: #f8fafc;
+  --blue-border: #bfdbfe;
+  --gray-border: #e5e7eb;
+  --gray-input-border: #d1d5db;
+  --gray-body: #374151;
+  --gray-muted: #6b7280;
+  --gray-disabled: #9ca3af;
+  --gray-bg: #f3f4f6;
+  --gray-readonly-bg: #f1f5f9;
+  --green: #16a34a;
+  --green-dark: #15803d;
+  --green-bg: #dcfce7;
+  --green-border: #86efac;
+  --amber: #b45309;
+  --amber-dark: #92400e;
+  --amber-bg: #fef3c7;
+  --red: #dc2626;
+  --red-dark: #b91c1c;
+  --red-bg: #fee2e2;
+  --red-bg-soft: #fef2f2;
+  --red-border: #fecaca;
+  --violet: #7c3aed;
+  --violet-dark: #6d28d9;
+  --violet-bg: #ede9fe;
+  --indigo-bg: #eef2ff;
+  --indigo-border: #c7d2fe;
+
+  // Deliberately theme-CONSTANT (no dark-mode override below) — these back only a "solid fill +
+  // white text" button/chip role (`.tb-btn--primary/--success`, `.tb-function-chip--active`), never
+  // reused for plain text/links/borders. `--blue`/`--green` themselves ARE brightened for dark mode
+  // (see `dark-theme-tokens` below) because THEY separately back a "colored text/accent directly on
+  // the page background" role (tab/link active color, focus outlines, section top-borders) that needs
+  // to lighten for contrast against a dark page — but reusing that same brightened value as a BUTTON
+  // FILL would put white text on a pale blue/green background, failing WCAG contrast. Keeping a
+  // dedicated, constant "solid" pair for the fill role avoids that clash without touching the accent
+  // role's own dark-mode brightening.
+  --blue-solid: #1d4ed8;
+  --blue-solid-hover: #1e40af;
+  --green-solid: #16a34a;
+  --green-solid-hover: #15803d;
+
+  // Theme-aware surface tokens (2026-08-19, "Balance Component — Theme Support") — every literal
+  // `#fff` background and the page's own hardcoded body background were replaced with these two so
+  // dark mode (below) can override them in exactly one place. `--bg-page` is the `<body>`/page
+  // canvas; `--bg-surface` is any raised element sitting ON that canvas (cards/`.tb-section`,
+  // inputs, dialogs, quick-pick rows) — identical to page background in light mode (a subtle
+  // bordered-white-on-white-page look, unchanged from before this token existed) but ONE step
+  // lighter than the page in dark mode, so cards/inputs read as physically raised rather than
+  // vanishing into the page.
+  --bg-page: #f5f6f8;
+  --bg-surface: #ffffff;
+  --overlay: rgba(15, 23, 42, 0.5);
+
+  --font-sans:
+    'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: Consolas, 'SFMono-Regular', Menlo, monospace;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-pill: 999px;
+
+  // Elevation — deliberately subtle (banking/back-office tool, not a marketing site): a soft
+  // 1-2px lift for resting cards, a slightly deeper one for anything that floats above the page
+  // (dialogs). Extracted from the dialog's own pre-existing inline shadow value, not new.
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05), 0 1px 1px rgba(15, 23, 42, 0.03);
+  --shadow-md: 0 4px 10px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 20px 44px rgba(15, 23, 42, 0.28);
+  --transition-fast: 120ms ease;
+}
+
+/**
+ * Dark-mode token overrides (2026-08-19, "Balance Component — Theme Support", user-requested as a
+ * common framework feature — see `src/app/theme.service.ts`, which is the ONLY code that ever reads/
+ * writes `data-theme`/`data-bs-theme`). Every consuming `.scss`/`.html` file keeps referencing the
+ * SAME custom-property names declared in the light `:root` block above — nothing was renamed — so
+ * this is the one and only place dark-mode colors are chosen; every screen (Transaction Processing,
+ * Inquire Events, Balance Details, Event Timeline, dialogs, status badges) picks the change up
+ * automatically via inheritance, with zero per-screen theme code (Requirement #5).
+ *
+ * Two identical blocks, standard robust light/dark CSS pattern:
+ *  - `@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) { ... } }` — live system-
+ *    preference tracking BEFORE `ThemeService` has run (the brief pre-bootstrap window) and as a pure-
+ *    CSS fallback if JS is ever disabled; `:not([data-theme='light'])` keeps an explicit Light choice
+ *    from being overridden by a dark OS preference once the attribute IS set.
+ *  - `:root[data-theme='dark']` — the explicit-attribute selector `ThemeService.applyEffectiveTheme()`
+ *    actually drives once the app has booted (System resolved to dark, or an explicit Dark pick) —
+ *    this is what makes an explicit Dark choice win even on a light-OS system (Requirement #3).
+ *
+ * Palette choices, not a rote hex-inversion — this app is a banking/back-office tool ("deliberately
+ * subtle... not a marketing site", `transaction-builder.component.scss`'s own stated design
+ * philosophy): a near-black slate page (`#0f172a`) with a one-step-lighter slate surface (`#1e293b`)
+ * for anything raised above it, soft light-gray body text (`#e2e8f0`, not pure white — softer on a
+ * dark background), and the 4 status accents (green/amber/red/violet) each given a DIFFERENT
+ * treatment than their light-mode `-dark`/`-bg` pair rather than reused verbatim: a translucent tint
+ * of the hue over the dark surface (instead of light mode's solid pastel, which would itself clash
+ * visually on a dark background) paired with a BRIGHTENED foreground (light mode's `--green-dark:
+ * #15803d` reads as muted/desaturated against a dark background; `#4ade80` keeps the same hue family
+ * but is bright enough to clear WCAG AA's ~4.5:1 text-contrast floor against both the translucent tint
+ * AND the plain dark surface behind it — same reasoning applied to amber/red/violet below). `--navy`
+ * (used for headings/titles) is also brightened for dark mode specifically — the light-mode value is a
+ * deep, near-black navy that would be nearly invisible on a dark-slate background otherwise.
+ */
+@mixin dark-theme-tokens {
+  --navy: #93c5fd;
+  --blue: #60a5fa;
+  --blue-dark: #93c5fd;
+  --blue-bg: rgba(96, 165, 250, 0.16);
+  --blue-bg-soft: rgba(96, 165, 250, 0.08);
+  --blue-border: rgba(96, 165, 250, 0.35);
+  --gray-border: #334155;
+  --gray-input-border: #475569;
+  --gray-body: #e2e8f0;
+  --gray-muted: #94a3b8;
+  --gray-disabled: #64748b;
+  --gray-bg: #1e293b;
+  --gray-readonly-bg: #172033;
+  --green: #4ade80;
+  --green-dark: #86efac;
+  --green-bg: rgba(74, 222, 128, 0.16);
+  --green-border: rgba(74, 222, 128, 0.35);
+  --amber: #fbbf24;
+  --amber-dark: #fde68a;
+  --amber-bg: rgba(251, 191, 36, 0.16);
+  --red: #f87171;
+  --red-dark: #fca5a5;
+  --red-bg: rgba(248, 113, 113, 0.18);
+  --red-bg-soft: rgba(248, 113, 113, 0.1);
+  --red-border: rgba(248, 113, 113, 0.35);
+  --violet: #a78bfa;
+  --violet-dark: #c4b5fd;
+  --violet-bg: rgba(167, 139, 250, 0.18);
+  --indigo-bg: rgba(129, 140, 248, 0.16);
+  --indigo-border: rgba(129, 140, 248, 0.35);
+
+  --bg-page: #0f172a;
+  --bg-surface: #1e293b;
+  --overlay: rgba(0, 0, 0, 0.65);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 1px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 10px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 20px 44px rgba(0, 0, 0, 0.55);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    @include dark-theme-tokens;
+  }
+}
+
+:root[data-theme='dark'] {
+  @include dark-theme-tokens;
+}
+
+body {
+  background: var(--bg-page);
+  color: var(--gray-body);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast);
+}
+
+::selection {
+  background: var(--blue-border);
+  color: var(--navy);
+}
+
+// Top-level app shell (app.component.ts's own inline template) — a plain default Bootstrap
+// navbar previously; branded to match the rest of the app's navy/blue token system instead of
+// standing out as unstyled. Targets Bootstrap's own classes directly (no custom hook needed —
+// `.navbar`/`.nav-link` aren't used anywhere else in this app) rather than adding a class to the
+// inline template.
+.navbar {
+  // Overrides Bootstrap's own `bg-white` utility class removed from the template below (2026-08-19,
+  // theme support) — `bg-white` is a literal, non-theme-aware white; this app's own `--bg-surface`
+  // token is what makes the navbar correctly darken alongside every other surface.
+  background: var(--bg-surface) !important;
+  box-shadow: var(--shadow-sm);
+}
+
+// P2 UI/UX pass — replaces the former `.theme-switcher` (a plain-text `<select>`) with an icon
+// toggle button: bigger touch target, the icon alone signals state at a glance instead of requiring
+// a click to open a dropdown just to see the current choice.
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gray-muted);
+  background: transparent;
+  border: 1px solid var(--gray-input-border);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast),
+    background-color var(--transition-fast);
+
+  &:hover {
+    color: var(--blue);
+    border-color: var(--blue-border);
+    background: var(--blue-bg-soft);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--blue);
+    outline-offset: 2px;
+  }
+}
+
+.navbar-brand {
+  font-weight: 700;
+  color: var(--navy) !important;
+  letter-spacing: -0.01em;
+}
+
+.navbar-nav .nav-link {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-muted);
+  padding-bottom: 4px;
+  border-bottom: 2px solid transparent;
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast);
+
+  &:hover {
+    color: var(--blue);
+  }
+
+  &.active {
+    color: var(--blue);
+    border-bottom-color: var(--blue);
+  }
+}
+
+// ── Business Case Runner trace rows ──────────────────────────────────────
+// Brought into the same design-token system as transaction-builder.component.scss's own
+// .tb-error/.tb-hint--ok (left-accent + tint, not a bare background fill) so this page reads as
+// part of the same product rather than plain framework defaults.
+.step-note {
+  color: var(--gray-muted);
+  font-style: italic;
+}
+
+// `box-shadow`/`border-left` are unreliable on `<tr>` across browsers (border-collapse quirks) —
+// these rows are colored via `background`/`color` only, same mechanism the original plain
+// implementation used, just sourced from the shared token palette instead of one-off hex values.
+.step-ok {
+  background: var(--green-bg);
+  color: var(--green-dark);
+}
+
+.step-warn {
+  background: var(--amber-bg);
+  color: var(--amber-dark);
+}
+
+.step-error {
+  background: var(--red-bg);
+  color: var(--red-dark);
+}
+
+pre.step-detail {
+  white-space: pre-wrap;
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--gray-body);
+}
+
+// ── Loading spinner (P1 UI/UX pass) ──────────────────────────────────────
+// Global, not per-component: `.tb-spinner` is used across transaction-builder/checker-panel/
+// maker-panel/index-picker component templates, and each of those `.scss` files already sits close
+// to (or, once duplicated a 5th time, over) the `anyComponentStyle` 12kb build budget — a genuine
+// cross-cutting design-system atom belongs here next to the token palette above, not re-duplicated
+// per component. `currentColor` lets one rule fit both gray `.tb-hint` text and a colored `.tb-btn`
+// (white-on-blue, dark red outline text, …); `border-right-color: transparent` gives a 3/4-arc so
+// the spin reads as motion even at 10px.
+.tb-spinner {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  vertical-align: -1.5px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  opacity: 0.75;
+  animation: tb-spin 0.6s linear infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+// `.tb-btn` is display:inline-flex with its own `gap: 6px` (per-component, duplicated) — zero the
+// spinner's own margin there so the two spacing mechanisms don't stack.
+.tb-btn .tb-spinner {
+  margin-right: 0;
+}
+
+@keyframes tb-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+// ── Function/status icon set (P2 UI/UX pass) ─────────────────────────────
+// `TbIconComponent` (src/app/tb-icon.component.ts) — one shared 16px inline-SVG set (user-confirmed
+// "細線條風格" via AskUserQuestion) for the A1–A9/B1–B5 function-chip action-type icon, the Maker/
+// Checker/Look Up section-header role icon, and the status-badge icon (so status isn't conveyed by
+// color alone). Global for the same anyComponentStyle-budget reason `.tb-spinner` above is global.
+.tb-icon {
+  display: inline-block;
+  flex-shrink: 0;
+  margin-right: 4px;
+  vertical-align: -3px;
+}
+
+// `.tb-function-chip`/`.tb-section__header` are already `display:flex` with their own `gap` (both
+// per-component, duplicated) — zero the icon's own margin there so the two spacing mechanisms don't
+// stack, same pattern as `.tb-btn .tb-spinner` above. `.tb-status-badge` stays `inline-block` (no
+// flex/gap), so its own icon keeps the base `margin-right` above.
+.tb-function-chip .tb-icon,
+.tb-section__header .tb-icon {
+  margin-right: 0;
+}
+
+// `.tb-status-badge` is a 10px-font pill — the base 16px icon size reads oversized there, so this one
+// context gets a smaller instance instead (CSS `width`/`height` override the `<svg>` element's own
+// attribute values).
+.tb-status-badge .tb-icon {
+  width: 10px;
+  height: 10px;
+  margin-right: 3px;
+  vertical-align: -1.5px;
+}
+
+// ── LC Number / 2ndary natural-key emphasis (2026-08-28, "加粗放大+鮮明" — bold, enlarged, and
+// visually distinct) ──────────────────────────────────────────────────────
+// Global, not per-component (same reasoning as `.tb-spinner`/`.tb-icon` above): shared by A1/B1's own
+// typed LC Number input, the protected readout card every other function shows once its own target is
+// picked (`.tb-protected-natural-key`, maker-panel.component.scss), AND the `ngx-formly`-rendered
+// secondaryRef field's own `.form-control` (`className`, builder-fields.ts) — that last one is the reason
+// this can't be component-scoped at all: Formly's dynamically-created `<formly-field>` subtree carries a
+// DIFFERENT component's own Angular ViewEncapsulation `_ngcontent` attribute than `MakerPanelComponent`,
+// so a rule written in `maker-panel.component.scss` can target the literal template markup (the raw
+// input, the readout `<span>`s) but can never match anything inside that Formly subtree — confirmed live
+// (the class was present in the DOM, with zero visible effect) before moving here. `--blue-dark`/
+// `--blue-border` are the SAME "important identifier" palette `.tb-type-tag` already uses elsewhere,
+// kept deliberately distinct from the amount/currency figures' own `--navy` so an LC Number is never
+// mistaken for a monetary value at a glance.
+.tb-natural-key--emphasized,
+.tb-natural-key--emphasized .form-control {
+  font-size: 17px !important;
+  font-weight: 700 !important;
+  color: var(--blue-dark) !important;
+  letter-spacing: 0.01em;
+}
+
+input.tb-natural-key--emphasized,
+.tb-natural-key--emphasized input.form-control {
+  font-family: var(--font-mono);
+}
+
+// ── Balance-box title + action row (Event Details 60/40 split, 2026-08-21) ──────────────
+// Global, not per-component: `transaction-builder.component.scss` already sits at the
+// `anyComponentStyle` 12kb budget ceiling (see `.tb-spinner`/`.tb-icon` above for the same reasoning) —
+// a title-and-button flex row is small but genuinely cross-cutting (any `.tb-balance-box` can use it),
+// so it lives here rather than pushing that file further over.
+.tb-balance-box__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}

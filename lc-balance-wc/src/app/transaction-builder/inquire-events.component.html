@@ -1,0 +1,355 @@
+<!-- ══════════════════════════ INQUIRE EVENTS (2026-08-17) ══════════════════════════
+     Reuses: BalanceComponentApiService.resolveContract/catalog/listMovements (inquire-events.service.ts,
+     no new HTTP methods), buildFields() (builder-fields.ts, unchanged, decorated read-only via
+     toReadOnlyFields()), IMPORT_FUNCTIONS/EXPORT_FUNCTIONS (resolveFunctionForMovement(),
+     balance-component.model.ts), and the Account Entries dialog (openAccountEntries output, handled by
+     TransactionBuilderComponent — see this component's own class doc comment for why that dialog stays
+     parent-owned). -->
+<!-- Business instruction 2026-08-19 ("Inquire Events...uses only part of the available browser
+     width, leaving a large amount of unused space on the right") — Inquire Events has no .tb-side
+     sibling at all (unlike Transaction Processing, which populates BOTH .tb-main — the Maker/Checker
+     form — AND .tb-side — Look Up Current Balance), so reusing the bare .tb-workspace grid here left
+     CSS Grid reserving a second 50%-width track with nothing in it. .tb-workspace--single overrides
+     to a single full-width track (see inquire-events.component.scss) — this component only ever renders
+     while `activeMode === 'INQUIRE'` (parent's own *ngIf on <app-inquire-events>), so Transaction
+     Processing's own genuine 50/50 split is never affected. -->
+<div class="tb-workspace tb-workspace--single">
+  <div class="tb-main">
+    <!-- Business instruction 2026-08-17 ("Remove the second 'Inquire Events' heading within the
+         Inquire Events screen to avoid duplicate labeling. Keep only the top-level 'Inquire Events'
+         tab.") — the .tb-section__header/<h2> this section used to open with (redundant with the
+         top-level mode tab immediately above) is gone; content now starts directly with the Import
+         LC/Export Confirmed side tabs. Wrapped in .tb-section__body — every OTHER .tb-section on this
+         page already wraps its own content that way (own padding/consistent look); this section was
+         the one exception, now closed for the same "consistent behavior" reason as the rest of this
+         pass. -->
+    <section class="tb-section tb-section--maker">
+      <div class="tb-section__body">
+        <div class="tb-tabs tb-tabs--side">
+          <button type="button" class="tb-tab" [class.tb-tab--active]="inquireEvents.side === 'IMPORT'" (click)="inquireEvents.selectSide('IMPORT')">
+            Import LC
+          </button>
+          <button type="button" class="tb-tab" [class.tb-tab--active]="inquireEvents.side === 'EXPORT'" (click)="inquireEvents.selectSide('EXPORT')">
+            Export Confirmed
+          </button>
+        </div>
+
+        <!-- LC Master Records Index (2026-08-19, user-requested — "系統應先顯示所有 Import LC Master
+           Records 的 Index，而不是要求使用者必須先輸入單一 LC Number 才能查詢 Events"; extended the
+           SAME day, same wording, to Export Confirmed LC — "Same requirement for Export Confirmed").
+           Side-agnostic: one index/drill-down flow backs both Import LC and Export Confirmed LC,
+           selected purely by inquireEvents.side/indexEntityLabel. Shown BEFORE any single LC is
+           picked; selectLcFromIndex() drills into the SAME merged Events timeline below (unchanged),
+           and backToIndex() returns here with Page/Search/Sorting state preserved (InquireEventsService
+           never clears indexRows/indexPaging/indexSearch on that round trip — see its own doc
+           comments). The OLD single-exact-match "type LC Number, click Search" box (formerly Export
+           Confirmed's only entry point) is fully retired — both sides now share this Index instead. -->
+        <ng-container *ngIf="inquireEvents.indexView === 'INDEX'">
+          <app-transaction-search-field
+            label="LC Number Search / Filter"
+            placeholder="e.g. S0 (matches any LC Number containing this text)"
+            [value]="inquireEvents.indexSearch"
+            [loading]="inquireEvents.indexLoading"
+            (valueChange)="inquireEvents.indexSearch = $event"
+            (searchRequested)="inquireEvents.searchIndex()"
+          ></app-transaction-search-field>
+          <app-feedback-message *ngIf="indexErrorFeedback as feedback" [message]="feedback" (retry)="inquireEvents.searchIndex()"></app-feedback-message>
+          <div class="tb-hint mt-2" role="status" aria-live="polite" aria-busy="true" *ngIf="inquireEvents.indexLoading">
+            <span class="tb-spinner" aria-hidden="true"></span>Loading {{ inquireEvents.indexEntityLabel }} Master Records…
+          </div>
+
+          <div class="tb-table-scroll mt-2" *ngIf="!inquireEvents.indexLoading && inquireEvents.indexRows.length">
+            <table class="tb-table tb-table--lc-index">
+              <caption class="visually-hidden">
+                {{
+                  inquireEvents.indexEntityLabel
+                }}
+                Master Records
+              </caption>
+              <thead>
+                <tr>
+                  <th>LC Number</th>
+                  <th>Tenor Type</th>
+                  <th>Currency</th>
+                  <th class="tb-table__compact-number">LC Amount</th>
+                  <th class="tb-table__compact-number">Available Balance</th>
+                  <th class="tb-table__compact-number">Tight LC Balance</th>
+                  <th>Status</th>
+                  <th>Last Event Date/Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let row of inquireEvents.indexRows" (click)="inquireEvents.selectLcFromIndex(row.contract)">
+                  <td class="tb-table__ref">{{ row.contract.naturalKey.lcNumber }}</td>
+                  <td>{{ row.tenorType }}</td>
+                  <td>{{ row.currency }}</td>
+                  <td class="tb-table__amount tb-table__compact-number">{{ row.lcAmount | monetaryAmount: row.currency }}</td>
+                  <td class="tb-table__amount tb-table__compact-number">{{ row.availableBalance | monetaryAmount: row.currency }}</td>
+                  <td class="tb-table__amount tb-table__compact-number">{{ row.tightLcBalance | monetaryAmount: row.currency }}</td>
+                  <td class="tb-table__status">
+                    <app-contract-status-badge [status]="row.status" [closingPending]="row.closingPending"></app-contract-status-badge>
+                  </td>
+                  <td class="tb-table__time">{{ row.lastEventAt ? (row.lastEventAt | date: 'short') : '—' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <app-transaction-pagination
+            *ngIf="!inquireEvents.indexLoading && inquireEvents.indexPaging.totalPages > 1"
+            [page]="inquireEvents.indexPaging.page"
+            [totalPages]="inquireEvents.indexPaging.totalPages"
+            [total]="inquireEvents.indexPaging.total"
+            [loading]="inquireEvents.indexLoading"
+            (previousRequested)="inquireEvents.prevIndexPage()"
+            (nextRequested)="inquireEvents.nextIndexPage()"
+          ></app-transaction-pagination>
+          <app-feedback-message
+            *ngIf="!inquireEvents.indexLoading && !inquireEvents.indexRows.length && !inquireEvents.indexError"
+            [message]="indexEmptyFeedback"
+          ></app-feedback-message>
+        </ng-container>
+
+        <ng-container *ngIf="inquireEvents.indexView === 'EVENTS'">
+          <!-- User-requested 2026-08-26 ("Back to Import LC Index 顯示太小不明顯", then further
+           "字體放大 變粗 顏色用顯明一點的 與 Found:... 垂直間距加大", then "垂直間距上下一致") — first
+           bumped from .tb-btn--tiny (11px) to the standard .tb-btn--outline size, then upgraded again to
+           .tb-btn--nav-back (solid-fill, larger/bolder) once that still read as too quiet for a primary
+           nav control; the gap ABOVE this button (from the tabs) and the gap BELOW it (to the "Found:"
+           hint) are both mt-3 — deliberately equal, not independently tuned. -->
+          <button type="button" class="tb-btn tb-btn--nav-back mt-3" (click)="inquireEvents.backToIndex()">
+            ‹ Back to {{ inquireEvents.indexEntityLabel }} Index
+          </button>
+          <div class="tb-error mt-2" role="alert" *ngIf="inquireEvents.searchError">{{ inquireEvents.searchError }}</div>
+          <div class="tb-hint tb-hint--ok mt-3" *ngIf="inquireEvents.rootContract">
+            Found: {{ inquireEvents.rootContract.naturalKey.lcNumber }} — {{ inquireEvents.rootContract.status }}
+          </div>
+        </ng-container>
+
+        <!-- LC Master Records Index (2026-08-19) — this whole results section (Events table, Original
+           Transaction Screen, Balance Tabs) stays hidden while browsing the Index (indexView ===
+           'INDEX'), on BOTH sides, even though rootContract/selectedEvent themselves are deliberately
+           NOT cleared by backToIndex() (so a re-drill-down into the SAME LC doesn't need a re-fetch —
+           see InquireEventsService's own doc comments). -->
+        <ng-container *ngIf="inquireEvents.indexView === 'EVENTS'">
+          <div class="mt-3" *ngIf="inquireEvents.rootContract">
+            <h3 class="tb-subheading">Events — LC {{ inquireEvents.rootContract.naturalKey.lcNumber }} (all ledgers, Event Date/Time order)</h3>
+            <div class="tb-hint" role="status" aria-live="polite" aria-busy="true" *ngIf="inquireEvents.eventsLoading">
+              <span class="tb-spinner" aria-hidden="true"></span>Loading events…
+            </div>
+            <!-- Business instruction 2026-08-17 ("Since the View screen already provides access to Account
+             Entries, remove the Account Entries button from the Event List... The View button should
+             serve as the single entry point for reviewing the selected Event, including its
+             Transaction Details, Account Entries, and Balance Snapshot.") — the row-level Account
+             Entries button/column was removed; View (below) already reaches the same dialog via the
+             "Original Transaction Screen" panel's own Account Entries button, reusing
+             openAccountEntryDialog() unchanged.
+             2026-08-18 — wrapped in .tb-table-scroll (same fix as the Look Up panel's own Event
+             Timeline, 2026-08-17 "Time column truncated" bug): this table sits inside the same
+             .tb-section whose own overflow:hidden silently clips a nowrap column instead of scrolling
+             it into view; adding the new Function column below widens this table enough to risk the
+             identical bug, so it gets the same proactive fix rather than waiting for it to reproduce. -->
+            <div class="tb-table-scroll" *ngIf="!inquireEvents.eventsLoading && inquireEvents.events.length">
+              <table class="tb-table">
+                <caption class="visually-hidden">
+                  Events — LC
+                  {{
+                    inquireEvents.rootContract.naturalKey.lcNumber
+                  }}
+                  (all ledgers, Event Date/Time order)
+                </caption>
+                <!-- UX enhancement (2026-08-18, "Inquire Events 把Function name放在Event 的第一個欄位" — put
+               the Function name in the Events table's own first column) — reuses
+               InquireEventsService.functionFor()'s own per-phase resolution (the SAME rule
+               selectEvent() already applies for the "View" screen's own header — extracted there so
+               both call sites share one Strategy-table lookup rather than two copies), so a 'finalize'
+               row correctly shows "A4 · Sight Settlement" here too, not the sibling 'create' row's "A3
+               · Document Arrival". "—" for legacy data no current function produces, same convention
+               every other unresolved-function fallback in this app already uses. -->
+                <thead>
+                  <tr>
+                    <th>Function</th>
+                    <th>Ledger</th>
+                    <th>Type</th>
+                    <th>Amount</th>
+                    <th>Tighten LC Balance</th>
+                    <th>Reference</th>
+                    <th>Secondary Ref.</th>
+                    <th>Status</th>
+                    <th>Time</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <!-- Business instruction 2026-08-17 ("The View button is not required... Each Event row
+                 itself should be clickable... hover → highlight/pointer → single click → View Event
+                 Details") — the row-level View button/column was removed; the whole <tr> now dispatches
+                 the identical selectEvent() call the button used to. .tb-table's own tbody tr already
+                 carries cursor:pointer + hover-highlight styling (the same pickable-row affordance every
+                 other .tb-table in this app already uses), so no new CSS was needed. -->
+                  <tr *ngFor="let e of inquireEvents.pagedEvents" (click)="inquireEvents.selectEvent(e)">
+                    <td>
+                      <span class="tb-type-tag" *ngIf="inquireEvents.functionFor(e) as fn">{{ fn.code }} · {{ fn.label }}</span>
+                      <span class="tb-muted" *ngIf="!inquireEvents.functionFor(e) && inquireEvents.systemLabelFor(e) as sysLabel">{{ sysLabel }}</span>
+                      <span class="tb-muted" *ngIf="!inquireEvents.functionFor(e) && !inquireEvents.systemLabelFor(e)">—</span>
+                    </td>
+                    <td>
+                      <span class="tb-type-tag">{{ e.contract.instrumentType }}</span>
+                    </td>
+                    <td>
+                      <span class="tb-type-tag">{{ displayMovementType(e.contract.instrumentType, e.movement.movementType, e.movement.amount) }}</span>
+                    </td>
+                    <td class="tb-table__amount">{{ displayMovementAmount(e.contract.instrumentType, e.movement.movementType, e.movement.amount) | monetaryAmount: e.movement.currency }}</td>
+                    <td class="tb-table__amount">{{ inquireEvents.tightenLcBalanceFor(e) | monetaryAmount: e.movement.currency }}</td>
+                    <td class="tb-table__ref">{{ inquireEvents.primaryReferenceFor(e) }}</td>
+                    <td class="tb-table__ref">{{ inquireEvents.secondaryReferenceFor(e) }}</td>
+                    <td>
+                      <app-transaction-status-badge
+                        [status]="e.eventStatus"
+                        [instrumentType]="e.contract.instrumentType"
+                        [movementType]="e.movement.movementType"
+                        [phase]="e.phase"
+                        [acknowledgedAt]="e.movement.acknowledgedAt"
+                      ></app-transaction-status-badge>
+                    </td>
+                    <td class="tb-table__time">{{ e.eventTime | date: 'short' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <!-- UX enhancement (2026-08-18, "Inquire Event可以設計成Page by Page方式嗎?") — CLIENT-SIDE
+             pagination over the already-fully-loaded, already-sorted events array (no re-fetch per
+             page — see InquireEventsService.eventsPaging's own doc comment for why). Same Prev/Next +
+             "Page X / Y (Z total)" convention app-index-picker's own pagination uses elsewhere in this
+             app, reused rather than reinvented — only shown once there's more than one page. -->
+            <app-transaction-pagination
+              *ngIf="inquireEvents.eventsPaging.totalPages > 1"
+              [page]="inquireEvents.eventsPaging.page"
+              [totalPages]="inquireEvents.eventsPaging.totalPages"
+              [total]="inquireEvents.eventsPaging.total"
+              [loading]="inquireEvents.eventsLoading"
+              (previousRequested)="inquireEvents.prevEventsPage()"
+              (nextRequested)="inquireEvents.nextEventsPage()"
+            ></app-transaction-pagination>
+            <div class="tb-hint" *ngIf="!inquireEvents.eventsLoading && !inquireEvents.events.length">No Events found under this LC.</div>
+          </div>
+
+          <!-- Event Details 60/40 split (business instruction 2026-08-21, "Event Details 版面調整") —
+           Original Transaction Screen (A, 60%) alongside the Balance Tabs (B, 40%). Reuses the bare
+           .tb-workspace grid rule as-is (same 3fr/2fr ratio, gap, 1100px breakpoint already needed
+           here) rather than duplicating an identical rule under a new class name — this is a plain
+           CSS Grid utility, unrelated to the outer .tb-workspace--single full-width modifier a few
+           lines above (that one governs the OUTER Inquire Events panel, not this inner split). -->
+          <div class="tb-workspace">
+            <!-- Original transaction screen, restored, read-only — same buildFields()/<formly-form> the live
+             Maker Submit screen uses, decorated via toReadOnlyFields() (builder-fields.ts). -->
+            <div class="tb-balance-box mt-3" *ngIf="inquireEvents.selectedEvent as sel">
+              <div class="tb-balance-box__header">
+                <div class="tb-balance-box__title">
+                  Original Transaction Screen —
+                  <ng-container *ngIf="inquireEvents.selectedEventFunction as fn">{{ fn.code }} · {{ fn.label }}</ng-container>
+                  <ng-container *ngIf="!inquireEvents.selectedEventFunction">(function not resolved — showing captured transaction data)</ng-container>
+                </div>
+                <button
+                  type="button"
+                  class="tb-btn tb-btn--tiny"
+                  *ngIf="sel.movement.contingentAccountEntry"
+                  (click)="openAccountEntryDialog(sel.movement, sel.contract.instrumentType, sel.phase, sel.linkedMovement)"
+                >
+                  Account Entries
+                </button>
+              </div>
+              <!-- User-requested 2026-08-26 ("LC Number/IB Number 字可否放大一點、號碼用不同顏色顯示") — these
+               three natural-key identifier rows get their own larger/accented value style
+               (.tb-balance-row__value--id) so the LC/IB/SG Number stands out at a glance; every other row in
+               this box (Status/Submitted/Approved/etc.) keeps the plain .tb-balance-row__value styling. -->
+              <div class="tb-balance-row">
+                <span class="tb-balance-row__label">LC Number</span
+                ><span class="tb-balance-row__value tb-balance-row__value--id">{{ sel.contract.naturalKey.lcNumber }}</span>
+              </div>
+              <div class="tb-balance-row" *ngIf="sel.contract.naturalKey.ibNumber">
+                <span class="tb-balance-row__label">{{ ibNumberLabel }}</span
+                ><span class="tb-balance-row__value tb-balance-row__value--id">{{ sel.contract.naturalKey.ibNumber }}</span>
+              </div>
+              <div class="tb-balance-row" *ngIf="sel.contract.naturalKey.sgNumber">
+                <span class="tb-balance-row__label">SG Number</span
+                ><span class="tb-balance-row__value tb-balance-row__value--id">{{ sel.contract.naturalKey.sgNumber }}</span>
+              </div>
+              <formly-form
+                [form]="inquireEvents.selectedEventForm"
+                [fields]="inquireEvents.selectedEventFields"
+                [model]="inquireEvents.selectedEventModel"
+              ></formly-form>
+              <div class="tb-balance-row">
+                <span class="tb-balance-row__label">Status</span
+                ><span class="tb-balance-row__value">{{
+                  displayStatus(sel.eventStatus, sel.contract.instrumentType, sel.movement.movementType, sel.phase, sel.movement.acknowledgedAt)
+                }}</span>
+              </div>
+              <!-- Submit/EC/Approve audit trail (business instruction 2026-08-20, "交易要有SUBMIT
+               DATETIME/USER, EC DATETIME/USER (optional) AND APPROVE DATATIME/USER"). Submit
+               (createdBy/createdAt) always shown; EC/Approve are mutually exclusive, gated on the
+               movement's own real status — never inferred, since cancel() now writes its own
+               cancelledBy/cancelledAt pair instead of reusing releasedBy/releasedAt (see the
+               microservice's own types.ts BalanceMovement.cancelledAt doc comment). -->
+              <div class="tb-balance-row">
+                <span class="tb-balance-row__label">Submitted</span
+                ><span class="tb-balance-row__value">{{ sel.movement.createdBy }} — {{ sel.movement.createdAt | date: 'short' }}</span>
+              </div>
+              <!-- sel.eventStatus (not sel.movement.status directly, though as of 2026-08-18 they're always
+               the same value — see toEventRows()'s own doc comment) gates this. A 'create'-phase row for
+               an already-finalized movement now correctly shows "Approved by/at" here too, same as its
+               sibling 'finalize' row — both are showing the SAME real fact about the SAME movement. -->
+              <div class="tb-balance-row" *ngIf="sel.eventStatus === 'RELEASED' && sel.movement.releasedBy">
+                <span class="tb-balance-row__label">Approved</span
+                ><span class="tb-balance-row__value">{{ sel.movement.releasedBy }} — {{ sel.movement.releasedAt | date: 'short' }}</span>
+              </div>
+              <div class="tb-balance-row" *ngIf="sel.eventStatus === 'REJECTED' && sel.movement.releasedBy">
+                <span class="tb-balance-row__label">Rejected</span
+                ><span class="tb-balance-row__value">{{ sel.movement.releasedBy }} — {{ sel.movement.releasedAt | date: 'short' }}</span>
+              </div>
+              <div class="tb-balance-row" *ngIf="sel.eventStatus === 'CANCELLED' && sel.movement.cancelledBy">
+                <span class="tb-balance-row__label">EC (Cancelled)</span
+                ><span class="tb-balance-row__value">{{ sel.movement.cancelledBy }} — {{ sel.movement.cancelledAt | date: 'short' }}</span>
+              </div>
+            </div>
+
+            <!-- Balance Tabs (2026-08-17, user-specified — up to 3 tabs: LC/Confirmed LC Balance (always),
+             Acceptance Balance (Usance tenor only), Shipping Guarantee Balance (Import only) — same
+             gating rule as the Look Up panel's own LC/Acceptance/SG tabs (lookupIsUsanceLc/lookupHasSg),
+             reused here as selectedEventIsUsanceLc/selectedEventHasSg. A child tab is only ever populated
+             when the selected Event belongs to that specific child (confirmed via AskUserQuestion) — the
+             LC tab is always populated (own ledger for a root Event, the parent's own balance —
+             rootEventSnapshot — for a child Event). Renders the SAME app-balance-snapshot-box component
+             (2026-08-21, Part B extraction) Transaction Processing's own Look Up panel uses, and the same
+             .tb-tabs/.tb-tab tab-strip markup pattern as the Look Up panel's own LC/Acceptance/SG tabs.
+             Wrapped in .tb-balance-box (2026-08-21) so column B gets the SAME outer frame as column A's
+             own Original Transaction Screen box — also required structurally: .tb-workspace's grid
+             auto-places DIRECT children into its 2 columns, so the tab-strip + app-balance-snapshot-box
+             (a THIRD/FOURTH sibling otherwise, since <ng-container> itself renders no wrapping element)
+             must be one single element to land in column 2 rather than wrapping onto a second row under
+             column A. -->
+            <div class="tb-balance-box mt-3" *ngIf="inquireEvents.selectedEvent">
+              <div class="tb-tabs" *ngIf="inquireEvents.selectedEventTabs.length > 1">
+                <button
+                  type="button"
+                  class="tb-tab"
+                  *ngFor="let tab of inquireEvents.selectedEventTabs"
+                  [class.tb-tab--active]="inquireEvents.selectedEventTab === tab.key"
+                  (click)="inquireEvents.selectEventTab(tab.key)"
+                >
+                  {{ tab.label }}
+                </button>
+              </div>
+              <app-balance-snapshot-box
+                *ngIf="inquireEvents.selectedEvent as sel2"
+                [title]="inquireEvents.activeEventTab?.title ?? null"
+                [status]="sel2.contract.status"
+                [snapshot]="inquireEvents.activeEventTab?.snapshot ?? null"
+                [impact]="inquireEvents.activeEventTab?.impact ?? null"
+              ></app-balance-snapshot-box>
+            </div>
+          </div>
+        </ng-container>
+      </div>
+    </section>
+  </div>
+</div>

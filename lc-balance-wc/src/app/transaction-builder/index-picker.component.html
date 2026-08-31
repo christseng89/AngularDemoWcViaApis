@@ -1,0 +1,50 @@
+<div class="index-picker">
+  <div class="index-picker__label" *ngIf="label">{{ label }}</div>
+
+  <div class="index-picker__search" *ngIf="searchable">
+    <input
+      class="index-picker__search-input"
+      [ngModel]="searchValue"
+      (ngModelChange)="searchValueChange.emit($event)"
+      (keyup.enter)="search.emit()"
+      [placeholder]="searchPlaceholder" />
+    <button type="button" class="index-picker__search-btn" (click)="search.emit()">Search</button>
+  </div>
+
+  <div class="index-picker__loading" *ngIf="loading" role="status" aria-live="polite" aria-busy="true">
+    <span class="tb-spinner" aria-hidden="true"></span>Loading…
+  </div>
+
+  <ng-container *ngIf="!loading">
+    <div class="index-picker__empty" [class.index-picker__empty--not-found]="isNotFound" [attr.role]="isNotFound ? 'alert' : null" [attr.aria-live]="isNotFound ? 'polite' : null" *ngIf="!items.length">
+      {{ displayedEmptyText }}
+    </div>
+
+    <div class="index-picker__list" *ngIf="items.length">
+      <div
+        class="index-picker__header"
+        [style.--index-picker-columns]="'repeat(' + columnHeaders.length + ', minmax(0, 1fr))'"
+        *ngIf="columnHeaders.length">
+        <span *ngFor="let heading of columnHeaders">{{ heading }}</span>
+      </div>
+      <button
+        type="button"
+        class="index-picker__row"
+        [class.index-picker__row--columns]="columnHeaders.length"
+        [style.--index-picker-columns]="'repeat(' + columnHeaders.length + ', minmax(0, 1fr))'"
+        *ngFor="let item of items"
+        [class.index-picker__row--active]="selectedId === itemId(item)"
+        (click)="pick.emit(itemId(item))">
+        <ng-container *ngTemplateOutlet="rowTemplate ?? null; context: { $implicit: item }"></ng-container>
+      </button>
+    </div>
+
+    <div class="index-picker__auto-hint" *ngIf="autoPickedHint && (total > 0 ? total === 1 : items.length === 1)">{{ autoPickedHint }}</div>
+
+    <div class="index-picker__pagination" *ngIf="total > 0">
+      <button type="button" class="index-picker__page-btn" [disabled]="page <= 1" (click)="prevPage.emit()">‹ Prev</button>
+      <span class="index-picker__page-info">Page {{ page }} / {{ totalPages }} ({{ total }} total, ordered by Reference)</span>
+      <button type="button" class="index-picker__page-btn" [disabled]="page >= totalPages" (click)="nextPage.emit()">Next ›</button>
+    </div>
+  </ng-container>
+</div>

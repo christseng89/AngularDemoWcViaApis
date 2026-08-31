@@ -1,0 +1,19 @@
+{
+  "name": "business-days-mock",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local mock of a real business-day calendar service for lc-balance's F1 proposal §13.5 Auto Close Grace Period Phase 2 (AUTO CLOSE only, not AUTO EXPIRY) — see ../../analysis/standing-microservice-reference/Auto-Close-Grace-Period-Business-Day-Requirement.md. Implements only POST /business-days/add against one domestic calendar; not a copy of lc-balance-new/microservices/standing-mock (different feature, different scope).",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "jest"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^7.0.0"
+  }
+}
