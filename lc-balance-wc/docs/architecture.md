@@ -105,3 +105,10 @@ SQLite 适合当前开发和验证，但其文件级锁不能代表生产环境�
   → 单元、合约、案例和真实功能验证
   → OAS、决策记录及相关文档
 ```
+
+# Phase 4 framework adapters
+
+Angular, React and Vue integrations are deliberately one-way thin ports over the versioned native
+element contract. `adapter-core.ts` centralizes property assignment, typed event subscription and
+method forwarding. No adapter may import transaction-builder domain services. React and Vue are
+host-provided runtimes and therefore cannot increase the core WC runtime dependency graph.

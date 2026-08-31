@@ -164,3 +164,5 @@ tags:
 | `maker-submit.service.spec.ts`            | [[MOVEMENT-RULE-028]]                                                                                                                    |
 | `submit-rules.spec.ts`                    | [[MOVEMENT-RULE-020]], [[MOVEMENT-RULE-023]], [[MOVEMENT-RULE-025]], [[MOVEMENT-RULE-026]]                                               |
 | `test/unit/app.test.ts`                   | [[MOVEMENT-RULE-002]], [[MOVEMENT-RULE-003]], [[MOVEMENT-RULE-010]], [[MOVEMENT-RULE-015]], [[MOVEMENT-RULE-016]]                        |
+
+- `src/adapters/**` → [[balance-component-web-component-phase-4]]

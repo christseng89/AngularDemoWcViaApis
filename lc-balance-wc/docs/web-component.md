@@ -93,3 +93,15 @@ Dialog/overlay 保持在 shadow root 内，fixed overlay 仍以 viewport 定位�
 - 业务视图继续调用既有相对 HTTP 路径：`/api/*` 与 `/balance-component/*`。宿主环境必须把这些路径转发到现有 Backend Orchestrator 与 Balance Microservice。
 - Phase 3 使用原生 Shadow DOM；Bootstrap 与 `src/styles.scss` 仍作为独立 `styles.css` 交付，但由 WC 内部加载，不进入宿主全局 cascade。
 - Angular 应用与 Web Component 共用相同的 DI/Formly provider 定义，但只有应用模式额外安装 Router provider。
+
+# Framework adapters (Phase 4)
+
+The canonical API remains the native `<balance-component-app>` element. Thin adapters live under
+`src/adapters`: Angular provides a standalone component; React uses
+`createBalanceComponentReactAdapter(React)`; Vue uses `createBalanceComponentVueBinding()` and
+configures `compilerOptions.isCustomElement` with the exported
+`balanceComponentVueCompilerOptions.isCustomElement`. React and Vue runtimes are supplied by the
+host and are not included in the core WC bundle.
+
+All adapters assign `config` as a DOM property, forward `navigate()` and `refresh()` Promises, and
+remove their instance-owned Custom Event listeners during unmount.
