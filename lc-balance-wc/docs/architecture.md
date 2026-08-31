@@ -36,6 +36,14 @@ Balance Microservice (:4100)
 - Web Component 不安装 Angular Router；既有应用继续由 `src/main.ts`、`AppComponent` 和 `app.routes.ts` 驱动。
 - 两种入口只共享 `shared-app.providers.ts` 的 HTTP/Formly provider，不改变任何业务服务或 HTTP API 合约。宿主集成说明见 `web-component.md`。
 
+### Web Component Phase 2
+
+- `src/web-component.ts` 的 Custom Element class 提供 `navigate(view)` 与 `refresh()` Promise API，并以元素实例自身的内部 command bridge 呼叫 Angular shell。
+- command bridge 不冒泡至宿主；完成状态只通过公开 Promise 与 `balance-*` Custom Events 传递。
+- Angular shell 以独立 `ViewContainerRef` 创建／销毁 lazy-loaded view，使 refresh 能重建当前组件，同时保持最后可用 view 直至新 view 成功加载。
+- 多个元素实例各自持有 view、loading、render lifecycle 与事件状态；不新增跨实例可变 store。
+- Phase 2 不含认证、API base URL、Backend、Microservice 或 OAS 修改。
+
 ## Backend Orchestrator
 
 - `backend/server.js` 提供 Business Case Runner 使用的 API。

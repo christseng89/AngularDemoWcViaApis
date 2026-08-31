@@ -26,6 +26,8 @@ tags:
 
 **2026-08-31 Web Component Phase 1：** 新增 `src/web-component.ts`、`src/app/shared-app.providers.ts` 与 `src/app/web-component/*`，建立无 Router 的 Angular Elements 入口、版本化配置和 DOM 事件契约。详见 [[balance-component-web-component-phase-1]]；两份 OAS 经复核后保持不变。
 
+**2026-08-31 Web Component Phase 2：** 扩充 `balance-component-element.contract.ts`、Angular shell 与 `src/web-component.ts`，新增跨框架 `navigate()`／`refresh()`、refresh/error events 及多实例隔离验证。详见 [[balance-component-web-component-phase-2]]；Backend、Microservice、业务规则与两份 OAS 均未修改。
+
 ## Angular UI — 交易构建器（Transaction Builder，29 个文件）
 
 | 源文件 | 生成的规则 |

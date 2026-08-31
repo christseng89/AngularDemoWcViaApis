@@ -16,5 +16,8 @@ describe('registerBalanceComponent', () => {
     expect(registry.define).toHaveBeenCalledTimes(1);
     expect(registry.define).toHaveBeenCalledWith(BALANCE_COMPONENT_TAG_NAME, expect.any(Function));
     expect(BALANCE_COMPONENT_TAG_NAME).toBe('balance-component-app');
+    const constructor = definitions.get(BALANCE_COMPONENT_TAG_NAME);
+    expect(constructor?.prototype.navigate).toEqual(expect.any(Function));
+    expect(constructor?.prototype.refresh).toEqual(expect.any(Function));
   });
 });

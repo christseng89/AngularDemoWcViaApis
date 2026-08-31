@@ -22,9 +22,28 @@ export interface BalanceNavigationDetail {
   readonly to: BalanceComponentView;
 }
 
+export interface BalanceRefreshDetail {
+  readonly view: BalanceComponentView;
+}
+
 export interface BalanceErrorDetail {
-  readonly code: 'INVALID_CONFIG_VERSION' | 'VIEW_LOAD_FAILED';
+  readonly code: 'INVALID_CONFIG_VERSION' | 'INVALID_VIEW' | 'VIEW_LOAD_FAILED' | 'ELEMENT_NOT_CONNECTED';
   readonly message: string;
+  readonly operation: 'initialize' | 'configure' | 'navigate' | 'refresh';
+  readonly view?: BalanceComponentView;
+}
+
+export interface BalanceComponentElement extends HTMLElement {
+  config: Partial<BalanceComponentConfig> | null | undefined;
+  navigate(view: BalanceComponentView): Promise<void>;
+  refresh(): Promise<void>;
+}
+
+export interface BalanceComponentEventMap {
+  'balance-ready': CustomEvent<BalanceReadyDetail>;
+  'balance-navigation': CustomEvent<BalanceNavigationDetail>;
+  'balance-refresh': CustomEvent<BalanceRefreshDetail>;
+  'balance-error': CustomEvent<BalanceErrorDetail>;
 }
 
 const DEFAULT_CONFIG: NormalizedBalanceComponentConfig = {
@@ -41,4 +60,14 @@ export function normalizeBalanceComponentConfig(config: Partial<BalanceComponent
     version: BALANCE_COMPONENT_CONTRACT_VERSION,
     initialView: config?.initialView ?? DEFAULT_CONFIG.initialView,
   };
+}
+
+export function isBalanceComponentView(value: unknown): value is BalanceComponentView {
+  return value === 'transaction-builder' || value === 'business-cases';
+}
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'balance-component-app': BalanceComponentElement;
+  }
 }

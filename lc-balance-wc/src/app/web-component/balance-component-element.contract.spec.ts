@@ -1,4 +1,4 @@
-import { BALANCE_COMPONENT_CONTRACT_VERSION, normalizeBalanceComponentConfig } from './balance-component-element.contract';
+import { BALANCE_COMPONENT_CONTRACT_VERSION, isBalanceComponentView, normalizeBalanceComponentConfig } from './balance-component-element.contract';
 
 describe('Balance Component element contract', () => {
   it('uses the transaction builder when configuration is absent', () => {
@@ -17,5 +17,14 @@ describe('Balance Component element contract', () => {
 
   it('rejects unsupported contract versions at the boundary', () => {
     expect(() => normalizeBalanceComponentConfig({ version: '2' as '1' })).toThrow('Unsupported Balance Component contract version: 2');
+  });
+
+  it.each([
+    ['transaction-builder', true],
+    ['business-cases', true],
+    ['unknown', false],
+    [null, false],
+  ])('validates view %p at the JavaScript boundary', (value, expected) => {
+    expect(isBalanceComponentView(value)).toBe(expected);
   });
 });

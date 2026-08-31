@@ -20,7 +20,6 @@
 
   @if (loading) {
     <p class="balance-element__status" aria-live="polite">Loading Balance Component…</p>
-  } @else if (activeComponent) {
-    <ng-container *ngComponentOutlet="activeComponent" />
   }
+  <div [hidden]="loading"><ng-template #viewHost /></div>
 </section>

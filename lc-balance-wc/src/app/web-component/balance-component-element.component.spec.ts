@@ -49,6 +49,56 @@ describe('BalanceComponentElementComponent', () => {
     expect(navigated).toHaveBeenCalledWith({ from: 'transaction-builder', to: 'business-cases' });
   });
 
+  it('refreshes by recreating only the current view and emits completion', async () => {
+    const refreshed = jest.fn();
+    fixture.componentInstance.balanceRefresh.subscribe(refreshed);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const firstView = fixture.nativeElement.querySelector('app-transaction-builder');
+
+    await fixture.componentInstance.refresh();
+    fixture.detectChanges();
+    const refreshedView = fixture.nativeElement.querySelector('app-transaction-builder');
+
+    expect(refreshedView).not.toBe(firstView);
+    expect(refreshed).toHaveBeenCalledWith({ view: 'transaction-builder' });
+  });
+
+  it('keeps separate mutable view state across element instances', async () => {
+    const secondFixture = TestBed.createComponent(BalanceComponentElementComponent);
+    fixture.detectChanges();
+    secondFixture.detectChanges();
+    await Promise.all([fixture.whenStable(), secondFixture.whenStable()]);
+
+    await fixture.componentInstance.navigate('business-cases');
+    fixture.detectChanges();
+    secondFixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('app-business-case-runner')).not.toBeNull();
+    expect(secondFixture.nativeElement.querySelector('app-transaction-builder')).not.toBeNull();
+    expect(secondFixture.nativeElement.querySelector('app-business-case-runner')).toBeNull();
+    secondFixture.destroy();
+  });
+
+  it('rejects an invalid JavaScript view and preserves the last usable view', async () => {
+    const failed = jest.fn();
+    fixture.componentInstance.balanceError.subscribe(failed);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    await expect(fixture.componentInstance.navigate('invalid' as 'transaction-builder')).rejects.toThrow('Unsupported Balance Component view: invalid');
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('app-transaction-builder')).not.toBeNull();
+    expect(failed).toHaveBeenCalledWith({
+      code: 'INVALID_VIEW',
+      operation: 'navigate',
+      message: 'Unsupported Balance Component view: invalid',
+    });
+  });
+
   it('emits a typed error for an unsupported configuration version', () => {
     const failed = jest.fn();
     fixture.componentInstance.balanceError.subscribe(failed);
@@ -57,6 +107,7 @@ describe('BalanceComponentElementComponent', () => {
 
     expect(failed).toHaveBeenCalledWith({
       code: 'INVALID_CONFIG_VERSION',
+      operation: 'configure',
       message: 'Unsupported Balance Component contract version: 2',
     });
   });

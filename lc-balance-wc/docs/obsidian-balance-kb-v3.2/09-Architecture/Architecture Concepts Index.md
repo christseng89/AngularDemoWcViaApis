@@ -22,6 +22,7 @@ tags:
 ## 2026-08-31 Web Component 更新
 
 - [[balance-component-web-component-phase-1|Balance Component Web Component Phase 1]]
+- [[balance-component-web-component-phase-2|Balance Component Web Component Phase 2]]
 
 - [[Balance Architecture]]
 - [[CatalogPickerService]]
