@@ -12,11 +12,13 @@ tags:
 
 以当前 source code 与 tests 为准，完成 Transaction Processing 同 session Delete Pending 的知识同步：
 
-- Microservice OAS 更新至 v1.42.0；Channel OAS 维持 v1.9.0。
+- Microservice OAS 更新至 v1.42.1；Channel OAS 维持 v1.9.0。
 - A1／B1 成功后回到新输入，其余 Function 回到 Transaction Index。
 - A4 使用 withdraw-maker-submit，保留 A3／A3S source。
 - A3S／B4／B5 是 sibling-first、primary-last 的多次单笔 cancel，不是 atomic batch。
 - Maker Queue／Fix Pending 与上述 Transaction Processing flow 分离。
 - Maker Queue、Inquire Events、Inquire Delete Pending 保留原始 HTTP status；status 0／5xx 显示服务不可用，不再误报 `BAL-UI-UNEXPECTED`。
+- Angular client 对安全读取采用 `.env` 可配置的 3 次 bounded exponential backoff；POST command 不自动重送。
+- `x-client-retry-policy` 是 client operational metadata，不改变 HTTP 或 Channel wire contract。
 
 权威入口：`analysis/balance-component-api.yaml`、`docs/current-behavior.md`、`docs/balance-business-rules.md`。

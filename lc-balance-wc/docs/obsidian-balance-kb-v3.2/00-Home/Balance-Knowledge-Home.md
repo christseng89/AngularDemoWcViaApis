@@ -41,6 +41,7 @@ tags:
 - [[API Index|API 索引]] —— 07-API
 - [[Data Model Concepts Index|数据模型概念索引]] —— 08-Data-Model
 - [[Architecture Concepts Index|架构概念索引]] —— 09-Architecture
+- [[HTTP-Retry-Policy|HTTP 安全读取重试策略]] —— `.env`、backoff 与写入保护边界
 
 ## 规则、证据与场景
 
@@ -54,6 +55,7 @@ tags:
 - [[Knowledge-Quality-Report|知识质量报告]] —— 本知识库自评的质量评审（见下）
 - [[Freshness-Update-Log-2026-08-26|知识新鲜度更新日志（2026-08-26）]] —— 本次增量同步做了什么、依据什么、诚实披露未覆盖范围
 - [[Freshness-Update-Log-2026-08-30|知识新鲜度更新日志（2026-08-30）]] —— 对齐最新源码、OAS、Transaction Index、Tight Balance 与原子 compound 行为
+- [[Freshness-Update-Log-2026-08-31|知识新鲜度更新日志（2026-08-31）]] —— 对齐 inquiry error、safe-read retry 与 OAS 1.42.1
 
 ## 方法论说明
 
