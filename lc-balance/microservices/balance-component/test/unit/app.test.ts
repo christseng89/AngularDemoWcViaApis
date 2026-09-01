@@ -307,16 +307,13 @@ describe('HTTP integration — v0.12: unmatched Document Arrival now REJECTS pas
     expect(res.body.status).toBe('PENDING');
   });
 
-  test('Checker approves BOTH with one compound Release action — SG redemption first, then the Document Arrival (component.ts release() ordering) — LC settles at 21,000, SG at 0', async () => {
+  test('Checker completes the A3S action — releases the SG redemption and acknowledges the Document Arrival without finalizing the Usance LC', async () => {
     await request(app).post(`/balance-movements/${sgRedeemMovementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
-    // Widened 2026-08-27 (business-confirmed) — this LC's own UTILIZE is an explicit-tenor (SELLERS_USANCE)
-    // IPLC_LC/UTILIZE, so a direct /release now requires makerSubmittedAt first, same gate Sight/A4
-    // already had; this test isn't about that gate, just needs the movement genuinely RELEASED.
-    await request(app).post(`/balance-movements/${matchedUtilizeMovementId}/maker-submit`).send({ makerSubmittedBy: 'maker1' }).expect(200);
-    await request(app).post(`/balance-movements/${matchedUtilizeMovementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+    await request(app).post(`/balance-movements/${matchedUtilizeMovementId}/acknowledge`).send({ acknowledgedBy: 'checker1' }).expect(200);
 
     const lcSnapshot = await request(app).get(`/balance-contracts/${lcId}/balance`).expect(200);
-    expect(lcSnapshot.body.confirmedBalance).toBe('21000');
+    expect(lcSnapshot.body.confirmedBalance).toBe('121000');
+    expect(lcSnapshot.body.availableBalance).toBe('21000');
 
     const sgSnapshot = await request(app).get(`/balance-contracts/${sgId}/balance`).expect(200);
     expect(sgSnapshot.body.confirmedBalance).toBe('0');
@@ -1245,12 +1242,6 @@ describe('HTTP integration — Tenor Type Routing (business instruction 2026-08-
         createdBy: 'maker1',
       })
       .expect(201);
-    // Widened 2026-08-27 (business-confirmed) — a direct /release on an explicit-tenor IPLC_LC/UTILIZE
-    // now requires makerSubmittedAt first, same gate Sight/A4 already had; this test isn't about that
-    // gate, just needs the movement genuinely RELEASED before creating the Acceptances below.
-    await request(app).post(`/balance-movements/${utilize.body.movementId}/maker-submit`).send({ makerSubmittedBy: 'maker1' }).expect(200);
-    await request(app).post(`/balance-movements/${utilize.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
-
     const sellersAcceptance = await request(app)
       .post('/balance-movements')
       .send({
@@ -3267,8 +3258,8 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
         eventSeq: 1,
         amount: '100000',
         currency: 'USD',
-        tenorType: 'SELLERS_USANCE',
-        tenorDays: 90,
+        tenorType: 'SIGHT',
+        tenorDays: 0,
         createdBy: 'maker1',
       })
       .expect(201);
@@ -3812,6 +3803,10 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
         })
         .expect(201);
       await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+      const lcContract = await request(app)
+        .get('/balance-contracts')
+        .query({ instrumentType: 'IPLC_LC', lcNumber: 'LC-BAL123-USANCE-OK' })
+        .expect(200);
       const utilize = await request(app)
         .post('/balance-movements')
         .send({
@@ -3836,7 +3831,7 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
           amount: '40000',
           currency: 'USD',
           tenorType: 'SELLERS_USANCE',
-          parentLogicalContractId: lc.body.logicalContractId,
+          parentLogicalContractId: lcContract.body.logicalContractId,
           referencedTransactionId: utilize.body.movementId,
           createdBy: 'maker1',
         })
@@ -3964,6 +3959,10 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
         })
         .expect(201);
       await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+      const lcContract = await request(app)
+        .get('/balance-contracts')
+        .query({ instrumentType: 'IPLC_LC', lcNumber: 'LC-USANCE-SNAPSHOT' })
+        .expect(200);
       const utilize = await request(app)
         .post('/balance-movements')
         .send({
@@ -3990,7 +3989,7 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
           amount: '40000',
           currency: 'USD',
           tenorType: 'SELLERS_USANCE',
-          parentLogicalContractId: lc.body.logicalContractId,
+          parentLogicalContractId: lcContract.body.logicalContractId,
           referencedTransactionId: utilize.body.movementId,
           createdBy: 'maker1',
         })
@@ -4983,6 +4982,7 @@ describe('HTTP integration — referencedTransactionId passthrough (bug fixed 20
       })
       .expect(201);
     await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+    const lcContract = await request(app).get(`/balance-contracts/${lc.body.balanceContractId}`).expect(200);
     const arrival = await request(app)
       .post('/balance-movements')
       .send({
@@ -4996,13 +4996,14 @@ describe('HTTP integration — referencedTransactionId passthrough (bug fixed 20
         createdBy: 'maker1',
       })
       .expect(201);
+    await request(app).post(`/balance-movements/${arrival.body.movementId}/acknowledge`).send({ acknowledgedBy: 'checker1' }).expect(200);
 
     const acceptance = await request(app)
       .post('/balance-movements')
       .send({
         instrumentType: 'IPLC_ACCEPTANCE',
         naturalKey: { lcNumber: 'RTID-LC1', ibNumber: 'IB-RTID-1' },
-        parentLogicalContractId: lc.body.balanceContractId,
+        parentLogicalContractId: lcContract.body.logicalContractId,
         movementType: 'CREATE',
         eventSeq: 1,
         amount: '30000',

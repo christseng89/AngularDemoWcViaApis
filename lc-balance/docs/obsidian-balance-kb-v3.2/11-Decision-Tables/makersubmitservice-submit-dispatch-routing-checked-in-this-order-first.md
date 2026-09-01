@@ -1,29 +1,26 @@
 ---
 knowledge_id: makersubmitservice-submit-dispatch-routing-checked-in-this-order-first
-title: "MakerSubmitService.submit() 分发路由（按此顺序依次检查，命中即止）"
+title: 'MakerSubmitService.submit() 分发路由'
 domain: Balance
 category: Decision Table
-snapshot_date: 2026-08-22
+snapshot_date: 2026-09-01
 tags:
   - balance
   - decision-table
 ---
 
-# MakerSubmitService.submit() 分发路由（按此顺序依次检查，命中即止）
+# MakerSubmitService.submit() 分发路由
 
-| # | Condition（条件） | Shape invoked（调用的处理形态） | createMovement call count（createMovement 调用次数） |
-|---|---|---|---|
-| 1 | compoundSubmission.possibleShapes 包含 documentArrivalWithSg 且 selectedArrivalSg 已设置 且 arrivalSgSnapshot 已设置 | submitDocumentArrivalWithSg（A3S） | 2（先 SG 赎回，再 LC UTILIZE） |
-| 2 | compoundSubmission.possibleShapes 包含 confirmationHonourWithReceivable 且 model.movementType === 'HONOUR' 且 selectedContract 已设置 | submitConfirmationHonourWithReceivable（B4 即期） | 2（先 Honour，再 Due-From-Issuing-Bank CREATE） |
-| 3 | compoundSubmission.possibleShapes 包含 confirmationAcceptWithReceivable 且 selectedContract 已设置 | submitConfirmationAcceptWithReceivable（B4 远期） | 3（Accept、Acceptance CREATE、Receivable CREATE） |
-| 4 | movementDerivation.amountVsAvailableDerivation === 'SETTLE' 且 model.instrumentType === 'EPLC_ACCEPTANCE' 且 selectedContract 已设置 | submitAcceptanceSettleWithReceivable（B5） | 2 次 createMovement + 1 次 resolveContract（Settle、解析 receivable 合约、REIMBURSE） |
-| 5（默认） | 以上均未命中 | submitPlain | 1 |
+| #   | 条件                  | 调用形态                                 | 写入                                                            |
+| --- | --------------------- | ---------------------------------------- | --------------------------------------------------------------- |
+| 1   | A3S 且已选择 SG       | `submitDocumentArrivalWithSg`            | atomic compound：SG redemption + LC UTILIZE                     |
+| 2   | B4 HONOUR             | `submitConfirmationHonourWithReceivable` | atomic compound：HONOUR + Due From Issuing Bank CREATE          |
+| 3   | B4 ACCEPT             | `submitConfirmationAcceptWithReceivable` | atomic compound：ACCEPT + Acceptance CREATE + Receivable CREATE |
+| 4   | 以上均未命中，包括 B5 | `submitPlain`                            | 一笔 movement                                                   |
 
-## Source Evidence
+B5 的 `SETTLE` 只负责推导 `FULL_SETTLE`／`PARTIAL_SETTLE`，不会触发额外 Receivable lookup 或 movement。
 
-- `maker-submit.service.ts:66-85`
+## Source evidence
 
-## Related Knowledge
-
-- Angular Maker Panel + Submit Orchestration
-- [[Business-Rule-Index]]
+- `src/app/transaction-builder/maker-submit.service.ts`
+- `src/app/transaction-builder/maker-submit.service.spec.ts`

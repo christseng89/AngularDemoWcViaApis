@@ -35,9 +35,12 @@ const EXPECTED_IDS = [
   'export-case-12',
   'export-case-13',
   'export-case-14',
+  'import-a3s-ready',
   'import-a4-ready',
   'import-a6-ready',
+  'import-a7-ready',
   'export-b4-ready',
+  'export-b5-ready',
 ];
 
 const VALID_STEP_TYPES = ['note', 'createMovement', 'createCompoundMovements', 'compoundActions', 'release', 'makerSubmit', 'acknowledge', 'snapshot'];
@@ -46,33 +49,79 @@ describe('data/businessCases.js buildRegistry()', () => {
   const registry = buildRegistry();
 
   it('returns all lifecycle and manual-readiness business cases in Run All order', () => {
-    expect(registry).toHaveLength(32);
+    expect(registry).toHaveLength(35);
     expect(registry.map((c) => c.id)).toEqual(EXPECTED_IDS);
   });
 
-  it('Run All ends with retained, eligible prerequisites for manual A4, A6, and B4 testing', () => {
+  it('Run All ends with one parent and three retained child prerequisites for each manual target', () => {
     const byId = Object.fromEntries(registry.map((businessCase) => [businessCase.id, businessCase]));
+    const a3s = byId['import-a3s-ready'];
     const a4 = byId['import-a4-ready'];
     const a6 = byId['import-a6-ready'];
+    const a7 = byId['import-a7-ready'];
     const b4 = byId['export-b4-ready'];
+    const b5 = byId['export-b5-ready'];
 
     const assertImportReady = (businessCase, tenorType) => {
       const issue = businessCase.steps.find((step) => step.type === 'createMovement' && step.request?.movementType === 'ISSUE');
-      const arrival = businessCase.steps.find((step) => step.type === 'createMovement' && step.request?.movementType === 'UTILIZE');
+      const arrivals = businessCase.steps.filter((step) => step.type === 'createMovement' && step.request?.movementType === 'UTILIZE');
       expect(issue.request.tenorType).toBe(tenorType);
-      expect(arrival).toBeDefined();
-      expect(businessCase.steps.some((step) => step.type === 'acknowledge' && step.movementRef === arrival.captureAs)).toBe(true);
+      expect(arrivals).toHaveLength(3);
+      expect(new Set(arrivals.map((step) => step.request.balanceContractIdRef))).toEqual(new Set(['lc']));
+      expect(arrivals.map((step) => step.request.sourceTransactionRef)).toEqual(['B01', 'B02', 'B03']);
+      arrivals.forEach((arrival) => {
+        expect(businessCase.steps.some((step) => step.type === 'acknowledge' && step.movementRef === arrival.captureAs)).toBe(true);
+      });
       expect(businessCase.steps.some((step) => step.type === 'makerSubmit')).toBe(false);
       expect(businessCase.steps.some((step) => step.functionCode === 'A4' || step.functionCode === 'A6')).toBe(false);
     };
 
     assertImportReady(a4, 'SIGHT');
     assertImportReady(a6, 'SELLERS_USANCE');
-    const presentDocs = b4.steps.find((step) => step.type === 'createMovement' && step.request?.instrumentType === 'EPLC_EXAMINATION');
-    expect(presentDocs).toBeDefined();
-    expect(b4.steps.some((step) => step.type === 'release' && step.movementRef === presentDocs.captureAs)).toBe(true);
+    const shippingGuarantees = a3s.steps.filter((step) => step.type === 'createMovement' && step.request?.instrumentType === 'SHGT');
+    expect(shippingGuarantees).toHaveLength(3);
+    expect(shippingGuarantees.map((step) => step.request.naturalKey.sgNumber)).toEqual(['G01', 'G02', 'G03']);
+    const importAcceptances = a7.steps.filter((step) => step.type === 'createMovement' && step.request?.instrumentType === 'IPLC_ACCEPTANCE');
+    expect(importAcceptances).toHaveLength(3);
+    expect(importAcceptances.map((step) => step.request.naturalKey.ibNumber)).toEqual(['IB0001', 'IB0002', 'IB0003']);
+    const presentDocs = b4.steps.filter((step) => step.type === 'createMovement' && step.request?.instrumentType === 'EPLC_EXAMINATION');
+    expect(presentDocs).toHaveLength(3);
+    presentDocs.forEach((presentDoc) => {
+      expect(b4.steps.some((step) => step.type === 'release' && step.movementRef === presentDoc.captureAs)).toBe(true);
+    });
     expect(b4.steps.some((step) => step.functionCode === 'B4')).toBe(false);
-    expect(registry.slice(-3).map((businessCase) => businessCase.id)).toEqual(['import-a4-ready', 'import-a6-ready', 'export-b4-ready']);
+    const exportAcceptances = b5.steps.flatMap((step) => step.requests || []).filter((request) => request.instrumentType === 'EPLC_ACCEPTANCE');
+    expect(exportAcceptances).toHaveLength(3);
+    expect(exportAcceptances.map((request) => request.naturalKey.ibNumber)).toEqual(['IB0001', 'IB0002', 'IB0003']);
+    expect(registry.slice(-6).map((businessCase) => businessCase.id)).toEqual(EXPECTED_IDS.slice(-6));
+  });
+
+  it('Run All retains at least three generated transactions for A3S, A6, A7, B4, and B5', () => {
+    const requests = registry.flatMap((businessCase) =>
+      businessCase.steps.flatMap((step) => (step.request ? [step.request] : step.requests || [])),
+    );
+    const count = (predicate) => requests.filter(predicate).length;
+
+    const generatedCounts = {
+      A3S: count(
+        (request) => request.instrumentType === 'IPLC_LC' && request.movementType === 'UTILIZE' && Boolean(request.businessEventId),
+      ),
+      A6: count((request) => request.instrumentType === 'IPLC_ACCEPTANCE' && request.movementType === 'CREATE'),
+      A7: count(
+        (request) =>
+          request.instrumentType === 'IPLC_ACCEPTANCE' && ['PARTIAL_SETTLE', 'FULL_SETTLE'].includes(request.movementType),
+      ),
+      B4: count(
+        (request) => request.instrumentType === 'EPLC_CONFIRMATION' && ['HONOUR', 'ACCEPT'].includes(request.movementType),
+      ),
+      B5: count(
+        (request) =>
+          request.instrumentType === 'EPLC_ACCEPTANCE' && ['PARTIAL_SETTLE', 'FULL_SETTLE'].includes(request.movementType),
+      ),
+    };
+
+    Object.values(generatedCounts).forEach((generatedCount) => expect(generatedCount).toBeGreaterThanOrEqual(3));
+    expect(requests.some((request) => request.movementType === 'REIMBURSE')).toBe(false);
   });
 
   it('every case has a non-empty title/description and a non-empty step list', () => {
@@ -202,7 +251,7 @@ describe('data/businessCases.js buildRegistry()', () => {
     registry.forEach((c) => {
       const firstWithNaturalKey = c.steps.find((s) => s.type === 'createMovement' && s.request && s.request.naturalKey && s.request.naturalKey.lcNumber);
       expect(firstWithNaturalKey).toBeDefined();
-      expect(firstWithNaturalKey.request.naturalKey.lcNumber).toMatch(/^(IMP|EXP)-C\d+-\d+-\d+$/);
+      expect(firstWithNaturalKey.request.naturalKey.lcNumber).toMatch(/^(IMP|EXP)-(C\d+|A3S|A4|A6|A7|B4|B5)-\d+-\d+$/);
     });
   });
 

@@ -200,6 +200,7 @@ export class BalanceService {
     this.movementSnapshots = new MovementSnapshotService(this.contracts, this.movements, this.snapshotService, this.queries);
     this.releasePolicy = new MovementReleasePolicyService(
       this.movements,
+      this.contracts,
       this.requestValidator,
       this.lifecycleEligibility,
       (movementType) => !!this.movementTypeRegistry[movementType]?.isCreating,
@@ -1156,6 +1157,11 @@ export class BalanceService {
           throw new RequestValidationError(
             `submitByMaker() only applies to an IPLC_LC UTILIZE movement (A4 Sight Settlement) — ` +
               `movement ${movementId} is ${contract?.instrumentType ?? 'unknown'}/${movement.movementType}.`,
+          );
+        }
+        if (contract.status !== 'ACTIVE' || (contract.tenorType && contract.tenorType !== 'SIGHT')) {
+          throw new IllegalStateTransitionError(
+            `Movement ${movementId} is not eligible for A4 — select a PENDING Document Arrival under an ACTIVE Sight LC.`,
           );
         }
       },

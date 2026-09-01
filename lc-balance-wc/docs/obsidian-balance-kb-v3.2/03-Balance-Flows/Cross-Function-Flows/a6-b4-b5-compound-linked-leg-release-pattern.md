@@ -1,27 +1,31 @@
 ---
 knowledge_id: a6-b4-b5-compound-linked-leg-release-pattern
-title: "A6 / B4 / B5 复合式关联腿（linked-leg）release 模式"
+title: 'A6 / B4 关联腿 release 与 B5 单腿结算对照'
 domain: Balance
 category: Domain Concept
 status: CONFIRMED
-source_repository: Balance Component (lc-balance)
-last_verified_commit: "N/A — no .git history in the analyzed snapshot, see [[Source-to-Knowledge-Map]]"
-snapshot_date: 2026-08-22
+snapshot_date: 2026-09-01
 tags:
   - balance
-  - domain-concept
+  - maker-checker
+  - compound
 ---
 
-# A6 / B4 / B5 复合式关联腿（linked-leg）release 模式
+# A6 / B4 关联腿 release 与 B5 单腿结算对照
 
-三种不同的复合结构都遵循相同的骨架：先创建主/关联腿（primary/linked legs，共享 businessEventId，和/或主腿携带指向其自身来源 movement 的 referencedTransactionIdRef），然后按固定顺序 release。A6（Acceptance CREATE 引用一笔 Document Arrival）：先 release Document Arrival（通过其自身解析出的 referencedTransactionId），再 release Acceptance CREATE。B4（Honour/Accept 引用一笔 B3 Present-Docs earmark，并附带一条关联的资产/负债腿——Sight/HONOUR 对应 EPLC_DUE_FROM_ISSUING_BANK，Usance/ACCEPT 对应 EPLC_ACCEPTANCE + EPLC_ACCEPTANCE_REIMB_RECEIVABLE）：先 release B4 的主腿（其副作用是同时将所引用的 B3 记录标记为"consumed"），再 release 关联腿。B5（Acceptance FULL_SETTLE + Reimbursement Receivable REIMBURSE）：先 release 主结算，再 release 关联的偿付（reimbursement）。
+A6 与 B4 都关联既有 source movement。A6 的 Acceptance CREATE 引用同 LC 的 A3／A3S Document Arrival；Checker 依序处理 source 与新 Acceptance。B4 的 HONOUR／ACCEPT 引用同 Confirmation 的已 RELEASED、未消费 B3 Present Docs，并在 compound transaction 中建立所需资产／负债 legs。
 
-## 证据来源
+B5 已不属于此 compound 家族。它只在所选 `EPLC_ACCEPTANCE` 上建立并放行一笔 `FULL_SETTLE` 或 `PARTIAL_SETTLE`；不会查找或处理 `EPLC_ACCEPTANCE_REIMB_RECEIVABLE`。
 
-- `backend/data/businessCases.js:1813-1855,1902-1997 (B4/B5)`
-- `backend/data/businessCases.js:743-794 (A6)`
+## Source evidence
 
-## 相关知识
+- `src/app/transaction-builder/function-strategy.ts`
+- `src/app/transaction-builder/maker-submit.service.ts`
+- `src/app/transaction-builder/checker-actions.service.ts`
+- `microservices/balance-component/src/service/movementReleasePolicyService.ts`
 
-- [[Business-Rule-Index]]
-- [[Balance Component Overview]]
+## Related knowledge
+
+- [[compound-submission-linked-legs]]
+- [[B5-Settlement-Reimbursement-Maturity]]
+- [[Transaction Index Selection Contract]]

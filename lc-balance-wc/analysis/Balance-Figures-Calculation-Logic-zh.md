@@ -1,6 +1,6 @@
 # Balance Component — 餘額數字計算與更新邏輯
 
-> 2026-08-30 同步：現行功能範圍為 A1–A11／B1–B7（A5 保留不用）。Tight Available Balance
+> 現行進口功能：A1、A2、A3、A3S、A4、A6、A7、A8、A9、A10、A11；出口功能：B1–B7。Tight Available Balance
 > 不得為負；A3S 上限為 Tight Available + selected SG outstanding。現行摘要見
 > `../docs/current-behavior.md`。
 
@@ -242,7 +242,7 @@ Present Docs Earmark）。
   A4 自己的 picker 另外還會排除它自己已經 Maker-Submitted 過的 UTILIZE（`makerSubmittedAt` 已設定）
   ——A4 自己的 Maker 步驟對它也沒有事可做了。
 
-**複合功能**（A3S、A6、B4、B5）**一次會動到不只一份合約的列**——下面各自的表格會逐腿明講。
+**複合功能**（A3S、A6、B4）**一次會動到不只一份合約的列**——下面各自的表格會逐腿明講。
 
 ---
 
@@ -580,20 +580,17 @@ Confirmation 自己的 `GET .../balance` 讀出來是 `presentDocsEarmarkApprove
 | SG（Pending／Approved） | N/A | N/A |
 | Document Arrival（Pending／Approved） | N/A——僅限 Import 側的概念 | N/A |
 
-### B5 — Settlement — Reimbursement / Maturity（`EPLC_ACCEPTANCE` / `FULL_SETTLE` 或
-`PARTIAL_SETTLE`——複合式，僅限 Usance 持有到期）
+### B5 — Settlement / Maturity（`EPLC_ACCEPTANCE` / `FULL_SETTLE` 或
+`PARTIAL_SETTLE`，僅限 Usance 持有到期）
 
-Maker Submit **一起建立 2 筆連動交易**（PENDING）：Acceptance 自己的 `FULL_SETTLE`／
-`PARTIAL_SETTLE`（`req`）**先**建立，接著解析出對應的（早已存在、由 B4 建立的）
-`EPLC_ACCEPTANCE_REIMB_RECEIVABLE` 合約，對它建立自己的 `REIMBURSE`。Checker Release 依同樣順序
-釋放兩者。
+Maker Submit 只針對所選 Acceptance 建立一筆 PENDING `FULL_SETTLE`／`PARTIAL_SETTLE`。
+它不查找、建立、Reimburse 或 Release `EPLC_ACCEPTANCE_REIMB_RECEIVABLE`；Checker 也只 Release
+這一筆 Acceptance Settlement。
 
-| 數字 | Submit 時（兩腿都 PENDING） | Checker Release 時 |
+| 數字 | Submit 時（PENDING） | Checker Release 時 |
 |---|---|---|
 | Acceptance 的 Confirmed Balance | 不變 | **−= ceilingAmount** |
 | Acceptance 的 Available Balance | **−= ceilingAmount** | 不變（已經反映過了） |
-| Reimbursement Receivable 的 Confirmed Balance | 不變 | **−= ceilingAmount** |
-| Reimbursement Receivable 的 Available Balance | **−= ceilingAmount** | 不變（已經反映過了） |
 | Off-Balance Exposure／Tight Available（任一合約） | `null`——兩個 instrumentType 都不是 `IPLC_LC`／`EPLC_LC`／`EPLC_CONFIRMATION` | `null` |
 | Present Docs Earmark（P/A） | 不受影響——B5 從不碰 `EPLC_EXAMINATION` | 不受影響 |
 | SG（Pending／Approved） | N/A | N/A |
@@ -643,7 +640,7 @@ Confirmed Balance（可以是 0，絕不能是負數）；資格條件跟金額�
 | B2（Inc/Dec） | 自己的合約 | `null` | 自己的合約 | 不受影響 | — | — |
 | B3 | 對 Confirmed／Available 是 `null` 效果（MEMO_ONLY） | `null` | Confirmation（透過 Earmark） | **自己的合約，Release 時拆分** | — | — |
 | B4 | Confirmation ＋ 新的資產／負債合約 | `null` | Confirmation（Approved 桶被消費） | **Confirmation（Approved 下降）** | — | — |
-| B5 | Acceptance ＋ Receivable | `null` | `null` | 不受影響 | — | — |
+| B5 | 僅 Acceptance | `null` | `null` | 不受影響 | — | — |
 | B6 | 自己的合約（沖銷到 0） | `null` | 自己的合約 | —（只有在已經是 0 時才符合資格） | — | — |
 
 ---

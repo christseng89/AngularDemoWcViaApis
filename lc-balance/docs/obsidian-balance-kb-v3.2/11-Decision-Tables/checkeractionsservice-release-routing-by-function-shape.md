@@ -1,9 +1,9 @@
 ---
 knowledge_id: checkeractionsservice-release-routing-by-function-shape
-title: "CheckerActionsService.release() 按功能形态的路由方式"
+title: 'CheckerActionsService.release() 按功能形态的路由方式'
 domain: Balance
 category: Decision Table
-snapshot_date: 2026-08-22
+snapshot_date: 2026-09-01
 tags:
   - balance
   - decision-table
@@ -11,19 +11,16 @@ tags:
 
 # CheckerActionsService.release() 按功能形态的路由方式
 
-| FunctionStrategy 条件 | 适用对象 | 放行链路 | 成功后的结果类型 |
-|---|---|---|---|
-| checkerRelease.settlesDocumentArrival && sourceAlreadyReleasedBeforePick | B4（来源为 B3，已单独放行过） | resolveSettlesDocumentArrivalIds() -> releaseAcceptance()（先放行主分录，再分支至开证行应收分录 [HONOUR] 或 承兑负债+应收 分录 [ACCEPT]）——绝不重复放行来源分录 | released |
-| checkerRelease.settlesDocumentArrival && !sourceAlreadyReleasedBeforePick | A6（来源为远期单据到达，仅需确认） | resolveSettlesDocumentArrivalIds() -> 放行来源分录 -> releaseAcceptance() 放行新增的承兑主分录 | released |
-| compoundSubmission.possibleShapes 包含 'documentArrivalWithSg' | A3S | resolveLinkedMovementId(SG redeem) -> 放行 SG 赎回 -> 对来源 UTILIZE 调用 acknowledgeUtilize()（该分录从不放行） | documentArrivalAcknowledged |
-| movementDerivation.amountVsAvailableDerivation === 'SETTLE' | B5 | resolveLinkedMovementId(Reimburse) -> 放行承兑结算主分录 -> 放行匹配的偿付应收 | released |
-| 以上均不适用 | A1-A5（普通）、A7-A9、B1-B3 | 对 selectedCheckerMovement.movementId ?? submitResult.movementId 执行单一的普通 release() | released |
+| FunctionStrategy 条件                                        | 适用对象                             | 放行链路                                                     | 成功结果                    |
+| ------------------------------------------------------------ | ------------------------------------ | ------------------------------------------------------------ | --------------------------- |
+| `settlesDocumentArrival && sourceAlreadyReleasedBeforePick`  | B4                                   | 重验 B3 source 后执行 B4 compound release，不重复 release B3 | released                    |
+| `settlesDocumentArrival && !sourceAlreadyReleasedBeforePick` | A6                                   | 解析并处理 Document Arrival source，再 release Acceptance    | released                    |
+| `possibleShapes` 含 `documentArrivalWithSg`                  | A3S                                  | compound release SG redemption + LC UTILIZE                  | documentArrivalAcknowledged |
+| 以上均不适用                                                 | A1、A2、A3、A4、A7–A11、B1–B3、B5–B7 | 对 selected movement 执行一次普通 release                    | released                    |
 
-## 来源证据
+B5 不解析或 release Reimbursement Receivable。
 
-- `checker-actions.service.ts:49-128`
+## Source evidence
 
-## 相关知识
-
-- Angular Checker Panel + Actions
-- [[Business-Rule-Index]]
+- `src/app/transaction-builder/checker-actions.service.ts`
+- `src/app/transaction-builder/checker-actions.service.spec.ts`

@@ -112,7 +112,6 @@ export class TransactionBuilderComponent {
   private makerContext: MakerCheckerContext = {
     submitResult: null,
     selectedPayMovement: null,
-    matchedReceivableMovementId: null,
     dueFromIssuingBankMovementId: null,
     acceptanceMovementId: null,
     acceptanceReimbReceivableMovementId: null,
@@ -233,7 +232,6 @@ export class TransactionBuilderComponent {
     this.makerContext = {
       submitResult: null,
       selectedPayMovement: null,
-      matchedReceivableMovementId: null,
       dueFromIssuingBankMovementId: null,
       acceptanceMovementId: null,
       acceptanceReimbReceivableMovementId: null,
@@ -613,12 +611,6 @@ export class TransactionBuilderComponent {
     if (this.selectedFunctionStrategy?.compoundSubmission.possibleShapes.includes('documentArrivalWithSg')) {
       return this.selectedCheckerMovement.movementType === 'UTILIZE' && !!this.selectedCheckerMovement.businessEventId;
     }
-    if (this.selectedFunctionStrategy?.movementDerivation.amountVsAvailableDerivation === 'SETTLE') {
-      return (
-        (this.selectedCheckerMovement.movementType === 'FULL_SETTLE' || this.selectedCheckerMovement.movementType === 'PARTIAL_SETTLE') &&
-        !!this.selectedCheckerMovement.businessEventId
-      );
-    }
     if (this.selectedFunctionStrategy?.checkerRelease.settlesDocumentArrival) {
       return !!this.selectedCheckerMovement.referencedTransactionId;
     }
@@ -760,7 +752,6 @@ export class TransactionBuilderComponent {
       submitResult: this.makerContext.submitResult,
       selectedFunction: this.selectedFunction,
       selectedPayMovement: this.makerContext.selectedPayMovement,
-      matchedReceivableMovementId: this.makerContext.matchedReceivableMovementId,
       dueFromIssuingBankMovementId: this.makerContext.dueFromIssuingBankMovementId,
       acceptanceMovementId: this.makerContext.acceptanceMovementId,
       acceptanceReimbReceivableMovementId: this.makerContext.acceptanceReimbReceivableMovementId,

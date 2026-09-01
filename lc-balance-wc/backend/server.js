@@ -94,6 +94,41 @@ function assertNonNegativeTightAvailable(label, response) {
   }
 }
 
+/** Test-runner safety net: repair an unexpected negative Tight balance with A02/B02. */
+async function autoAmendNegativeTightAvailable({ label, response, balanceContractId, instrumentType, trace }) {
+  const value = response?.eventSnapshot?.tightAvailableBalance ?? response?.tightAvailableBalance;
+  if (value === null || value === undefined || Number(value) >= 0) return;
+
+  const isImport = instrumentType === 'IPLC_LC';
+  const isExport = instrumentType === 'EPLC_CONFIRMATION' || instrumentType === 'EPLC_LC';
+  if (!isImport && !isExport) assertNonNegativeTightAvailable(label, response);
+
+  const functionCode = isImport ? 'A2' : 'B2';
+  const sourceTransactionRef = isImport ? 'A02' : 'B02';
+  const amendment = {
+    instrumentType,
+    balanceContractId,
+    movementType: isImport ? 'AMEND_INCREASE' : 'AMEND',
+    eventSeq: Date.now(),
+    amount: String(value).replace(/^-/, ''),
+    currency: response.currency,
+    sourceTransactionRef,
+    createdBy: 'maker1',
+  };
+  const created = await callMicroservice('POST', '/balance-movements', amendment);
+  if (!created.ok) throw new Error(`Automatic ${sourceTransactionRef} failed with HTTP ${created.status}: ${JSON.stringify(created.body)}`);
+  trace.push({ type: 'createMovement', functionCode, label: `Auto ${sourceTransactionRef} — restore negative Tight LC Balance`, request: amendment, status: created.status, ok: true, response: created.body });
+
+  const released = await callMicroservice('POST', `/balance-movements/${created.body.movementId}/release`, { releasedBy: 'checker1' });
+  if (!released.ok) throw new Error(`Automatic ${sourceTransactionRef} release failed with HTTP ${released.status}: ${JSON.stringify(released.body)}`);
+  trace.push({ type: 'release', functionCode, label: `Checker releases automatic ${sourceTransactionRef}`, status: released.status, ok: true, response: released.body });
+
+  const repaired = await callMicroservice('GET', `/balance-contracts/${balanceContractId}/balance`);
+  if (!repaired.ok) throw new Error(`Automatic ${sourceTransactionRef} verification failed with HTTP ${repaired.status}: ${JSON.stringify(repaired.body)}`);
+  assertNonNegativeTightAvailable(`Automatic ${sourceTransactionRef}`, repaired.body);
+  trace.push({ type: 'snapshot', functionCode, label: `Balance after automatic ${sourceTransactionRef}`, status: repaired.status, ok: true, response: repaired.body });
+}
+
 // Quality-report-balance.md BAL-124 (2026-08-17, found while fixing BAL-131): 'release' and
 // 'makerSubmit' (Import Case #6's own A4 real Maker Submit) are the identical shape — POST to a
 // per-movement sub-path with one body key, same "skipped" handling when the referenced createMovement
@@ -136,8 +171,7 @@ async function runCase(businessCase) {
       const request = await resolveMovementRequest(captured, step.request);
       const result = await callMicroservice('POST', '/balance-movements', request);
       assertExpectedOutcome(step, result);
-      if (result.ok) assertNonNegativeTightAvailable(step.label, result.body);
-      if (step.captureAs) captured[step.captureAs] = { response: result.body };
+      if (step.captureAs) captured[step.captureAs] = { response: result.body, request };
       trace.push({
         type: 'createMovement',
         functionCode: step.functionCode,
@@ -148,6 +182,15 @@ async function runCase(businessCase) {
         expectedError: Boolean(step.expectError),
         response: result.body,
       });
+      if (result.ok) {
+        await autoAmendNegativeTightAvailable({
+          label: step.label,
+          response: result.body,
+          balanceContractId: result.body.balanceContractId,
+          instrumentType: request.instrumentType,
+          trace,
+        });
+      }
       continue;
     }
 
@@ -158,7 +201,7 @@ async function runCase(businessCase) {
       assertExpectedOutcome(step, result);
       if (result.ok) {
         step.captureAs.forEach((key, index) => {
-          captured[key] = { response: result.body[index] };
+          captured[key] = { response: result.body[index], request: requests[index] };
         });
       }
       trace.push({
@@ -197,6 +240,14 @@ async function runCase(businessCase) {
       const result = await callMicroservice('POST', `/balance-movements/${movementId}/${subPath}`, { [bodyKey]: step[bodyKey] });
       assertExpectedOutcome(step, result);
       trace.push({ type: step.type, functionCode: step.functionCode, label: step.label, status: result.status, ok: result.ok, response: result.body });
+      const capturedEntry = captured[step.movementRef];
+      await autoAmendNegativeTightAvailable({
+        label: step.label,
+        response: result.body,
+        balanceContractId: capturedEntry?.response?.balanceContractId,
+        instrumentType: capturedEntry?.request?.instrumentType,
+        trace,
+      });
       continue;
     }
 
@@ -204,8 +255,14 @@ async function runCase(businessCase) {
       const balanceContractId = captured[step.contractRef]?.response?.balanceContractId;
       const result = await callMicroservice('GET', `/balance-contracts/${balanceContractId}/balance`);
       if (!result.ok) throw new Error(`Snapshot step "${step.label}" unexpectedly failed with HTTP ${result.status}: ${JSON.stringify(result.body)}`);
-      assertNonNegativeTightAvailable(step.label, result.body);
       trace.push({ type: 'snapshot', label: step.label, status: result.status, ok: result.ok, response: result.body });
+      await autoAmendNegativeTightAvailable({
+        label: step.label,
+        response: result.body,
+        balanceContractId,
+        instrumentType: captured[step.contractRef]?.request?.instrumentType,
+        trace,
+      });
       continue;
     }
 

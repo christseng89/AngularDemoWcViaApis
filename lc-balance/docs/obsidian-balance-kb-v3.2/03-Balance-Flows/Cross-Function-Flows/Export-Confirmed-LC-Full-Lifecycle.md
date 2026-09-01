@@ -1,12 +1,12 @@
 ---
 knowledge_id: Export-Confirmed-LC-Full-Lifecycle
-title: "出口保兌信用狀完整生命週期（Export Confirmed LC Full Lifecycle）"
+title: '出口保兌信用狀完整生命週期（Export Confirmed LC Full Lifecycle）'
 domain: Balance
 category: Flow
 status: CONFIRMED
 source_repository: Balance Component (lc-balance)
-last_verified_commit: "N/A — no .git history in the analyzed snapshot, see [[Source-to-Knowledge-Map]]"
-snapshot_date: 2026-08-30
+last_verified_commit: 'N/A — no .git history in the analyzed snapshot, see [[Source-to-Knowledge-Map]]'
+snapshot_date: 2026-09-01
 tags:
   - balance
   - flow
@@ -29,14 +29,14 @@ tags:
 
 ## 生命週期階段總覽
 
-| 階段 | 功能代碼 | instrumentType / movementType | 是否必要 | 銜接前置條件 |
-|---|---|---|---|---|
-| 保兌 | [[B1-Confirm-LC\|B1]] | `EPLC_CONFIRMATION` / `ISSUE` | 必要（起點） | 無——建立根合約，保兌行對受益人的獨立承諾 |
-| 修改 | [[B2-Confirm-LC-Amendment\|B2]] | `EPLC_CONFIRMATION` / `AMEND`（帶符號金額表達 Increase／Decrease） | 可選，可重複 | B1 的 ISSUE 已 RELEASED |
-| 交單 | [[B3-Present-Docs\|B3]] | `EPLC_EXAMINATION` / `CREATE` | 必要，可依批次重複 | B1 的 ISSUE 已 RELEASED；未超出 Present Docs Earmark 調整後的 Tight Available Balance |
-| 兌付／承兌 | [[B4-Honour-Acceptance\|B4]] | `EPLC_CONFIRMATION` / `HONOUR`（Sight）或 `ACCEPT`（Usance）——由所選 Confirmation 自身 tenorType 伺服端推導 | 必要（每筆已 RELEASED 的 B3 都需要對應一次 B4） | 對應的 B3 記錄已真正 RELEASED 且尚未被消耗 |
-| 結算（償付／到期） | [[B5-Settlement-Reimbursement-Maturity\|B5]] | `EPLC_ACCEPTANCE` / `FULL_SETTLE`／`PARTIAL_SETTLE`（複合，另含 `EPLC_ACCEPTANCE_REIMB_RECEIVABLE` / `REIMBURSE`） | 僅 Usance（B4 走 ACCEPT）分支需要，可重複至歸零 | B4 的 Usance 分支已建立並 RELEASED 的 `EPLC_ACCEPTANCE` |
-| 結案 | [[B6-Confirmed-LC-Close\|B6]] | `EPLC_CONFIRMATION` / `CLOSE` | 必要（終點） | Acceptance 子項合計 = 0；樹中無未結事件（含已 RELEASED 但尚未被 B4 消耗的 B3）；尚未 CLOSED |
+| 階段         | 功能代碼                                     | instrumentType / movementType                                                                               | 是否必要                                        | 銜接前置條件                                                                                |
+| ------------ | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| 保兌         | [[B1-Confirm-LC\|B1]]                        | `EPLC_CONFIRMATION` / `ISSUE`                                                                               | 必要（起點）                                    | 無——建立根合約，保兌行對受益人的獨立承諾                                                    |
+| 修改         | [[B2-Confirm-LC-Amendment\|B2]]              | `EPLC_CONFIRMATION` / `AMEND`（帶符號金額表達 Increase／Decrease）                                          | 可選，可重複                                    | B1 的 ISSUE 已 RELEASED                                                                     |
+| 交單         | [[B3-Present-Docs\|B3]]                      | `EPLC_EXAMINATION` / `CREATE`                                                                               | 必要，可依批次重複                              | B1 的 ISSUE 已 RELEASED；未超出 Present Docs Earmark 調整後的 Tight Available Balance       |
+| 兌付／承兌   | [[B4-Honour-Acceptance\|B4]]                 | `EPLC_CONFIRMATION` / `HONOUR`（Sight）或 `ACCEPT`（Usance）——由所選 Confirmation 自身 tenorType 伺服端推導 | 必要（每筆已 RELEASED 的 B3 都需要對應一次 B4） | 對應的 B3 記錄已真正 RELEASED 且尚未被消耗                                                  |
+| 结算（到期） | [[B5-Settlement-Reimbursement-Maturity\|B5]] | `EPLC_ACCEPTANCE` / `FULL_SETTLE` 或 `PARTIAL_SETTLE`（单一 movement）                                      | 仅 Usance（B4 走 ACCEPT）分支需要，可重复至归零 | B4 Usance 分支已建立并 RELEASED 的 `EPLC_ACCEPTANCE`                                        |
+| 結案         | [[B6-Confirmed-LC-Close\|B6]]                | `EPLC_CONFIRMATION` / `CLOSE`                                                                               | 必要（終點）                                    | Acceptance 子項合計 = 0；樹中無未結事件（含已 RELEASED 但尚未被 B4 消耗的 B3）；尚未 CLOSED |
 
 ## Mermaid 流程圖
 
@@ -64,7 +64,7 @@ flowchart TD
 
     DUE_FROM --> DUE_FROM_NOTE["實際收款／結算 EPLC_DUE_FROM_ISSUING_BANK<br/>不屬於本圖任何具名功能的既定範圍<br/>（UNCLEAR，見下方說明）"]
 
-    B5_CREATE --> B5_DO["B5 Settlement — Reimbursement／Maturity<br/>POST /balance-movements/compound<br/>EPLC_ACCEPTANCE FULL/PARTIAL_SETTLE ＋ EPLC_ACCEPTANCE_REIMB_RECEIVABLE REIMBURSE<br/>整组原子成功或回滚"]
+    B5_CREATE --> B5_DO["B5 Acceptance Settlement／Maturity<br/>POST /balance-movements<br/>EPLC_ACCEPTANCE FULL/PARTIAL_SETTLE<br/>不处理 Reimbursement Receivable"]
     B5_DO --> B5_CHK{"Acceptance 餘額<br/>是否已歸零？"}
     B5_CHK -- 否（Partial Settle） --> B5_DO
     B5_CHK -- 是 --> MERGE
@@ -88,7 +88,7 @@ flowchart TD
 
 ## UNCLEAR／已知落差（如實標註，不臆測）
 
-- **Sight 分支（HONOUR）之後，`EPLC_DUE_FROM_ISSUING_BANK` 的實際收款／結算不在本流程圖任何具名功能之內**：[[B4-Honour-Acceptance]] 自身文字稱「實際收款留待 B5，且屬 Balance Component 範疇外」，但 [[B5-Settlement-Reimbursement-Maturity]] 自身的 `catalogTenorFilter` 明確限定為 `USANCE`——兩份筆記對「Sight 收款是否走 B5」的文字描述並不完全一致。本圖如實呈現兩者原文，不代為調解此落差，標註為 CONFLICT／UNCLEAR，任務指示的「B5（僅限 Usance 情境，可選）」與 B5 自身 `catalogTenorFilter: USANCE` 的定義一致，故本圖按此處理：Sight 分支的資產收款/結算步驟在 Balance Component 具名功能之外，不畫入 B5。
+- **Sight 分支（HONOUR）之后，`EPLC_DUE_FROM_ISSUING_BANK` 的实际收款／结算不属于任何 Balance Component 具名功能。** B5 明确只结算 Usance `EPLC_ACCEPTANCE`，不处理 Sight asset 或 Reimbursement Receivable。
 - **Channel API 尚未收錄 B6**：`balance-component-channel-api.yaml` 的 `POST /channel/transactions` functionCode 列舉僅含 `A1, A2, A3, A3S, A4, A6, A7, A8, A9, B1, B2, B3, B4, B5`，並不含 B6；B6 目前僅能透過微服務層 API 呼叫，Channel API 門面尚未同步——已在 [[B6-Confirmed-LC-Close]] 中核實，本圖 B6 節點的 API 描述以微服務層為準。
 - **多批次交單下 B3／B4 的交錯順序**：本圖僅呈現單一批次的最簡代表性路徑；技術筆記中未見對多批次交叉排序的專屬業務規則說明，標註 UNCLEAR，不予臆測。
 - **B2（Amendment）在生命週期中的精確可執行時間窗**：本圖將 B2 畫在 B3 之前，但 B2 實際上只要求 B1 的 ISSUE 已 RELEASED，理論上可在整個 Confirmation ACTIVE 期間隨時執行；圖中位置僅為可讀性安排，非嚴格時序限制。
@@ -102,7 +102,7 @@ flowchart TD
 - [[B4-Honour-Acceptance]]
 - [[B5-Settlement-Reimbursement-Maturity]]
 - [[B6-Confirmed-LC-Close]]
-- [[a6-b4-b5-compound-linked-leg-release-pattern]] — B4/B5 複合終結來源記錄的通用骨架
+- [[a6-b4-b5-compound-linked-leg-release-pattern]] — A6/B4 关联腿与 B5 单腿结算对照
 - [[b3-genuinely-releases-the-removed-acknowledge-only-design]] — B3 由舊有 acknowledge()-only 設計改為真正 release 的背景
 - [[b3-b4-compound-release-export-present-docs-honour-accept]] — B3→B4 交單到兌付/承兌的複合放行細節
 - [[a10-b6-close-write-off-lifecycle]] — A10/B6 核銷生命週期通用模式

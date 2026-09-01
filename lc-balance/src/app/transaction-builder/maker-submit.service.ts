@@ -1,13 +1,13 @@
 import { Injectable } from '@angular/core';
 import { defer, Observable, of } from 'rxjs';
-import { catchError, map, switchMap } from 'rxjs/operators';
+import { catchError, map } from 'rxjs/operators';
 import { BalanceComponentApiService, BalanceContract, BalanceMovement, BalanceSnapshot, CreateMovementRequest } from './balance-component-api.service';
 import { InstrumentType, TransactionFunction } from './balance-component.model';
 import { describeApiError } from './api-error';
 import { deriveFunctionStrategy } from './function-strategy';
 
 /**
- * BAL-003 — the Maker submission shapes (A3S/B3-Sight/B4-Usance/B5 compound + the default single-call
+ * BAL-003 — the Maker submission shapes (A3S/B4 compound + the default single-call
  * path), extracted from `TransactionBuilderComponent`. Owns only the API-call orchestration; depends
  * solely on `MakerSubmitContext` (Interface Segregation) and the API client, never on the component.
  * Never mutates UI state — resolves to one `MakerSubmitOutcome`, which the component's own
@@ -45,7 +45,6 @@ export interface MakerSubmitSecondary {
   acceptanceMovementId?: string;
   acceptanceMovement?: BalanceMovement;
   acceptanceReimbReceivableMovementId?: string;
-  matchedReceivableMovementId?: string;
 }
 
 /**
@@ -83,9 +82,6 @@ export class MakerSubmitService {
     }
     if (strategy?.compoundSubmission.possibleShapes.includes('confirmationAcceptWithReceivable') && ctx.selectedContract) {
       return this.submitConfirmationAcceptWithReceivable(req, ctx);
-    }
-    if (strategy?.movementDerivation.amountVsAvailableDerivation === 'SETTLE' && ctx.model.instrumentType === 'EPLC_ACCEPTANCE' && ctx.selectedContract) {
-      return this.submitAcceptanceSettleWithReceivable(req, ctx);
     }
     return this.submitPlain(req);
   }
@@ -181,36 +177,6 @@ export class MakerSubmitService {
       })),
       catchError((err) => of<MakerSubmitOutcome>({ kind: 'failed', message: describeApiError(err), cause: err, secondary: {} })),
     );
-  }
-
-  /** B5's Usance/CNF_MATURE branch only — `req` (the Acceptance's own FULL_SETTLE/PARTIAL_SETTLE) first, then resolves the matching EPLC_ACCEPTANCE_REIMB_RECEIVABLE contract and REIMBURSEs it. */
-  private submitAcceptanceSettleWithReceivable(req: CreateMovementRequest, ctx: MakerSubmitContext): Observable<MakerSubmitOutcome> {
-    const businessEventId = crypto.randomUUID();
-    req.businessEventId = businessEventId;
-    const acceptanceContract = ctx.selectedContract!;
-    return this.api
-      .resolveContract('EPLC_ACCEPTANCE_REIMB_RECEIVABLE', {
-        lcNumber: acceptanceContract.naturalKey.lcNumber,
-        ibNumber: acceptanceContract.naturalKey.ibNumber,
-      })
-      .pipe(
-        switchMap((receivableContract) => {
-          const reimbReq: CreateMovementRequest = {
-            instrumentType: 'EPLC_ACCEPTANCE_REIMB_RECEIVABLE',
-            balanceContractId: receivableContract.balanceContractId,
-            movementType: 'REIMBURSE',
-            eventSeq: Date.now(),
-            amount: String(ctx.model.amount),
-            currency: ctx.model.currency!,
-            createdBy: ctx.model.createdBy!,
-            businessEventId,
-          };
-          return this.api.createCompoundMovements([req, reimbReq]).pipe(
-            map(([result, reimb]) => ({ kind: 'submitted' as const, result: result!, secondary: { matchedReceivableMovementId: reimb!.movementId } })),
-          );
-        }),
-        catchError((err) => of<MakerSubmitOutcome>({ kind: 'failed', message: describeApiError(err), cause: err, secondary: {} })),
-      );
   }
 
   /** The default single-call path — every function that doesn't need one of the four compound shapes above. */

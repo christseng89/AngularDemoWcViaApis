@@ -1,6 +1,6 @@
 # Balance Component — Balance Figure Calculation & Update Logic
 
-> 2026-08-30 sync: the current function scope is A1–A11/B1–B7 (A5 remains unused).
+> Current Import scope: A1, A2, A3, A3S, A4, A6, A7, A8, A9, A10, A11. Export scope: B1–B7.
 > Tight Available Balance cannot be negative; A3S is capped by Tight Available
 > plus the selected SG outstanding. See `../docs/current-behavior.md`.
 
@@ -251,7 +251,7 @@ movement from `PENDING` → `RELEASED` has a highly specific, non-obvious effect
   A4's own picker additionally excludes a UTILIZE it has already Maker-Submitted itself
   (`makerSubmittedAt` set) — nothing left for A4's own Maker step either.
 
-**Compound functions** (A3S, A6, B4, B5) touch **more than one contract's row** at once — called out
+**Compound functions** (A3S, A6, B4) touch **more than one contract's row** at once — called out
 explicitly, leg by leg, in their own tables below.
 
 ---
@@ -598,12 +598,11 @@ un-netted, strict `-10000` figure (the provisional exception never leaks to a di
 | SG (Pending / Approved) | N/A | N/A |
 | Document Arrival (Pending / Approved) | N/A — Import-only concept | N/A |
 
-### B5 — Settlement — Reimbursement / Maturity (`EPLC_ACCEPTANCE` / `FULL_SETTLE` or `PARTIAL_SETTLE` — compound, Usance-held-to-maturity only)
+### B5 — Settlement / Maturity (`EPLC_ACCEPTANCE` / `FULL_SETTLE` or `PARTIAL_SETTLE` — Usance-held-to-maturity only)
 
-Maker Submit creates **2 linked movements together** (PENDING): the Acceptance's own `FULL_SETTLE`/
-`PARTIAL_SETTLE` (`req`) **first**, then resolves the matching (already-existing, B4-created)
-`EPLC_ACCEPTANCE_REIMB_RECEIVABLE` contract and creates its own `REIMBURSE` against it. Checker Release
-releases both in the same order.
+Maker Submit creates one PENDING `FULL_SETTLE`/`PARTIAL_SETTLE` movement against the selected
+Acceptance. It does not look up, create, reimburse, or release an `EPLC_ACCEPTANCE_REIMB_RECEIVABLE`.
+Checker Release releases that Acceptance settlement only.
 
 | Figure | At Submit (both legs PENDING) | At Checker Release |
 |---|---|---|
@@ -661,7 +660,7 @@ match are both re-checked at Approve.
 | B2 (Inc/Dec) | own contract | `null` | own contract | unaffected | — | — |
 | B3 | `null` effect on Confirmed/Available (MEMO_ONLY) | `null` | Confirmation (via Earmark) | **own contract, splits at Release** | — | — |
 | B4 | Confirmation + new asset/liability contract(s) | `null` | Confirmation (Approved bucket consumed) | **Confirmation (Approved drops)** | — | — |
-| B5 | Acceptance + Receivable | `null` | `null` | unaffected | — | — |
+| B5 | Acceptance only | `null` | `null` | unaffected | — | — |
 | B6 | own contract (writes off to 0) | `null` | own contract | — (only eligible once already 0) | — | — |
 
 ---

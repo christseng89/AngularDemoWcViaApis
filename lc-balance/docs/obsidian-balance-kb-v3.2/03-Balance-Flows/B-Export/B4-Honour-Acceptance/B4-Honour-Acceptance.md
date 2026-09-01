@@ -1,16 +1,16 @@
 ---
 knowledge_id: B4-Honour-Acceptance
-title: "B4 — 兌付／承兌（Honour/Acceptance）"
+title: 'B4 — 兌付／承兌（Honour/Acceptance）'
 domain: Balance
 category: Function Analysis
 function_code: B4
 function_direction: Export
 instrument_type: EPLC_CONFIRMATION
-movement_type: "HONOUR | ACCEPT（由所選 Confirmation 自身的 tenorType 伺服端推導，從不由 Maker 手動選擇）"
+movement_type: 'HONOUR | ACCEPT（由所選 Confirmation 自身的 tenorType 伺服端推導，從不由 Maker 手動選擇）'
 status: CONFIRMED
 source_repository: Balance Component (lc-balance)
-last_verified_commit: "N/A — no .git history in the analyzed snapshot, see [[Source-to-Knowledge-Map]]"
-snapshot_date: 2026-08-30
+last_verified_commit: 'N/A — no .git history in the analyzed snapshot, see [[Source-to-Knowledge-Map]]'
+snapshot_date: 2026-09-01
 tags:
   - balance
   - function-analysis
@@ -28,15 +28,15 @@ tags:
 
 ## 功能摘要
 
-| 項目 | 內容 |
-|---|---|
-| 功能代碼 | B4 |
-| 功能說明（原始 label） | Honour / Acceptance |
-| instrumentType | `EPLC_CONFIRMATION` |
-| movementType | `HONOUR`（Sight）／`ACCEPT`（Usance）——B4 是唯一一個真實 movementType 於 Submit 時由所選 Confirmation 合約自身的 `tenorType` 讀取推導、而非在註冊表中固定或透過 `subChoice` 選擇的功能（[[MOVEMENT-RULE-019]]） |
-| subChoice | 無——B4 沒有 `subChoice` 欄位，Sight/Usance 由 Tenor Type 自動判定，統一為單一法律事件步驟 |
-| 所屬方向 | Export（出口） |
-| 所屬母層功能 | B1（`EPLC_CONFIRMATION` 由 B1 建立）／B3（`pendingItemSourceCode: 'B3'`，Present Docs 必須先由 B3 建立並經 Checker 真正 RELEASED） |
+| 項目                       | 內容                                                                                                                                                                                                                                                                                                                                                                          |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 功能代碼                   | B4                                                                                                                                                                                                                                                                                                                                                                            |
+| 功能說明（原始 label）     | Honour / Acceptance                                                                                                                                                                                                                                                                                                                                                           |
+| instrumentType             | `EPLC_CONFIRMATION`                                                                                                                                                                                                                                                                                                                                                           |
+| movementType               | `HONOUR`（Sight）／`ACCEPT`（Usance）——B4 是唯一一個真實 movementType 於 Submit 時由所選 Confirmation 合約自身的 `tenorType` 讀取推導、而非在註冊表中固定或透過 `subChoice` 選擇的功能（[[MOVEMENT-RULE-019]]）                                                                                                                                                               |
+| subChoice                  | 無——B4 沒有 `subChoice` 欄位，Sight/Usance 由 Tenor Type 自動判定，統一為單一法律事件步驟                                                                                                                                                                                                                                                                                     |
+| 所屬方向                   | Export（出口）                                                                                                                                                                                                                                                                                                                                                                |
+| 所屬母層功能               | B1（`EPLC_CONFIRMATION` 由 B1 建立）／B3（`pendingItemSourceCode: 'B3'`，Present Docs 必須先由 B3 建立並經 Checker 真正 RELEASED）                                                                                                                                                                                                                                            |
 | 是否為複合提交（compound） | 是——`payableMovementType: 'CREATE'`、`payableMovementInstrumentType: 'EPLC_EXAMINATION'`。Sight 為 2 段（HONOUR + `EPLC_DUE_FROM_ISSUING_BANK` CREATE）；Usance 為 4 段（ACCEPT + `EPLC_ACCEPTANCE` CREATE + `EPLC_ACCEPTANCE_REIMB_RECEIVABLE` CREATE，外加所轉換的 B3 記錄本身以副作用形式被消耗，不再重複 Release）（`balance-component-channel-api.yaml` `compoundLegs`） |
 
 以上定義已用 Read 工具核實於 `/home/claude/balance-kb/repo/src/app/transaction-builder/balance-component.model.ts`（`EXPORT_FUNCTIONS` 陣列，`code === 'B4'` 項，第 463–476 行）；`balance-component-channel-api.yaml` 中 `GET /channel/functions` 的 `B4` 條目（第 956–969 行）與之一致，並額外確認 `hasParent: false`、`currencyMode: CARRIED`、`submitsTransaction: true`、`secondaryRefLabel: "EB Number"`。CONFIRMED。
@@ -68,7 +68,7 @@ UNCLEAR：兩份規範中未見到 B4 專屬（named）路徑，僅有以上通�
 
 - **Classification（分類）**：instrumentType=`EPLC_CONFIRMATION`；movementType 由 Confirmation 自身 tenorType 推導——Sight → `HONOUR`，其餘（Usance）一律 → `ACCEPT`，將源規格 Sight/Buyer's Usance/Seller's Usance 三分歸併為 Sight/Usance 二分，不區分源規格所稱 Buyer's Usance 的「Case 1」（即期兌付、不生 Acceptance）與「Case 2」（承兌延付、生 Acceptance）——每一筆非 Sight 的 Confirmation 一律走 Acceptance 路徑（[[MOVEMENT-RULE-058]]）。CONFIRMED。movementTypeMatchesFunction/resolveFunctionForMovement 的 `derivesMovementTypeFromTenor` 分支僅為 B4 匹配 `HONOUR`/`ACCEPT`，明確不匹配 `CLOSE`（避免誤吞併 B6 事件）（[[MOVEMENT-RULE-024]]）。CONFIRMED。
 
-- **Business Decision（業務決策）**：Sight 分支（HONOUR）釋放 Confirmation 或有敞口，建立 `EPLC_DUE_FROM_ISSUING_BANK` 表內資產（實際收款留待 B5，且屬 Balance Component 範疇外）；Usance 分支（ACCEPT）釋放 Confirmation 或有敞口，同時建立 `EPLC_ACCEPTANCE`（表內負債）與其配對的 `EPLC_ACCEPTANCE_REIMB_RECEIVABLE`（表內資產），是一次橫跨 Folio 4（保兌或有）與 Folio 5（承兌影子備忘）的複合「釋放+建立」，與 A6「一次 Release 完成兩件事」模式相符（[[MOVEMENT-RULE-060]]）。CONFIRMED。承兌/DPU 在承兌發生當下即以表內、全額方式確認，並非僅記備忘（源規格書設計原理，[[EXPOSURE-RULE-020]]）。CONFIRMED。
+- **Business Decision（业务决策）**：Sight 分支（HONOUR）释放 Confirmation 或有敞口并建立 `EPLC_DUE_FROM_ISSUING_BANK`；其实际收款属于 Balance Component 范畴外，不走 B5。Usance 分支（ACCEPT）释放 Confirmation 或有敞口，同时建立 `EPLC_ACCEPTANCE` 与配对的 `EPLC_ACCEPTANCE_REIMB_RECEIVABLE`。B5 后续只结算 Acceptance，不处理该 Receivable。CONFIRMED。
 
 - **Balance/Exposure Decision（表內 vs 表外）**：主段（HONOUR/ACCEPT）釋放 `EPLC_CONFIRMATION` 的或有敞口（Folio 4，依 tenor 加後綴的科目族，[[EXPOSURE-RULE-007]]）；資產/負債段（`EPLC_DUE_FROM_ISSUING_BANK`／`EPLC_ACCEPTANCE`／`EPLC_ACCEPTANCE_REIMB_RECEIVABLE`）屬表內或影子備忘性質，其中 Acceptance/Reimb Receivable 一組屬 Folio 5 影子備忘配對（供 MIS/MT 對帳），真正的表內負債/資產分錄由範疇外的另一元件記錄（[[EXPOSURE-RULE-020]]、[[EXPOSURE-RULE-007]]）。CONFIRMED。B4 仍處於 PENDING 狀態的 HONOUR/ACCEPT，會臨時抵扣其所引用的 B3 記錄——但**僅限展示/讀取路徑**（`assembleSnapshot()` 內的 `derivePresentDocsProvisionallyConsumedIds()`），任何全新、無關的 B3 交單充足性檢查與 B2 的 AMEND_DECREASE 檢查均維持嚴格、不享有此抵扣（[[EXPOSURE-RULE-005]]、[[BALANCE-RULE-010]]）。CONFIRMED。
 
@@ -103,16 +103,17 @@ flowchart TD
   H2 --> I
   I --> J["Release 主段：\nHONOUR/ACCEPT PENDING→RELEASED\n（副作用：設定所引用 B3 記錄的\npresentDocsConsumedAt，不重複放行 B3）"]
   J --> K{"Sight 或 Usance？"}
-  K -->|Sight| L1["Release 第2段：\n建立 EPLC_DUE_FROM_ISSUING_BANK\n（表內資產，供 B5 收款）"]
+  K -->|Sight| L1["Release 第2段：\n建立 EPLC_DUE_FROM_ISSUING_BANK\n（实际收款在 Balance Component 范畴外）"]
   K -->|Usance| L2["Release 第2段：建立 EPLC_ACCEPTANCE\n（Folio4 或有→Folio5 表內負債）"]
   L2 --> L3["Release 第3段：建立\nEPLC_ACCEPTANCE_REIMB_RECEIVABLE\n（配對表內資產，影子備忘）"]
-  L1 --> M(["完成：Confirmation 或有敞口釋放；\nPresent Docs Earmark 占用解除；\n新資產/負債記錄可供 B5 結算"])
+  L1 --> M(["完成：Confirmation 或有敞口释放；\nPresent Docs Earmark 占用解除；\n只有 Acceptance 可供 B5 结算"])
   L3 --> M
 ```
 
 ## 交叉引用（Related Knowledge）
 
 相關業務規則：
+
 - [[MOVEMENT-RULE-019]] — B4 的 movementType 由 Confirmation 自身 tenorType 推導，從不由用戶手動選擇
 - [[MOVEMENT-RULE-024]] — movementTypeMatchesFunction 的 derivesMovementTypeFromTenor 分支只為 B4 匹配 HONOUR/ACCEPT，不匹配 CLOSE
 - [[MOVEMENT-RULE-032]] — 'finalize' 階段事件解析回其終結功能（A4/B4），而非通用產生方

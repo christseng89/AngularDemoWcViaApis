@@ -99,7 +99,7 @@ export class BusinessCaseRunnerComponent implements OnInit {
     next();
   }
 
-  /** Standalone — does not read/touch run()/runAll()'s own state (result/allResults/running/runningAll). */
+  /** Cleanup also clears stale case traces after the database is empty. */
   resetDatabase(): void {
     if (!confirm('This permanently deletes ALL Balance Contracts and Movements from the database. Continue?')) return;
     this.resettingDatabase = true;
@@ -107,6 +107,9 @@ export class BusinessCaseRunnerComponent implements OnInit {
     this.api.resetDatabase().subscribe({
       next: () => {
         this.resettingDatabase = false;
+        this.result = null;
+        this.allResults = [];
+        this.loadError = null;
         this.resetDatabaseMessage = 'Database tables cleaned up.';
       },
       error: (err) => {

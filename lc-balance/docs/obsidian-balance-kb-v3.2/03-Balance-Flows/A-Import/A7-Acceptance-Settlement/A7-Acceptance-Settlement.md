@@ -1,16 +1,16 @@
 ---
 knowledge_id: A7-Acceptance-Settlement
-title: "A7 —— 承兌結算（Acceptance Settlement）功能分析"
+title: 'A7 —— 承兌結算（Acceptance Settlement）功能分析'
 domain: Balance
 category: Function Analysis
 function_code: A7
 function_direction: Import
 instrument_type: IPLC_ACCEPTANCE
-movement_type: "FULL_SETTLE / PARTIAL_SETTLE"
+movement_type: 'FULL_SETTLE / PARTIAL_SETTLE'
 status: CONFIRMED
 source_repository: Balance Component (lc-balance)
-last_verified_commit: "N/A — no .git history in the analyzed snapshot, see [[Source-to-Knowledge-Map]]"
-snapshot_date: 2026-08-22
+last_verified_commit: 'N/A — no .git history in the analyzed snapshot, see [[Source-to-Knowledge-Map]]'
+snapshot_date: 2026-09-01
 tags:
   - balance
   - function-analysis
@@ -62,7 +62,7 @@ tags:
    - Channel API 面向：非 A1/B1 的 functionCode（含 A7）一律禁止在請求體中出現 `currency` 欄位，Currency Code 由母 LC 沿用（僅規格層要求，微服務尚未強制執行）（[[MAKER-CHECKER-RULE-049]]）。
 
 4. **Classification（分類）** —— CONFIRMED
-   `instrumentType = IPLC_ACCEPTANCE`，`movementType ∈ {FULL_SETTLE, PARTIAL_SETTLE}`。A6/A7 是目前 `IPLC_ACCEPTANCE`/`EPLC_ACCEPTANCE` 唯一存在的三種 movementType（`CREATE`/`PARTIAL_SETTLE`/`FULL_SETTLE`）中，A7 專司後兩者（[[MOVEMENT-RULE-044]]：Acceptance 一經承兌即不可撤銷，不存在任何 `*_AMD_*` 修改類事件）。**與 Export 對應功能 B5 的重要不對稱**（CONFIRMED，`function-strategy.ts` 行 128 vs. 150-156）：B5（`EPLC_ACCEPTANCE`）的 `amountVsAvailableDerivation` 為 `'SETTLE'`，Full/Partial 由 Amount 與 Available Balance 的比較關係在提交時自動推導，且屬於複合提交（`acceptanceSettleWithReceivable`，同時結清 Acceptance 與其連動的 Reimbursement Receivable）；A7（`IPLC_ACCEPTANCE`）則是 `NO_SPECIAL_BEHAVIOR`——Full/Partial 由 Maker 直接於 subChoice 手動挑選，提交形態為單純的 `plain`，不涉及任何連動 Receivable 動帳。
+   `instrumentType = IPLC_ACCEPTANCE`，`movementType ∈ {FULL_SETTLE, PARTIAL_SETTLE}`。A7 由 Maker 直接选择 Full/Partial；B5 则按输入 Amount 与 Available Balance 自动推导 Full/Partial。两者当前都使用 `plain` 单一 movement，B5 不再联动 Reimbursement Receivable。
 
 5. **Business Decision（業務決策）** —— CONFIRMED
    - **Maker Submit**：`POST /balance-movements`，對既有 `IPLC_ACCEPTANCE` 合約建立一筆新的 PENDING `FULL_SETTLE`/`PARTIAL_SETTLE` 動帳（非建立新合約）。
@@ -114,14 +114,16 @@ flowchart TD
 ## 交叉引用（Related Knowledge）
 
 **Maker/Checker 相關規則**
+
 - [[MAKER-CHECKER-RULE-019]] —— 自然鍵（LC/IB/SG Number）解析依功能形態而異：A7/A9/B5 共用「selectedContract 回退至雙欄位 searchNaturalKey」形態
 - [[MAKER-CHECKER-RULE-023]] —— hasEligibleTargetSelected：A7 屬於「其餘非建立類功能」的通用 selectedContract 鎖定分支
 - [[MOVEMENT-RULE-083]] —— 2026-08-26 新增：A7 自身 Step 1（LC Index）的 Acceptance 餘額資格閘門（`requiresEligibleParentAcceptance`），與 A3S/A9 的 SG 餘額資格閘門同一形態
 - [[MAKER-CHECKER-RULE-049]] —— Channel API 對非 A1/B1（含 A7）的 functionCode 一律禁止輸入 Currency Code
 
 **狀態／曝險／過帳相關規則**
+
 - [[EXPOSURE-RULE-019]] —— Acceptance/DPU 是影子備忘分錄，`exposureNature=ACTUAL` 而非 `CONTINGENT`；涵蓋 A7 的 `FULL_SETTLE`/`PARTIAL_SETTLE`
-- [[EXPOSURE-RULE-025]] —— B5（Export 對應功能）結算的影子配對反轉規則，供對照 A7 與 B5 的異同（B5 為自動推導＋複合提交，A7 為手動挑選＋單一提交）
+- [[EXPOSURE-RULE-025]] —— B5（Export 对应功能）结算的影子配对反转规则；B5 为自动推导，A7 为手动选择，两者均为单一提交
 - [[MOVEMENT-RULE-001]] —— MOVEMENT_DIRECTION 按 instrument/movementType 組合固定不變，`PARTIAL_SETTLE`/`FULL_SETTLE` 皆為 -1
 - [[MOVEMENT-RULE-012]] —— Acceptance Tenor 一致性於 `resolveOrCreateContract()` 內部由服務端強制校驗（A6 CREATE 當下即已鎖定 tenorType，A7 結算沿用同一合約）
 - [[MOVEMENT-RULE-018]] —— 功能按鈕操作圖示分組：A7 與 A9/B5 同屬 redeem 圖示群組
@@ -132,9 +134,11 @@ flowchart TD
 - [[checkredeemsufficiency]] —— `checkRedeemSufficiency()` 純函式，被 SHGT 的 `PARTIAL_REDEEM`/`FULL_REDEEM` 與 Acceptance 的 `PARTIAL_SETTLE`/`FULL_SETTLE`（含 A7）逐字共用
 
 **Tolerance 相關規則**
+
 - [[TOLERANCE-RULE-002]] —— Tolerance 換算的 instrumentType 適用性門控，`IPLC_ACCEPTANCE` 不適用
 
 **總覽**
+
 - [[Balance Component Overview]]
 
 ## Fix Pending UI 狀態一致性（2026-08-31）

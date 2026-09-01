@@ -478,7 +478,7 @@ describe('MakerQueueService', () => {
       expect(svc.isCompoundShape(row)).toBe(false);
     });
 
-    it('is true for a compound-submission leg (businessEventId set, e.g. an A3S/B4/B5 leg)', () => {
+    it('is true for a compound-submission leg (businessEventId set, e.g. an A3S/B4 leg)', () => {
       const svc = new MakerQueueService(makeApi());
       const row = { movement: makeMovement({ movementType: 'UTILIZE', businessEventId: 'be-1' }), contract: makeContract() };
       expect(svc.isCompoundShape(row)).toBe(true);

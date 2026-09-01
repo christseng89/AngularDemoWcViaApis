@@ -1,6 +1,6 @@
 ---
 knowledge_id: A3S-Document-Arrival-SG
-title: "A3S — 單據到單（含提貨擔保贖回）Document Arrival with Shipping Guarantee Redemption"
+title: 'A3S — 單據到單（含提貨擔保贖回）Document Arrival with Shipping Guarantee Redemption'
 domain: Balance
 category: Function Analysis
 function_code: A3S
@@ -9,7 +9,7 @@ instrument_type: IPLC_LC
 movement_type: UTILIZE
 status: CONFIRMED
 source_repository: Balance Component (lc-balance)
-last_verified_commit: "N/A — no .git history in the analyzed snapshot, see [[Source-to-Knowledge-Map]]"
+last_verified_commit: 'N/A — no .git history in the analyzed snapshot, see [[Source-to-Knowledge-Map]]'
 snapshot_date: 2026-08-30
 tags:
   - balance
@@ -28,16 +28,16 @@ tags:
 
 ## 功能摘要
 
-| 項目 | 內容 |
-|---|---|
-| 功能代碼 | **A3S** |
-| 功能說明（代碼原文 label） | `Document Arrival w/ Shipping Gtee`（`balance-component.model.ts:311`，中文暫譯：單據到單／含提貨擔保函贖回） |
-| instrumentType | `IPLC_LC`（`balance-component.model.ts:313`） |
-| movementType | `UTILIZE`（`balance-component.model.ts:314`）——與 A3（純單據到單）**完全相同的 movementType**，僅以是否顯式匹配一筆未償 SG 作區分（見 [[MOVEMENT-RULE-043]]） |
-| subChoice | 無獨立 subChoice 選項；A3S 是一個**複合式（compound）Maker 提交**，固定包含兩段 leg：①SHGT 的 `FULL_REDEEM \| PARTIAL_REDEEM`（先行，贖回被匹配的 SG）②IPLC_LC 的 `UTILIZE`（隨後，同金額，即本筆信用證自身的單據到單）——見 `balance-component-api.yaml:865-876`（`compoundLegs`） |
-| 方向 | Import（進口） |
-| 母層功能 | A1（LC Issue，`balance-component.model.ts` 註解 §294 起的資料結構脈絡；A3S 與 A3 皆作用於 A1 建立的 IPLC_LC 根合約之上） |
-| 二級參照欄位 | IB Number（`secondaryRefLabel: 'IB Number'`，`balance-component.model.ts:315`） |
+| 項目                       | 內容                                                                                                                                                                                                                                                                               |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 功能代碼                   | **A3S**                                                                                                                                                                                                                                                                            |
+| 功能說明（代碼原文 label） | `Document Arrival w/ Shipping Gtee`（`balance-component.model.ts:311`，中文暫譯：單據到單／含提貨擔保函贖回）                                                                                                                                                                      |
+| instrumentType             | `IPLC_LC`（`balance-component.model.ts:313`）                                                                                                                                                                                                                                      |
+| movementType               | `UTILIZE`（`balance-component.model.ts:314`）——與 A3（純單據到單）**完全相同的 movementType**，僅以是否顯式匹配一筆未償 SG 作區分（見 [[MOVEMENT-RULE-043]]）                                                                                                                      |
+| subChoice                  | 無獨立 subChoice 選項；A3S 是一個**複合式（compound）Maker 提交**，固定包含兩段 leg：①SHGT 的 `FULL_REDEEM \| PARTIAL_REDEEM`（先行，贖回被匹配的 SG）②IPLC_LC 的 `UTILIZE`（隨後，同金額，即本筆信用證自身的單據到單）——見 `balance-component-api.yaml:865-876`（`compoundLegs`） |
+| 方向                       | Import（進口）                                                                                                                                                                                                                                                                     |
+| 母層功能                   | A1（LC Issue，`balance-component.model.ts` 註解 §294 起的資料結構脈絡；A3S 與 A3 皆作用於 A1 建立的 IPLC_LC 根合約之上）                                                                                                                                                           |
+| 二級參照欄位               | IB Number（`secondaryRefLabel: 'IB Number'`，`balance-component.model.ts:315`）                                                                                                                                                                                                    |
 
 **API 端點**（均為真實查證，非杜撰）：
 
@@ -72,7 +72,7 @@ Maker 在 Transaction Processing 畫面選擇功能 A3S，並挑選一張存在�
 
 ## Classification（分類）
 
-A3S 與 A3 底層 movementType 完全相同（皆為 `IPLC_LC`/`UTILIZE`），對外之所以拆成兩個獨立 functionCode，純粹是為了讓 Maker／Channel 端能明確選出「有無顯式匹配 SG」這條分支（[[MOVEMENT-RULE-043]]）。A3S 屬於複合式提交（compound submission，`possibleShapes` 含 `'documentArrivalWithSg'`），與 A6、B4、B5 同屬「一次 Submit 動兩個以上帳」的家族。
+A3S 与 A3 底层 movementType 完全相同（皆为 `IPLC_LC`/`UTILIZE`），拆分 functionCode 是为了明确有无 SG 配对。A3S 属于 compound submission；B4 也有 compound legs，A6 关联既有 source。B5 已改为 plain 单一 Acceptance settlement，不属于此家族。
 
 ## Business Decision（業務決策）
 

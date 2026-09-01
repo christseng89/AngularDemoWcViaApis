@@ -87,7 +87,6 @@ function setMakerContext(comp: TransactionBuilderComponent, overrides: Partial<M
   (comp as any).makerContext = {
     submitResult: null,
     selectedPayMovement: null,
-    matchedReceivableMovementId: null,
     dueFromIssuingBankMovementId: null,
     acceptanceMovementId: null,
     acceptanceReimbReceivableMovementId: null,
@@ -244,13 +243,13 @@ describe('TransactionBuilderComponent — coverage gap-closing (getters + error 
       c.selectedCheckerMovement = null;
       expect(c.isCheckerCompoundOwnSubmission).toBe(false);
 
-      // B5/settlesAcceptanceOnMature: same shape as A3S above.
+      // B5 is a plain single-movement settlement even when a caller supplies correlation metadata.
       const cB5 = new TransactionBuilderComponent(mockApi());
       cB5.selectFunction(fn('B5'));
       cB5.selectedCheckerMovement = movement({ movementId: 'm-b5', movementType: 'FULL_SETTLE', businessEventId: 'be-2' });
-      expect(cB5.isCheckerCompoundOwnSubmission).toBe(true);
+      expect(cB5.isCheckerCompoundOwnSubmission).toBe(false);
       cB5.selectedCheckerMovement = movement({ movementId: 'm-b5', movementType: 'PARTIAL_SETTLE', businessEventId: 'be-2' });
-      expect(cB5.isCheckerCompoundOwnSubmission).toBe(true);
+      expect(cB5.isCheckerCompoundOwnSubmission).toBe(false);
       cB5.selectedCheckerMovement = movement({ movementId: 'm-b5', movementType: 'PARTIAL_SETTLE', businessEventId: null });
       expect(cB5.isCheckerCompoundOwnSubmission).toBe(false);
       cB5.selectedCheckerMovement = movement({ movementId: 'm-b5', movementType: 'CREATE', businessEventId: 'be-2' });

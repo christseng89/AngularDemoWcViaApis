@@ -319,7 +319,7 @@ const EXPORT_TENOR_OPTIONS = [
   { value: 'SELLERS_USANCE', label: 'Usance' },
 ];
 
-/** A3 (Sight) and a former A5 (Usance) were merged — mechanically identical (IPLC_LC/UTILIZE), only the Catalog tenor filter differed; the picked LC's own tenorType already routes to A4 or A6. A5's number was retired, not reused. */
+/** A3 handles Document Arrival for every tenor; the picked LC's own tenorType routes onward to A4 or A6. */
 export const IMPORT_FUNCTIONS: TransactionFunction[] = [
   {
     code: 'A1',
@@ -563,9 +563,8 @@ export const EXPORT_FUNCTIONS: TransactionFunction[] = [
     pendingItemSourceCode: 'B3',
     help: "The actual Honour/Accept legal event (cs-tf-balance-knowhow §7.4a/§7.6) — Sight vs Usance is read from the picked Confirmation's own Tenor Type (declared at B1), not re-asked here. Pick the Confirmation, then the already-RELEASED B3 (Present Docs) record under it (B3 must be genuinely Released first — go to B3 if nothing shows here) — EB Number and Amount are carried from it. Sight: Honours, releasing the Confirmation contingent and creating the Due from Issuing Bank asset (rationale §7.4a) — go to B5 to record the actual reimbursement later. Usance: Accepts, releasing the Confirmation contingent and creating BOTH the Acceptance liability AND its Reimbursement Receivable asset (rationale §7.6) — go to B5 at maturity too. Checker: one Release does the primary (Honour/Accept) and whichever secondary leg(s) that tenor needs, and consumes the B3 record's own Present Docs Earmark occupancy as a side effect.",
   },
-  // CNF_MATURE (impl-spec-en.md) clears BOTH the Acceptance liability and its Reimbursement Receivable
-  // in ONE event. Sight's own receivable has no paired liability, so it's out of scope here — B5 is
-  // Usance-only.
+  // CNF_MATURE settles the Acceptance liability only. Reimbursement Receivable settlement belongs
+  // outside B5 and is not resolved or posted as a companion movement. B5 remains Usance-only.
   {
     code: 'B5',
     label: 'Settlement — Reimbursement / Maturity',
@@ -575,7 +574,7 @@ export const EXPORT_FUNCTIONS: TransactionFunction[] = [
     defaultParentInstrumentType: 'EPLC_CONFIRMATION',
     catalogTenorFilter: 'USANCE',
     transactionIndexSecondaryRefLabel: 'EB Number',
-    help: "Confirm LC Settlement — Usance held-to-maturity only (CNF_MATURE): one compound settles BOTH the Acceptance (this bank's own DPU liability, paid to the beneficiary) AND its matching Reimbursement Receivable (the issuing bank's own reimbursement to this bank), same amount, in a single Checker Release. Pick the LC (LC Index, Usance only), then the EB Number (EB Index) — a single LC can have multiple Document Presentations. Sight settlement (Due from Issuing Bank) is out of Balance Component's own scope — Balance Component only owns the contingent/liability side; B4 still creates that asset, but collecting it happens outside this system. Nego'd/discounted Usance (EPLC_EXPORT_BILLS_DISCOUNTED) is still follow-up work, not this function.",
+    help: "Confirm LC Settlement — Usance held-to-maturity only (CNF_MATURE): settles the selected Acceptance only. B5 does not resolve or settle a matching Reimbursement Receivable. Pick the LC (LC Index, Usance only), then the EB Number (EB Index) — a single LC can have multiple Document Presentations. Sight settlement (Due from Issuing Bank) and reimbursement collection are outside this B5 flow.",
   },
   // Export analog of A10 — see A10's own help text/doc comment above for the shared rationale.
   {

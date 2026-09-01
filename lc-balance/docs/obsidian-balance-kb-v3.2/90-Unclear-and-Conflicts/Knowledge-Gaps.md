@@ -1,6 +1,9 @@
+Warning: truncated output (original token count: 25447)
+Total output lines: 1379
+
 ---
 knowledge_id: Knowledge-Gaps
-title: "知识空白"
+title: '知识空白'
 domain: Balance
 category: Gap Log
 snapshot_date: 2026-08-26
@@ -475,10 +478,10 @@ MakerSubmitService.submit() 的分派条件引用了 `deriveFunctionStrategy(ctx
 maker-submit.service.ts:7、67-84
 
 **存在的问题：**
-除了测试文件中 A3S/B4/B5 的 fixture 数据可以推断出的范围之外，每种 possibleShapes 取值究竟适用于哪些具体函数的完整集合，在本次未能独立对照 function-strategy.ts 自身的注册表进行确认。
+**RESOLVED 2026-09-01：** 已对照 `function-strategy.ts` 与 OAS；compound shapes 适用于 A3S 与 B4，B5 为 `plain`。
 
 **待确认的问题：**
-除 A3S/B4/B5 之外，是否还有其他函数的 FunctionStrategy 也设置了这些 compoundSubmission 形状之一，是本次萃取可能遗漏的？
+现行 registry 未发现其他 function 使用这些 compound submission shapes。
 
 ---
 
@@ -565,285 +568,7 @@ LookUpPanelService 自身的测试覆盖，是否位于一个本次批次未匹�
 ### GAP-041 (angular-inquire-lookup)
 
 **观察到的情况：**
-selectEvent() 无条件地将 ownImpact 计算为 {before: movement.balanceBefore, after: movement.balanceAfter}（不依据状态派生），而 BalanceSnapshotBoxComponent 自身的模板将 impact.after === null/undefined 视为"仍处于 PENDING——在被 Released 之前尚未产生影响"的信号。
-
-**依据来源：**
-inquire-events.service.ts:507-515，对照 balance-snapshot-box.component.html:11-17
-
-**存在的问题：**
-关于 balanceBefore/balanceAfter 究竟"在什么时候"才会被填充这条确切的业务规则（即，依据 CLAUDE.md 决策日志自身的表述——"在变动记录仍处于 PENDING 期间两者都为 null"），仅由 BalanceSnapshotImpact 的一处文档注释所断言，本次萃取的文件范围内并未直接对照 balanceService.ts 自身的写入路径重新验证。
-
-**待确认的问题：**
-（在本次范围之外的 balanceService.ts 中）确认 balanceBefore/balanceAfter 只在 Release 时才写入，从不在 Create 时写入——本次萃取仅基于该文档注释将其视为 CONFIRMED，而文档注释在证据优先级中属于第 5 级（源代码注释），并非可执行的写入路径本身。
-
----
-
-### GAP-042 (angular-pickers-shell)
-
-**观察到的情况：**
-picker-selection.service.ts 中 Step-2 的加载逻辑（loadSgsForArrival、loadSettleableBalances）在调用 api.catalog() 时明确将第 8 个参数 `requireIssueReleased` 传为 `true`，但 document-arrival-hints.service.ts 中结构相似的 loadChildHints() 与 loadSgBalanceEligibility() 调用 api.catalog() 时只传了 6 个位置参数，完全省略了这个标志。
-
-**依据来源：**
-picker-selection.service.ts:104、203；document-arrival-hints.service.ts:104、176
-
-**存在的问题：**
-仅凭本次所读的文件，无法确认这些"提示计算"调用在 API 层是悄悄继承了某个不同（或缺失）的 requireIssueReleased 默认值——如果该默认值与 `true` 不同，一张提示映射表就有可能把一个尚未 Issue-Released 的子合约计为符合资格，而对应的 Step-2 挑选器（明确传了 true）却会正确地将其排除，从而产生一条承诺了某个候选项、但挑选器自身却根本不会展示的提示。
-
-**待确认的问题：**
-BalanceComponentApiService.catalog() 中被省略的第 8 个参数（requireIssueReleased）自身的默认值是否就是 `true`？如果不是，"提示 vs. 挑选器"之间的这种不一致，是有意为之（提示刻意宽松一些），还是一个未被注意到的知识空白？
-
----
-
-### GAP-043 (angular-pickers-shell)
-
-**观察到的情况：**
-picker-selection.service.ts 的 selectSettleableBalance() 在为 B5 自身的 EB Index 挑选构造一个合成 BalanceContract 时，硬编码了 `status: 'ACTIVE'` 字段，无论底层真实合约当前的实际状态是什么。
-
-**依据来源：**
-picker-selection.service.ts:241-255
-
-**存在的问题：**
-由于 loadSettleableBalances() 只会填充那些已经过滤为 Available > 0、且 requireIssueReleased:true 的候选项，这一点在实践中很可能是无害的——但这种硬编码意味着，如果真实合约的状态在"加载候选列表"与"实际选中"之间发生了竞争性变化（例如另一个会话中通过 A10/B6 Close 关闭了它），任何读取这个合成对象自身状态字段的逻辑都不会察觉到这一点。
-
-**待确认的问题：**
-挑中一笔在此期间已被 Closed/Superseded 的可结算余额，是否存在真实风险？如果存在，本次范围之外是否有后续的服务端检查，会在任何变动记录被创建之前真正捕获到这一点？
-
----
-
-### GAP-044 (angular-pickers-shell)
-
-**观察到的情况：**
-TransactionBuilderComponent.isCheckerCompoundOwnSubmission 自身的文档注释说明，它的第 4 个（兜底）分支——同时匹配 submitResult.movementId 与 'confirmationHonourWithReceivable'——"在当今任何真实函数下都不可达"，因为 settlesDocumentArrival 在 B4 上是无条件的，总是会先行匹配。
-
-**依据来源：**
-transaction-builder.component.ts:272-273
-
-**存在的问题：**
-这是已被确认的死代码，保留在一张原本驱动真实复合式 Release 路由的决策表中——本身不是缺陷，但值得确认它是为未来某个函数而有意保留的，还是仅仅已经过时。
-
-**待确认的问题：**
-这个兜底分支是为即将到来的某个函数形态而预留的，还是应该在下一次触碰这个方法时被移除？
-
----
-
-### GAP-045 (business-case-registry)
-
-**观察到的情况：**
-决策日志记载，该注册表通过恰好新增 7 条条目——import-case-8、import-case-9、import-case-10、import-case-11、export-case-8、export-case-9、export-case-10——"从 14 条增长到了 21 条"。而实际代码及其自身可通过的测试（businessCases.test.js 的 EXPECTED_IDS/长度断言）显示了 23 条案例——该注册表还包含 import-case-12 和 export-case-11，这两条并未在那条决策日志条目中被提及。
-
-**依据来源：**
-CLAUDE.md 决策日志（"Balance-Component-Test-Case-Proposal.md §4"条目），对照 backend/data/businessCases.js / backend/test/businessCases.test.js
-
-**存在的问题：**
-CLAUDE.md 中没有任何决策日志条目记录 import-case-12（针对 Import 侧的"Acceptance 未结清余额为负的 Close 门槛"）或 export-case-11（同一负值门槛的 Export 侧）的业务原理——两者都已存在于代码中，测试也很完整，明显是同一个"§4 A10/B6 Close 可行性"计划的延伸，但它们的新增日期晚于、或被遗漏在了那条日志条目之外。
-
-**待确认的问题：**
-import-case-12/export-case-11 的后续决策日志条目，是从未被写过，还是这两条案例是在一次更早的/并行的批次中新增的、而那次批次自身的日志条目在本文件中缺失？无论哪种情况，CLAUDE.md 中注册表的案例数量声称应从"21"更正为与代码相符的"23"。
-
----
-
-### GAP-046 (business-case-registry)
-
-**观察到的情况：**
-TraceStep.type 在 Angular 客户端中被声明为 'createMovement' | 'release' | 'snapshot' | 'note' 这几种取值，但后端实际上还会产生 type:'makerSubmit' 的追踪记录（RELEASE_SHAPED_STEP_TYPES 包含 makerSubmit；import-case-1/6/10 等多个案例都用到了它，server.test.js 与 runCase.test.js 都直接对 {type:'makerSubmit', ...} 这一追踪形状做了断言）。
-
-**依据来源：**
-src/app/business-case-runner/balance-case-api.service.ts（TraceStep.type），对照 backend/server.js + backend/data/businessCases.js
-
-**存在的问题：**
-这是后端实际的追踪步骤词汇表与 Angular 客户端所声明类型之间一处真实的类型漂移。由于该组件的 rowClass()/statusText()/detailText() 使用的是 if 链而不是穷举式 switch，一条 makerSubmit 步骤不会导致崩溃，但会悄悄地落入通用分支（例如 statusText() 的兜底逻辑 `${step.status ?? ''} ${step.ok ? 'OK':'ERROR'}`，而不是任何针对 makerSubmit 的显式文案）——没有针对该步骤类型的专属视觉呈现，未来任何朝穷举式 switch 方向的重构，都会因此出现类型错误或渲染错误。
-
-**待确认的问题：**
-TraceStep.type 缺少 'makerSubmit' 这个字面量，究竟是一处有意的简化（在展示层面把它当作 'release' 处理），还是应该通过拓宽该联合类型、并加入显式处理来修复的疏漏？
-
----
-
-### GAP-047 (business-case-registry)
-
-**观察到的情况：**
-注册表中的每一个 businessEventId 值都是一个纯粹硬编码的字符串（例如 `${lc}-b01`、`${lc}-honour`），在 createMovement 请求体中原样直接传递——编排层（server.js）对这个字段完全没有做任何校验、生成或匹配逻辑；它是纯粹透传的数据。
-
-**依据来源：**
-backend/data/businessCases.js（businessEventId 字段的贯穿使用）
-
-**存在的问题：**
-该字段所支撑的实际服务端语义（A3S 轧差、B4 的临时占用轧差等，均在 CLAUDE.md 中有记录）完全存在于本次萃取范围之外的微服务 balanceService.ts 中。businessCases.js 或 server.js 本身都不会强制某个案例的 businessEventId 配对在语义上是正确的——一次打错的引用复用、或两条不相关的记录意外共享了同一个字符串，都会在这些文件中悄无声息地改变轧差行为，而不会报出任何错误。
-
-**待确认的问题：**
-这不是所读文件中的缺陷，但值得标记为一处范围边界：本注册表中每一个 businessEventId 配对的正确性，完全依赖人工编写时的纪律，加上（范围之外的）微服务自身的领域测试，而不是任何可以从 businessCases.js/server.js 本身验证的东西。
-
----
-
-### GAP-048 (api-specs)
-
-**观察到的情况：**
-两份 OAS 文件在端点描述和 schema 字段描述中，反复引用了一份未提交的"设计文档 §N"（依据微服务自身 package.json 的说明，该文档在仓库中并不存在）。
-
-**依据来源：**
-balance-component-api.yaml 第 4-17 行（顶层描述），以及 paths/schemas 各处数十处内联的"(设计文档 §N)"引用
-
-**存在的问题：**
-归因于该设计文档的章节级论断（例如"设计文档 §6.1""§3.3 GL Ownership""§7 Tenor"）无法针对任何已提交的来源进行独立核实——只有 OAS 自身复述的文字内容是可核查的。
-
-**待确认的问题：**
-是否存在这份设计文档可找回的副本？还是说，依据本仓库自身 CLAUDE.md 的决策日志，两份 OAS 文件中每一处"(设计文档 §N)"引用都应被纯粹当作历史归因来看待，没有独立可核实的路径？
-
----
-
-### GAP-049 (api-specs)
-
-**观察到的情况：**
-balance-component-channel-api.yaml 的 servers 区块说明，参考用的 Angular 客户端是直接调用微服务 API 的，并没有经过一个已构建完成的渠道层——本文件"规定的是意图中的渠道契约……而不是（目前）一个真正在运行的服务"。
-
-**依据来源：**
-balance-component-channel-api.yaml 第 118-120 行
-
-**存在的问题：**
-与微服务 API（在 v1.0.0 到 v1.16.0 之间被反复对照真实运行中的实现重新校准，每一次都修正了通过检视发现的漂移）不同，渠道 API 显然从未被对照一个真正在运行的实现进行检验，因此其所陈述的规则（例如确切的 400/409 响应形状、schema 层面的币种强制校验）都只是设计意图，而非既定事实。
-
-**待确认的问题：**
-渠道 API 应该被当作与微服务 API 同等权威的业务规则文档来看待，还是应该被标记为一个置信度更低/带有愿景性质的层级，直到有一个真正的渠道服务能够对照它进行验证？
-
----
-
-### GAP-050 (api-specs)
-
-**观察到的情况：**
-BalanceMovement.lmtsReservationId 的文档说明是"实际的 LMTS 调用机制尚未对照源代码进行追溯——这个字段只是一个占位式的透传字段"。
-
-**依据来源：**
-balance-component-api.yaml 第 1398-1406 行
-
-**存在的问题：**
-这个字段本应支撑的 LMTS Reserve/Confirm/Release 补偿模式虽然被提及，但其实际的集成行为尚未定义/未经验证。
-
-**待确认的问题：**
-LMTS 集成是否仍在计划之中，还是这个字段已经永久性地变成了遗留字段（就像已被移除的 MovementWarning schema 一样）？
-
----
-
-### GAP-051 (api-specs)
-
-**观察到的情况：**
-ContractStatus.SUPERSEDED 与 MovementStatus.SUPERSEDED 在各自的枚举中都被声明，且都带有明确的文档注释，说明目前没有任何端点会把任何记录迁移到这些状态（版本化/迭代机制和"就地编辑"的 PATCH 流程均已被确认从未实现、并已在 v1.0.0 从契约中移除）。
-
-**依据来源：**
-balance-component-api.yaml 第 1218-1238、155-167 行（v1.0.0 REMOVED 清单）
-
-**存在的问题：**
-两个枚举值，加上 BalanceMovement.supersededMovementId/reversalOfMovementId 字段，纯粹作为"为未来预留"的占位符而存在，如今没有任何东西会真正填充它们。
-
-**待确认的问题：**
-这些为未来保留、当前不可达的状态/字段，是否应该被标记为可以从 schema 中移除，直到版本化/反冲功能真正被构建出来，以避免消费方为一个永远不会发生的状态编写分支逻辑？
-
----
-
-### GAP-052 (api-specs)
-
-**观察到的情况：**
-微服务自身对 BalanceMovement.movementType 的描述写道："本服务自身并不在服务端强制执行按 instrumentType 划分的允许列表；那种合法性映射的所有权归调用方所有。"
-
-**依据来源：**
-balance-component-api.yaml 第 1361 行
-
-**存在的问题：**
-任何绕过渠道 API 的调用方（渠道 API 的全部职责就是从一个具名业务函数派生出合法的 instrumentType+movementType 组合）都可以直接向微服务提交一个非法组合、而不会遭到任何仅基于合法性的服务端拒绝——只有行为层面的分桶运算（方向/充足性）才可能顺带捕获到某些误用情形。
-
-**待确认的问题：**
-这是一个可接受的信任边界（微服务有意保持工具无关性，合法性强制执行属于上一层的职责），还是一个值得后续在服务端增加白名单机制来弥补的真实完整性知识空白——特别是考虑到本应提供这层守卫的渠道 API 自身并非一个正在运行的服务（参见前一条知识空白）？
-
----
-
-### GAP-053 (api-specs)
-
-**观察到的情况：**
-ChannelError 自身的描述说明，CURRENCY_MISMATCH "在正常使用下有意设计为通过本渠道不可达……但仍收录在内以求完整，因为底层微服务仍然可能抛出它"。
-
-**依据来源：**
-balance-component-channel-api.yaml 第 804-817、377-381 行（POST /channel/transactions 409 响应）
-
-**存在的问题：**
-渠道客户端究竟在什么情况下真的能够看到这个错误，规定得比较松散（"仅当一个绕过本渠道的直接微服务调用方产生了一条真正冲突的记录时才会浮现出来"）——渠道层是应该转译/抑制它，还是应该在那种边界情形下原样透传，目前并不明确。
-
-**待确认的问题：**
-渠道 API 是否应该记录一个真正能通过渠道触发此响应的具体场景（例如两个渠道客户端之间的竞争）？还是应确认这纯粹是防御性文档，没有真实的触发路径？
-
----
-
-### GAP-054 (api-specs)
-
-**观察到的情况：**
-GET /balance-contracts/catalog 记录了一条排序方面的业务说明（"pickup 时 Order by Reference"），但对于 GET /balance-contracts/close-eligible、GET /balance-movements?businessEventId=（记录为"最先创建的排最前，按创建顺序"）或 GET /balance-contracts/{id}/movements（记录为"最新的排最前"），都没有相应的排序规则说明。
-
-**依据来源：**
-balance-component-api.yaml 第 562-569、616-631、703-729、841-853 行
-
-**存在的问题：**
-各个列表端点之间的排序约定并不一致（catalog = 按自然键升序；movements = 最新在前；businessEventId 查询 = 最旧在前），且 close-eligible 自身的排序规则完全未作说明。
-
-**待确认的问题：**
-close-eligible 的排序规则，是单纯继承自 catalog 自身"按参考号升序"这一约定（两者都是"挑选器"类端点），还是确实未作规定/由具体实现决定？
-
----
-
-### GAP-055 (design-docs-spec)
-
-**观察到的情况：**
-这两份文档使用的是一套与实际 Balance Component 代码库自身枚举完全不同、也远更细粒度的数据模型和词汇表：事件代码如 LC_ISSUE/LC_ACCEPT/SG_ISSUE/CNF_ACCEPT/EX_NEGOTIATE，余额类型如 LC_CUSTOMER_LIABILITY/ACCEPTANCE_DPU_OUTSTANDING/DUE_FROM_ISSUING_BANK，一套 ContractStatus 状态机（DRAFT→ISSUED→AMENDED→PARTIALLY_UTILISED/FULLY_UTILISED→CLOSED / EXPIRED→CLOSED / CANCELLED→CLOSED），以及诸如 undertaking_availability × financing_structure × funding_party 这样的维度——这些都无法与实际的 InstrumentType（IPLC_LC/EPLC_LC/IPLC_ACCEPTANCE/EPLC_ACCEPTANCE/SHGT/EPLC_CONFIRMATION/EPLC_EXAMINATION）、ContractStatus（ACTIVE|SUPERSEDED|CLOSED|CANCELLED）或 TenorType（SIGHT|BUYERS_USANCE|SELLERS_USANCE|DP|DA）枚举干净地对应起来。
-
-**依据来源：**
-TF_Balance_Component_Spec-en.txt 与 TF_Contingent_Liability_Lifecycle-en.txt 全文
-
-**存在的问题：**
-CLAUDE.md 已经将这一点记录为一项已确认的、已知的不匹配（这些设计文档自身的 §N 引用，指向的是一份确实存在、但从未提交的另一份文档，与源代码注释中"设计文档 §N"引用所指的并非同一份）。本次萃取是在这一认知前提下提取业务原理的，但这意味着以上所列的具体规则（例如完整的事件目录、确切的总账科目名称、精确的状态机）都不应被假定为字面意义上实现于当前代码库中、且未经过单独核实——它们所解释的是"为什么"当前系统的简化枚举会是这个样子，而不是对它们的字面 1:1 规格说明。
-
-**待确认的问题：**
-是否存在（或应当创建）一份映射文档，把这套通用引擎的词汇表（event_code、balance_type、undertaking_availability/financing_structure/funding_party）翻译到实际代码库的 InstrumentType/MovementType/TenorType 上，以便未来针对源代码的萃取，能够准确引用这些设计文档规则中哪些确实已经实现、哪些属于有意简化而省略？
-
----
-
-### GAP-056 (design-docs-spec)
-
-**观察到的情况：**
-该设计文档明确、反复地反对任何"以金额为依据"的 SG 解除担保方式（"为什么不能用 SG Redemption = MIN(单据金额, SG 未结清余额)……这会在整个组合上造成持续增长的永久性高估"），坚持解除担保必须仅以票据/单证为依据（承运人交还、书面解除、B/L 交回），必须全额、无残余、分两个阶段（先 REDEEMABLE 再 RELEASED），在"单据收到"这一阶段不产生任何总账变动。而 CLAUDE.md 记录的实际实现中，A9 是"以金额为依据"的——"仅限 FULL_REDEEM，金额受保护（等于该 SG 自身的 Available Balance）"，A3S 自身的对冲式赎回腿则使用 MIN(单据金额, SG 可用余额)。
-
-**依据来源：**
-TF_Contingent_Liability_Lifecycle-en.txt §4.4，对照 CLAUDE.md 自身"A9（SG Redemption）锁定为仅 Full Redeem"条目
-
-**存在的问题：**
-目前尚不清楚实际的 shgtRedeem.ts/A3S 机制是否真的满足这份设计文档所要求的"以票据为依据的解除担保"这一意图（例如，因为赎回金额始终只由重新推导出的 Available Balance 驱动，而不是原始单据匹配；同时假定现实世界中的承运人放货始终与一次 Maker/Checker 赎回动作一一对应），还是说这是一处已披露的简化处理，偏离了本设计文档"绝不按金额匹配、始终以票据/全额为依据"这条更严格的规则。本次萃取无法访问 shgtRedeem.ts/A3S 源代码，因此无法就此加以验证。
-
-**待确认的问题：**
-实际的 A9/A3S SG 赎回机制（以金额为依据、锚定于 Available Balance）究竟是真正实现了这份设计文档"以票据为依据的解除担保"这一原则，还是一处已知、可接受、但应被明确记录为偏离（而非默认视为等价）的做法？
-
----
-
-### GAP-057 (design-docs-spec)
-
-**观察到的情况：**
-这些设计文档要求分别、可独立寻址地输出五个数值——accounting_balance、ead_economic、ecl_ead、ead_regulatory、limit_utilisation——外加一个用于区分 REGULATORY 与 INTERNAL_POLICY 两种 CCF 处理方式的 ccf_source 字段，并要求一份强制性的月度对账桥接报告，以及一条强制性不变式（I10）：监管报表永远不得读取 ead_economic。
-
-**依据来源：**
-TF_Balance_Component_Spec-en.txt §8.5"五个风险敞口数值"，以及 §10.2/§10.3（ead_economic/ead_regulatory/CCF/ccf_source）
-
-**存在的问题：**
-仅凭本次萃取所能获取的材料（只有这两份设计文档），无法判断实际的 Balance Component 微服务是否计算或对外提供这五个独立的风险敞口数值中的任何一个、一个 ccf_source 字段、或任何对账桥接报告——CLAUDE.md 自身对已交付系统的描述，集中在 Confirmed/Available/Tight Available Balance 与 Face Amount 上，这看起来是一个窄得多的子集，聚焦于操作层面的余额跟踪，而非完整的监管/经济风险敞口汇总。
-
-**待确认的问题：**
-完整的五数值风险敞口模型（以及 CCF/ccf_source 的监管与内部区分）是否本就在 Balance Component 的范围之内？还是说这明确不在范围之内（该组件按照 CLAUDE.md 自身所述的范围边界，只负责跟踪或有负债余额，CCF/监管资本计算留给一个独立的下游系统去处理）？
-
----
-
-### GAP-058 (design-docs-spec)
-
-**观察到的情况：**
-该设计文档要求，每一次开证/修改事件都要计提一笔"表外信用风险敞口拨备"（IFRS 9 ECL），对属于金融担保范畴的工具采用"ECL 拨备与未摊销手续费两者取高"的计量方式，并要求 Stage 1/2/3 分级，且要求在包括仅涉及期限变更、金额无变动的每一个事件上都重新计算。
-
-**依据来源：**
-TF_Contingent_Liability_Lifecycle-en.txt §9.3 和 §2.1(2)——IFRS 9 ECL"取高者"计量方式与 Stage 1/2/3 拨备
-
-**存在的问题：**
-CLAUDE.md 对实际 Balance Component 的描述中，任何地方都没有出现 ECL/拨备的概念、字段或事件（该组件的范围被明确表述为跟踪或有负债/风险敞口，而不是会计/总账过账）——尚不清楚 IFRS 9 ECL 拨备计算是有意不在本微服务的范围之内（由某个读取本账本的独立风险/拨备系统负责），还是一项确实尚未构建的需求。
+selectEvent() 无条件地将 ownImpact 计算为…5447 tokens truncated…件的范围被明确表述为跟踪或有负债/风险敞口，而不是会计/总账过账）——尚不清楚 IFRS 9 ECL 拨备计算是有意不在本微服务的范围之内（由某个读取本账本的独立风险/拨备系统负责），还是一项确实尚未构建的需求。
 
 **待确认的问题：**
 IFRS 9 ECL/拨备计算是否明确不在 Balance Component 的范围之内（委托给下游的风险引擎处理）？还是说这是本设计文档中一项尚未被处理、应作为未来工作被追踪的需求？
@@ -1284,7 +1009,6 @@ analysis/contingent-liability-ledger.html Folio 1/Folio 4 残留行；microservi
 
 **2026-08-26 更新（已解决）：** 是，F1 已交付独立的、自动的、基于日期的 AUTO EXPIRY 机制（新 movementType `EXPIRE`，`domain/expiryEligibility.ts`，由背景 `setInterval` 批次以 `BATCH_MAKER`/`BATCH_CHECKER` 系统身份逐筆触发，四眼原则不被繞過），与既有 Maker/Checker 触发的 CLOSE 并存、彼此独立——CLOSE 仍是自愿终止路径，EXPIRE 是到期自动路径，两者有各自独立的 movementType，可在稽核/报表中区分。详见 [[STATUS-RULE-031]]、[[MOVEMENT-RULE-063]]、[[09-Architecture/auto-expiry-auto-close-background-sweep-and-grace-period]]。
 
-
 ### GAP-007 (F1-REOPEN)
 
 **观察到的情况：**
@@ -1378,4 +1102,3 @@ REOPEN 复原金额是否应该套用 Tolerance 换算？如果本来就不需�
 
 **待确认的问题：**
 不适用——這不是需要業務方回答的問題，而是提醒未來的讀者：這個「三份邏輯不一致」的觀察，其解法已經有明確的責任歸屬（Standing 團隊），不需要 `balance-component` 工程隊再次評估是否要自己統一。
-

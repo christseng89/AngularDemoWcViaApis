@@ -30,6 +30,21 @@ info:
     and called the microservice directly could not evade it).
 
 
+    v1.11.0 (2026-09-01, same-parent multi-transaction synchronization; no
+    channel wire change): one LC or Confirmation may own multiple independent
+    secondary-reference transactions. The reference Run All fixtures retain
+    three eligible children under one parent for each A3S/A4/A6/A7/B4/B5
+    picker; every later command still addresses exactly one selected child and
+    the server revalidates that child's current lifecycle status.
+
+
+    v1.10.0 (2026-09-01, synchronization only; no channel wire change): the
+    Business Case Runner's negative-Tight A02/B02 repair is an internal client
+    of the existing Microservice API and adds no channel endpoint or schema.
+    A6's channel Checker action continues to map to the atomic compound release
+    documented below.
+
+
     API design principle — `POST /channel/transactions` describes one logical
     transaction leg. Several named business
     functions are business-approved to require more than one linked
@@ -88,7 +103,7 @@ info:
     change): corrects the scope text to A1–A11/B1–B7, records that this is a
     logical/not-separately-deployed channel façade in the reference workspace,
     and aligns compound-event guidance with Microservice OAS v1.37.0: A3S,
-    A6, B4 and B5 adapters must use atomic `/balance-movements/compound*`
+    A6 and B4 adapters must use atomic `/balance-movements/compound*`
     operations. Transaction Index SG/IB/EB Amount and Tight LC Balance are UI
     projections and therefore do not introduce channel response fields.
 
@@ -168,12 +183,12 @@ info:
 
     v1.9.0 (2026-08-31, lifecycle documentation synchronization; no wire-shape
     change): clarifies that cancel remains a one-transaction proxy. Linked
-    A3S/B4/B5 legs require ordered caller orchestration and are not an atomic
+    A3S/B4 legs require ordered caller orchestration and are not an atomic
     cancel batch. A4 Maker Submit withdrawal is a distinct microservice
     operation and must not cancel its A3/A3S source. Transaction Processing
     reset behavior and Maker Queue separation are reference-client concerns,
     not new channel response fields.
-  version: "1.9.0"
+  version: "1.11.0"
 servers:
   - url: https://channel-api.bank.example/balance-component/v1
     description: Production-style contract root for a web/mobile origination channel. This prototype's own reference implementation is the Transaction Builder Angular app under lc-balance-wc/src/app/transaction-builder/, which today calls the Microservice API directly rather than through a built channel layer — this file specifies the intended channel contract for that same business capability, not (yet) a running service.
@@ -378,6 +393,15 @@ paths:
         endpoint at all — they resolve straight to an existing PENDING
         transaction (via `GET /channel/contracts/{id}/movements` or the
         Checker queue) and go directly to `.../release`.
+
+
+        The channel's Index selection is convenience, not authority. Submit
+        re-resolves the selected contract and applies the same microservice
+        eligibility rules: derived functions require an eligible current
+        target; A6 requires a same-LC acknowledged PENDING A3/A3S source; B4
+        requires a same-Confirmation RELEASED, unconsumed B3 source not already
+        reserved by another pending B4. Stale or direct API requests are
+        rejected instead of bypassing the UI filter.
       requestBody:
         required: true
         content:
@@ -477,6 +501,12 @@ paths:
         no unnecessary batch/compound endpoint beyond what the approved
         business design itself already treats as one user action, and
         that action is still, mechanically, N one-movement releases.
+
+
+        Release rechecks current lifecycle and referenced-source eligibility;
+        it does not rely on the earlier Maker Submit or Checker queue snapshot.
+        A state change between Submit and Approve therefore returns 409, keeping
+        UI Checker behavior and direct API behavior consistent.
       parameters:
         - name: transactionId
           in: path
@@ -559,7 +589,7 @@ paths:
 
 
         v1.9.0 — one request cancels one transaction only. A caller handling
-        A3S/B4/B5 must cancel linked siblings first and the primary movement
+        A3S/B4 must cancel linked siblings first and the primary movement
         last; this sequence is not an atomic channel operation. A4 is not a
         cancel: the reference client calls the microservice's
         `/balance-movements/{movementId}/withdraw-maker-submit` operation to
@@ -1051,9 +1081,7 @@ components:
           defaultParentInstrumentType: EPLC_CONFIRMATION
           currencyMode: CARRIED
           submitsTransaction: true
-          compoundLegs:
-            - { legInstrumentType: EPLC_ACCEPTANCE, legMovementType: FULL_SETTLE, description: "Usance held-to-maturity only — CNF_MATURE." }
-            - { legInstrumentType: EPLC_ACCEPTANCE_REIMB_RECEIVABLE, legMovementType: REIMBURSE, description: "Its matching Reimbursement Receivable, same amount, same Checker Release." }
+          compoundLegs: []
         - code: A10
           label: LC Close
           side: IMPORT

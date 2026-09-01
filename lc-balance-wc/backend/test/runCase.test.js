@@ -246,14 +246,16 @@ describe('server.js internals — direct unit tests (not via HTTP/businessCases.
       expect(global.fetch).toHaveBeenCalledTimes(2);
     });
 
-    it('fails a successful create response that contains a negative Tight Available Balance', async () => {
-      global.fetch = jest.fn(async () =>
-        jsonResponse(201, {
-          movementId: 'mv-invalid',
-          balanceContractId: 'bc-invalid',
-          eventSnapshot: { tightAvailableBalance: '-0.01' },
-        }),
-      );
+    it('automatically creates and releases A02 when an Import test step reports a negative Tight Available Balance', async () => {
+      global.fetch = jest
+        .fn()
+        .mockImplementationOnce(async () => jsonResponse(201, { movementId: 'mv-original', balanceContractId: 'bc-1', currency: 'USD', eventSnapshot: { tightAvailableBalance: '-0.01' } }))
+        .mockImplementationOnce(async (_url, opts) => {
+          expect(JSON.parse(opts.body)).toMatchObject({ instrumentType: 'IPLC_LC', movementType: 'AMEND_INCREASE', amount: '0.01', sourceTransactionRef: 'A02' });
+          return jsonResponse(201, { movementId: 'mv-a02', balanceContractId: 'bc-1' });
+        })
+        .mockImplementationOnce(async () => jsonResponse(200, { movementId: 'mv-a02', status: 'RELEASED' }))
+        .mockImplementationOnce(async () => jsonResponse(200, { balanceContractId: 'bc-1', tightAvailableBalance: '0', currency: 'USD' }));
       const businessCase = {
         id: 'synthetic-negative-tight',
         steps: [
@@ -266,14 +268,26 @@ describe('server.js internals — direct unit tests (not via HTTP/businessCases.
         ],
       };
 
-      await expect(runCase(businessCase)).rejects.toThrow(/invalid negative Tight Available Balance \(-0.01\)/);
+      const trace = await runCase(businessCase);
+      expect(trace.map((step) => step.label)).toEqual([
+        'Invalid successful transaction',
+        'Auto A02 — restore negative Tight LC Balance',
+        'Checker releases automatic A02',
+        'Balance after automatic A02',
+      ]);
     });
 
-    it('fails a snapshot that reports a negative Tight Available Balance', async () => {
+    it('automatically creates and releases B02 when an Export snapshot reports a negative Tight Available Balance', async () => {
       global.fetch = jest
         .fn()
         .mockImplementationOnce(async () => jsonResponse(201, { movementId: 'mv-1', balanceContractId: 'bc-1' }))
-        .mockImplementationOnce(async () => jsonResponse(200, { tightAvailableBalance: '-1' }));
+        .mockImplementationOnce(async () => jsonResponse(200, { balanceContractId: 'bc-1', tightAvailableBalance: '-1', currency: 'USD' }))
+        .mockImplementationOnce(async (_url, opts) => {
+          expect(JSON.parse(opts.body)).toMatchObject({ instrumentType: 'EPLC_CONFIRMATION', movementType: 'AMEND', amount: '1', sourceTransactionRef: 'B02' });
+          return jsonResponse(201, { movementId: 'mv-b02', balanceContractId: 'bc-1' });
+        })
+        .mockImplementationOnce(async () => jsonResponse(200, { movementId: 'mv-b02', status: 'RELEASED' }))
+        .mockImplementationOnce(async () => jsonResponse(200, { balanceContractId: 'bc-1', tightAvailableBalance: '0', currency: 'USD' }));
       const businessCase = {
         id: 'synthetic-negative-snapshot',
         steps: [
@@ -281,13 +295,39 @@ describe('server.js internals — direct unit tests (not via HTTP/businessCases.
             type: 'createMovement',
             label: 'Valid create',
             captureAs: 'lc',
-            request: { instrumentType: 'IPLC_LC', movementType: 'ISSUE', amount: '1000' },
+            request: { instrumentType: 'EPLC_CONFIRMATION', movementType: 'ISSUE', amount: '1000' },
           },
           { type: 'snapshot', label: 'Invalid balance snapshot', contractRef: 'lc' },
         ],
       };
 
-      await expect(runCase(businessCase)).rejects.toThrow(/invalid negative Tight Available Balance \(-1\)/);
+      const trace = await runCase(businessCase);
+      expect(trace.at(-3)?.label).toBe('Auto B02 — restore negative Tight LC Balance');
+      expect(trace.at(-1)?.response.tightAvailableBalance).toBe('0');
+    });
+
+    it.each([
+      ['create', [jsonResponse(201, { movementId: 'mv-original', balanceContractId: 'bc-1', currency: 'USD', tightAvailableBalance: '-1' }), jsonResponse(409, { code: 'REJECTED' })], /Automatic A02 failed/],
+      ['release', [jsonResponse(201, { movementId: 'mv-original', balanceContractId: 'bc-1', currency: 'USD', tightAvailableBalance: '-1' }), jsonResponse(201, { movementId: 'mv-a02' }), jsonResponse(409, { code: 'REJECTED' })], /Automatic A02 release failed/],
+      ['verification', [jsonResponse(201, { movementId: 'mv-original', balanceContractId: 'bc-1', currency: 'USD', tightAvailableBalance: '-1' }), jsonResponse(201, { movementId: 'mv-a02' }), jsonResponse(200, { status: 'RELEASED' }), jsonResponse(500, { code: 'INTERNAL_ERROR' })], /Automatic A02 verification failed/],
+      ['still negative', [jsonResponse(201, { movementId: 'mv-original', balanceContractId: 'bc-1', currency: 'USD', tightAvailableBalance: '-1' }), jsonResponse(201, { movementId: 'mv-a02' }), jsonResponse(200, { status: 'RELEASED' }), jsonResponse(200, { tightAvailableBalance: '-0.01' })], /invalid negative Tight Available Balance/],
+    ])('reports an automatic A02 %s failure', async (_stage, responses, expected) => {
+      global.fetch = jest.fn();
+      responses.forEach((response) => global.fetch.mockResolvedValueOnce(response));
+      const businessCase = {
+        id: 'synthetic-auto-a02-failure',
+        steps: [{ type: 'createMovement', label: 'Negative Import result', request: { instrumentType: 'IPLC_LC', movementType: 'UTILIZE', amount: '1' } }],
+      };
+      await expect(runCase(businessCase)).rejects.toThrow(expected);
+    });
+
+    it('rejects a negative Tight result for an instrument without an A02/B02 repair rule', async () => {
+      global.fetch = jest.fn(async () => jsonResponse(201, { movementId: 'mv-sg', balanceContractId: 'sg-1', tightAvailableBalance: '-1' }));
+      const businessCase = {
+        id: 'synthetic-unsupported-auto-amend',
+        steps: [{ type: 'createMovement', label: 'Negative SG result', request: { instrumentType: 'SHGT', movementType: 'ISSUE', amount: '1' } }],
+      };
+      await expect(runCase(businessCase)).rejects.toThrow(/invalid negative Tight Available Balance/);
     });
 
     it('makerSubmit step: POSTs to .../maker-submit with makerSubmittedBy, distinct from release', async () => {

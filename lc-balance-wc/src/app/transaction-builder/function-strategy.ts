@@ -43,7 +43,7 @@ export interface MovementDerivationStrategy {
 }
 
 /** `maker-submit.service.ts`'s own dispatch-table shape — which submission method a function's own Submit uses. */
-export type SubmissionShape = 'plain' | 'documentArrivalWithSg' | 'confirmationHonourWithReceivable' | 'confirmationAcceptWithReceivable' | 'acceptanceSettleWithReceivable';
+export type SubmissionShape = 'plain' | 'documentArrivalWithSg' | 'confirmationHonourWithReceivable' | 'confirmationAcceptWithReceivable';
 
 export interface CompoundSubmissionStrategy {
   /** Every submission shape this function can produce. B4 is the only function with two (HONOUR/ACCEPT both true on its registry entry; chosen at submit time by model.movementType). */
@@ -80,7 +80,6 @@ export type FixPendingEditableField = 'amount' | 'tolerancePct' | 'tenorType' | 
 export type FixPendingMode = 'STANDARD' | 'REMARKS_ONLY';
 
 export type MakerResultSiblingKey =
-  | 'matchedReceivableMovementId'
   | 'dueFromIssuingBankMovementId'
   | 'acceptanceMovementId'
   | 'acceptanceReimbReceivableMovementId'
@@ -134,12 +133,6 @@ const B4_DELETE: MakerResultDeletePendingStrategy = Object.freeze({
   operation: 'CANCEL',
   siblingMovementIdKeys: Object.freeze<MakerResultSiblingKey[]>(['dueFromIssuingBankMovementId', 'acceptanceMovementId', 'acceptanceReimbReceivableMovementId']),
 });
-const B5_DELETE: MakerResultDeletePendingStrategy = Object.freeze({
-  enabled: true,
-  operation: 'CANCEL',
-  siblingMovementIdKeys: Object.freeze<MakerResultSiblingKey[]>(['matchedReceivableMovementId']),
-});
-
 /**
  * Per-function behavior, hand-authored per code — the sole source of truth (no longer derived from
  * flags on `TransactionFunction`). A1/A2/A7/A8/B1/B2/B3 share `NO_SPECIAL_BEHAVIOR` (no special case in
@@ -162,9 +155,9 @@ const B5_DELETE: MakerResultDeletePendingStrategy = Object.freeze({
  *   Docs record is already released by pick time); compoundSubmission has both
  *   confirmationHonourWithReceivable and confirmationAcceptWithReceivable, chosen at submit time by
  *   model.movementType.
- * - B5 — amountVsAvailableDerivation 'SETTLE' (same shape as A9's REDEEM derivation); compoundSubmission
- *   acceptanceSettleWithReceivable (settles the Acceptance and its linked Reimbursement Receivable
- *   together); usesSettleableBalanceIndex (a dedicated "EB Index" Step-2 picker).
+ * - B5 — amountVsAvailableDerivation 'SETTLE' (same shape as A9's REDEEM derivation) and
+ *   usesSettleableBalanceIndex (a dedicated "EB Index" Step-2 picker). Submit and Checker Release both
+ *   act only on the selected Acceptance; no Reimbursement Receivable lookup or companion leg is used.
  * - A10/B6 — amountAutoFilledFrom 'confirmedBalance' (Amount is never typed at all, unlike A9/B5's own
  *   amountVsAvailableDerivation above — see that field's own doc comment for the distinction).
  * - A11/B7 (Reopen, F1) — amountFixed '0' (Amount is a fixed literal, not carried from any live balance —
@@ -286,9 +279,8 @@ const FUNCTION_STRATEGY_DEFINITIONS: Readonly<Record<string, FunctionStrategy>> 
     code: 'B5',
     fixPendingEnabled: true,
     fixPendingMode: 'REMARKS_ONLY',
-    makerResultDeletePending: B5_DELETE,
+    makerResultDeletePending: CANCEL_DELETE,
     movementDerivation: { ...NO_SPECIAL_BEHAVIOR.movementDerivation, amountVsAvailableDerivation: 'SETTLE' },
-    compoundSubmission: { possibleShapes: ['acceptanceSettleWithReceivable'] },
     selectionFlow: { usesSettleableBalanceIndex: true },
   },
   // B6 — Export counterpart of A10: same "Reason Code is the real Fix Pending target" shape.

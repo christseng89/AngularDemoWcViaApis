@@ -260,7 +260,7 @@ describe('balance-component.model data invariants', () => {
   });
 
   describe('IMPORT_FUNCTIONS (A-series)', () => {
-    it('has exactly the 11 surviving A-codes, in order (A5 was retired, not reused; A11 is F1\'s new Reopen)', () => {
+    it('has exactly the 11 registered Import codes in order', () => {
       expect(IMPORT_FUNCTIONS.map((f) => f.code)).toEqual(['A1', 'A2', 'A3', 'A3S', 'A4', 'A6', 'A7', 'A8', 'A9', 'A10', 'A11']);
     });
 

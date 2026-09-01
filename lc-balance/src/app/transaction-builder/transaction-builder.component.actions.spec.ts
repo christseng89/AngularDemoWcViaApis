@@ -120,7 +120,6 @@ function setMakerContext(comp: TransactionBuilderComponent, overrides: Partial<M
   (comp as any).makerContext = {
     submitResult: null,
     selectedPayMovement: null,
-    matchedReceivableMovementId: null,
     dueFromIssuingBankMovementId: null,
     acceptanceMovementId: null,
     acceptanceReimbReceivableMovementId: null,
@@ -470,73 +469,21 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(comp.arrivalApproved).toBe(true);
     });
 
-    it('B5 settlesAcceptanceOnMature: releases the Acceptance then the matching Receivable, then auto-resets to a fresh B5 screen', () => {
+    it('B5 releases only the selected Acceptance settlement, then resets to a fresh B5 screen', () => {
       const { comp, api } = setup();
       comp.selectFunction(B5);
-      setMakerContext(comp, { matchedReceivableMovementId: 'mv-receivable', submitResult: makeMovement({ movementId: 'mv-settle', status: 'PENDING' }) });
-      api.release
-        .mockReturnValueOnce(of({ movementId: 'mv-settle', status: 'RELEASED' }) as any)
-        .mockReturnValueOnce(of({ movementId: 'mv-receivable', status: 'RELEASED' }) as any);
+      setMakerContext(comp, { submitResult: makeMovement({ movementId: 'mv-settle', status: 'PENDING' }) });
+      api.release.mockReturnValueOnce(of({ movementId: 'mv-settle', status: 'RELEASED' }) as any);
 
       comp.release();
 
-      expect(api.release).toHaveBeenNthCalledWith(1, 'mv-settle', 'checker1');
-      expect(api.release).toHaveBeenNthCalledWith(2, 'mv-receivable', 'checker1');
+      expect(api.release).toHaveBeenCalledTimes(1);
+      expect(api.release).toHaveBeenCalledWith('mv-settle', 'checker1');
       // See the A6 test above for why submitResult is null, not the leg response.
       expect(comp.selectedFunction).toBe(B5);
       expect((comp as any).makerContext.submitResult).toBeNull();
       expect(comp.actionBusy).toBe(false);
       expect(comp.releaseSuccessHint).toContain('mv-settle');
-    });
-
-    it('B5: a failed Acceptance release never releases the Receivable', () => {
-      const { comp, api } = setup();
-      comp.selectFunction(B5);
-      setMakerContext(comp, { matchedReceivableMovementId: 'mv-receivable', submitResult: makeMovement({ movementId: 'mv-settle', status: 'PENDING' }) });
-      api.release.mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
-
-      comp.release();
-
-      expect(api.release).toHaveBeenCalledTimes(2);
-      expect(comp.makerOutcomeSignal).toEqual({ kind: 'failed', message: 'ILLEGAL_STATE_TRANSITION' });
-    });
-
-    it('B5: Acceptance release succeeds but the Receivable release fails', () => {
-      const { comp, api } = setup();
-      comp.selectFunction(B5);
-      setMakerContext(comp, { matchedReceivableMovementId: 'mv-receivable', submitResult: makeMovement({ movementId: 'mv-settle', status: 'PENDING' }) });
-      api.release
-        .mockReturnValueOnce(of({ movementId: 'mv-settle', status: 'RELEASED' }) as any)
-        .mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
-
-      comp.release();
-
-      expect(comp.makerOutcomeSignal).toEqual({
-        kind: 'failed',
-        message: 'ILLEGAL_STATE_TRANSITION',
-      });
-    });
-
-    // Bug fixed (business-reported 2026-08-21, same guard fix as the B4 test below) — 把所有交易都測一遍:
-    // B5's own matchedReceivableMovementId is only ever populated in the SAME Maker session that
-    // Submitted it — an independent Checker session resolves it via businessEventId instead, same
-    // resolveLinkedMovementId() helper A3S uses above.
-    it('B5 settlesAcceptanceOnMature, genuinely independent Checker session (submitResult and matchedReceivableMovementId both null): still resolves the Receivable via businessEventId and releases both legs, not a silent no-op', () => {
-      const { comp, api } = setup();
-      comp.selectFunction(B5);
-      setMakerContext(comp, { createdBy: 'maker1' });
-      comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-settle', movementType: 'FULL_SETTLE', status: 'PENDING', businessEventId: 'be-3' });
-      api.findByBusinessEventId.mockReturnValueOnce(of([makeMovement({ movementId: 'mv-receivable', movementType: 'REIMBURSE', status: 'PENDING' })]) as any);
-      api.release
-        .mockReturnValueOnce(of({ movementId: 'mv-settle', status: 'RELEASED' }) as any)
-        .mockReturnValueOnce(of({ movementId: 'mv-receivable', status: 'RELEASED' }) as any);
-
-      comp.release();
-
-      expect(api.findByBusinessEventId).toHaveBeenCalledWith('be-3');
-      expect(api.release).toHaveBeenNthCalledWith(1, 'mv-settle', 'checker1');
-      expect(api.release).toHaveBeenNthCalledWith(2, 'mv-receivable', 'checker1');
-      expect(comp.makerOutcomeSignal?.kind).not.toBe('failed');
     });
 
     // B4's source (B3's Present Docs earmark) is independently Checker-Released before B4 picks it, so

@@ -361,8 +361,8 @@ describe('A10 — Import LC Close', () => {
     } catch (e) {
       error = e;
     }
-    expect(error).toBeInstanceOf(InsufficientBalanceError);
-    expect((error as Error).message).toContain('already been Closed');
+    expect(error).toBeInstanceOf(IllegalStateTransitionError);
+    expect((error as Error).message).toContain('contract status CLOSED is not eligible');
   });
 
   test('locked out: every other function (e.g. AMEND_INCREASE) can no longer resolve this LC by natural key once Closed', () => {

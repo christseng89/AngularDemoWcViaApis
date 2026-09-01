@@ -263,7 +263,7 @@ export function toEventRows(movement: BalanceMovement, contract: BalanceContract
  *   already outside `deriveContingentAccountEntry()`'s own scope (returns `null`), so there is no second
  *   contingent set to merge.
  *
- * Deliberately NOT extended to A3S (`documentArrivalWithSg`) or B5 (`acceptanceSettleWithReceivable`) —
+ * Deliberately NOT extended to A3S (`documentArrivalWithSg`) —
  * their own two legs are genuinely TWO DIFFERENT real economic events submitted together (redeeming an
  * SG vs. utilizing the LC; settling an Acceptance vs. its own on-balance-sheet receivable), not one
  * exposure transforming into two simultaneously-visible views of itself — merging those would misrepresent

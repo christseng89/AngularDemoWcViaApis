@@ -17,6 +17,25 @@ info:
     the discrepancy inline.
 
 
+    v1.44.0 (2026-09-01, same-parent multi-transaction readiness fixtures;
+    no endpoint-shape change): the reference Run All suite ends with six
+    readiness cases for A3S, A4, A6, A7, B4 and B5. Each case creates one
+    parent LC or Confirmation and retains three independently addressable,
+    eligible child transactions under it (G01-G03, B01-B03, E01-E03 or
+    IB0001-IB0003). This exercises the existing natural-key and catalog APIs;
+    it does not introduce a batch endpoint or relax lifecycle eligibility.
+
+
+    v1.43.0 (2026-09-01, Business Case Runner safety synchronization; no
+    endpoint-shape change): the reference test runner uses the existing create,
+    release and balance-read endpoints to repair a negative Tight Available
+    Balance. Import creates/releases A02 (`AMEND_INCREASE`); Export
+    creates/releases B02 (`AMEND`), then verifies a non-negative snapshot.
+    A6 release-time validation accepts its acknowledged source while PENDING
+    or immediately after that source was released earlier in the same atomic
+    compound Checker action.
+
+
     Explicitly OUT OF SCOPE: IBL/EBL and any actual funded/discounted
     exposure (Loan Component's domain, fronting the external eLoan system —
     see Design doc §1 and Cross-Reference Finding 3b), interest/accrual
@@ -67,7 +86,7 @@ info:
     remains the route-facing compatibility façade while query, snapshot,
     contract resolution, request validation, release policy/side effects and
     lifecycle responsibilities are delegated to focused services. Reaffirms
-    that A3S/A6/B4/B5 multi-leg writes use the existing atomic
+    that A3S/A6/B4 multi-leg writes use the existing atomic
     `/balance-movements/compound*` endpoints. Also documents the retained
     Run-All prerequisites (A4-ready Sight A3, A6-ready Usance A3 and B4-ready
     released B3) and clarifies that Transaction Index columns such as SG/IB/EB
@@ -101,7 +120,7 @@ info:
     function returns to its Transaction Index. This is client navigation,
     not a new service endpoint. A4 calls the existing
     `/balance-movements/{movementId}/withdraw-maker-submit` operation so its
-    A3/A3S source is preserved. Other functions call `/cancel`; A3S/B4/B5
+    A3/A3S source is preserved. Other functions call `/cancel`; A3S/B4
     cancel their linked legs sibling-first and the primary leg last. Those
     calls remain independent and are not an atomic batch cancellation.
     Maker Queue/Fix Pending is a separate entry flow and is unchanged.
@@ -315,8 +334,8 @@ info:
 
     v1.2.0 (2026-08-16, bug fixed, reviewer-reported — "A1 -> A8 -> A3S -> A4, the related SG entries
     was not shown"): ADDED `GET /balance-movements?businessEventId=`. Root cause: the reference Angular
-    Transaction Builder client's own Checker Release for a linked-movement submission (A3S's SG
-    redemption + LC UTILIZE, B5's Acceptance settle + Reimbursement Receivable REIMBURSE) used to
+    Transaction Builder client's own Checker Release for a linked-movement submission (such as A3S's SG
+    redemption + LC UTILIZE) used to
     resolve the linked leg's own movementId purely from the Maker's own in-memory client state —
     correct only when the SAME browser session that submitted also performs the release, never true
     for a genuinely separate Checker session (the whole point of Maker/Checker 4-eyes separation). This
@@ -830,7 +849,7 @@ info:
     verification; see that document's §9-§13 for the full decision record):
       - CHANGED: `POST /balance-movements/{movementId}/cancel` (Delete Pending / Maker EC) gained two
         always-on side effects — (1) writes one independent, append-only `DeletePendingAuditRecord`
-        per call (a compound function's own cascade, e.g. A3S/B4/B5, naturally produces one per leg);
+        per call (a compound function's own cascade, e.g. A3S/B4, naturally produces one per leg);
         (2) when the cancelled movement is the root ISSUE of `IPLC_LC`/`EPLC_LC`/`EPLC_CONFIRMATION`
         (A1/B1 only), the owning contract is ALSO marked `ContractStatus.CANCELLED` — genuinely reachable
         now, not merely reserved — freeing the natural key (`lcNumber`) for the same Maker to re-Submit
@@ -969,7 +988,7 @@ info:
         callers no longer need client-side compensation for an approved multi-leg command.
       - DOCUMENTED business routing: Import A3/A3S continues to A4 for Sight or A6 for Seller's/Buyer's
         Usance; Export B3 continues to B4, whose HONOUR/ACCEPT compound shape is selected by Sight/Usance.
-  version: "1.42.1"
+  version: "1.44.0"
 x-client-retry-policy:
   configuration:
     maxRetries: BALANCE_HTTP_RETRY_COUNT
@@ -1336,6 +1355,15 @@ paths:
         exists for that natural key.
 
 
+        Transaction Index eligibility is authoritative server-side, not only
+        a UI filter. Every derived A2-A11/B2-B7 create re-resolves its target
+        and requires the contract/parent to exist in an eligible status
+        (normally ACTIVE; CLOSE and REOPEN use their documented lifecycle
+        exceptions). A stale or hand-crafted API request is rejected rather
+        than creating a movement against a target the current Index would no
+        longer show.
+
+
         See CURRENCY CONSISTENCY in this document's top-level description
         for the full rule — in short, `currency` is always required, and
         for every case other than a genuinely root new Logical Contract
@@ -1404,13 +1432,17 @@ paths:
         description.
 
 
-        v1.29.0 — a new `IPLC_ACCEPTANCE`/`CREATE` (A6) whose own `referencedTransactionId` points at a
-        still-PENDING, already-acknowledged, not-yet-Maker-Submitted `IPLC_LC`/`UTILIZE` (A3/A3S's own
+        v1.29.0 — a new `IPLC_ACCEPTANCE`/`CREATE` (A6) requires its
+        `referencedTransactionId` to point at a same-LC, still-PENDING,
+        already-acknowledged, not-yet-Maker-Submitted `IPLC_LC`/`UTILIZE` (A3/A3S's own
         earmark) ALSO sets that referenced UTILIZE's own `makerSubmittedBy`/`makerSubmittedAt` as a side
         effect of THIS call — see `BalanceMovement.makerSubmittedBy`'s own description for the full
         mechanism and why (A6 has no separate "Maker Submit" step of its own to set it from otherwise).
-        Best-effort/silent — an unrelated or already-submitted `referencedTransactionId` (e.g. from a raw
-        API caller) is simply ignored, never a validation error.
+        An unrelated, unacknowledged, already-submitted, or wrong-status
+        reference is a validation/state error. B4 is symmetric: its reference
+        must be a same-Confirmation, RELEASED and unconsumed
+        `EPLC_EXAMINATION`/`CREATE`, and cannot already be reserved by another
+        pending B4 movement.
       requestBody:
         required: true
         content:
@@ -1428,7 +1460,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/BalanceMovement' }
         '400':
-          description: Request validation failed — includes malformed fields, the Acceptance/parent-tenor consistency check, a missing required parentLogicalContractId, and a reused sourceTransactionRef.
+          description: Request validation failed — includes malformed fields, the Acceptance/parent-tenor consistency check, a missing/non-ACTIVE parent, an ineligible A6/B4 referenced source transaction, and a reused sourceTransactionRef.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -1444,8 +1476,8 @@ paths:
       description: >
         Shape (a), v1.2.0 — bug fixed 2026-08-16, reviewer-reported ("A1 -> A8 -> A3S -> A4, the related SG
         entries was not shown"): lets a caller independently resolve the linked leg(s) of a compound
-        submission (A3S's SG redemption + LC UTILIZE, B5's Acceptance settle + Reimbursement
-        Receivable REIMBURSE) by their shared businessEventId, without needing to have been the same
+        submission (such as A3S's SG redemption + LC UTILIZE) by their shared businessEventId,
+        without needing to have been the same
         caller/session that originally submitted them — the whole point of Maker/Checker 4-eyes
         separation being genuinely two different actors. Cross-contract by design (the SG's own
         balanceContractId differs from the LC's) — businessEventId is the only correlation the two
@@ -1742,6 +1774,14 @@ paths:
         must cancel and resubmit with the current figure, never auto-recomputed here). On success, this
         call's own side effect retires the contract (`ContractStatus.CLOSED`, `effectiveTo` set) — the
         movement itself is RELEASED exactly like any other.
+
+
+        Checker Release does not trust eligibility captured when the Maker
+        submitted. It rechecks the persisted movement, contract lifecycle,
+        reference/source state, and function-specific release policy against
+        current data; a stale approval is rejected with 409. This keeps API
+        behavior aligned with the UI Checker queue and prevents a state change
+        between Submit and Approve from being bypassed.
       parameters:
         - name: movementId
           in: path
@@ -1803,7 +1843,8 @@ paths:
         400 if the movement's instrumentType is not IPLC_LC or its
         movementType is not UTILIZE. 409 if the movement is not currently
         PENDING, or if it was already submitted (makerSubmittedAt already
-        set).
+        set). The referenced LC must still be ACTIVE and Sight-tenor; a Usance
+        Document Arrival belongs to A6 and cannot be submitted through A4.
       parameters:
         - name: movementId
           in: path
@@ -2054,7 +2095,7 @@ paths:
         Pending Phase, `analysis/Balance-Component-FixPending-DeletePending-
         Proposal-zh.md`): (1) every call writes one independent, append-only
         `delete_pending_audit` record — see `GET /delete-pending-audit`
-        below; a compound function's own cascade (A3S/B4/B5, each leg
+        below; a compound function's own cascade (A3S/B4, each leg
         cancelled via its own separate call to this endpoint) naturally
         produces one audit row per leg, no special-casing needed. (2) when
         the cancelled movement is a "creating" movementType (`ISSUE` or
@@ -2089,7 +2130,7 @@ paths:
 
         v1.41.0 (2026-08-31) — one call still cancels exactly one movement.
         Transaction Processing may expose this operation immediately after
-        any A1-A11/B1-B7 Maker Submit. For A3S/B4/B5, the client uses its
+        any registered Maker Submit. For A3S/B4, the client uses its
         function strategy to cancel linked sibling movements first and the
         primary movement last, producing one audit record per cancelled leg.
         This ordered sequence is not an atomic batch operation: if a call

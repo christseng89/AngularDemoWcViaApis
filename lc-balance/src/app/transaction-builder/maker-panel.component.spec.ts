@@ -14,7 +14,7 @@ import { IMPORT_FUNCTIONS, EXPORT_FUNCTIONS, TransactionFunction, InstrumentType
 import type { InquiredEvent } from './inquire-events.service';
 import * as functionStrategyModule from './function-strategy';
 
-// submit()'s compound branches (A3S/B4/B5) call `crypto.randomUUID()` to link legs via businessEventId —
+// submit()'s compound branches (A3S/B4) call `crypto.randomUUID()` to link legs via businessEventId —
 // jsdom's test environment doesn't always implement it. Polyfill once, module-load time.
 if (typeof (globalThis as any).crypto === 'undefined') {
   (globalThis as any).crypto = {};
@@ -357,7 +357,6 @@ describe('MakerPanelComponent', () => {
       comp.compoundLegs.dueFromIssuingBankMovementId = 'mv2';
       comp.compoundLegs.acceptanceReimbReceivableMovementId = 'mv3';
       comp.compoundLegs.acceptanceMovementId = 'mv4';
-      comp.compoundLegs.matchedReceivableMovementId = 'mv5';
 
       triggerSelectFunction(comp, A2);
 
@@ -388,7 +387,6 @@ describe('MakerPanelComponent', () => {
       expect(comp.compoundLegs.dueFromIssuingBankMovementId).toBeNull();
       expect(comp.compoundLegs.acceptanceReimbReceivableMovementId).toBeNull();
       expect(comp.compoundLegs.acceptanceMovementId).toBeNull();
-      expect(comp.compoundLegs.matchedReceivableMovementId).toBeNull();
     });
 
     it('resets naturalKey/searchNaturalKey/searchError on every pick, and applies the Sight tenorType default (B1)', () => {
@@ -2719,7 +2717,7 @@ describe('MakerPanelComponent', () => {
 
   // =========================================================================
   // Group C — from transaction-builder.component.actions.spec.ts (submit()'s own validation guards,
-  // isSubmitReady, request-building, and its 4 compound shapes — A3S/B4 Sight/B4 Usance/B5). Every other
+  // isSubmitReady, request-building, and its compound shapes — A3S/B4 Sight/B4 Usance). Every other
   // describe block in that origin file (release()/reject()/deleteMakerPending()/checkerAct()/
   // approveArrival()/runLookup()/etc) is genuinely Checker/parent-owned and stayed in
   // transaction-builder.component.actions.spec.ts unchanged.
@@ -3493,9 +3491,9 @@ describe('MakerPanelComponent', () => {
   });
 
   // ---------------------------------------------------------------------
-  // submit() — B5 settlesAcceptanceOnMature compound
+  // submit() — B5 plain Acceptance settlement
   // ---------------------------------------------------------------------
-  describe('submit() — B5 settlesAcceptanceOnMature compound', () => {
+  describe('submit() — B5 plain Acceptance settlement', () => {
     function primed(comp: MakerPanelComponent) {
       triggerSelectFunction(comp, B5);
       comp.model.amount = '500';
@@ -3507,62 +3505,28 @@ describe('MakerPanelComponent', () => {
       comp.selectedContractSnapshot = makeSnapshotC({ availableBalance: '500' });
     }
 
-    it('settles the Acceptance then resolves and reimburses the matching Receivable', () => {
+    it('settles only the selected Acceptance', () => {
       const { comp, api } = setupC();
-      api.createMovement
-        .mockReturnValueOnce(of({ body: { movementId: 'settle-1', status: 'PENDING' } }) as any)
-        .mockReturnValueOnce(of({ body: { movementId: 'reimb-1', status: 'PENDING' } }) as any);
-      api.resolveContract.mockReturnValueOnce(
-        of(makeContractC({ balanceContractId: 'bc-receivable', instrumentType: 'EPLC_ACCEPTANCE_REIMB_RECEIVABLE' })) as any,
-      );
+      api.createMovement.mockReturnValueOnce(of({ body: { movementId: 'settle-1', status: 'PENDING' } }) as any);
       primed(comp);
 
       comp.submit();
 
       expect(lastReqC(api, 0)).toMatchObject({ instrumentType: 'EPLC_ACCEPTANCE', balanceContractId: 'bc-accept', movementType: 'FULL_SETTLE' });
-      expect(api.resolveContract).toHaveBeenCalledWith('EPLC_ACCEPTANCE_REIMB_RECEIVABLE', { lcNumber: 'LC001', ibNumber: 'EB01' });
-      expect(lastReqC(api, 1)).toMatchObject({
-        instrumentType: 'EPLC_ACCEPTANCE_REIMB_RECEIVABLE',
-        balanceContractId: 'bc-receivable',
-        movementType: 'REIMBURSE',
-      });
+      expect(api.resolveContract).not.toHaveBeenCalled();
+      expect(api.createMovement).toHaveBeenCalledTimes(1);
       expect(comp.submitResult).toEqual({ movementId: 'settle-1', status: 'PENDING' });
-      expect(comp.compoundLegs.matchedReceivableMovementId).toBe('reimb-1');
     });
 
-    it('a failed Acceptance settle never resolves the Receivable', () => {
+    it('surfaces an Acceptance settlement failure without resolving a Receivable', () => {
       const { comp, api } = setupC();
       api.createMovement.mockReturnValueOnce(apiErrC('INSUFFICIENT_AVAILABLE_BALANCE') as any);
       primed(comp);
 
       comp.submit();
 
-      expect(api.resolveContract).toHaveBeenCalledTimes(1);
+      expect(api.resolveContract).not.toHaveBeenCalled();
       expect(comp.submitError).toBe('INSUFFICIENT_AVAILABLE_BALANCE');
-    });
-
-    it('settle succeeds but resolveContract fails — surfaces the compound error', () => {
-      const { comp, api } = setupC();
-      api.createMovement.mockReturnValueOnce(of({ body: { movementId: 'settle-1', status: 'PENDING' } }) as any);
-      api.resolveContract.mockReturnValueOnce(apiErrC('NOT_FOUND') as any);
-      primed(comp);
-
-      comp.submit();
-
-      expect(comp.submitError).toBe('NOT_FOUND');
-    });
-
-    it('settle + resolve succeed but the Receivable createMovement fails — surfaces the compound error', () => {
-      const { comp, api } = setupC();
-      api.createMovement
-        .mockReturnValueOnce(of({ body: { movementId: 'settle-1', status: 'PENDING' } }) as any)
-        .mockReturnValueOnce(apiErrC('REQUEST_VALIDATION_FAILED') as any);
-      api.resolveContract.mockReturnValueOnce(of(makeContractC({ balanceContractId: 'bc-receivable' })) as any);
-      primed(comp);
-
-      comp.submit();
-
-      expect(comp.submitError).toBe('REQUEST_VALIDATION_FAILED');
     });
   });
 

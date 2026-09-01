@@ -201,7 +201,7 @@ describe('MakerSubmitService.submit() — dispatch routing', () => {
     });
   });
 
-  it('routes B5 to the Settle+Receivable compound when instrumentType is EPLC_ACCEPTANCE', (done) => {
+  it('routes B5 to a single Acceptance settlement without resolving a Receivable', (done) => {
     const api = makeApi();
     const service = new MakerSubmitService(api);
     const ctx = makeContext({
@@ -212,8 +212,8 @@ describe('MakerSubmitService.submit() — dispatch routing', () => {
 
     service.submit(makeReq({ instrumentType: 'EPLC_ACCEPTANCE', movementType: 'FULL_SETTLE' }), ctx).subscribe((outcome) => {
       expect(outcome.kind).toBe('submitted');
-      expect(api.resolveContract).toHaveBeenCalledTimes(1);
-      expect(api.createMovement).toHaveBeenCalledTimes(2);
+      expect(api.resolveContract).not.toHaveBeenCalled();
+      expect(api.createMovement).toHaveBeenCalledTimes(1);
       done();
     });
   });
@@ -454,19 +454,16 @@ describe('MakerSubmitService — submitConfirmationAcceptWithReceivable (B4 Usan
   });
 });
 
-describe('MakerSubmitService — submitAcceptanceSettleWithReceivable (B5)', () => {
+describe('MakerSubmitService — plain Acceptance settlement (B5)', () => {
   const ctx = makeContext({
     selectedFunction: B5,
     model: { amount: '1000', currency: 'USD', createdBy: 'maker1', instrumentType: 'EPLC_ACCEPTANCE' },
     selectedContract: makeContract({ instrumentType: 'EPLC_ACCEPTANCE', naturalKey: { lcNumber: 'LC001', ibNumber: 'EB01', sgNumber: null } }),
   });
 
-  it('all three legs succeed: secondary carries the Reimburse movementId', (done) => {
+  it('submits only the selected Acceptance settlement', (done) => {
     const api = makeApi({
-      createMovement: jest
-        .fn()
-        .mockReturnValueOnce(of({ body: makeMovement({ movementId: 'settle-1', movementType: 'FULL_SETTLE' }) }))
-        .mockReturnValueOnce(of({ body: makeMovement({ movementId: 'reimburse-1', movementType: 'REIMBURSE' }) })),
+      createMovement: jest.fn(() => of({ body: makeMovement({ movementId: 'settle-1', movementType: 'FULL_SETTLE' }) })),
     });
     const service = new MakerSubmitService(api);
 
@@ -474,8 +471,10 @@ describe('MakerSubmitService — submitAcceptanceSettleWithReceivable (B5)', () 
       expect(outcome.kind).toBe('submitted');
       if (outcome.kind === 'submitted') {
         expect(outcome.result.movementId).toBe('settle-1');
-        expect(outcome.secondary.matchedReceivableMovementId).toBe('reimburse-1');
+        expect(outcome.secondary).toEqual({});
       }
+      expect(api.resolveContract).not.toHaveBeenCalled();
+      expect(api.createCompoundMovements).not.toHaveBeenCalled();
       done();
     });
   });
@@ -495,42 +494,6 @@ describe('MakerSubmitService — submitAcceptanceSettleWithReceivable (B5)', () 
     });
   });
 
-  it('the matching Reimbursement Receivable contract cannot be resolved: result stays the Settle response', (done) => {
-    const api = makeApi({
-      createMovement: jest.fn(() => of({ body: makeMovement({ movementId: 'settle-2', movementType: 'FULL_SETTLE' }) })),
-      resolveContract: jest.fn(() => throwError(() => ({ error: { message: 'NOT_FOUND' } }))),
-    });
-    const service = new MakerSubmitService(api);
-
-    service.submit(makeReq({ instrumentType: 'EPLC_ACCEPTANCE', movementType: 'FULL_SETTLE' }), ctx).subscribe((outcome) => {
-      expect(outcome.kind).toBe('failed');
-      if (outcome.kind === 'failed') {
-        expect(outcome.message).toContain('NOT_FOUND');
-        expect(outcome.result).toBeUndefined();
-      }
-      done();
-    });
-  });
-
-  it('the REIMBURSE call itself fails after Settle+resolve succeed: result stays the Settle response', (done) => {
-    const api = makeApi({
-      createMovement: jest
-        .fn()
-        .mockReturnValueOnce(of({ body: makeMovement({ movementId: 'settle-3', movementType: 'FULL_SETTLE' }) }))
-        .mockReturnValueOnce(throwError(() => ({ error: { message: 'ILLEGAL_STATE_TRANSITION' } }))),
-    });
-    const service = new MakerSubmitService(api);
-
-    service.submit(makeReq({ instrumentType: 'EPLC_ACCEPTANCE', movementType: 'FULL_SETTLE' }), ctx).subscribe((outcome) => {
-      expect(outcome.kind).toBe('failed');
-      if (outcome.kind === 'failed') {
-        expect(outcome.message).toContain('ILLEGAL_STATE_TRANSITION');
-        expect(outcome.result).toBeUndefined();
-        expect(outcome.secondary).toEqual({});
-      }
-      done();
-    });
-  });
 });
 
 describe('MakerSubmitService — submitPlain (default path)', () => {

@@ -18,7 +18,6 @@ export interface CheckerActionContext {
   readonly submitResult: BalanceMovement | null;
   readonly selectedFunction: TransactionFunction | null;
   readonly selectedPayMovement: BalanceMovement | null;
-  readonly matchedReceivableMovementId: string | null;
   readonly dueFromIssuingBankMovementId: string | null;
   readonly acceptanceMovementId: string | null;
   readonly acceptanceReimbReceivableMovementId: string | null;
@@ -93,26 +92,6 @@ export class CheckerActionsService {
           ).pipe(
             map(() => ({ kind: 'documentArrivalAcknowledged' as const })),
             catchError((err) => this.fail(`Could not release the Shipping Guarantee redemption — Document Arrival NOT acknowledged: ${describeApiError(err)}`)),
-          );
-        }),
-      );
-    }
-
-    // B5's Usance/CNF_MATURE branch only — one Release does both the Acceptance's own FULL_SETTLE/
-    // PARTIAL_SETTLE and the matching Reimbursement Receivable's REIMBURSE, per the CNF_MATURE event.
-    // matchedReceivableMovementId resolves via businessEventId when unavailable, same as A3S above.
-    if (strategy?.movementDerivation.amountVsAvailableDerivation === 'SETTLE') {
-      return this.resolveLinkedMovementId(ctx, ctx.matchedReceivableMovementId, 'REIMBURSE').pipe(
-        switchMap((matchedReceivableMovementId) => {
-          if (!matchedReceivableMovementId) {
-            return this.fail(
-              'Could not find the matching Reimbursement Receivable linked to this Acceptance Settle (no businessEventId correlation found) — release it separately first.',
-            );
-          }
-          const primaryMovementId = ctx.selectedCheckerMovement?.movementId ?? ctx.submitResult?.movementId;
-          return this.api.releaseCompoundMovements([primaryMovementId!, matchedReceivableMovementId], checkerId).pipe(
-            map(([res]) => ({ kind: 'released' as const, result: res! })),
-            catchError((err) => this.fail(describeApiError(err))),
           );
         }),
       );

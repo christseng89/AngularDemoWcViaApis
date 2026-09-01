@@ -16,6 +16,8 @@
 - 只有合法且当前仍可处理的状态才能 Release、Reject、Fix Pending 或 Delete Pending。
 - 选取记录与最终动作之间可能发生并发变化；最终动作必须重新验证资格和余额。
 - UI 隐藏或禁用按钮不构成安全控制。
+- Transaction Index 只是候选清单；Maker Submit/API create 与 Checker Release 必须各自重新解析目标并验证当前资格，不能信任客户端带回的旧状态。
+- A6 的来源必须是同 LC、已 acknowledged、仍 PENDING 且尚未 Maker Submit 的 A3／A3S；B4 的来源必须是同 Confirmation、已 RELEASED、未消耗且未被另一笔 pending B4 占用的 B3。
 
 ## 状态
 
@@ -38,7 +40,7 @@
 
 ## Function 差异
 
-- A1–A11／B1–B7 的共同流程由共享实现承担。
+- 已注册功能 A1、A2、A3、A3S、A4、A6–A11、B1–B7 的共同流程由共享实现承担；A5 不属于现行功能目录。
 - Tenor、Function eligibility、picker、关联 movement、会计阶段和状态展示的差异由 `function-strategy.ts`、Policy 或 Domain registry 统一表达。
 - 新增 Function Code 条件前，先检查是否已有共享策略可以表达该差异。
 - A3S 使用 SG Number／SG Amount，A6 使用 IB Number／IB Amount，B4 使用 EB Number／EB Amount；
@@ -49,7 +51,7 @@
 - Fix Pending 修改同一业务事件时应保持其身份与完整审计，不制造对用户可见的技术业务状态。
 - Delete Pending 必须遵守所有权、角色、生命周期和 compound event 规则。
 - Compound event 的建立／Release 必须使用现有 compound endpoint，在一个事务内完成。
-- Delete Pending 目前没有 atomic batch cancel endpoint。A3S／B4／B5 由调用端按策略先取消 sibling legs、最后取消 primary leg；每个 `/cancel` 都独立提交并留下自己的 audit。因此中途失败可能形成部分取消，调用端必须停止、显示真实状态，不得宣称自动回滚。
+- Delete Pending 目前没有 atomic batch cancel endpoint。A3S／B4 由调用端按策略先取消 sibling legs、最后取消 primary leg；每个 `/cancel` 都独立提交并留下自己的 audit。B5 只取消自己的 Acceptance Settlement。
 - A4 Delete Pending 只撤回本次 Maker Submit，使用 `/withdraw-maker-submit`，不得取消作为来源的 A3／A3S movement。
 - Transaction Processing 的同 session Delete Pending 与 Maker Queue／Fix Pending 是不同入口；共享 domain policy 与 API client，但不得互相泄漏按钮或导航状态。
 - 新增引用主表的审计表时，必须同步检查数据库清理和 reset 流程的外键删除顺序。

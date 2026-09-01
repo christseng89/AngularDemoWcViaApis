@@ -3,6 +3,7 @@ import { MovementReleasePolicyService } from '../../../src/service/movementRelea
 import type { MovementRequestValidator } from '../../../src/service/movementRequestValidator';
 import type { ContractLifecycleEligibilityService } from '../../../src/service/contractLifecycleEligibilityService';
 import type { BalanceMovementStore } from '../../../src/store/balanceMovementStore';
+import type { BalanceContractStore } from '../../../src/store/balanceContractStore';
 import type { BalanceContract, BalanceMovement, InstrumentType } from '../../../src/types';
 
 function contract(instrumentType: InstrumentType = 'IPLC_LC', overrides: Partial<BalanceContract> = {}): BalanceContract {
@@ -36,7 +37,8 @@ function movement(movementType = 'UTILIZE', overrides: Partial<BalanceMovement> 
 }
 
 function setup(isCreating = false) {
-  const movements = { listByContract: jest.fn(() => []) } as unknown as BalanceMovementStore;
+  const movements = { listByContract: jest.fn(() => []), findById: jest.fn() } as unknown as BalanceMovementStore;
+  const contracts = { findById: jest.fn() } as unknown as BalanceContractStore;
   const validator = {
     assertValidAmount: jest.fn(),
     assertToleranceNonNegative: jest.fn(),
@@ -48,9 +50,10 @@ function setup(isCreating = false) {
   } as unknown as ContractLifecycleEligibilityService;
   return {
     movements,
+    contracts,
     validator,
     lifecycle,
-    service: new MovementReleasePolicyService(movements, validator, lifecycle, () => isCreating),
+    service: new MovementReleasePolicyService(movements, contracts, validator, lifecycle, () => isCreating),
   };
 }
 
@@ -91,6 +94,51 @@ describe('MovementReleasePolicyService submit guards', () => {
 });
 
 describe('MovementReleasePolicyService eligibility', () => {
+  it('rejects an inactive ordinary contract and a missing referenced source', () => {
+    const { service, movements } = setup();
+    expect(() => service.assertEligibility(movement('AMEND_INCREASE'), contract('IPLC_LC', { status: 'CLOSED' }), new Decimal(0))).toThrow(
+      'contract status is now CLOSED',
+    );
+    jest.mocked(movements.findById).mockReturnValue(undefined);
+    expect(() =>
+      service.assertEligibility(
+        movement('CREATE', { referencedTransactionId: 'missing-source' }),
+        contract('IPLC_ACCEPTANCE', { parentLogicalContractId: 'lc-logical' }),
+        new Decimal(0),
+      ),
+    ).toThrow('referenced source transaction no longer exists');
+  });
+
+  it('rechecks A6 and B4 referenced sources against current state', () => {
+    const { service, movements, contracts } = setup();
+    const a3 = movement('UTILIZE', {
+      movementId: 'a3',
+      balanceContractId: 'lc-contract',
+      acknowledgedAt: '2026-01-01',
+      makerSubmittedAt: '2026-01-02',
+    });
+    jest.mocked(movements.findById).mockReturnValue(a3);
+    jest.mocked(contracts.findById).mockReturnValue(contract('IPLC_LC', { balanceContractId: 'lc-contract', logicalContractId: 'lc-logical' }));
+    const a6 = movement('CREATE', { referencedTransactionId: 'a3' });
+    const acceptance = contract('IPLC_ACCEPTANCE', { parentLogicalContractId: 'lc-logical' });
+    expect(() => service.assertEligibility(a6, acceptance, new Decimal(0))).not.toThrow();
+    jest.mocked(movements.findById).mockReturnValue({ ...a3, status: 'RELEASED' });
+    expect(() => service.assertEligibility(a6, acceptance, new Decimal(0))).not.toThrow();
+    jest.mocked(movements.findById).mockReturnValue({ ...a3, status: 'REJECTED' });
+    expect(() => service.assertEligibility(a6, acceptance, new Decimal(0))).toThrow('A3/A3S source is no longer');
+
+    const b3 = movement('CREATE', { movementId: 'b3', balanceContractId: 'exam', status: 'RELEASED', presentDocsConsumedAt: null });
+    jest.mocked(movements.findById).mockReturnValue(b3);
+    jest.mocked(contracts.findById).mockReturnValue(
+      contract('EPLC_EXAMINATION', { balanceContractId: 'exam', parentLogicalContractId: 'confirmation-logical' }),
+    );
+    const b4 = movement('ACCEPT', { referencedTransactionId: 'b3' });
+    const confirmation = contract('EPLC_CONFIRMATION', { balanceContractId: 'confirmation', logicalContractId: 'confirmation-logical' });
+    expect(() => service.assertEligibility(b4, confirmation, new Decimal(0))).not.toThrow();
+    jest.mocked(movements.findById).mockReturnValue({ ...b3, presentDocsConsumedAt: '2026-01-03' });
+    expect(() => service.assertEligibility(b4, confirmation, new Decimal(0))).toThrow('B3 source is no longer');
+  });
+
   it.each(['CLOSE', 'EXPIRE'] as const)('%s rejects stale eligibility and a changed frozen balance', (movementType) => {
     const { service, lifecycle } = setup();
     const candidate = movement(movementType);

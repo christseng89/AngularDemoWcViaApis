@@ -113,7 +113,7 @@ export function lcNumberFromParent(model: BuilderModel): boolean {
 
 /**
  * Whatever LC Number is currently resolved for THIS function, from whichever picker shape it came from
- * (freely typed A1/B1, Parent picker A6/A8, flat Catalog A2-A5/A3S, or the LC+IB/SG two-field search
+ * (freely typed A1/B1, Parent picker A6/A8, flat Catalog A2/A3/A3S/A4, or the LC+IB/SG two-field search
  * A7/A9/B5). Feeds both the Checker queue and runLookup()'s auto-fill.
  *
  * `lcNumberFromParent` (A6/A8/B3) falls back to `s.naturalKey.lcNumber` when `selectedParent` is null —

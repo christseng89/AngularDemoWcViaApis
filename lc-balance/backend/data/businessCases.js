@@ -196,14 +196,7 @@ function importCase2(lc, ib) {
           createdBy: MAKER,
         },
       },
-      // Added 2026-08-28 — this case predates the A6 cascade design (analysis/balance-component-api.yaml
-      // v1.29.0) and directly plain-releases this Usance UTILIZE rather than going through a real A6
-      // IPLC_ACCEPTANCE/CREATE (see Import Case 7 for that fuller shape) — v1.29.0's own widened
-      // Maker-Submit gate (Sight-only -> any explicit tenorType) now requires this explicit step first;
-      // without it, the release two steps below 409s with ILLEGAL_STATE_TRANSITION.
-      { type: 'makerSubmit', label: 'Real Maker Submit before Accept', movementRef: 'utilize', makerSubmittedBy: MAKER },
-      { type: 'release', label: 'Accept 50,000 (Usance) — LC Liability -> Acceptance Liability', movementRef: 'utilize', releasedBy: CHECKER },
-      { type: 'snapshot', label: 'LC Balance after Accept (expect 71,000)', contractRef: 'lc' },
+      { type: 'acknowledge', label: 'Checker acknowledges Document Arrival B01 (A3)', movementRef: 'utilize', acknowledgedBy: CHECKER },
       ...createAndRelease(
         'Create Acceptance 50,000 (carved out of the LC, linked call)',
         'acceptance',
@@ -218,10 +211,12 @@ function importCase2(lc, ib) {
           tenorType: 'BUYERS_USANCE',
           tenorDays: 120,
           exposureNature: 'ACTUAL',
+          referencedTransactionIdRef: 'utilize',
           createdBy: MAKER,
         },
         'Checker releases Acceptance CREATE',
       ),
+      { type: 'snapshot', label: 'LC Balance after Accept (expect 71,000)', contractRef: 'lc' },
       { type: 'snapshot', label: 'Acceptance Balance (expect 50,000)', contractRef: 'acceptance' },
       ...createAndRelease(
         'Settlement Due Date 50,000 (Cr CA)',
@@ -1142,14 +1137,7 @@ function importCase9(lc, ib) {
           createdBy: MAKER,
         },
       },
-      // Added 2026-08-28 — this case predates the A6 cascade design (analysis/balance-component-api.yaml
-      // v1.29.0) and directly plain-releases this Usance UTILIZE rather than going through a real A6
-      // IPLC_ACCEPTANCE/CREATE (see Import Case 7 for that fuller shape) — v1.29.0's own widened
-      // Maker-Submit gate (Sight-only -> any explicit tenorType) now requires this explicit step first;
-      // without it, the release two steps below 409s with ILLEGAL_STATE_TRANSITION.
-      { type: 'makerSubmit', label: 'Real Maker Submit before Accept', movementRef: 'utilize', makerSubmittedBy: MAKER },
-      { type: 'release', label: 'Accept 50,000 (Usance) — LC Liability -> Acceptance Liability', movementRef: 'utilize', releasedBy: CHECKER },
-      { type: 'snapshot', label: 'LC Balance after Accept (expect 71,000)', contractRef: 'lc' },
+      { type: 'acknowledge', label: 'Checker acknowledges Document Arrival B01 (A3)', movementRef: 'utilize', acknowledgedBy: CHECKER },
       ...createAndRelease(
         'Create Acceptance 50,000 (carved out of the LC, linked call)',
         'acceptance',
@@ -1164,10 +1152,12 @@ function importCase9(lc, ib) {
           tenorType: 'BUYERS_USANCE',
           tenorDays: 120,
           exposureNature: 'ACTUAL',
+          referencedTransactionIdRef: 'utilize',
           createdBy: MAKER,
         },
         'Checker releases Acceptance CREATE',
       ),
+      { type: 'snapshot', label: 'LC Balance after Accept (expect 71,000)', contractRef: 'lc' },
       { type: 'snapshot', label: 'Acceptance Balance (expect 50,000)', contractRef: 'acceptance' },
       ...createAndRelease(
         'Settlement Due Date 50,000 (Cr CA)',
@@ -1403,10 +1393,7 @@ function importCase12(lc, ib) {
           createdBy: MAKER,
         },
       },
-      // Added 2026-08-28 — same fix as Import Case 2/9, see that comment for the full explanation.
-      { type: 'makerSubmit', label: 'Real Maker Submit before Accept', movementRef: 'utilize', makerSubmittedBy: MAKER },
-      { type: 'release', label: 'Accept 50,000 (Usance) — LC Liability -> Acceptance Liability', movementRef: 'utilize', releasedBy: CHECKER },
-      { type: 'snapshot', label: 'LC Balance after Accept (expect 50,000 — 100,000 minus 50,000 utilized)', contractRef: 'lc' },
+      { type: 'acknowledge', label: 'Checker acknowledges Document Arrival B01 (A3)', movementRef: 'utilize', acknowledgedBy: CHECKER },
       ...createAndRelease(
         'Create Acceptance 50,000 (carved out of the LC, linked call) — left outstanding, never settled',
         'acceptance',
@@ -1421,10 +1408,12 @@ function importCase12(lc, ib) {
           tenorType: 'SELLERS_USANCE',
           tenorDays: 120,
           exposureNature: 'ACTUAL',
+          referencedTransactionIdRef: 'utilize',
           createdBy: MAKER,
         },
         'Checker releases Acceptance CREATE',
       ),
+      { type: 'snapshot', label: 'LC Balance after Accept (expect 50,000 — 100,000 minus 50,000 utilized)', contractRef: 'lc' },
       { type: 'snapshot', label: 'Acceptance Liability before Close attempt (expect 50,000 — never settled)', contractRef: 'acceptance' },
       {
         type: 'createMovement',
@@ -2188,7 +2177,7 @@ function exportCase7(lc, ib) {
     title:
       'Export Case #7 — USD Sellers Usance 120 days + Confirmed + Present Docs (B3) -> Accept (B4) -> Acceptance + Reimbursement Receivable -> Settlement (B5)',
     description:
-      'Confirm LC 100,000 (Sellers Usance 120d) -> Present Docs 10,000 (B3 memo earmark) -> Issuing Bank Accept 10,000 (B4 unified legal event; compound-creates Acceptance Liability + Acceptance Reimbursement Receivable) -> Acceptance Settlement (B5; compound-releases FULL_SETTLE + REIMBURSE)',
+      'Confirm LC 100,000 (Sellers Usance 120d) -> Present Docs 10,000 (B3 memo earmark) -> Issuing Bank Accept 10,000 (B4 unified legal event; compound-creates Acceptance Liability + Acceptance Reimbursement Receivable) -> Acceptance Settlement (B5; settles the Acceptance only)',
     steps: [
       ...createAndRelease(
         'Confirm LC 100,000 (Sellers Usance, 120 days)',
@@ -2297,29 +2286,11 @@ function exportCase7(lc, ib) {
           eventSeq: 2,
           amount: '10000',
           currency: 'USD',
-          businessEventId: `${lc}-settle`,
-          createdBy: MAKER,
-        },
-      },
-      {
-        type: 'createMovement',
-        label: 'Reimbursement Receivable REIMBURSE 10,000 (linked compound leg, same submission as Settlement — shares businessEventId)',
-        captureAs: 'reimburse',
-        request: {
-          instrumentType: 'EPLC_ACCEPTANCE_REIMB_RECEIVABLE',
-          balanceContractIdRef: 'reimbReceivable',
-          movementType: 'REIMBURSE',
-          eventSeq: 2,
-          amount: '10000',
-          currency: 'USD',
-          businessEventId: `${lc}-settle`,
           createdBy: MAKER,
         },
       },
       { type: 'release', label: 'Checker releases Settlement (Acceptance FULL_SETTLE)', movementRef: 'settle', releasedBy: CHECKER },
-      { type: 'release', label: 'Checker releases Reimbursement Receivable REIMBURSE (linked compound leg)', movementRef: 'reimburse', releasedBy: CHECKER },
       { type: 'snapshot', label: 'Acceptance Liability after Settlement (expect 0)', contractRef: 'acceptance' },
-      { type: 'snapshot', label: 'Acceptance Reimbursement Receivable after Reimburse (expect 0)', contractRef: 'reimbReceivable' },
     ],
   };
 }
@@ -2434,7 +2405,7 @@ function exportCase9(lc, ib) {
     id: 'export-case-9',
     title: 'Export Case #9 — USD Sellers Usance 120 days + Confirmed, full lifecycle to Close (B6)',
     description:
-      'Confirm LC 100,000 (Sellers Usance) -> Present Docs (B3) -> Accept (B4, compound-creates Acceptance + Reimbursement Receivable) -> Settlement (B5, compound-releases both) -> B6 Close once the Acceptance is confirmed at 0 and the Present Docs presentation is consumed.',
+      'Confirm LC 100,000 (Sellers Usance) -> Present Docs (B3) -> Accept (B4, compound-creates Acceptance + Reimbursement Receivable) -> Settlement (B5, settles the Acceptance only) -> B6 Close once the Acceptance is confirmed at 0 and the Present Docs presentation is consumed.',
     steps: [
       ...createAndRelease(
         'Confirm LC 100,000 (Sellers Usance, 120 days)',
@@ -2542,27 +2513,10 @@ function exportCase9(lc, ib) {
           eventSeq: 2,
           amount: '10000',
           currency: 'USD',
-          businessEventId: `${lc}-settle`,
-          createdBy: MAKER,
-        },
-      },
-      {
-        type: 'createMovement',
-        label: 'Reimbursement Receivable REIMBURSE 10,000 (linked compound leg, same submission as Settlement — shares businessEventId)',
-        captureAs: 'reimburse',
-        request: {
-          instrumentType: 'EPLC_ACCEPTANCE_REIMB_RECEIVABLE',
-          balanceContractIdRef: 'reimbReceivable',
-          movementType: 'REIMBURSE',
-          eventSeq: 2,
-          amount: '10000',
-          currency: 'USD',
-          businessEventId: `${lc}-settle`,
           createdBy: MAKER,
         },
       },
       { type: 'release', label: 'Checker releases Settlement (Acceptance FULL_SETTLE)', movementRef: 'settle', releasedBy: CHECKER },
-      { type: 'release', label: 'Checker releases Reimbursement Receivable REIMBURSE (linked compound leg)', movementRef: 'reimburse', releasedBy: CHECKER },
       { type: 'snapshot', label: 'Acceptance Liability before Close (expect 0)', contractRef: 'acceptance' },
       { type: 'snapshot', label: 'CONF LIAB before Close (expect 90,000 — the remaining unpresented face amount to be written off)', contractRef: 'conf' },
       {
@@ -2960,11 +2914,11 @@ function exportCase14(lc) {
  * lifecycle cases, not eligibility bypasses: the normal downstream picker must discover them exactly as
  * it would discover a manually entered A3/A3S or B3.
  */
-function importA4Ready(lc) {
+function importA3SReady(lc) {
   return {
-    id: 'import-a4-ready',
-    title: 'Manual Test Seed — A4-ready Sight Document Arrival',
-    description: 'Leaves one Sight A3 Document Arrival Checker-approved/EARMARKED and not Maker-submitted or processed by A4.',
+    id: 'import-a3s-ready',
+    title: 'Manual Test Seed — A3S-ready Shipping Guarantees',
+    description: 'Leaves one active Sight LC with three outstanding Shipping Guarantees selectable by A3S.',
     steps: [
       ...createAndRelease(
         'A1 Issue 100,000 (Sight)',
@@ -2982,22 +2936,65 @@ function importA4Ready(lc) {
         },
         'Checker releases A1 Issue',
       ),
-      {
-        type: 'createMovement',
-        label: 'A3 Document Arrival 10,000 — retain for manual A4',
-        captureAs: 'arrival',
-        request: {
-          instrumentType: 'IPLC_LC',
-          balanceContractIdRef: 'lc',
-          movementType: 'UTILIZE',
-          eventSeq: 2,
+      ...[1, 2, 3].flatMap((ordinal) => createAndRelease(
+        `A8 Shipping Guarantee G0${ordinal} 10,000 — retain for manual A3S`,
+        `sg${ordinal}`,
+        {
+          instrumentType: 'SHGT',
+          naturalKey: { lcNumber: lc, sgNumber: `G0${ordinal}` },
+          parentLogicalContractIdRef: 'lc',
+          movementType: 'ISSUE',
+          eventSeq: 1,
           amount: '10000',
           currency: 'USD',
-          sourceTransactionRef: 'B01',
           createdBy: MAKER,
         },
-      },
-      { type: 'acknowledge', label: 'Checker approves A3 — remains EARMARKED and eligible for A4', movementRef: 'arrival', acknowledgedBy: CHECKER },
+        `Checker releases A8 Shipping Guarantee G0${ordinal}`,
+      )),
+    ],
+  };
+}
+
+function importA4Ready(lc) {
+  return {
+    id: 'import-a4-ready',
+    title: 'Manual Test Seed — A4-ready Sight Document Arrivals',
+    description: 'Leaves three Sight A3 Document Arrivals under one LC Checker-approved/EARMARKED and not processed by A4.',
+    steps: [
+      ...createAndRelease(
+        'A1 Issue 100,000 (Sight)',
+        'lc',
+        {
+          instrumentType: 'IPLC_LC',
+          naturalKey: { lcNumber: lc },
+          movementType: 'ISSUE',
+          eventSeq: 1,
+          amount: '100000',
+          currency: 'USD',
+          tenorType: 'SIGHT',
+          expiryDate: '2028-12-28',
+          createdBy: MAKER,
+        },
+        'Checker releases A1 Issue',
+      ),
+      ...[1, 2, 3].flatMap((ordinal) => [
+        {
+          type: 'createMovement',
+          label: `A3 Document Arrival B0${ordinal} 10,000 — retain for manual A4`,
+          captureAs: `arrival${ordinal}`,
+          request: {
+            instrumentType: 'IPLC_LC',
+            balanceContractIdRef: 'lc',
+            movementType: 'UTILIZE',
+            eventSeq: ordinal + 1,
+            amount: '10000',
+            currency: 'USD',
+            sourceTransactionRef: `B0${ordinal}`,
+            createdBy: MAKER,
+          },
+        },
+        { type: 'acknowledge', label: `Checker approves A3 B0${ordinal} — remains EARMARKED and eligible for A4`, movementRef: `arrival${ordinal}`, acknowledgedBy: CHECKER },
+      ]),
     ],
   };
 }
@@ -3005,8 +3002,8 @@ function importA4Ready(lc) {
 function importA6Ready(lc) {
   return {
     id: 'import-a6-ready',
-    title: 'Manual Test Seed — A6-ready Usance Document Arrival',
-    description: "Leaves one Seller's Usance A3 Document Arrival Checker-approved/EARMARKED and not processed by A6.",
+    title: 'Manual Test Seed — A6-ready Usance Document Arrivals',
+    description: "Leaves three Seller's Usance A3 Document Arrivals under one LC Checker-approved/EARMARKED and not processed by A6.",
     steps: [
       ...createAndRelease(
         "A1 Issue 100,000 (Seller's Usance)",
@@ -3025,22 +3022,65 @@ function importA6Ready(lc) {
         },
         'Checker releases A1 Issue',
       ),
-      {
-        type: 'createMovement',
-        label: 'A3 Document Arrival 10,000 — retain for manual A6',
-        captureAs: 'arrival',
-        request: {
-          instrumentType: 'IPLC_LC',
-          balanceContractIdRef: 'lc',
-          movementType: 'UTILIZE',
-          eventSeq: 2,
-          amount: '10000',
-          currency: 'USD',
-          sourceTransactionRef: 'B01',
-          createdBy: MAKER,
+      ...[1, 2, 3].flatMap((ordinal) => [
+        {
+          type: 'createMovement',
+          label: `A3 Document Arrival B0${ordinal} 10,000 — retain for manual A6`,
+          captureAs: `arrival${ordinal}`,
+          request: {
+            instrumentType: 'IPLC_LC',
+            balanceContractIdRef: 'lc',
+            movementType: 'UTILIZE',
+            eventSeq: ordinal + 1,
+            amount: '10000',
+            currency: 'USD',
+            sourceTransactionRef: `B0${ordinal}`,
+            createdBy: MAKER,
+          },
         },
-      },
-      { type: 'acknowledge', label: 'Checker approves A3 — remains EARMARKED and eligible for A6', movementRef: 'arrival', acknowledgedBy: CHECKER },
+        { type: 'acknowledge', label: `Checker approves A3 B0${ordinal} — remains EARMARKED and eligible for A6`, movementRef: `arrival${ordinal}`, acknowledgedBy: CHECKER },
+      ]),
+    ],
+  };
+}
+
+function importA7Ready(lc) {
+  return {
+    id: 'import-a7-ready',
+    title: 'Manual Test Seed — A7-ready Acceptances',
+    description: 'Leaves three released Import Acceptances under one LC with outstanding balances selectable by A7.',
+    steps: [
+      ...createAndRelease(
+        "A1 Issue 100,000 (Seller's Usance)",
+        'lc',
+        {
+          instrumentType: 'IPLC_LC', naturalKey: { lcNumber: lc }, movementType: 'ISSUE', eventSeq: 1,
+          amount: '100000', currency: 'USD', tenorType: 'SELLERS_USANCE', tenorDays: 120,
+          expiryDate: '2028-12-28', createdBy: MAKER,
+        },
+        'Checker releases A1 Issue',
+      ),
+      ...[1, 2, 3].flatMap((ordinal) => [
+        {
+          type: 'createMovement', label: `A3 Document Arrival B0${ordinal} 10,000`, captureAs: `arrival${ordinal}`,
+          request: {
+            instrumentType: 'IPLC_LC', balanceContractIdRef: 'lc', movementType: 'UTILIZE', eventSeq: ordinal + 1,
+            amount: '10000', currency: 'USD', sourceTransactionRef: `B0${ordinal}`, createdBy: MAKER,
+          },
+        },
+        { type: 'acknowledge', label: `Checker approves A3 B0${ordinal} for A6`, movementRef: `arrival${ordinal}`, acknowledgedBy: CHECKER },
+        ...createAndRelease(
+          `A6 Acceptance IB000${ordinal} 10,000 — retain for manual A7`,
+          `acceptance${ordinal}`,
+          {
+            instrumentType: 'IPLC_ACCEPTANCE', naturalKey: { lcNumber: lc, ibNumber: `IB000${ordinal}` },
+            parentLogicalContractIdRef: 'lc', movementType: 'CREATE', eventSeq: 1, amount: '10000',
+            currency: 'USD', tenorType: 'SELLERS_USANCE', tenorDays: 120, exposureNature: 'ACTUAL',
+            referencedTransactionIdRef: `arrival${ordinal}`, createdBy: MAKER,
+          },
+          `Checker releases A6 Acceptance IB000${ordinal}`,
+        ),
+      ]),
     ],
   };
 }
@@ -3049,7 +3089,7 @@ function exportB4Ready(lc) {
   return {
     id: 'export-b4-ready',
     title: 'Manual Test Seed — B4-ready Present Docs',
-    description: 'Leaves one B3 Present Docs Checker-approved/EARMARKED and not consumed by B4.',
+    description: 'Leaves three released B3 Present Docs under one Confirmation and not consumed by B4.',
     steps: [
       ...createAndRelease(
         'B1 Confirm LC 100,000 (Sight)',
@@ -3067,12 +3107,12 @@ function exportB4Ready(lc) {
         },
         'Checker releases B1 Confirmation',
       ),
-      ...createAndRelease(
-        'B3 Present Docs 10,000 — retain for manual B4',
-        'presentDocs',
+      ...[1, 2, 3].flatMap((ordinal) => createAndRelease(
+        `B3 Present Docs E0${ordinal} 10,000 — retain for manual B4`,
+        `presentDocs${ordinal}`,
         {
           instrumentType: 'EPLC_EXAMINATION',
-          naturalKey: { lcNumber: lc, ibNumber: 'E01' },
+          naturalKey: { lcNumber: lc, ibNumber: `E0${ordinal}` },
           parentLogicalContractIdRef: 'conf',
           movementType: 'CREATE',
           eventSeq: 1,
@@ -3080,8 +3120,73 @@ function exportB4Ready(lc) {
           currency: 'USD',
           createdBy: MAKER,
         },
-        'Checker approves B3 — remains EARMARKED and eligible for B4',
+        `Checker releases B3 E0${ordinal} — remains eligible for B4`,
+      )),
+    ],
+  };
+}
+
+function exportB5Ready(lc) {
+  return {
+    id: 'export-b5-ready',
+    title: 'Manual Test Seed — B5-ready Export Acceptances',
+    description: 'Leaves three released Export Acceptances under one Confirmation with outstanding balances selectable by B5.',
+    steps: [
+      ...createAndRelease(
+        "B1 Confirm LC 100,000 (Seller's Usance)",
+        'conf',
+        {
+          instrumentType: 'EPLC_CONFIRMATION', naturalKey: { lcNumber: lc }, movementType: 'ISSUE', eventSeq: 1,
+          amount: '100000', currency: 'USD', tenorType: 'SELLERS_USANCE', tenorDays: 120,
+          expiryDate: '2028-12-28', createdBy: MAKER,
+        },
+        'Checker releases B1 Confirmation',
       ),
+      ...[1, 2, 3].flatMap((ordinal) => {
+        const eventId = `${lc}-b4-ready-${ordinal}`;
+        return [
+          ...createAndRelease(
+            `B3 Present Docs E0${ordinal} 10,000`,
+            `examination${ordinal}`,
+            {
+              instrumentType: 'EPLC_EXAMINATION', naturalKey: { lcNumber: lc, ibNumber: `E0${ordinal}` },
+              parentLogicalContractIdRef: 'conf', movementType: 'CREATE', eventSeq: 1,
+              amount: '10000', currency: 'USD', createdBy: MAKER,
+            },
+            `Checker releases B3 Present Docs E0${ordinal}`,
+          ),
+          {
+            type: 'createCompoundMovements', functionCode: 'B4', label: `B4 Accept E0${ordinal} with linked balances`,
+            captureAs: [`accept${ordinal}`, `acceptance${ordinal}`, `reimbReceivable${ordinal}`],
+            requests: [
+              {
+                instrumentType: 'EPLC_CONFIRMATION', balanceContractIdRef: 'conf', movementType: 'ACCEPT', eventSeq: ordinal + 1,
+                amount: '10000', currency: 'USD', sourceTransactionRef: `E0${ordinal}`,
+                referencedTransactionIdRef: `examination${ordinal}`, businessEventId: eventId, createdBy: MAKER,
+              },
+              {
+                instrumentType: 'EPLC_ACCEPTANCE', naturalKey: { lcNumber: lc, ibNumber: `IB000${ordinal}` },
+                parentLogicalContractIdRef: 'conf', movementType: 'CREATE', eventSeq: 1, amount: '10000',
+                currency: 'USD', tenorType: 'SELLERS_USANCE', tenorDays: 120, exposureNature: 'ACTUAL',
+                businessEventId: eventId, createdBy: MAKER,
+              },
+              {
+                instrumentType: 'EPLC_ACCEPTANCE_REIMB_RECEIVABLE', naturalKey: { lcNumber: lc, ibNumber: `IB000${ordinal}` },
+                parentLogicalContractIdRef: 'conf', movementType: 'CREATE', eventSeq: 1, amount: '10000',
+                currency: 'USD', businessEventId: eventId, createdBy: MAKER,
+              },
+            ],
+          },
+          {
+            type: 'compoundActions', functionCode: 'B4', label: `B4 Checker approval E0${ordinal} — retain Acceptance for B5`, actor: CHECKER,
+            actions: [
+              { kind: 'release', movementRef: `accept${ordinal}` },
+              { kind: 'release', movementRef: `acceptance${ordinal}` },
+              { kind: 'release', movementRef: `reimbReceivable${ordinal}` },
+            ],
+          },
+        ];
+      }),
     ],
   };
 }
@@ -3118,10 +3223,13 @@ function buildRegistry() {
     exportCase12(lcNumberFor('EXP-C12')),
     exportCase13(lcNumberFor('EXP-C13')),
     exportCase14(lcNumberFor('EXP-C14')),
-    // Keep these LAST: Run All must finish with untouched downstream prerequisites for manual testing.
-    importA4Ready(lcNumberFor('IMP-C16')),
-    importA6Ready(lcNumberFor('IMP-C17')),
-    exportB4Ready(lcNumberFor('EXP-C15')),
+    // Keep these LAST: each case retains one parent with three independently eligible child references.
+    importA3SReady(lcNumberFor('IMP-A3S')),
+    importA4Ready(lcNumberFor('IMP-A4')),
+    importA6Ready(lcNumberFor('IMP-A6')),
+    importA7Ready(lcNumberFor('IMP-A7')),
+    exportB4Ready(lcNumberFor('EXP-B4')),
+    exportB5Ready(lcNumberFor('EXP-B5')),
   ];
 }
 

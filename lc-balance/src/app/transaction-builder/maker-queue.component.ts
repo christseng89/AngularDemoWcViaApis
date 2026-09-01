@@ -74,7 +74,7 @@ export class MakerQueueComponent {
    */
   deletePendingLabel(row: MakerQueueRow): string {
     if (this.makerQueue.isCompoundShape(row)) {
-      return 'Delete Pending (compound) — this row represents every leg of the same Business Event (A3S/B4/B5); deleting it cancels all of them together, not just this one.';
+      return 'Delete Pending (compound) — this row represents every leg of the same Business Event (A3S/B4); deleting it cancels all of them together, not just this one.';
     }
     return this.makerQueue.isWithdrawMakerSubmitCase(row)
       ? "Delete Pending (A4) — returns this record to A3/A3S's own Checker-acknowledged (EARMARKED) state, ready to Maker-Submit A4 again. Does not cancel the underlying Document Arrival."

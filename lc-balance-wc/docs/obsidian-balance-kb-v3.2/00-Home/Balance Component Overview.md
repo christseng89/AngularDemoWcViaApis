@@ -1,12 +1,12 @@
 ---
 knowledge_id: Balance-Component-Overview
-title: "余额组件概览"
+title: '余额组件概览'
 domain: Balance
 category: Domain Concept
 status: CONFIRMED
 source_repository: Balance Component (lc-balance)
-last_verified_commit: "N/A — no .git history in the analyzed snapshot, see [[Source-to-Knowledge-Map]]"
-snapshot_date: 2026-08-30
+last_verified_commit: 'N/A — no .git history in the analyzed snapshot, see [[Source-to-Knowledge-Map]]'
+snapshot_date: 2026-09-01
 tags:
   - balance
   - overview
@@ -42,11 +42,17 @@ Balance Component 是贸易金融领域的**或有负债／表外风险敞口台
 
 **系统不强制验证 Maker 与 Checker 是否为不同的真实使用者身份。** 演示数据中所有 createMovement 请求固定使用 `createdBy: 'maker1'`，release/makerSubmit 步骤固定使用 `'checker1'`/`'maker1'`；`release()` 推导实际 Checker 身份时也只是一个简化的双角色模型（`createdBy` 为 `maker1` 则记为 `checker1`，否则记为 `checker2'`）。本系统并未建模任何真实身份验证或职责分离（Segregation of Duties）机制，这属于银行外部授权政策的范畴，不在本组件之内。
 
-**功能代码 A5 已退役，合并进 A3。** 现行具名业务功能范围为进口 A1–A11 与出口 B1–B7；A5 编号保留但不作为独立功能。A11／B7 为 Reopen 功能。
+现行进口功能为 A1、A2、A3、A3S、A4、A6、A7、A8、A9、A10、A11；出口功能为 B1–B7。A11／B7 为 Reopen 功能。
 
 ## 2026-08-30 现行行为入口
 
 最新生命周期、Tight LC Balance、Transaction Index、原子 compound 与验证基准见 [[Freshness-Update-Log-2026-08-30]]。交易选择组合身份见 [[Transaction Index Selection Contract]]，服务端职责拆分见 [[BalanceService Facade Architecture]]。
+
+Transaction Index 是候选清单；API 在 Maker Submit/create 与 Checker Release 两个阶段都重新验证当前 eligibility，确保 UI 与直接 API caller 遵循同一套状态规则。
+
+## 2026-09-01 source sync
+
+最新功能目录、B5 单一 Settlement、服务端资格重检、35 个 Business Cases 与负 Tight Balance 自动 A02/B02 修复见 [[Freshness-Update-Log-2026-09-01]]。
 
 ## 相关知识
 

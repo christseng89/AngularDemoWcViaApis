@@ -205,9 +205,8 @@ function validateFunctionSpecificRules(
     }
     patch.movementType = 'FULL_REDEEM';
   }
-  // B5 only, same "derive Full/Partial from amount vs Available" shape as A9 above, targeting SETTLE.
-  // Grounded in impl-spec-en.md's CNF_MATURE row — ONE event clears both the Acceptance liability and
-  // its matching Reimbursement Receivable together, not two independent ones.
+  // B5 only, same "derive Full/Partial from amount vs Available" shape as A9 above, targeting the
+  // selected Acceptance. No Reimbursement Receivable lookup or companion movement is part of B5.
   if (strategy?.movementDerivation.amountVsAvailableDerivation === 'SETTLE' && model.instrumentType === 'EPLC_ACCEPTANCE') {
     if (!ctx.selectedContractSnapshot) {
       return 'Search for the Acceptance to settle first.';

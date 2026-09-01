@@ -56,5 +56,8 @@ YYYY-MM-DD-简短主题.md
 ## 现有资料
 
 - [2026-08-30 BalanceService façade與原子 Compound Event](2026-08-30-balance-service-facade-and-atomic-compound-events.md)
+- [2026-09-01 B5 單筆結算與 Business Case 樣本下限](2026-09-01-b5-single-settlement-and-run-all-samples.md)
+- [2026-09-01 Transaction Index API 權威驗證](2026-09-01-transaction-index-api-eligibility.md)
+- [2026-09-01 Business Case 負 Tight 自動修復與 Cleanup 清場](2026-09-01-business-case-negative-tight-auto-amend.md)
 
 重构前累计的已确认决策仍可在 `../history/implementation-log.md` 中检索。后续在相关规则被再次修改或正式复核时，逐项提炼为本目录的独立记录，无需一次性复制整个历史日志。

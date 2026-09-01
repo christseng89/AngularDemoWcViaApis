@@ -4,6 +4,7 @@ import { computeReopenRestoreAmount } from '../domain/reopenRestoration';
 import { IllegalStateTransitionError, RequestValidationError } from '../errors';
 import { parseMonetaryAmount } from '../money';
 import type { BalanceMovementStore } from '../store/balanceMovementStore';
+import type { BalanceContractStore } from '../store/balanceContractStore';
 import type { BalanceContract, BalanceMovement } from '../types';
 import { ContractLifecycleEligibilityService } from './contractLifecycleEligibilityService';
 import {
@@ -17,6 +18,7 @@ import {
 export class MovementReleasePolicyService {
   constructor(
     private readonly movements: BalanceMovementStore,
+    private readonly contracts: BalanceContractStore,
     private readonly validator: MovementRequestValidator,
     private readonly lifecycleEligibility: ContractLifecycleEligibilityService,
     private readonly isCreatingMovement: (movementType: string) => boolean,
@@ -64,6 +66,9 @@ export class MovementReleasePolicyService {
   }
 
   assertEligibility(movement: BalanceMovement, contract: BalanceContract, before: Decimal): void {
+    this.assertContractStatus(movement, contract);
+    this.assertReferencedSource(movement, contract);
+
     if (movement.movementType === 'CLOSE') {
       const eligibility = this.lifecycleEligibility.evaluateClose(contract, movement.movementId);
       if (!eligibility.eligible) {
@@ -93,6 +98,55 @@ export class MovementReleasePolicyService {
         `Cannot release movement ${movement.movementId} — A9 (Shipping Guarantee Redemption) must be Full Redeem only; ` +
           `a standalone Partial Redeem (no businessEventId) is not a legal release target.`,
       );
+    }
+  }
+
+  private assertContractStatus(movement: BalanceMovement, contract: BalanceContract): void {
+    const lifecycleExceptions = new Set(['CLOSE', 'EXPIRE', 'REOPEN', 'REVERSAL', 'AMEND_EXPIRY_DATE']);
+    if (!lifecycleExceptions.has(movement.movementType) && contract.status !== 'ACTIVE') {
+      throw new IllegalStateTransitionError(
+        `Cannot release movement ${movement.movementId} — contract status is now ${contract.status}, no longer ACTIVE. Refresh the Transaction Index.`,
+      );
+    }
+  }
+
+  private assertReferencedSource(movement: BalanceMovement, contract: BalanceContract): void {
+    if (!movement.referencedTransactionId) return;
+    const source = this.movements.findById(movement.referencedTransactionId);
+    if (!source) {
+      throw new IllegalStateTransitionError(`Cannot release movement ${movement.movementId} — referenced source transaction no longer exists.`);
+    }
+
+    const sourceContract = this.contracts.findById(source.balanceContractId);
+    if (contract.instrumentType === 'IPLC_ACCEPTANCE' && movement.movementType === 'CREATE') {
+      const sameLc = contract.parentLogicalContractId === sourceContract?.logicalContractId;
+      const eligible =
+        sameLc &&
+        sourceContract?.instrumentType === 'IPLC_LC' &&
+        source.movementType === 'UTILIZE' &&
+        Boolean(source.acknowledgedAt) &&
+        Boolean(source.makerSubmittedAt) &&
+        (source.status === 'PENDING' || source.status === 'RELEASED');
+      if (!eligible) {
+        throw new IllegalStateTransitionError(
+          `Cannot release movement ${movement.movementId} — the referenced A3/A3S source is no longer the acknowledged transaction selected for this LC.`,
+        );
+      }
+    }
+
+    if (contract.instrumentType === 'EPLC_CONFIRMATION' && (movement.movementType === 'HONOUR' || movement.movementType === 'ACCEPT')) {
+      const sameConfirmation = sourceContract?.parentLogicalContractId === contract.logicalContractId;
+      const eligible =
+        sameConfirmation &&
+        sourceContract?.instrumentType === 'EPLC_EXAMINATION' &&
+        source.movementType === 'CREATE' &&
+        source.status === 'RELEASED' &&
+        !source.presentDocsConsumedAt;
+      if (!eligible) {
+        throw new IllegalStateTransitionError(
+          `Cannot release movement ${movement.movementId} — the referenced B3 source is no longer a RELEASED, unconsumed transaction for this Confirmation.`,
+        );
+      }
     }
   }
 

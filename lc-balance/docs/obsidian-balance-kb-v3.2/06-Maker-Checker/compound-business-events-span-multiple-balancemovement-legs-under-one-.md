@@ -1,11 +1,11 @@
 ---
 knowledge_id: compound-business-events-span-multiple-balancemovement-legs-under-one-
-title: "组合业务事件在同一个 businessEventId 下横跨多个 BalanceMovement leg"
+title: '组合业务事件在同一个 businessEventId 下横跨多个 BalanceMovement leg'
 domain: Balance
 category: Domain Concept
 status: CONFIRMED
 source_repository: Balance Component (lc-balance)
-last_verified_commit: "N/A — no .git history in the analyzed snapshot, see [[Source-to-Knowledge-Map]]"
+last_verified_commit: 'N/A — no .git history in the analyzed snapshot, see [[Source-to-Knowledge-Map]]'
 snapshot_date: 2026-08-22
 tags:
   - balance
@@ -14,11 +14,11 @@ tags:
 
 # 组合业务事件在同一个 businessEventId 下横跨多个 BalanceMovement leg
 
-多项贸易金融动作并非单笔独立的分类账过账，而是一束必须一起联动的相关联 leg：A3S 将一笔 SG 赎回与一次 Document Arrival 打包；B4 Sight 将一次 Confirmation Honour 与一笔新的 Due-from-Issuing-Bank 资产打包（该资产本身又是一笔已释放的 B3 Present Docs 提示的下游）；B4 Usance 将一次 Confirmation Accept 与一笔新的 Acceptance 负债及其 Reimbursement Receivable 资产打包；B5 Usance/CNF_MATURE 将一次 Acceptance settle 与其相匹配的 Reimbursement Receivable 打包。businessEventId（同一事件下的各 leg）与 referencedTransactionId（本记录自身的前驱）是 Checker 层用于跨会话重建并释放/取消这些"意图上原子化"捆绑包所依赖的两种关联机制。
+现行多腿动作包括 A3S（SG redemption + Document Arrival）与 B4（Sight Honour + Due-from-Issuing-Bank，或 Usance Accept + Acceptance + Reimbursement Receivable）。它们使用 `businessEventId` 关联 compound legs；A6 使用 `referencedTransactionId` 关联既有 Document Arrival。B5 已改为单一 Acceptance settlement，不再与 Reimbursement Receivable 打包。
 
 ## Source Evidence
 
-- `CLAUDE.md: A3S/B5 checker compound release cross-session fix decision-log entry`
+- `src/app/transaction-builder/function-strategy.ts`
 - `checker-actions.service.ts:49-128,233-296`
 
 ## Related Knowledge

@@ -193,7 +193,7 @@ function amountFieldLabel(
     return "Amount (Full Redeem — carried from the SG's Available Balance, protected)";
   }
   if (flags.amountCappedAtAcceptance) {
-    return "Amount (defaults to the Acceptance's Available Balance — reduce for a Partial Settle, must not exceed it; also settles the matching Reimbursement Receivable for the same amount)";
+    return "Amount (defaults to the Acceptance's Available Balance — reduce for a Partial Settle; must not exceed it)";
   }
   if (strategy?.compoundSubmission.possibleShapes.includes('documentArrivalWithSg')) {
     return 'Bill Amount (actual document amount — see SG Redemption Amount below)';

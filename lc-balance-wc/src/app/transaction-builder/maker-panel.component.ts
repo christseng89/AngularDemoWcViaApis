@@ -66,7 +66,6 @@ import { MonetaryAmountPipe } from './monetary-amount.pipe';
 export interface MakerCheckerContext {
   submitResult: BalanceMovement | null;
   selectedPayMovement: BalanceMovement | null;
-  matchedReceivableMovementId: string | null;
   dueFromIssuingBankMovementId: string | null;
   acceptanceMovementId: string | null;
   acceptanceReimbReceivableMovementId: string | null;
@@ -87,7 +86,7 @@ interface TransactionIndexRow {
 }
 
 /**
- * The 7 flat compound-leg movement fields A3S/A6/B4/B5's multi-leg submissions produce, grouped into one
+ * The compound-leg movement fields A3S/A6/B4's multi-leg submissions produce, grouped into one
  * object. Doesn't change `MakerCheckerContext`'s shape — `emitContext()` destructures the 5 id fields
  * back out for the emitted DTO. `arrivalSgRedeemMovement`/`acceptanceMovement` (full `BalanceMovement`,
  * vs. the other 5 bare `movementId` strings) back this panel's own "Account Entries — SG
@@ -100,7 +99,6 @@ export interface CompoundLegState {
   acceptanceReimbReceivableMovementId: string | null;
   acceptanceMovementId: string | null;
   acceptanceMovement: BalanceMovement | null;
-  matchedReceivableMovementId: string | null;
 }
 
 const EMPTY_COMPOUND_LEGS: CompoundLegState = {
@@ -110,7 +108,6 @@ const EMPTY_COMPOUND_LEGS: CompoundLegState = {
   acceptanceReimbReceivableMovementId: null,
   acceptanceMovementId: null,
   acceptanceMovement: null,
-  matchedReceivableMovementId: null,
 };
 
 /**
@@ -465,12 +462,11 @@ export class MakerPanelComponent implements OnChanges {
   private emitContext(): void {
     // MakerCheckerContext only wants the 5 bare movementId fields, never the 2 full-BalanceMovement
     // ones (arrivalSgRedeemMovement/acceptanceMovement) — see CompoundLegState's own doc comment.
-    const { matchedReceivableMovementId, dueFromIssuingBankMovementId, acceptanceMovementId, acceptanceReimbReceivableMovementId, arrivalSgRedeemMovementId } =
+    const { dueFromIssuingBankMovementId, acceptanceMovementId, acceptanceReimbReceivableMovementId, arrivalSgRedeemMovementId } =
       this.compoundLegs;
     this.contextChanged.emit({
       submitResult: this.submitResult,
       selectedPayMovement: this.pickerSelection.selectedPayMovement,
-      matchedReceivableMovementId,
       dueFromIssuingBankMovementId,
       acceptanceMovementId,
       acceptanceReimbReceivableMovementId,

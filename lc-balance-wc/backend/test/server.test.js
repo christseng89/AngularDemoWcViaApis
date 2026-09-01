@@ -83,13 +83,13 @@ describe('lc-balance-wc backend (Node.js 中台 orchestrator)', () => {
   });
 
   describe('GET /api/business-cases', () => {
-    it('lists all 32 registered business cases with id/title/description/stepCount, and never calls the microservice', async () => {
+    it('lists all 35 registered business cases with id/title/description/stepCount, and never calls the microservice', async () => {
       global.fetch = jest.fn();
 
       const res = await request(app).get('/api/business-cases');
 
       expect(res.status).toBe(200);
-      expect(res.body).toHaveLength(32);
+      expect(res.body).toHaveLength(35);
 
       const registry = buildRegistry();
       res.body.forEach((c, i) => {
@@ -320,6 +320,9 @@ describe('lc-balance-wc backend (Node.js 中台 orchestrator)', () => {
         if (method === 'POST' && /\/balance-movements\/[^/]+\/maker-submit$/.test(url)) {
           return jsonResponse(200, { status: 'PENDING', makerSubmittedBy: 'maker1' });
         }
+        if (method === 'POST' && /\/balance-movements\/[^/]+\/acknowledge$/.test(url)) {
+          return jsonResponse(200, { status: 'PENDING', acknowledgedBy: 'checker1' });
+        }
         if (method === 'GET' && /\/balance-contracts\/[^/]+\/balance$/.test(url)) {
           return jsonResponse(200, { balanceContractId: 'bc-lc', logicalContractId: 'lct-bc-lc' });
         }
@@ -389,6 +392,9 @@ describe('lc-balance-wc backend (Node.js 中台 orchestrator)', () => {
         if (method === 'POST' && /\/balance-movements\/[^/]+\/maker-submit$/.test(url)) {
           return jsonResponse(200, { status: 'PENDING', makerSubmittedBy: 'maker1' });
         }
+        if (method === 'POST' && /\/balance-movements\/[^/]+\/acknowledge$/.test(url)) {
+          return jsonResponse(200, { status: 'PENDING', acknowledgedBy: 'checker1' });
+        }
         if (method === 'GET' && /\/balance-contracts\/[^/]+\/balance$/.test(url)) {
           // Simulate the microservice failing to resolve the snapshot needed for logicalContractId.
           return jsonResponse(500, { code: 'INTERNAL_ERROR' });
@@ -402,7 +408,7 @@ describe('lc-balance-wc backend (Node.js 中台 orchestrator)', () => {
       expect(res.body).toEqual({ code: 'ORCHESTRATION_ERROR', message: 'An internal error occurred while running this business case.' });
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         expect.stringContaining('import-case-2'),
-        expect.stringMatching(/Snapshot step .* unexpectedly failed with HTTP 500/),
+        expect.stringMatching(/Could not resolve logicalContractId.*INTERNAL_ERROR/),
       );
       consoleErrorSpy.mockRestore();
     });

@@ -1,9 +1,9 @@
 ---
 knowledge_id: API-Index
-title: "API 索引"
+title: 'API 索引'
 domain: Balance
 category: Index
-snapshot_date: 2026-08-31
+snapshot_date: 2026-09-01
 tags:
   - balance
   - index
@@ -65,7 +65,7 @@ tags:
 - [[persisted-event-snapshot-family-eventsnapshot-and-its-5-siblings|持久化的 Event Snapshot 家族（eventSnapshot 及其 5 个同级字段）]]
 - [[a10-b6-close-close-movementtype|A10/B6 关闭（CLOSE movementType）]]
 - [[channel-currency-code-rule-input-vs-carried|Channel 币别代码规则（INPUT 与 CARRIED 的区别）]]
-- [[channel-compound-leg-functions-a3s-b4-b5|Channel 复合分腿功能：A3S、B4、B5]]
+- [[channel-compound-leg-functions-a3s-b4-b5|Channel 复合分腿功能：A3S、B4（B5 为单腿）]]
 - [[confirmed-available-tight-available-balance-derivation|Confirmed / Available / Tight Available Balance 的推导逻辑]]
 - [[off-balance-sheet-exposure-present-docs-earmark-import-export-analogs|表外风险敞口与 Present Docs Earmark（进口/出口的对应概念）]]
 - [[contingent-account-entry-vs-pass-through-account-entry-gl-ownership-bo|Contingent Account Entry 与直通式 Account Entry 的区别（GL 归属边界）]]
@@ -75,7 +75,14 @@ tags:
 
 ## 2026-08-31 OAS 同步
 
-- 微服务 OAS：`1.42.1`；Channel OAS：`1.9.0`。本次没有新增 endpoint 或成功 response field；新增 `x-client-retry-policy` 记录 Angular／Web Component 安全读取的操作策略。
-- Channel OAS 是逻辑 façade 契约，参考 client 仍直接调用 microservice adapter；Retry metadata 不改变 Channel 或 DOM contract。
+- 微服务 OAS：`1.42.1`；Channel OAS：`1.9.0`。本次没有新增 endpoint 或成功 response field；新增 `x-client-retry-policy` 记录 UI 安全读取的操作策略。
+- Channel OAS 是逻辑 façade 契约，参考 Angular 实作仍直接调用 microservice adapter；Retry metadata 不改变 Channel wire contract。
 - A3S／A6／B4 等多腿动作映射到 atomic compound submit／release；`partialSuccess` 仅保留旧版相容语义。
 - Transaction Index 的 SG／IB／EB Amount 与 Tight LC Balance 是 UI projection，不是新增 wire fields。见 [[Transaction Index Selection Contract]]。
+
+## 2026-09-01 OAS 同步
+
+- 微服务 OAS：`1.44.0`；Channel OAS：`1.11.0`。
+- A5 已从功能目录移除；A3 依母 LC tenor 导向 A4 或 A6。
+- B5 是单一 Acceptance settlement，Channel `compoundLegs` 为 `[]`。
+- Index eligibility 与 Maker create／Checker release 的服务端重检保持一致。详见 [[Freshness-Update-Log-2026-09-01]]。

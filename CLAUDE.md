@@ -292,6 +292,13 @@ touching this logic):
 away). Same failure mode as `lc-payment-wc/`: if a backend isn't running, the corresponding UI tab 400s
 or hangs with no obvious hint — check the process before assuming a bug.
 
+There's a fourth, standalone microservice not part of the three-process setup above:
+`microservices/business-days-mock/` (port 4500, `cd microservices/business-days-mock && npm start`) — a
+minimal Taiwan-calendar `POST /business-days/add` mock built for the F1 proposal §13.5 "Auto Close Grace
+Period" **Phase 2**. It is **not** wired into `dev:all` and **not** yet consumed by anything —
+`domain/autoCloseGracePeriod.ts`'s `addBusinessDays()` still uses Phase-1 weekend-only logic in-repo.
+Treat it as reference-only scaffolding until Phase 2 lands.
+
 ```bash
 cd lc-balance
 npm install
@@ -357,7 +364,7 @@ large. `transaction-builder.component.ts` is still covered by four spec files
 (`transaction-builder.component.spec.ts` for function/mode selection, `.actions.spec.ts` for
 Maker/Checker action-dispatch wiring, `.gaps.spec.ts` for leftover getters/error branches, and
 `.inquire.spec.ts` for Inquire Events wiring) — a holdover from when the component itself was much larger
-(see Source layout below: it's grown back to 805 lines as of 2026-08-30, still well below its 2,923-line
+(see Source layout below: it's grown back to 846 lines as of 2026-09-01, still well below its 2,923-line
 peak and still a thin orchestration layer, not a God Component), not a project-wide pattern.
 
 `lc-balance/Quality-report-balance.md` is a SonarQube-style static/structural code-quality review of
@@ -384,8 +391,8 @@ forgotten; check it, not just `Quality-report-balance.md`, before assuming somet
   a sequence of BAL-003 extractions logged in `lc-balance/CLAUDE.md` — most recently a
   "Feature Components + Facade" pilot moving Maker-side logic into `MakerPanelComponent` and Checker
   search/queue into `CheckerPanelComponent` — brought it down to 436 lines before subsequent feature work
-  grew it back to 805 lines (2026-08-30); it's still not the largest file in this sub-project —
-  `maker-panel.component.ts` (1,961 lines as of the same date) is. Both counts drift often; treat them as
+  grew it back to 846 lines (2026-09-01); it's still not the largest file in this sub-project —
+  `maker-panel.component.ts` (2,039 lines as of the same date) is. Both counts drift often; treat them as
   approximate. `transaction-builder.component.ts` remains a thin orchestration/wiring layer, not a God
   Component again: mode/function-side selection, wiring `MakerPanelComponent` ↔
   `CheckerPanelComponent` ↔ `LookUpPanelService` ↔ `InquireEventsService` together via signal/context
@@ -503,4 +510,6 @@ built `dist/` output — don't hand-edit those paths without re-running `release
 `web-component-governance.md`, `web-component-operations.md`, `web-component-testing.md`,
 `web-component-usage.md`, and `framework-integrations.md` split out the formalized reference set (added
 phase 6, 2026-08-31), plus `docs/migrations/web-component-v1.md` and dated entries under
-`docs/decisions/` for that phase's OAS-impact and doc-formalization decisions.
+`docs/decisions/` for that phase's OAS-impact and doc-formalization decisions. Two further docs sit
+outside that phase-6 set but are current and referenced from both `README.md` and `package.json`'s
+`files` array: `docs/http-retry-policy.md` and `docs/releasing-web-component.md`.

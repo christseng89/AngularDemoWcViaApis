@@ -1,11 +1,11 @@
 ---
 knowledge_id: Maker-Checker-Lifecycle
-title: "Maker Checker 生命周期"
+title: 'Maker Checker 生命周期'
 domain: Balance
 category: Domain Concept
 status: CONFIRMED
 source_repository: Balance Component (lc-balance)
-last_verified_commit: "N/A — no .git history in the analyzed snapshot, see [[Source-to-Knowledge-Map]]"
+last_verified_commit: 'N/A — no .git history in the analyzed snapshot, see [[Source-to-Knowledge-Map]]'
 snapshot_date: 2026-08-22
 tags:
   - balance
@@ -35,11 +35,11 @@ Balance Component 强制实施真正的 **4-eyes** 控制：Maker 提交一笔 [
 
 ## A3/A3S 的 acknowledgment 环节
 
-A3/A3S（Document Arrival）有其自身独立的两阶段确认：`POST .../acknowledge`（由早先仅供 B3 使用的路由改造而来）会写入 `acknowledgedBy`/`acknowledgedAt`——这是一个与该 movement 自身最终 `release()` 截然不同的 *Checker* acknowledgment。一旦 acknowledged，`displayStatus()` 会显示为 `EARMARKED`（而非 `EARMARKING`），Checker Queue 也会隐藏该项——"A3 A3S 交易 Approve 過後 不要再顯示."
+A3/A3S（Document Arrival）有其自身独立的两阶段确认：`POST .../acknowledge`（由早先仅供 B3 使用的路由改造而来）会写入 `acknowledgedBy`/`acknowledgedAt`——这是一个与该 movement 自身最终 `release()` 截然不同的 _Checker_ acknowledgment。一旦 acknowledged，`displayStatus()` 会显示为 `EARMARKED`（而非 `EARMARKING`），Checker Queue 也会隐藏该项——"A3 A3S 交易 Approve 過後 不要再顯示."
 
 ## 跨会话的组合/关联 movement 关联关系
 
-多个功能（A3S、A6、B4、B5）会创建或解析共享同一个 `businessEventId` 或 `referencedTransactionId` 的*关联对（linked pair）* movement。客户端内存中的 Maker Submit 响应最初是唯一的关联机制——这意味着一个在真正独立的会话/浏览器中操作的 Checker，会在无声无息中 no-op（甚至连请求都没有发出）。通过 `GET /balance-movements?businessEventId=` + `resolveLinkedMovementId()` 修复；后来又因同一个 bug 在 A6/B4 自身的 Release/Reject 流程中再次出现，进一步放宽了守卫条件（`!selectedCheckerMovement && !makerContext.submitResult?.movementId`——两者任一满足即可）。
+A3S 与 B4 通过 `businessEventId` 识别 compound legs；A6 通过 `referencedTransactionId` 关联既有 Document Arrival。Checker 可从服务端重新解析关联关系，不依赖 Maker 同一浏览器会话的内存结果。B5 是 plain 单一 movement，独立 Checker 直接处理所选 settlement。
 
 ## 按功能划分的 Checker Queue 范围
 

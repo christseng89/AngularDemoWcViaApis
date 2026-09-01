@@ -275,12 +275,18 @@ describe('BusinessCaseRunnerComponent', () => {
       const resetDatabase = jest.fn(() => of({ status: 'ok' }));
       const api = makeApi({ resetDatabase });
       const component = makeComponent(api);
+      component.result = { id: 'old', title: 'old', description: 'old', trace: [] };
+      component.allResults = [{ id: 'old', title: 'old', description: 'old', trace: [] }];
+      component.loadError = 'old error';
 
       component.resetDatabase();
 
       expect(resetDatabase).toHaveBeenCalledTimes(1);
       expect(component.resettingDatabase).toBe(false);
       expect(component.resetDatabaseMessage).toBe('Database tables cleaned up.');
+      expect(component.result).toBeNull();
+      expect(component.allResults).toEqual([]);
+      expect(component.loadError).toBeNull();
     });
 
     it('sets resettingDatabase=true and clears any previous message before the response arrives', () => {

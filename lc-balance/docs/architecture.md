@@ -34,8 +34,9 @@ Balance Microservice (:4100)
 - `backend/server.js` 提供 Business Case Runner 使用的 API。
 - `backend/data/businessCases.js` 是声明式案例注册表。
 - 此层负责开发／测试场景编排，不是 Balance 业务规则的权威实现位置。
-- Run All 的最后三个 seed case 必须保留 A4-ready Sight A3、A6-ready Usance A3 和 B4-ready B3，
-  不得为了完成整套案例而继续消费这些人工测试 prerequisite。
+- Run All 的最后六个 readiness cases 各使用一个母 LC／Confirmation，并在同一母契约下保留三笔
+  合格 secondary references，分别供 A3S、A4、A6、A7、B4、B5 的 Transaction Index 测试；不得
+  为了完成整套案例而继续消费这些人工测试 prerequisite。
 
 ## Balance Component 微服务
 

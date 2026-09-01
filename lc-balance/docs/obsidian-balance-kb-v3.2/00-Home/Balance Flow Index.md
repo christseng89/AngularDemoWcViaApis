@@ -1,9 +1,9 @@
 ---
 knowledge_id: Balance-Flow-Index
-title: "Balance Flow Index"
+title: 'Balance Flow Index'
 domain: Balance
 category: Index
-snapshot_date: 2026-08-26
+snapshot_date: 2026-09-01
 tags:
   - balance
   - index
@@ -11,7 +11,7 @@ tags:
 
 # Balance Flow Index
 
-v3.2 结构：按业务功能（Function）组织的端到端业务流程索引，覆盖进口方向 A1–A11（11 个功能）、出口方向 B1–B7（7 个功能），以及跨功能生命周期与技术专题笔记（Cross-Function-Flows）。每个功能文件夹下的主笔记（与文件夹同名）给出该功能的完整流程分析，子笔记补充该功能内的具体判定/规则细节。
+v3.2 结构：按业务功能（Function）组织端到端业务流程，现行目录为进口 A1、A2、A3、A3S、A4、A6–A11（A5 已移除）与出口 B1–B7，并包含跨功能生命周期与技术专题笔记。每个功能文件夹下的主笔记给出完整流程分析，子笔记补充具体判定与规则。
 
 **2026-08-26 更新：** F1 新增 A11（进口 LC Reopen）、B7（出口 Confirmed LC Reopen）两个具名功能，详见 [[A11-LC-Reopen]]、[[B7-Confirmed-LC-Reopen]]，以及 [[Freshness-Update-Log-2026-08-26]]。
 
@@ -19,7 +19,7 @@ v3.2 结构：按业务功能（Function）组织的端到端业务流程索引�
 
 另见：[[Balance Derivation Rules]]、[[Maker Checker Lifecycle]]、[[Off-Balance-Sheet Exposure]]。
 
-## A-Import（进口方向，10 个功能）
+## A-Import（进口方向，11 个功能）
 
 - **[[A1-LC-Issue|A1 — 进口信用状开立（LC Issue）]]**
 - **[[A2-LC-Amendment|A2 — 进口信用证修改（LC Amendment）]]**
@@ -40,8 +40,9 @@ v3.2 结构：按业务功能（Function）组织的端到端业务流程索引�
 - **[[A9-SG-Redemption|A9 — 提货担保赎回（Shipping Guarantee Redemption，仅限全额 Full Redeem）]]**
   - [[sg-redemption-amount-min-bill-amount-sg-outstanding|SG Redemption Amount = MIN(Bill Amount, SG Outstanding)]]
 - **[[A10-LC-Close|A10 — 进口信用状结案（LC Close）]]**
+- **[[A11-LC-Reopen|A11 — 进口信用状重开（LC Reopen）]]**
 
-## B-Export（出口方向，6 个功能）
+## B-Export（出口方向，7 个功能）
 
 - **[[B1-Confirm-LC|B1 — 出口信用状保兑（Confirm LC）]]**
 - **[[B2-Confirm-LC-Amendment|B2 — 保兑信用证修改（Confirm LC Amendment）]]**
@@ -50,6 +51,7 @@ v3.2 结构：按业务功能（Function）组织的端到端业务流程索引�
 - **[[B4-Honour-Acceptance|B4 — 兑付／承兑（Honour/Acceptance）]]**
 - **[[B5-Settlement-Reimbursement-Maturity|B5 — 结算（偿付／到期）Settlement — Reimbursement / Maturity]]**
 - **[[B6-Confirmed-LC-Close|B6 — 保兑信用状结案（Confirmed LC Close）]]**
+- **[[B7-Confirmed-LC-Reopen|B7 — 保兑信用状重开（Confirmed LC Reopen）]]**
 
 ## Cross-Function-Flows（跨功能流程）
 
@@ -64,7 +66,7 @@ v3.2 结构：按业务功能（Function）组织的端到端业务流程索引�
 - [[a10-b6-close-submit-through-release-lifecycle|A10/B6 Close——从 Submit 到 Release 的生命周期]]
 - [[a10-b6-close-write-off-lifecycle|A10 / B6 Close 核销生命周期]]
 - [[a10-b6-close-write-off-pattern-import-case-8-9-10-11-12-export-case-8-|A10 / B6 Close 核销模式（import-case-8/9/10/11/12，export-case-8/9/11）]]
-- [[a6-b4-b5-compound-linked-leg-release-pattern|A6 / B4 / B5 复合式关联腿（linked-leg）release 模式]]
+- [[a6-b4-b5-compound-linked-leg-release-pattern|A6 / B4 关联腿 release 与 B5 单腿结算对照]]
 - [[b3-b4-compound-release-export-present-docs-honour-accept|B3 → B4 复合式 release（Export Present Docs → Honour/Accept）]]
 - [[closeeligibilityinputs-closeeligibilityresult-evaluatecloseeligibility|CloseEligibilityInputs / CloseEligibilityResult / evaluateCloseEligibility()]]
 - [[evaluatecontractcloseeligibility-private-service-method-3-call-sites|evaluateContractCloseEligibility()（私有服务方法，3 处调用点）]]

@@ -32,7 +32,7 @@ describe('PR-2 — FunctionStrategy is a faithful projection of the current regi
       'acceptanceMovementId',
       'acceptanceReimbReceivableMovementId',
     ]);
-    expect(FUNCTION_STRATEGIES['B5'].makerResultDeletePending.siblingMovementIdKeys).toEqual(['matchedReceivableMovementId']);
+    expect(FUNCTION_STRATEGIES['B5'].makerResultDeletePending.siblingMovementIdKeys).toEqual([]);
   });
 
   describe('movementDerivation — matches PR-1\'s autoRedeemType/settlesAcceptanceOnMature/movementTypeFromContractTenor characterization', () => {
@@ -88,8 +88,8 @@ describe('PR-2 — FunctionStrategy is a faithful projection of the current regi
       expect(twoShapes.map((s) => s.code)).toEqual(['B4']);
     });
 
-    it('B5 (settlesAcceptanceOnMature) -> acceptanceSettleWithReceivable, only B5', () => {
-      expect(FUNCTION_STRATEGIES['B5'].compoundSubmission.possibleShapes).toEqual(['acceptanceSettleWithReceivable']);
+    it('B5 is a plain single-movement submission', () => {
+      expect(FUNCTION_STRATEGIES['B5'].compoundSubmission.possibleShapes).toEqual(['plain']);
     });
 
     it('every function without a compound flag falls back to plain (matches "no matching flag -> submitPlain" in PR-1)', () => {
@@ -97,7 +97,7 @@ describe('PR-2 — FunctionStrategy is a faithful projection of the current regi
         .filter((s) => s.compoundSubmission.possibleShapes.length === 1 && s.compoundSubmission.possibleShapes[0] === 'plain')
         .map((s) => s.code)
         .sort();
-      expect(plainCodes).toEqual(['A1', 'A2', 'A3', 'A4', 'A6', 'A7', 'A8', 'A9', 'A10', 'A11', 'B1', 'B2', 'B3', 'B6', 'B7'].sort());
+      expect(plainCodes).toEqual(['A1', 'A2', 'A3', 'A4', 'A6', 'A7', 'A8', 'A9', 'A10', 'A11', 'B1', 'B2', 'B3', 'B5', 'B6', 'B7'].sort());
     });
   });
 

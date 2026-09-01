@@ -22,7 +22,7 @@ const FUNCTION_ORDER: string[] = [...IMPORT_FUNCTIONS, ...EXPORT_FUNCTIONS].map(
  * `siblingMovementIds` (business-confirmed 2026-08-28, "1 只應該顯示一筆 2 一筆刪全部" — reversing this
  * queue's own former "3 separate rows, Delete Pending disabled" posture for a compound event, see
  * `isCompoundShape()`'s own updated doc comment) — present only on a MERGED representative row for a
- * compound submission (A3S/B4/B5): every movementId sharing this row's own `movement.businessEventId`,
+ * compound submission (A3S/B4): every movementId sharing this row's own `movement.businessEventId`,
  * INCLUDING this row's own `movement.movementId`. Absent (undefined) on a plain single-leg row.
  */
 export interface MakerQueueRow {
@@ -187,7 +187,7 @@ export class MakerQueueService {
 
   /**
    * Business-confirmed 2026-08-28 — collapses every compound submission's own multiple raw movements
-   * (A3S/B4/B5, all sharing one `businessEventId`) into ONE display row, same "one Business Event, one
+   * (A3S/B4, sharing one `businessEventId`) into ONE display row, same "one Business Event, one
    * row" principle `mergeAccountingEventRows()` (inquire-events.service.ts) already applies to A6/B4 on
    * the merged event timeline. The representative row is whichever leg is a DIRECT registry match — its
    * own `contract.instrumentType` equals `functionFor()`'s resolved function's own registered
@@ -277,7 +277,7 @@ export class MakerQueueService {
 
   /**
    * Business-confirmed 2026-08-28 ("1 只應該顯示一筆 2 一筆刪全部") — reverses this queue's former
-   * Phase-2-era posture (A3S/B4/B5 compound rows shown separately, Delete Pending disabled on all of
+   * Phase-2-era posture (A3S/B4 compound rows shown separately, Delete Pending disabled on all of
    * them — see the superseded doc comment this replaces, in the same session's own CLAUDE.md decision
    * log). The original blocker (`checker-actions.service.ts`'s own `deleteMakerPending()` cascade relies
    * on same-session-only `arrivalSgRedeemMovementId`/`acceptanceMovementId`/etc. state) no longer applies
@@ -300,7 +300,7 @@ export class MakerQueueService {
    * change here either. EXCLUDES a compound row (`isCompoundShape()`) UNLESS it's specifically the
    * `documentArrivalWithSg` (A3S) shape (`isArrivalWithSgCompound()` below) — Fix Pending's own
    * `editPending()` generally only ever corrects ONE movement, so single-leg-editing a row that really
-   * represents two linked records would silently desync them for every OTHER compound shape (B4/B5) —
+   * represents two linked records would silently desync them for every OTHER compound shape (B4) —
    * but A3S's own Phase 4 cascade (`BalanceService.applyArrivalWithSgCompoundEdit()`, 2026-08-28)
    * specifically handles this ONE shape correctly, recomputing/replacing the SG's own matched leg
    * alongside the LC's own UTILIZE. A merged A3S row's own representative leg structurally resolves to

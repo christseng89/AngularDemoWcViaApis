@@ -59,7 +59,6 @@ function makeContext(overrides: Partial<CheckerActionContext> = {}): CheckerActi
     submitResult: null,
     selectedFunction: null,
     selectedPayMovement: null,
-    matchedReceivableMovementId: null,
     dueFromIssuingBankMovementId: null,
     acceptanceMovementId: null,
     acceptanceReimbReceivableMovementId: null,
@@ -177,53 +176,20 @@ describe('CheckerActionsService.release() — A3S (documentArrivalWithSg) linked
   });
 });
 
-describe('CheckerActionsService.release() — B5 (settlesAcceptanceOnMature) linked Reimbursement Receivable resolution', () => {
-  it('fast path: releases the primary Acceptance settle, then the already-known Reimbursement Receivable', (done) => {
+describe('CheckerActionsService.release() — B5 plain Acceptance settlement', () => {
+  it('releases only the selected Acceptance settlement', (done) => {
     const api = makeApi();
     const service = new CheckerActionsService(api);
     const ctx = makeContext({
       selectedFunction: B5,
-      matchedReceivableMovementId: 'receivable-1',
-      selectedCheckerMovement: makeMovement({ movementId: 'settle-1', movementType: 'FULL_SETTLE', businessEventId: 'be-7' }),
+      selectedCheckerMovement: makeMovement({ movementId: 'settle-1', movementType: 'FULL_SETTLE' }),
     });
 
     service.release(ctx).subscribe((outcome) => {
       expect(outcome.kind).toBe('released');
-      expect(api.release).toHaveBeenNthCalledWith(1, 'settle-1', 'checker1');
-      expect(api.release).toHaveBeenNthCalledWith(2, 'receivable-1', 'checker1');
+      expect(api.release).toHaveBeenCalledTimes(1);
+      expect(api.release).toHaveBeenCalledWith('settle-1', 'checker1');
       expect(api.findByBusinessEventId).not.toHaveBeenCalled();
-      done();
-    });
-  });
-
-  it('cross-session fallback: resolves the Reimbursement Receivable via businessEventId, using selectedCheckerMovement as the primary (not a stale/absent submitResult)', (done) => {
-    const linked = [makeMovement({ movementId: 'receivable-2', movementType: 'REIMBURSE', businessEventId: 'be-8' })];
-    const api = makeApi({ findByBusinessEventId: jest.fn(() => of(linked)) });
-    const service = new CheckerActionsService(api);
-    const ctx = makeContext({
-      selectedFunction: B5,
-      matchedReceivableMovementId: null,
-      submitResult: null,
-      selectedCheckerMovement: makeMovement({ movementId: 'settle-2', movementType: 'PARTIAL_SETTLE', businessEventId: 'be-8' }),
-    });
-
-    service.release(ctx).subscribe((outcome) => {
-      expect(outcome.kind).toBe('released');
-      expect(api.release).toHaveBeenNthCalledWith(1, 'settle-2', 'checker1');
-      expect(api.release).toHaveBeenNthCalledWith(2, 'receivable-2', 'checker1');
-      done();
-    });
-  });
-
-  it('no matching Reimbursement Receivable found — fails cleanly, never releases the primary', (done) => {
-    const api = makeApi({ findByBusinessEventId: jest.fn(() => of([])) });
-    const service = new CheckerActionsService(api);
-    const ctx = makeContext({ selectedFunction: B5, selectedCheckerMovement: makeMovement({ movementType: 'FULL_SETTLE', businessEventId: 'be-9' }) });
-
-    service.release(ctx).subscribe((outcome) => {
-      expect(outcome.kind).toBe('failed');
-      if (outcome.kind === 'failed') expect(outcome.message).toContain('Could not find the matching Reimbursement Receivable');
-      expect(api.release).not.toHaveBeenCalled();
       done();
     });
   });

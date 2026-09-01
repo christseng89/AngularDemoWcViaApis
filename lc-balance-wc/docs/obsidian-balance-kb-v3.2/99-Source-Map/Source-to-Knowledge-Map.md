@@ -3,7 +3,7 @@ knowledge_id: Source-to-Knowledge-Map
 title: '源文件到知识映射'
 domain: Balance
 category: Traceability
-snapshot_date: 2026-08-31
+snapshot_date: 2026-09-01
 tags:
   - balance
   - traceability
@@ -24,11 +24,7 @@ tags:
 
 **2026-08-31 增量同步：** 复核 `InquireDeletePendingComponent` 的 standalone dependency 边界；移除模板未使用的 `TbIconComponent` 后，确认无 API contract 变化，两份 OAS 保持不变。详见 [[InquireDeletePendingComponent]]。
 
-**2026-08-31 Web Component Phase 1：** 新增 `src/web-component.ts`、`src/app/shared-app.providers.ts` 与 `src/app/web-component/*`，建立无 Router 的 Angular Elements 入口、版本化配置和 DOM 事件契约。详见 [[balance-component-web-component-phase-1]]；两份 OAS 经复核后保持不变。
-
-**2026-08-31 Web Component Phase 2：** 扩充 `balance-component-element.contract.ts`、Angular shell 与 `src/web-component.ts`，新增跨框架 `navigate()`／`refresh()`、refresh/error events 及多实例隔离验证。详见 [[balance-component-web-component-phase-2]]；Backend、Microservice、业务规则与两份 OAS 均未修改。
-
-**2026-08-31 Web Component Phase 3：** `balance-component-element.component.*` 导入 Shadow DOM、实例级 theme 与稳定 `--balance-*` tokens；`src/web-component.ts` 自动解析 shadow 内部 stylesheet。详见 [[balance-component-web-component-phase-3]]；Backend、Microservice、业务规则与两份 OAS 均未修改。
+**2026-09-01 增量同步：** 复核 Business Case Runner、Transaction Index、Maker Submit、Checker Release 与两份 OAS。B5 改为单一 Acceptance settlement，A5 移除；Microservice 在 create/release 重验 contract、parent 与 A6/B4 source eligibility；Runner 增加负 Tight Balance 的 A02/B02 自动修复与同 parent 三笔 readiness fixtures。详见 [[Freshness-Update-Log-2026-09-01]]。
 
 ## Angular UI — 交易构建器（Transaction Builder，29 个文件）
 
@@ -164,8 +160,3 @@ tags:
 | `maker-submit.service.spec.ts`            | [[MOVEMENT-RULE-028]]                                                                                                                    |
 | `submit-rules.spec.ts`                    | [[MOVEMENT-RULE-020]], [[MOVEMENT-RULE-023]], [[MOVEMENT-RULE-025]], [[MOVEMENT-RULE-026]]                                               |
 | `test/unit/app.test.ts`                   | [[MOVEMENT-RULE-002]], [[MOVEMENT-RULE-003]], [[MOVEMENT-RULE-010]], [[MOVEMENT-RULE-015]], [[MOVEMENT-RULE-016]]                        |
-
-- `src/adapters/**` → [[balance-component-web-component-phase-4]]
-- `e2e/**`, `playwright.config.ts`, `scripts/*release*` → [[balance-component-web-component-phase-5]]
-- `README.md`, `docs/web-component-*.md`, `docs/migrations/web-component-v1.md` → [[balance-component-web-component-phase-6]]
-- `analysis/balance-component-api.yaml`, `analysis/balance-component-channel-api.yaml` → [[balance-component-web-component-phase-6]] (2026-08-31 no-change verification)

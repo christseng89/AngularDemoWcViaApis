@@ -36,6 +36,8 @@ export class MovementContractService {
     if (contract && ROOT_INSTRUMENT_TYPES.has(contract.instrumentType) && req.movementType !== 'ISSUE') {
       this.assertRootIssueReleased(contract, `process a ${req.movementType} event`);
     }
+    if (contract) this.assertContractStatusEligible(contract, req.movementType);
+    this.assertReferencedTransactionEligible(req, contract);
     if (contract && req.currency !== contract.currency) {
       throw new CurrencyMismatchError(
         `Supplied currency "${req.currency}" does not match this contract's own currency "${contract.currency}" ` +
@@ -76,13 +78,81 @@ export class MovementContractService {
   private assertParentReady(req: CreateMovementRequest): void {
     if (!req.parentLogicalContractId) return;
     const parent = this.contracts.findActiveByLogicalContractId(req.parentLogicalContractId);
-    if (!parent) return;
+    if (!parent) {
+      throw new RequestValidationError(
+        `Cannot create ${req.instrumentType} — parent logical contract ${req.parentLogicalContractId} was not found or not ACTIVE.`,
+      );
+    }
     this.assertRootIssueReleased(parent, `create a new ${req.instrumentType} under it`);
     if (req.currency !== parent.currency) {
       throw new CurrencyMismatchError(
         `Supplied currency "${req.currency}" does not match the parent contract's own currency ` +
           `"${parent.currency}" (parentLogicalContractId ${req.parentLogicalContractId}).`,
       );
+    }
+  }
+
+  /** Mirrors the Transaction Index status gate for direct API callers. */
+  private assertContractStatusEligible(contract: BalanceContract, movementType: string): void {
+    if (movementType === 'REOPEN' || movementType === 'REVERSAL') return;
+    if (movementType === 'CLOSE' && (contract.status === 'ACTIVE' || contract.status === 'EXPIRED')) return;
+    if (movementType === 'AMEND_EXPIRY_DATE') {
+      if (contract.status === 'ACTIVE' || contract.status === 'EXPIRED') return;
+      throw new IllegalStateTransitionError(
+        `Cannot amend the Expiry Date of a ${contract.status} contract — only ACTIVE or EXPIRED contracts are eligible.`,
+      );
+    } else if (contract.status === 'ACTIVE') {
+      return;
+    }
+    throw new IllegalStateTransitionError(
+      `Cannot process ${movementType} against ${contract.instrumentType} ${contract.naturalKey.lcNumber} — ` +
+        `contract status ${contract.status} is not eligible for this transaction. Refresh the Index and select an eligible transaction.`,
+    );
+  }
+
+  /** Rechecks A6/B4 Step-2 Index eligibility at the microservice boundary. */
+  private assertReferencedTransactionEligible(req: CreateMovementRequest, target: BalanceContract | undefined): void {
+    if (!req.referencedTransactionId) return;
+    const source = this.movements.findById(req.referencedTransactionId);
+    if (!source) throw new NotFoundError(`Referenced transaction ${req.referencedTransactionId} was not found.`);
+    const sourceContract = this.contracts.findById(source.balanceContractId);
+
+    if (req.instrumentType === 'IPLC_ACCEPTANCE' && req.movementType === 'CREATE') {
+      const sameParent =
+        !!sourceContract &&
+        (sourceContract.logicalContractId === req.parentLogicalContractId || sourceContract.naturalKey.lcNumber === req.naturalKey?.lcNumber);
+      const eligible =
+        sameParent &&
+        sourceContract.instrumentType === 'IPLC_LC' &&
+        source.movementType === 'UTILIZE' &&
+        source.status === 'PENDING' &&
+        !!source.acknowledgedAt &&
+        !source.makerSubmittedAt;
+      if (!eligible) {
+        throw new IllegalStateTransitionError(
+          `Referenced transaction ${source.movementId} is not eligible for A6 — select an acknowledged, still-PENDING Document Arrival from the same LC.`,
+        );
+      }
+    }
+
+    if (req.instrumentType === 'EPLC_CONFIRMATION' && (req.movementType === 'HONOUR' || req.movementType === 'ACCEPT')) {
+      const sameParent = !!sourceContract && !!target && sourceContract.parentLogicalContractId === target.logicalContractId;
+      const alreadySelected = !!target && this.movements.listByContract(target.balanceContractId).some(
+        (movement) =>
+          movement.eventSeq !== req.eventSeq && movement.status === 'PENDING' && movement.referencedTransactionId === source.movementId,
+      );
+      const eligible =
+        sameParent &&
+        sourceContract.instrumentType === 'EPLC_EXAMINATION' &&
+        source.movementType === 'CREATE' &&
+        source.status === 'RELEASED' &&
+        !source.presentDocsConsumedAt &&
+        !alreadySelected;
+      if (!eligible) {
+        throw new IllegalStateTransitionError(
+          `Referenced transaction ${source.movementId} is not eligible for B4 — select a released, unconsumed Present Docs record from the same Confirmation.`,
+        );
+      }
     }
   }
 
