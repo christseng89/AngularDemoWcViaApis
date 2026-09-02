@@ -1,6 +1,6 @@
 export const BALANCE_COMPONENT_CONTRACT_VERSION = '1' as const;
 
-export type BalanceComponentView = 'transaction-builder' | 'business-cases';
+export type BalanceComponentView = 'balance-accounts' | 'transaction-builder' | 'business-cases';
 export type BalanceComponentTheme = 'system' | 'light' | 'dark';
 
 export const BALANCE_COMPONENT_THEME_TOKENS = [
@@ -85,7 +85,7 @@ export function normalizeBalanceComponentConfig(config: Partial<BalanceComponent
 }
 
 export function isBalanceComponentView(value: unknown): value is BalanceComponentView {
-  return value === 'transaction-builder' || value === 'business-cases';
+  return value === 'balance-accounts' || value === 'transaction-builder' || value === 'business-cases';
 }
 
 export function isBalanceComponentTheme(value: unknown): value is BalanceComponentTheme {

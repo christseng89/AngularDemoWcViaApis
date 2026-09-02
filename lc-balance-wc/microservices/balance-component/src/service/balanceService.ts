@@ -9,6 +9,8 @@ import { DeletePendingAuditStore } from '../store/deletePendingAuditStore';
 import { FixPendingAuditStore } from '../store/fixPendingAuditStore';
 import { applyStatusTransition, assertMakerCheckerSeparation } from '../domain/statusTransition';
 import { deriveContingentAccountEntry } from '../domain/contingentAccountEntry';
+import { mappingKeyFor } from '../domain/balanceAccountMapping';
+import { BalanceAccountMappingService } from './balanceAccountMappingService';
 import { computeCeilingAmount } from '../domain/tolerance';
 import { computeAvailableBalance, computeConfirmedBalance, computePendingDecreaseTotal, MOVEMENT_DIRECTION } from '../domain/balanceDerivation';
 import {
@@ -181,6 +183,7 @@ export class BalanceService {
   private readonly movementContracts: MovementContractService;
   /** Raw SQLite handle used only for atomic Fix Pending audit + correction writes. */
   private readonly db: Db;
+  private readonly accountMappings: BalanceAccountMappingService;
 
   constructor(
     db: Db,
@@ -188,6 +191,7 @@ export class BalanceService {
     stores: BalanceServiceStores = createSqliteBalanceServiceStores(db),
   ) {
     this.db = db;
+    this.accountMappings = new BalanceAccountMappingService(db, undefined, this.now);
     this.contracts = stores.contracts;
     this.movements = stores.movements;
     this.deletePendingAudit = stores.deletePendingAudit;
@@ -630,6 +634,7 @@ export class BalanceService {
       currency: req.currency,
       tenorType: contract.tenorType,
       reversedDirection,
+      accountMapping: this.accountMappingFor(contract),
     });
 
     const movement: BalanceMovement = {
@@ -947,6 +952,7 @@ export class BalanceService {
       amount: ceilingAmount.toFixed(),
       currency: contract.currency,
       tenorType: merged.tenorType, // the PATCHED tenor when isCreatingEdit — a Sight->Usance Fix Pending edit must produce the correspondingly-worded Dr/Cr pair, not the pre-edit one
+      accountMapping: this.accountMappingFor(contract, merged.tenorType),
     });
 
     const editedAt = this.now();
@@ -1040,7 +1046,8 @@ export class BalanceService {
       movementType: newSgMovementType,
       amount: newSgRedeemAmount.toFixed(),
       currency: sgContract.currency,
-      tenorType: null,
+      tenorType: this.accountingTenorFor(sgContract),
+      accountMapping: this.accountMappingFor(sgContract),
     });
 
     const editedAt = this.now();
@@ -1213,6 +1220,19 @@ export class BalanceService {
       remarks: null,
     });
     return this.movements.findById(movementId)!;
+  }
+
+  private accountingTenorFor(contract: BalanceContract, override?: TenorType | null): TenorType | null {
+    if (override) return override;
+    if (contract.instrumentType === 'SHGT' && contract.parentLogicalContractId) {
+      return this.contracts.findActiveByLogicalContractId(contract.parentLogicalContractId)?.tenorType ?? null;
+    }
+    return contract.tenorType ?? null;
+  }
+
+  private accountMappingFor(contract: BalanceContract, overrideTenor?: TenorType | null) {
+    const key = mappingKeyFor(contract.instrumentType, this.accountingTenorFor(contract, overrideTenor));
+    return key ? (this.accountMappings.findByKey(key) ?? null) : null;
   }
 
   private guardSecondaryAction(

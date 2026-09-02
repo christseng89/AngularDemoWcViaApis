@@ -6,7 +6,7 @@
 ```ts
 interface BalanceComponentConfig {
   version: '1';
-  initialView?: 'transaction-builder' | 'business-cases';
+  initialView?: 'balance-accounts' | 'transaction-builder' | 'business-cases';
   theme?: 'system' | 'light' | 'dark';
 }
 ```

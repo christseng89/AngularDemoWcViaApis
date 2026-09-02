@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormlyModule } from '@ngx-formly/core';
 import { BalanceSnapshotBoxComponent } from './balance-snapshot-box.component';
 import { BalanceMovement } from './balance-component-api.service';
-import { InquireEventsService } from './inquire-events.service';
+import { InquireEventsService, type InquiredEvent } from './inquire-events.service';
 import {
   InstrumentType,
   displayStatus as displayStatusShared,
@@ -91,6 +91,15 @@ export class InquireEventsComponent {
   readonly statusBadgeIcon = statusBadgeIconShared;
   readonly displayMovementType = displayMovementTypeShared;
   readonly displayMovementAmount = displayMovementAmountShared;
+
+  /**
+   * Event rows are identified by movement plus display phase. A4 can project the same movement as
+   * separate create/finalize rows, so movementId alone would highlight two rows for one Detail panel.
+   */
+  isSelectedEvent(event: InquiredEvent): boolean {
+    const selected = this.inquireEvents.selectedEvent;
+    return selected?.movement.movementId === event.movement.movementId && selected.phase === event.phase;
+  }
 
   openAccountEntryDialog(
     movement: BalanceMovement,

@@ -9,7 +9,7 @@
  *
  * Deliberately reuses domain/balanceDerivation.ts's own MOVEMENT_DIRECTION table rather than
  * duplicating a second direction map — the Dr/Cr side an event posts to is the exact same "+1/-1"
- * concept that table already encodes for balance math; this module only adds the account-NAME layer
+ * concept that table already encodes for balance math; this module adds the account identity layer
  * on top (Design doc §5's direction table vs. this ledger's own account-inventory table are two views
  * of the same underlying fact).
  *
@@ -30,10 +30,17 @@
 import { parseMonetaryAmount } from '../money';
 import { MOVEMENT_DIRECTION } from './balanceDerivation';
 import type { InstrumentType, TenorType } from '../types';
+import type { BalanceAccountMapping } from './balanceAccountMapping';
 
 export interface ContingentAccountEntry {
   drAccount: string;
   crAccount: string;
+  drAccountNumber?: string;
+  drAccountDescription?: string;
+  crAccountNumber?: string;
+  crAccountDescription?: string;
+  accountMappingKey?: string;
+  accountMappingVersion?: number;
   currency: string;
   amount: string;
 }
@@ -48,7 +55,7 @@ interface AccountFamily {
 
 /** Ledger Folio 1 (also EPLC_LC — schema-valid but no function creates one today; kept in the same family for correctness if it ever is). */
 const LC_FAMILY: AccountFamily = { establishDr: "Customers' Liability under DC", establishCr: 'Documentary Credits Outstanding', tenorSuffix: 'LC' };
-/** Ledger Folio 2 — not tenor-suffixed; the SG's own contingent pair is identical regardless of the parent LC's tenor. */
+/** Ledger Folio 2 fallback names. Runtime mappings deliberately split SG by the parent LC risk class. */
 const SG_FAMILY: AccountFamily = {
   establishDr: "Customers' Liability under Shipping Guarantees",
   establishCr: 'Shipping Guarantees Outstanding',
@@ -130,6 +137,7 @@ export function deriveContingentAccountEntry(params: {
    * derive the flipped pair. Ignored for every other movementType.
    */
   reversedDirection?: 1 | -1;
+  accountMapping?: BalanceAccountMapping | null;
 }): ContingentAccountEntry | null {
   const family = accountFamilyFor(params.instrumentType);
   if (!family) return null;
@@ -175,12 +183,24 @@ export function deriveContingentAccountEntry(params: {
   // other movementType is always submitted with a positive amount, so this is a no-op for them.
   const netDirection: 1 | -1 = signedAmount.isNegative() ? (baseDirection === 1 ? -1 : 1) : baseDirection;
 
-  const establishDr = withTenorSuffix(family.establishDr, family, params.tenorType);
-  const establishCr = withTenorSuffix(family.establishCr, family, params.tenorType);
+  const establishDr = params.accountMapping?.accountA.accountDescription ?? withTenorSuffix(family.establishDr, family, params.tenorType);
+  const establishCr = params.accountMapping?.accountB.accountDescription ?? withTenorSuffix(family.establishCr, family, params.tenorType);
+  const drIdentity = netDirection === 1 ? params.accountMapping?.accountA : params.accountMapping?.accountB;
+  const crIdentity = netDirection === 1 ? params.accountMapping?.accountB : params.accountMapping?.accountA;
 
   return {
     drAccount: netDirection === 1 ? establishDr : establishCr,
     crAccount: netDirection === 1 ? establishCr : establishDr,
+    ...(params.accountMapping
+      ? {
+          drAccountNumber: drIdentity!.accountNumber,
+          drAccountDescription: drIdentity!.accountDescription,
+          crAccountNumber: crIdentity!.accountNumber,
+          crAccountDescription: crIdentity!.accountDescription,
+          accountMappingKey: params.accountMapping.mappingKey,
+          accountMappingVersion: params.accountMapping.version,
+        }
+      : {}),
     currency: params.currency,
     amount: signedAmount.abs().toFixed(),
   };

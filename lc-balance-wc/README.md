@@ -32,6 +32,7 @@ npm run release:prepare
 
 - [Angular／React／Vue 完整使用指南](docs/web-component-usage.md)
 - [HTTP 查詢重試政策](docs/http-retry-policy.md)
+- [Balance Account Number 維護與 API](docs/balance-account-number-maintenance.md)
 - [整合與部署總覽](docs/web-component.md)
 - [Angular／React／Vue 範例](docs/framework-integrations.md)
 - [公開契約參考](docs/web-component-contract.md)

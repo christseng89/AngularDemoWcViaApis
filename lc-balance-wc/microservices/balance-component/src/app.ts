@@ -8,6 +8,8 @@ import { SqliteUnitOfWork } from './service/unitOfWork';
 import { balanceContractsRouter } from './routes/balanceContracts';
 import { balanceMovementsRouter } from './routes/balanceMovements';
 import { deletePendingAuditRouter } from './routes/deletePendingAudit';
+import { balanceAccountMappingsRouter } from './routes/balanceAccountMappings';
+import { BalanceAccountMappingService } from './service/balanceAccountMappingService';
 import { ApiError } from './errors';
 
 /**
@@ -41,6 +43,7 @@ export function createApp(db: Db, service: BalanceService = new BalanceService(d
   app.use('/balance-movements', rateLimit({ windowMs: 60_000, limit: 1000, standardHeaders: true, legacyHeaders: false }));
   app.use(balanceMovementsRouter(service, compound));
   app.use(deletePendingAuditRouter(service));
+  app.use(balanceAccountMappingsRouter(new BalanceAccountMappingService(db)));
 
   app.get('/healthz', (_req, res) => res.json({ status: 'ok' }));
 

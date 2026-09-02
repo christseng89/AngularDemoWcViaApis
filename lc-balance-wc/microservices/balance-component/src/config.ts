@@ -77,3 +77,33 @@ export const AUTO_CLOSE_REASON_CODE = 'NATURAL_EXPIRY_ALL_BALANCES_CLEARED';
  * this constant itself doesn't need to change.
  */
 export const AUTO_CLOSE_GRACE_PERIOD_BUSINESS_DAYS = 2;
+
+export interface BalanceAccountNumberConfig {
+  pattern: string;
+  regex: RegExp;
+  minLength: number;
+  maxLength: number;
+}
+
+export function loadBalanceAccountNumberConfig(env: NodeJS.ProcessEnv = process.env): BalanceAccountNumberConfig {
+  const pattern = env.BALANCE_ACCOUNT_NUMBER_REGEX ?? '^.+$';
+  // Keep integer parsing independently testable without mutating global environment.
+  const readInt = (name: string, fallback: number): number => {
+    const raw = env[name];
+    const value = raw === undefined ? fallback : Number(raw);
+    if (!Number.isInteger(value) || value < 0) throw new Error(`${name} must be a non-negative integer.`);
+    return value;
+  };
+  const minLength = readInt('BALANCE_ACCOUNT_NUMBER_MIN_LEN', 1);
+  const maxLength = readInt('BALANCE_ACCOUNT_NUMBER_MAX_LEN', 128);
+  if (minLength > maxLength) throw new Error('BALANCE_ACCOUNT_NUMBER_MIN_LEN must not exceed BALANCE_ACCOUNT_NUMBER_MAX_LEN.');
+  let regex: RegExp;
+  try {
+    regex = new RegExp(pattern);
+  } catch {
+    throw new Error('BALANCE_ACCOUNT_NUMBER_REGEX must be a valid regular expression.');
+  }
+  return { pattern, regex, minLength, maxLength };
+}
+
+export const BALANCE_ACCOUNT_NUMBER_CONFIG = loadBalanceAccountNumberConfig();

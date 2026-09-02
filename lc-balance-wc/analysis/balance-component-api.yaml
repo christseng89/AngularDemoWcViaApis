@@ -17,6 +17,15 @@ info:
     the discrepancy inline.
 
 
+    v1.45.0 (2026-09-02, Balance Account Number maintenance): adds the
+    database-backed GET/PUT `/balance-account-mappings` API. Each fixed
+    product/risk route owns one Account A/Account B pair; movement direction
+    resolves that neutral pair to Dr/Cr. Syntax and trimmed length come from
+    BALANCE_ACCOUNT_NUMBER_REGEX, BALANCE_ACCOUNT_NUMBER_MIN_LEN and
+    BALANCE_ACCOUNT_NUMBER_MAX_LEN. Equal minimum and maximum means fixed
+    length. Optimistic versions prevent lost updates.
+
+
     v1.44.0 (2026-09-01, same-parent multi-transaction readiness fixtures;
     no endpoint-shape change): the reference Run All suite ends with six
     readiness cases for A3S, A4, A6, A7, B4 and B5. Each case creates one
@@ -39,9 +48,10 @@ info:
     Explicitly OUT OF SCOPE: IBL/EBL and any actual funded/discounted
     exposure (Loan Component's domain, fronting the external eLoan system —
     see Design doc §1 and Cross-Reference Finding 3b), interest/accrual
-    calculation (also Loan Component's domain), and GL account mapping
-    (Balance Component only carries caller-supplied accountEntries through
-    to a downstream accounting component — see §2/§3.3 "GL Ownership").
+    calculation (also Loan Component's domain), and general-purpose funded
+    GL mapping. Caller-supplied accountEntries remain downstream-owned; the
+    server-derived contingent voucher pair has its own Balance Account Number
+    mapping maintained by this service from v1.45.0.
 
 
     Core model (Design doc §3): a `BalanceContract` is one immutable
@@ -988,7 +998,7 @@ info:
         callers no longer need client-side compensation for an approved multi-leg command.
       - DOCUMENTED business routing: Import A3/A3S continues to A4 for Sight or A6 for Seller's/Buyer's
         Usance; Export B3 continues to B4, whose HONOUR/ACCEPT compound shape is selected by Sight/Usance.
-  version: "1.44.0"
+  version: "1.45.0"
 x-client-retry-policy:
   configuration:
     maxRetries: BALANCE_HTTP_RETRY_COUNT
@@ -2275,8 +2285,92 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
 
+  /balance-account-mappings:
+    get:
+      summary: List all fixed Balance Account Number mappings
+      operationId: listBalanceAccountMappings
+      responses:
+        '200':
+          description: Mapping inventory and effective validation metadata.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BalanceAccountMappingListResponse' }
+        '500': { description: Unexpected server failure. }
+
+  /balance-account-mappings/{mappingKey}:
+    put:
+      summary: Update one complete two-account set
+      operationId: updateBalanceAccountMapping
+      parameters:
+        - name: mappingKey
+          in: path
+          required: true
+          schema: { type: string }
+          example: IPLC_LC:SIGHT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateBalanceAccountMappingRequest' }
+      responses:
+        '200':
+          description: Updated mapping.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BalanceAccountMapping' }
+        '400': { description: Invalid account pair or actor. }
+        '404': { description: Unknown fixed mapping key. }
+        '409': { description: Optimistic mapping-version conflict. }
+        '500': { description: Unexpected server failure. }
+
 components:
   schemas:
+
+    BalanceAccountIdentity:
+      type: object
+      additionalProperties: false
+      required: [accountNumber, accountDescription]
+      properties:
+        accountNumber: { type: string, description: Validated by the effective environment regex and length bounds. }
+        accountDescription: { type: string, minLength: 1, maxLength: 200 }
+
+    BalanceAccountMapping:
+      type: object
+      required: [mappingKey, instrumentType, riskClass, accountA, accountB, version, updatedBy, updatedAt]
+      properties:
+        mappingKey: { type: string, example: IPLC_LC:SIGHT }
+        instrumentType: { $ref: '#/components/schemas/InstrumentType' }
+        riskClass: { type: string, enum: [SIGHT, BUYERS_USANCE, SELLERS_USANCE, USANCE] }
+        accountA: { $ref: '#/components/schemas/BalanceAccountIdentity' }
+        accountB: { $ref: '#/components/schemas/BalanceAccountIdentity' }
+        version: { type: integer, minimum: 1 }
+        updatedBy: { type: string }
+        updatedAt: { type: string, format: date-time }
+
+    BalanceAccountMappingListResponse:
+      type: object
+      required: [items, validation]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/BalanceAccountMapping' }
+        validation:
+          type: object
+          required: [pattern, minLength, maxLength]
+          properties:
+            pattern: { type: string }
+            minLength: { type: integer, minimum: 0 }
+            maxLength: { type: integer, minimum: 0 }
+
+    UpdateBalanceAccountMappingRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion, updatedBy, accountA, accountB]
+      properties:
+        expectedVersion: { type: integer, minimum: 1 }
+        updatedBy: { type: string, minLength: 1 }
+        accountA: { $ref: '#/components/schemas/BalanceAccountIdentity' }
+        accountB: { $ref: '#/components/schemas/BalanceAccountIdentity' }
 
     InstrumentType:
       type: string
@@ -2429,6 +2523,12 @@ components:
       properties:
         drAccount: { type: string }
         crAccount: { type: string }
+        drAccountNumber: { type: string }
+        drAccountDescription: { type: string }
+        crAccountNumber: { type: string }
+        crAccountDescription: { type: string }
+        accountMappingKey: { type: string }
+        accountMappingVersion: { type: integer, minimum: 1 }
         currency: { type: string }
         amount: { $ref: '#/components/schemas/MonetaryAmount' }
 

@@ -14,6 +14,7 @@
 - [版本、ownership、安全與 accessibility](web-component-governance.md)
 - [部署、rollback與 troubleshooting](web-component-operations.md)
 - [HTTP safe-read retry policy](http-retry-policy.md)
+- [Balance Account Number 維護與 API](balance-account-number-maintenance.md)
 - [測試策略與 release gates](web-component-testing.md)
 - [Release checklist](releasing-web-component.md)
 - [Version 1 migration](migrations/web-component-v1.md)
@@ -21,7 +22,7 @@
 
 ## 交付范围
 
-Phase 1 在保留既有 Angular 应用模式的同时，提供独立注册的 `<balance-component-app>` Custom Element。Web Component 使用自己的视图状态切换 Transaction Builder 与 Business Case Runner，不读取或修改宿主应用 Router。
+Phase 1 在保留既有 Angular 应用模式的同时，提供独立注册的 `<balance-component-app>` Custom Element。Web Component 使用自己的视图状态切换 Balance Account Number、Transaction Builder 与 Business Case Runner，不读取或修改宿主应用 Router。
 
 Phase 2 完成跨框架调用契约：React、Vue 或原生 JavaScript 可通过 DOM reference 调用 `navigate()`／`refresh()`，并订阅导航、刷新及错误事件。多个元素实例各自拥有独立的可变 view state 与事件来源。
 
@@ -68,7 +69,7 @@ npm run build
 ## 公共契约
 
 - `config.version`：当前仅支持 `'1'`。
-- `config.initialView`：`'transaction-builder'` 或 `'business-cases'`。
+- `config.initialView`：`'balance-accounts'`、`'transaction-builder'` 或 `'business-cases'`。
 - `config.theme`：`'system'`、`'light'` 或 `'dark'`；默认 `system`，每个实例独立。
 - `balance-ready`：Angular 壳层和初始视图加载完成；`detail` 包含 `version`、`view`。
 - `balance-navigation`：内部视图实际变化；`detail` 包含 `from`、`to`。

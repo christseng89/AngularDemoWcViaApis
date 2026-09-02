@@ -666,6 +666,25 @@ export const MIGRATIONS: Migration[] = [
       }
     },
   },
+  {
+    id: 23,
+    description: 'Add database-backed two-account maintenance mappings for each fixed Balance accounting risk route.',
+    up: (db) => {
+      db.exec(`CREATE TABLE IF NOT EXISTS balance_account_mappings (
+        mapping_key TEXT PRIMARY KEY,
+        instrument_type TEXT NOT NULL CHECK (instrument_type IN (${sqlInList(INSTRUMENT_TYPE_VALUES)})),
+        risk_class TEXT NOT NULL CHECK (risk_class IN ('SIGHT','BUYERS_USANCE','SELLERS_USANCE','USANCE')),
+        account_a_number TEXT NOT NULL,
+        account_a_description TEXT NOT NULL,
+        account_b_number TEXT NOT NULL,
+        account_b_description TEXT NOT NULL,
+        version INTEGER NOT NULL CHECK (version > 0),
+        updated_by TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE (instrument_type, risk_class)
+      )`);
+    },
+  },
 ];
 
 export function runMigrations(db: DatabaseSync): void {

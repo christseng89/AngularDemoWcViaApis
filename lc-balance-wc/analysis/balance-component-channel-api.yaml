@@ -30,6 +30,15 @@ info:
     and called the microservice directly could not evade it).
 
 
+    v1.12.0 (2026-09-02, Balance Account Number snapshot passthrough):
+    `ChannelTransaction.contingentAccountEntry` may now carry the optional
+    account number, account description, mapping key and mapping version
+    fields produced by Microservice API v1.45.0. This channel contract does
+    not expose the administrator-style mapping maintenance endpoint; the
+    reference WC calls the Microservice GET/PUT API directly. Historical
+    transaction vouchers remain immutable snapshots.
+
+
     v1.11.0 (2026-09-01, same-parent multi-transaction synchronization; no
     channel wire change): one LC or Confirmation may own multiple independent
     secondary-reference transactions. The reference Run All fixtures retain
@@ -188,7 +197,7 @@ info:
     operation and must not cancel its A3/A3S source. Transaction Processing
     reset behavior and Maker Queue separation are reference-client concerns,
     not new channel response fields.
-  version: "1.11.0"
+  version: "1.12.0"
 servers:
   - url: https://channel-api.bank.example/balance-component/v1
     description: Production-style contract root for a web/mobile origination channel. This prototype's own reference implementation is the Transaction Builder Angular app under lc-balance-wc/src/app/transaction-builder/, which today calls the Microservice API directly rather than through a built channel layer — this file specifies the intended channel contract for that same business capability, not (yet) a running service.
@@ -806,6 +815,12 @@ components:
       properties:
         drAccount: { type: string }
         crAccount: { type: string }
+        drAccountNumber: { type: string }
+        drAccountDescription: { type: string }
+        crAccountNumber: { type: string }
+        crAccountDescription: { type: string }
+        accountMappingKey: { type: string }
+        accountMappingVersion: { type: integer, minimum: 1 }
         currency: { type: string }
         amount: { $ref: '#/components/schemas/MonetaryAmount' }
 

@@ -383,7 +383,27 @@
 
   .tb-table__row--active {
     background: var(--blue-bg);
-    box-shadow: inset 3px 0 0 var(--blue);
+
+    td {
+      background: var(--blue-bg);
+      border-top: 2px solid var(--blue);
+      border-bottom: 2px solid var(--blue);
+      color: var(--navy);
+    }
+
+    td:first-child {
+      border-left: 2px solid var(--blue);
+      box-shadow: inset 4px 0 0 var(--blue);
+    }
+
+    td:last-child {
+      border-right: 2px solid var(--blue);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--blue);
+      outline-offset: 2px;
+    }
   }
 }
 

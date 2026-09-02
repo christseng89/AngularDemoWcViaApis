@@ -47,6 +47,7 @@ describe('Balance Component element contract', () => {
   });
 
   it.each([
+    ['balance-accounts', true],
     ['transaction-builder', true],
     ['business-cases', true],
     ['unknown', false],

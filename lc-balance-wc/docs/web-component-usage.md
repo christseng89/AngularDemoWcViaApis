@@ -65,13 +65,14 @@ balance.config = config;
 | Property      | 值                                          | 預設值                  |
 | ------------- | ------------------------------------------- | ----------------------- |
 | `version`     | `'1'`                                       | `'1'`                   |
-| `initialView` | `'transaction-builder'`、`'business-cases'` | `'transaction-builder'` |
+| `initialView` | `'balance-accounts'`、`'transaction-builder'`、`'business-cases'` | `'transaction-builder'` |
 | `theme`       | `'system'`、`'light'`、`'dark'`             | `'system'`              |
 
 公開方法只能在 element connected 後呼叫：
 
 ```ts
 await balance.navigate('business-cases');
+await balance.navigate('balance-accounts');
 await balance.refresh();
 ```
 

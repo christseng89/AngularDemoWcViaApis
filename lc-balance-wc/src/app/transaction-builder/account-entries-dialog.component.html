@@ -46,7 +46,7 @@
       <thead>
         <tr>
           <th>Dr/Cr</th>
-          <th>Account Name</th>
+          <th>Account Number / Description</th>
           <th>Currency</th>
           <th>Amount</th>
         </tr>
@@ -54,13 +54,19 @@
       <tbody>
         <tr>
           <td><span class="tb-drcr-tag tb-drcr-tag--dr">Dr</span></td>
-          <td>{{ entry.drAccount }}</td>
+          <td>
+            {{ entry.drAccountNumber || entry.drAccount }}
+            <span *ngIf="entry.drAccountDescription && entry.drAccountDescription !== entry.drAccountNumber">— {{ entry.drAccountDescription }}</span>
+          </td>
           <td>{{ entry.currency }}</td>
           <td class="tb-table__amount">{{ entry.amount | monetaryAmount: entry.currency }}</td>
         </tr>
         <tr>
           <td><span class="tb-drcr-tag tb-drcr-tag--cr">Cr</span></td>
-          <td>{{ entry.crAccount }}</td>
+          <td>
+            {{ entry.crAccountNumber || entry.crAccount }}
+            <span *ngIf="entry.crAccountDescription && entry.crAccountDescription !== entry.crAccountNumber">— {{ entry.crAccountDescription }}</span>
+          </td>
           <td>{{ entry.currency }}</td>
           <td class="tb-table__amount">{{ entry.amount | monetaryAmount: entry.currency }}</td>
         </tr>
@@ -85,7 +91,7 @@
         <thead>
           <tr>
             <th>Dr/Cr</th>
-            <th>Account Name</th>
+            <th>Account Number / Description</th>
             <th>Currency</th>
             <th>Amount</th>
           </tr>
@@ -93,13 +99,19 @@
         <tbody>
           <tr>
             <td><span class="tb-drcr-tag tb-drcr-tag--dr">Dr</span></td>
-            <td>{{ linkedEntry.drAccount }}</td>
+            <td>
+              {{ linkedEntry.drAccountNumber || linkedEntry.drAccount }}
+              <span *ngIf="linkedEntry.drAccountDescription && linkedEntry.drAccountDescription !== linkedEntry.drAccountNumber">— {{ linkedEntry.drAccountDescription }}</span>
+            </td>
             <td>{{ linkedEntry.currency }}</td>
             <td class="tb-table__amount">{{ linkedEntry.amount | monetaryAmount: linkedEntry.currency }}</td>
           </tr>
           <tr>
             <td><span class="tb-drcr-tag tb-drcr-tag--cr">Cr</span></td>
-            <td>{{ linkedEntry.crAccount }}</td>
+            <td>
+              {{ linkedEntry.crAccountNumber || linkedEntry.crAccount }}
+              <span *ngIf="linkedEntry.crAccountDescription && linkedEntry.crAccountDescription !== linkedEntry.crAccountNumber">— {{ linkedEntry.crAccountDescription }}</span>
+            </td>
             <td>{{ linkedEntry.currency }}</td>
             <td class="tb-table__amount">{{ linkedEntry.amount | monetaryAmount: linkedEntry.currency }}</td>
           </tr>

@@ -6,6 +6,7 @@ const root = resolve(new URL('..', import.meta.url).pathname.slice(1));
 const docs = [
   'README.md',
   'docs/http-retry-policy.md',
+  'docs/balance-account-number-maintenance.md',
   'docs/web-component-usage.md',
   'docs/web-component.md',
   'docs/framework-integrations.md',
@@ -57,7 +58,7 @@ for (const [name, document] of [
   }
 }
 
-const routeFiles = ['src/routes/balanceContracts.ts', 'src/routes/balanceMovements.ts', 'src/routes/deletePendingAudit.ts'];
+const routeFiles = ['src/routes/balanceContracts.ts', 'src/routes/balanceMovements.ts', 'src/routes/deletePendingAudit.ts', 'src/routes/balanceAccountMappings.ts'];
 for (const relative of routeFiles) {
   const source = readFileSync(resolve(root, 'microservices/balance-component', relative), 'utf8');
   for (const match of source.matchAll(/router\.(?:get|post|put|patch|delete)\('([^']+)'/g)) {

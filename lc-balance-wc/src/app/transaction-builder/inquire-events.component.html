@@ -179,13 +179,18 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <!-- Business instruction 2026-08-17 ("The View button is not required... Each Event row
-                 itself should be clickable... hover → highlight/pointer → single click → View Event
-                 Details") — the row-level View button/column was removed; the whole <tr> now dispatches
-                 the identical selectEvent() call the button used to. .tb-table's own tbody tr already
-                 carries cursor:pointer + hover-highlight styling (the same pickable-row affordance every
-                 other .tb-table in this app already uses), so no new CSS was needed. -->
-                  <tr *ngFor="let e of inquireEvents.pagedEvents" (click)="inquireEvents.selectEvent(e)">
+                  <!-- A selected row keeps a persistent visual treatment and aria-selected state so the
+                 user can match it to the Detail panel below. movementId + phase is the row identity:
+                 A4 may expose one movement as separate create/finalize event rows. -->
+                  <tr
+                    *ngFor="let e of inquireEvents.pagedEvents"
+                    tabindex="0"
+                    [class.tb-table__row--active]="isSelectedEvent(e)"
+                    [attr.aria-selected]="isSelectedEvent(e)"
+                    (click)="inquireEvents.selectEvent(e)"
+                    (keydown.enter)="inquireEvents.selectEvent(e)"
+                    (keydown.space)="$event.preventDefault(); inquireEvents.selectEvent(e)"
+                  >
                     <td>
                       <span class="tb-type-tag" *ngIf="inquireEvents.functionFor(e) as fn">{{ fn.code }} · {{ fn.label }}</span>
                       <span class="tb-muted" *ngIf="!inquireEvents.functionFor(e) && inquireEvents.systemLabelFor(e) as sysLabel">{{ sysLabel }}</span>

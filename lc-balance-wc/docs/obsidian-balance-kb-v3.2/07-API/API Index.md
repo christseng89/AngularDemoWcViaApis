@@ -57,6 +57,7 @@ tags:
 - [[balancemovementcreaterequest-field-surface|BalanceMovementCreateRequest 字段清单]]
 - [[error-channelerror-code-taxonomy|Error / ChannelError 错误码分类体系]]
 - [[HTTP-Retry-Policy|HTTP 安全读取重试策略]]
+- [[Balance-Account-Number-Maintenance-API|Balance Account Number 維護 API]]
 - [[channelfunction-catalog-14-named-business-functions|ChannelFunction 目录 — 14 个命名业务功能]]
 - [[currency-derivation-server-side-three-tier|币别推导（服务端，三层规则）]]
 - [[one-movement-one-leg-one-call-correlation-without-atomicity|旧版逐腿调用模型（历史相容说明；现行 compound 写入必须原子）]]
@@ -86,3 +87,10 @@ tags:
 - A5 已从功能目录移除；A3 依母 LC tenor 导向 A4 或 A6。
 - B5 是单一 Acceptance settlement，Channel `compoundLegs` 为 `[]`。
 - Index eligibility 与 Maker create／Checker release 的服务端重检保持一致。详见 [[Freshness-Update-Log-2026-09-01]]。
+
+## 2026-09-02 OAS 同步
+
+- 微服務 OAS：`1.45.0`；Channel OAS：`1.12.0`。
+- 微服務新增 DB-backed `GET /balance-account-mappings` 與 optimistic-version `PUT /balance-account-mappings/{mappingKey}`。
+- `contingentAccountEntry` 新增 optional 科目號、科目說明、mapping key/version 快照欄位；歷史 movement 不追溯改寫。
+- Channel 只 passthrough voucher 快照欄位，不另設維護 endpoint；參考 WC 直接呼叫微服務 API。

@@ -32,6 +32,7 @@ import {
 import { BALANCE_COMPONENT_COMMAND_EVENT, BalanceComponentCommandDetail } from './balance-component-element.command';
 
 const VIEW_LOADERS: Record<BalanceComponentView, () => Promise<Type<unknown>>> = {
+  'balance-accounts': () => import('../balance-account-maintenance/balance-account-maintenance.component').then((module) => module.BalanceAccountMaintenanceComponent),
   'transaction-builder': () => import('../transaction-builder/transaction-builder.component').then((module) => module.TransactionBuilderComponent),
   'business-cases': () => import('../business-case-runner/business-case-runner.component').then((module) => module.BusinessCaseRunnerComponent),
 };

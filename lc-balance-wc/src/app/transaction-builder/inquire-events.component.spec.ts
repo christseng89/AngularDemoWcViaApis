@@ -1,5 +1,6 @@
 import { InquireEventsComponent } from './inquire-events.component';
 import type { BalanceMovement } from './balance-component-api.service';
+import type { InquiredEvent } from './inquire-events.service';
 
 /**
  * Direct-instantiation, no-TestBed unit tests (same convention as account-entries-dialog.component.spec.ts's
@@ -67,6 +68,24 @@ describe('InquireEventsComponent', () => {
 
       expect(spy).toHaveBeenCalledWith({ movement: m, instrumentType: 'EPLC_CONFIRMATION', phase: undefined });
     });
+  });
+
+  it('matches the selected table row by movementId and phase, not object reference', () => {
+    const c = new InquireEventsComponent();
+    const selected = {
+      movement: movement({ movementId: 'mv-selected' }),
+      contract: {},
+      eventTime: '2026-09-02T00:00:00.000Z',
+      eventStatus: 'RELEASED',
+      phase: 'create',
+    } as InquiredEvent;
+    c.inquireEvents = { selectedEvent: selected } as never;
+
+    expect(c.isSelectedEvent({ ...selected })).toBe(true);
+    expect(c.isSelectedEvent({ ...selected, phase: 'finalize' })).toBe(false);
+    expect(c.isSelectedEvent({ ...selected, movement: movement({ movementId: 'mv-other' }) })).toBe(false);
+    c.inquireEvents = { selectedEvent: null } as never;
+    expect(c.isSelectedEvent(selected)).toBe(false);
   });
 
   it('uses side-correct IB/EB terminology', () => {

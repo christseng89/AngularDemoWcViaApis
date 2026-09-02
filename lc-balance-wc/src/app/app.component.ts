@@ -16,6 +16,7 @@ const NEXT_THEME_MODE: Record<ThemeMode, ThemeMode> = { system: 'light', light: 
       <div class="container">
         <span class="navbar-brand">Balance Component</span>
         <div class="navbar-nav">
+          <a class="nav-link" routerLink="/balance-accounts" routerLinkActive="active">Balance Account Number</a>
           <a class="nav-link" routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Transaction Builder</a>
           <a class="nav-link" routerLink="/business-cases" routerLinkActive="active">Business Case Runner</a>
         </div>

@@ -1,10 +1,12 @@
 # Balance Component Current Behavior
 
-本文件是現行功能的快速基準，更新日期為 2026-09-01。詳細公式以 `balance-business-rules.md`、兩份 OAS 與自動化測試為準；歷史提案和 `docs/plans/` 不覆蓋本文件。
+本文件是現行功能的快速基準，更新日期為 2026-09-02。詳細公式以 `balance-business-rules.md`、兩份 OAS 與自動化測試為準；歷史提案和 `docs/plans/` 不覆蓋本文件。
 
 Web Component現況：Angular source由 `<balance-component-app>`重用，具 version 1 DOM contract、
 Shadow DOM、instance-local theme、Angular/React/Vue薄 adapters及可驗證 package。權威導覽為
 [web-component.md](web-component.md)。Phase 1–6不改 HTTP contract、認證或 Balance business rules。
+
+Balance Account Number 是獨立 Angular 與 WC 的第一個 view。11 組固定 Product／Risk Class 路由各自維護 Account A/B；SQLite 為執行期真實來源，JSON 只 seed 空資料庫。新 movement 將當時的科目號、說明與 mapping version 寫入 immutable `contingentAccountEntry`，後續配置變更不追溯歷史 voucher。格式由 `.env` regex 與 min/max length 控制，MIN=MAX 代表固定長度。詳見 [Balance Account Number 維護與 API](balance-account-number-maintenance.md)。
 
 ## Business lifecycle
 
@@ -57,6 +59,7 @@ Business Case Runner 每步都檢查 Tight Available Balance。若測試回覆�
 
 ## Inquiry error handling
 
+- Inquire Events 的目前選取列以持續的藍色邊框／背景與 `aria-selected` 標示，讓使用者能直接對照下方 Detail。列 identity 使用 `movementId + phase`，避免 A4 共用 movement 的 create/finalize 兩列同時被標示；滑鼠、Enter 與 Space 都可選取。
 - Angular host 與 Web Component host 對 GET／HEAD／OPTIONS 的暫時性失敗會自動重試；`.env` 預設 `BALANCE_HTTP_RETRY_COUNT=3`、`BALANCE_HTTP_RETRY_INITIAL_DELAY_MS=250`、`BALANCE_HTTP_RETRY_MAX_DELAY_MS=2000`，採 bounded exponential backoff。
 - 自動重試僅適用於 network/status 0、408、429 與 5xx。Submit、Approve、Fix/Delete Pending 等 POST command 絕不自動重送，以避免重複交易或 Account Entries。
 - Maker Queue、Inquire Events 與 Inquire Delete Pending 會保留原始 HTTP error status，再交由共用 presenter 分類。

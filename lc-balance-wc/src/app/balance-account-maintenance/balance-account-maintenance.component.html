@@ -1,0 +1,123 @@
+<main class="account-maintenance">
+  <header class="account-maintenance__header">
+    <div>
+      <h1>Balance Account Number Maintenance</h1>
+      <p>Maintain the two-account set used by each product and risk class. Transaction direction determines Dr/Cr automatically.</p>
+    </div>
+    @if (!selectedMapping()) {
+      <button type="button" class="secondary-button" (click)="reload()" [disabled]="loading()">Reload</button>
+    }
+  </header>
+
+  <section class="maintenance-toolbar" aria-label="Maintenance settings">
+    <label>
+      Updated By
+      <input [ngModel]="updatedBy()" (ngModelChange)="updatedBy.set($event)" maxlength="64" />
+    </label>
+    <div class="validation-rule">
+      <strong>Account Number rule</strong>
+      @if (fixedLength(); as length) { Exactly {{ length }} characters } @else { {{ validation().minLength }}–{{ validation().maxLength }} characters }
+      <code>{{ validation().pattern }}</code>
+    </div>
+  </section>
+
+  @if (loading()) {
+    <p class="state-message" aria-live="polite">Loading account sets…</p>
+  } @else if (loadError()) {
+    <div class="state-message state-message--error" role="alert">{{ loadError() }}</div>
+  } @else if (selectedMapping(); as mapping) {
+    <section class="mapping-detail" aria-labelledby="mapping-detail-title">
+      <button type="button" class="secondary-button back-button" (click)="backToIndex()" [disabled]="savingKeys().has(mapping.mappingKey)">
+        ← Back to Account Set Index
+      </button>
+      <section class="mapping-card">
+          <header>
+            <div><strong id="mapping-detail-title">{{ mapping.instrumentType }}</strong><span>{{ mapping.riskClass }}</span></div>
+            <small>Version {{ mapping.version }} · {{ mapping.updatedBy }}</small>
+          </header>
+          <div class="account-grid">
+            @for (side of accountSides; track side) {
+              <fieldset>
+                <legend>{{ accountSideLabels[side] }}</legend>
+                <label>
+                  Account Number
+                  <input
+                    [value]="mapping[side].accountNumber"
+                    (input)="updateField(mapping.mappingKey, side, 'accountNumber', $any($event.target).value)"
+                    [minLength]="validation().minLength"
+                    [maxLength]="validation().maxLength"
+                    [attr.pattern]="validation().pattern"
+                    [readOnly]="!isEditing(mapping.mappingKey)"
+                    required
+                  />
+                </label>
+                <label>
+                  Account Description
+                  <input
+                    [value]="mapping[side].accountDescription"
+                    (input)="updateField(mapping.mappingKey, side, 'accountDescription', $any($event.target).value)"
+                    maxlength="200"
+                    [readOnly]="!isEditing(mapping.mappingKey)"
+                    required
+                  />
+                </label>
+              </fieldset>
+            }
+          </div>
+          <footer>
+            <div class="mapping-actions">
+              @if (!isEditing(mapping.mappingKey)) {
+                <button type="button" class="secondary-button" (click)="beginEdit(mapping.mappingKey)">Edit</button>
+              } @else {
+                @if (isDirty(mapping)) {
+                  <button type="button" class="primary-button" (click)="save(mapping)" [disabled]="savingKeys().has(mapping.mappingKey)">
+                    {{ savingKeys().has(mapping.mappingKey) ? 'Saving…' : 'Save Account Set' }}
+                  </button>
+                }
+                <button type="button" class="secondary-button" (click)="cancelEdit(mapping.mappingKey)" [disabled]="savingKeys().has(mapping.mappingKey)">
+                  Cancel
+                </button>
+              }
+            </div>
+            @if (rowMessages()[mapping.mappingKey]; as message) {
+              <span [class.success-message]="message.kind === 'success'" [class.error-message]="message.kind === 'error'" aria-live="polite">{{ message.text }}</span>
+            }
+          </footer>
+      </section>
+    </section>
+  } @else {
+    <section class="mapping-index" aria-labelledby="mapping-index-title">
+      <header class="mapping-index__header">
+        <div>
+          <h2 id="mapping-index-title">Account Set Index</h2>
+          <p>Select one product and risk class to view or maintain its account pair.</p>
+        </div>
+        <label class="mapping-search">
+          Search Account Sets
+          <input
+            type="search"
+            [ngModel]="searchQuery()"
+            (ngModelChange)="searchQuery.set($event)"
+            placeholder="Product, risk class, account or updater"
+          />
+        </label>
+      </header>
+      <div class="mapping-index__columns" aria-hidden="true">
+        <span>Product</span><span>Risk Class</span><span>Version</span><span>Updated By</span><span></span>
+      </div>
+      <div class="mapping-index__list">
+        @for (mapping of filteredMappings(); track mapping.mappingKey) {
+          <button type="button" class="mapping-index__row" (click)="viewMapping(mapping.mappingKey)" [attr.aria-label]="'View ' + mapping.instrumentType + ' ' + mapping.riskClass">
+            <strong>{{ mapping.instrumentType }}</strong>
+            <span class="risk-badge">{{ mapping.riskClass }}</span>
+            <span>{{ mapping.version }}</span>
+            <span>{{ mapping.updatedBy }}</span>
+            <span class="view-label">View →</span>
+          </button>
+        } @empty {
+          <p class="state-message">No account sets match “{{ searchQuery() }}”.</p>
+        }
+      </div>
+    </section>
+  }
+</main>

@@ -94,6 +94,12 @@ export interface AccountEntry {
 export interface ContingentAccountEntry {
   drAccount: string;
   crAccount: string;
+  drAccountNumber?: string;
+  drAccountDescription?: string;
+  crAccountNumber?: string;
+  crAccountDescription?: string;
+  accountMappingKey?: string;
+  accountMappingVersion?: number;
   currency: string;
   amount: string;
 }

@@ -4102,7 +4102,7 @@ describe('HTTP integration — contingent-liability account entries (analysis/co
         createdBy: 'maker1',
       })
       .expect(201);
-    expect(res.body.contingentAccountEntry).toEqual({
+    expect(res.body.contingentAccountEntry).toMatchObject({
       drAccount: "Customers' Liability under DC — Sight",
       crAccount: 'Documentary Credits Outstanding — Sight',
       currency: 'USD',
@@ -4135,7 +4135,7 @@ describe('HTTP integration — contingent-liability account entries (analysis/co
         createdBy: 'maker1',
       })
       .expect(201);
-    expect(decrease.body.contingentAccountEntry).toEqual({
+    expect(decrease.body.contingentAccountEntry).toMatchObject({
       drAccount: 'Documentary Credits Outstanding — Sight',
       crAccount: "Customers' Liability under DC — Sight",
       currency: 'USD',
@@ -4156,7 +4156,7 @@ describe('HTTP integration — contingent-liability account entries (analysis/co
         createdBy: 'maker1',
       })
       .expect(201);
-    expect(utilize.body.contingentAccountEntry).toEqual({
+    expect(utilize.body.contingentAccountEntry).toMatchObject({
       drAccount: 'Documentary Credits Outstanding — Sight',
       crAccount: "Customers' Liability under DC — Sight",
       currency: 'USD',
@@ -4197,7 +4197,7 @@ describe('HTTP integration — contingent-liability account entries (analysis/co
         createdBy: 'maker1',
       })
       .expect(201);
-    expect(issue.body.contingentAccountEntry).toEqual({
+    expect(issue.body.contingentAccountEntry).toMatchObject({
       drAccount: 'Issuing Bank Confirmation Exposure — Usance',
       crAccount: 'Confirmation Undertakings Outstanding — Usance',
       currency: 'USD',
@@ -4218,7 +4218,7 @@ describe('HTTP integration — contingent-liability account entries (analysis/co
         createdBy: 'maker1',
       })
       .expect(201);
-    expect(decrease.body.contingentAccountEntry).toEqual({
+    expect(decrease.body.contingentAccountEntry).toMatchObject({
       drAccount: 'Confirmation Undertakings Outstanding — Usance',
       crAccount: 'Issuing Bank Confirmation Exposure — Usance',
       currency: 'USD',
@@ -4226,7 +4226,7 @@ describe('HTTP integration — contingent-liability account entries (analysis/co
     });
   });
 
-  test('SHGT ISSUE then FULL_REDEEM — no tenor suffix on either leg', async () => {
+  test('SHGT ISSUE then FULL_REDEEM — account set follows the parent LC risk class', async () => {
     const issue = await request(app)
       .post('/balance-movements')
       .send({
@@ -4241,9 +4241,9 @@ describe('HTTP integration — contingent-liability account entries (analysis/co
         createdBy: 'maker1',
       })
       .expect(201);
-    expect(issue.body.contingentAccountEntry).toEqual({
-      drAccount: "Customers' Liability under Shipping Guarantees",
-      crAccount: 'Shipping Guarantees Outstanding',
+    expect(issue.body.contingentAccountEntry).toMatchObject({
+      drAccount: "Customers' Liability under Shipping Guarantees — Sight",
+      crAccount: 'Shipping Guarantees Outstanding — Sight',
       currency: 'USD',
       amount: '20000',
     });
@@ -4261,9 +4261,9 @@ describe('HTTP integration — contingent-liability account entries (analysis/co
         createdBy: 'maker1',
       })
       .expect(201);
-    expect(redeem.body.contingentAccountEntry).toEqual({
-      drAccount: 'Shipping Guarantees Outstanding',
-      crAccount: "Customers' Liability under Shipping Guarantees",
+    expect(redeem.body.contingentAccountEntry).toMatchObject({
+      drAccount: 'Shipping Guarantees Outstanding — Sight',
+      crAccount: "Customers' Liability under Shipping Guarantees — Sight",
       currency: 'USD',
       amount: '20000',
     });
@@ -4291,7 +4291,7 @@ describe('HTTP integration — contingent-liability account entries (analysis/co
       })
       .expect(201);
     expect(issue.body.ceilingAmount).toBe('110000');
-    expect(issue.body.contingentAccountEntry).toEqual({
+    expect(issue.body.contingentAccountEntry).toMatchObject({
       drAccount: "Customers' Liability under DC — Sight",
       crAccount: 'Documentary Credits Outstanding — Sight',
       currency: 'USD',
@@ -4313,7 +4313,7 @@ describe('HTTP integration — contingent-liability account entries (analysis/co
       })
       .expect(201);
     expect(increase.body.ceilingAmount).toBe('5500');
-    expect(increase.body.contingentAccountEntry).toEqual({
+    expect(increase.body.contingentAccountEntry).toMatchObject({
       drAccount: "Customers' Liability under DC — Sight",
       crAccount: 'Documentary Credits Outstanding — Sight',
       currency: 'USD',
@@ -4375,7 +4375,7 @@ describe('HTTP integration — contingent-liability account entries (analysis/co
       })
       .expect(201);
     expect(decrease.body.ceilingAmount).toBe('-5500'); // sign preserved through computeCeilingAmount()
-    expect(decrease.body.contingentAccountEntry).toEqual({
+    expect(decrease.body.contingentAccountEntry).toMatchObject({
       drAccount: 'Confirmation Undertakings Outstanding — Usance', // Decrease direction — same as the no-tolerance B2 test above, unaffected by this fix
       crAccount: 'Issuing Bank Confirmation Exposure — Usance',
       currency: 'USD',

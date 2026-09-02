@@ -49,7 +49,7 @@ describe('BalanceComponentElementComponent', () => {
     fixture.detectChanges();
 
     const buttons = shadowRoot().querySelectorAll('button') as NodeListOf<HTMLButtonElement>;
-    buttons[1].click();
+    buttons[2].click();
     await fixture.whenStable();
     fixture.detectChanges();
 
