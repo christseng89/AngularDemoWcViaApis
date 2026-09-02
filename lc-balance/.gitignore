@@ -1,6 +1,0 @@
-# lcov-report/ is the generated HTML coverage report — bulky, regenerated on every `npm test`/
-# `npm run test:coverage` run, and pure derived output. lcov.info (the compact text summary) stays
-# tracked as before; only the HTML report tree is ignored here. Covers both the Angular app's own
-# coverage/lcov-report/ and backend/coverage/lcov-report/ — microservices/balance-component/ already
-# excludes its whole coverage/ via its own .gitignore.
-**/coverage/lcov-report/
