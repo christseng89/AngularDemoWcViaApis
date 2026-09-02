@@ -7,6 +7,7 @@ export const routes: Routes = [
   },
   {
     path: '',
+    pathMatch: 'full',
     loadComponent: () => import('./transaction-builder/transaction-builder.component').then((m) => m.TransactionBuilderComponent),
   },
   {

@@ -234,7 +234,10 @@
               (previousRequested)="inquireEvents.prevEventsPage()"
               (nextRequested)="inquireEvents.nextEventsPage()"
             ></app-transaction-pagination>
-            <div class="tb-hint" *ngIf="!inquireEvents.eventsLoading && !inquireEvents.events.length">No Events found under this LC.</div>
+            <app-feedback-message
+              *ngIf="!inquireEvents.eventsLoading && !inquireEvents.events.length"
+              [message]="eventsEmptyFeedback"
+            ></app-feedback-message>
           </div>
 
           <!-- Event Details 60/40 split (business instruction 2026-08-21, "Event Details 版面調整") —

@@ -18,6 +18,7 @@ tags:
 - A3S／B4／B5 是 sibling-first、primary-last 的多次单笔 cancel，不是 atomic batch。
 - Maker Queue／Fix Pending 与上述 Transaction Processing flow 分离。
 - Maker Queue、Inquire Events、Inquire Delete Pending 保留原始 HTTP status；status 0／5xx 显示服务不可用，不再误报 `BAL-UI-UNEXPECTED`。
+- 2026-09-02 UI 對齊：Maker Queue、Inquire Events 與 Inquire Delete Pending 的正常空結果統一使用共用藍色 `FeedbackMessageComponent`；搜尋無匹配與服務錯誤仍保留不同 severity。
 - Angular／Web Component client 对安全读取采用 `.env` 可配置的 3 次 bounded exponential backoff；POST command 不自动重送。
 - `x-client-retry-policy` 是 client operational metadata，不改变 HTTP、Channel 或 DOM contract。
 - Maker Submit error policy 已覆盖 A1-A11／B1-B7：本地 validation 与 HTTP 4xx 分开呈现，保留 backend status／code／安全的 business reason；同步 dispatch exception 也统一转为 failed outcome。

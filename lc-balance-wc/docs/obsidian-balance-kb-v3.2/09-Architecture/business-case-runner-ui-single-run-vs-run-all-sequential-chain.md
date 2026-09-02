@@ -4,9 +4,9 @@ title: 'Business Case Runner UI——单次运行 vs. 全部运行的顺序链'
 domain: Balance
 category: Domain Concept
 status: CONFIRMED
-source_repository: Balance Component (lc-balance)
+source_repository: Balance Component (lc-balance-wc; legacy lc-balance removed)
 last_verified_commit: 'N/A — no .git history in the analyzed snapshot, see [[Source-to-Knowledge-Map]]'
-snapshot_date: 2026-09-01
+snapshot_date: 2026-09-02
 tags:
   - balance
   - domain-concept
@@ -46,3 +46,26 @@ Case 执行若发现 Tight LC Balance 小于 0，会自动透过现有 API 建�
 - `backend/test/businessCases.test.js`
 - `backend/test/runCase.test.js`
 - `analysis/Balance-Component-Test-Case-Proposal.md`
+
+## 2026-09-02 更新——Standalone route 可達性
+
+`lc-balance-wc` 現為唯一維護中的 Balance UI repository，舊 `lc-balance` folder 已移除。Standalone Angular shell 的 Transaction Builder 使用空路徑；該 route 必須設定 `pathMatch: 'full'`，否則 Angular 的預設 prefix matching 會先攔截 `/business-cases`，造成點擊 Business Case Runner 後仍停留在 Transaction Builder。回歸測試固定此 route invariant，wildcard redirect 仍置於最後。
+
+### 來源證據
+
+- `src/app/app.routes.ts`
+- `src/app/app.routes.spec.ts`
+
+## 2026-09-02 更新——Cleanup 後的服務恢復等待
+
+Cleanup Database 的 POST command 只發送一次，不會自動重送。Cleanup 成功後，Runner 會清除舊的單案、Run All 結果與錯誤，然後進入服務恢復等待狀態。預設每 2 秒對 `/api/business-cases` 發出一次 GET readiness probe，最多重試 15 次（約 30 秒）；該 GET 略過全域快速 retry interceptor，避免兩層 retry 疊加後造成密集 `ECONNREFUSED` log。等待期間 Run、Run All 與 Cleanup 均停用；backend 恢復後自動重載 case index，超時才顯示最終錯誤。
+
+重試次數與間隔由 `.env` 的 `BUSINESS_CASE_RECOVERY_RETRY_COUNT` 與 `BUSINESS_CASE_RECOVERY_INTERVAL_MS` 控制。自動 polling 僅在 Cleanup 成功後啟用；Browser Refresh／初次載入只檢查一次，失敗後提供 `Try again` 手動重試，避免 backend 未啟動時持續產生 Vite proxy logs。這是 Angular/backend orchestration 運行政策，不改變 Balance microservice OAS contract。
+
+### 來源證據
+
+- `src/app/business-case-runner/business-case-runner.component.ts`
+- `src/app/business-case-runner/balance-case-api.service.ts`
+- `src/app/core/http-retry/http-retry.interceptor.ts`
+- `scripts/generate-runtime-config.mjs`
+- `docs/http-retry-policy.md`

@@ -41,6 +41,17 @@ describe('InquireEventsComponent', () => {
     c.inquireEvents = { ...c.inquireEvents, indexError: null, indexEmptyIsError: true } as any;
     expect(c.indexEmptyFeedback).toMatchObject({ severity: 'WARNING', title: 'No matching transaction' });
   });
+
+  it('maps an LC with no event rows to the shared informational feedback style', () => {
+    const c = new InquireEventsComponent();
+
+    expect(c.eventsEmptyFeedback).toEqual({
+      severity: 'INFO',
+      title: 'No events available',
+      message: 'No events found under this LC.',
+      retryable: false,
+    });
+  });
   it('exposes openAccountEntries as an EventEmitter', () => {
     const c = new InquireEventsComponent();
     expect(c.openAccountEntries.emit).toBeInstanceOf(Function);

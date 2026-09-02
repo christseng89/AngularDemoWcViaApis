@@ -20,7 +20,7 @@ A3S、A4、A6、A7、B4、B5 不得繞過 prerequisite eligibility。Business Ca
 
 Transaction Index 只負責呈現候選項。A2–A11／B2–B7 的 API 會重新解析並驗證目前 contract status；A6 另驗證同 LC 的 acknowledged、PENDING、尚未 Maker Submit 的 A3／A3S，B4 另驗證同 Confirmation 的 RELEASED、未消耗且未被其他 pending B4 佔用的 B3。Checker Release 會再以最新狀態驗證；A6 原子 Release 允許來源仍為 PENDING，或已在同一複合動作中先轉為 RELEASED，不能依賴較早的 Index snapshot。
 
-Business Case Runner 每步都檢查 Tight Available Balance。若測試回覆出現負值，Import 會透過既有 API 自動建立及釋放 A02／`AMEND_INCREASE`，Export 會建立及釋放 B02／`AMEND`，再讀取 snapshot 確認已回復非負。Cleanup Database 成功後會清除先前的單一案例、Run All 結果卡及錯誤訊息。
+Business Case Runner 每步都檢查 Tight Available Balance。若測試回覆出現負值，Import 會透過既有 API 自動建立及釋放 A02／`AMEND_INCREASE`，Export 會建立及釋放 B02／`AMEND`，再讀取 snapshot 確認已回復非負。Cleanup Database 成功後會清除先前的單一案例、Run All 結果卡及錯誤訊息，並以預設每 2 秒一次、最多 15 次的低頻 GET 檢查等待 backend 恢復；等待期間操作按鈕停用，恢復後自動重載 case index。Cleanup POST 不會自動重送。Browser Refresh 只檢查 backend 一次，失敗後由使用者按 `Try again`，不進入自動 polling。
 
 ## Tight LC Balance
 
@@ -63,6 +63,7 @@ Business Case Runner 每步都檢查 Tight Available Balance。若測試回覆�
 - Angular host 與 Web Component host 對 GET／HEAD／OPTIONS 的暫時性失敗會自動重試；`.env` 預設 `BALANCE_HTTP_RETRY_COUNT=3`、`BALANCE_HTTP_RETRY_INITIAL_DELAY_MS=250`、`BALANCE_HTTP_RETRY_MAX_DELAY_MS=2000`，採 bounded exponential backoff。
 - 自動重試僅適用於 network/status 0、408、429 與 5xx。Submit、Approve、Fix/Delete Pending 等 POST command 絕不自動重送，以避免重複交易或 Account Entries。
 - Maker Queue、Inquire Events 與 Inquire Delete Pending 會保留原始 HTTP error status，再交由共用 presenter 分類。
+- Maker Queue、Inquire Events 與 Inquire Delete Pending 的正常無資料狀態共用 `FeedbackMessageComponent` 藍色資訊卡；只有使用者輸入搜尋條件後無匹配資料才顯示 warning，transport/service error 仍顯示 error。
 - Maker Submit 同樣保留 raw error cause；Angular 與 Web Component host 對 HTTP 5xx 顯示 `BAL-SVC-HTTP-{status}`，network/status 0 顯示 Balance service unavailable，而非誤標為 `BAL-UI-UNEXPECTED`。
 - Maker Submit 的本地 validation 顯示 `Check transaction details`；HTTP 400／422 顯示可安全呈現的 business validation reason，401／403／404 與其他 4xx 各有明確分類。這項共用 policy 適用所有已註冊功能、Angular host 與 Web Component host，複合與單筆 submission 的同步例外也會轉為同一個 failed outcome。
 - Network／status `0` 顯示 Balance service unavailable；HTTP `5xx` 顯示 temporarily unavailable，support code 使用 `BAL-SVC-HTTP-{status}`。
@@ -75,3 +76,5 @@ Business Case Runner 每步都檢查 Tight Available Balance。若測試回覆�
 ## Verification baseline
 
 截至 2026-09-01：Transaction Index API eligibility 變更後 Balance microservice 為 39 suites／791 tests；coverage statements 98.79%、branches 95.06%、functions 99.75%、lines 99.32%。Web Component host 使用相同 API eligibility。
+
+2026-09-02：`lc-balance-wc` 是目前唯一維護中的 Balance UI repository；舊 `lc-balance` folder 已移除。Standalone Angular 的 root route 使用 `pathMatch: 'full'`，因此 `/business-cases` 不再被空路徑的 Transaction Builder route 攔截；Web Component 仍以內部 view state 導覽三個 views。

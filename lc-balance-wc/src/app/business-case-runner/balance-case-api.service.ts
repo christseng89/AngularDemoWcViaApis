@@ -1,6 +1,8 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { HttpClient, HttpContext } from '@angular/common/http';
+import { Observable, retry, throwError, timer } from 'rxjs';
+import { SKIP_SAFE_READ_RETRY, isTransientHttpError } from '../core/http-retry/http-retry.interceptor';
+import { GENERATED_BUSINESS_CASE_RECOVERY_INTERVAL_MS, GENERATED_BUSINESS_CASE_RECOVERY_RETRY_COUNT } from '../core/http-retry/http-retry.config.generated';
 
 export interface BusinessCaseSummary {
   id: string;
@@ -29,13 +31,38 @@ export interface BusinessCaseRunResult {
   trace: TraceStep[];
 }
 
+export interface BusinessCaseRecoveryPolicy {
+  readonly maxRetries: number;
+  readonly intervalMs: number;
+}
+
+const DEFAULT_RECOVERY_POLICY: BusinessCaseRecoveryPolicy = {
+  maxRetries: GENERATED_BUSINESS_CASE_RECOVERY_RETRY_COUNT,
+  intervalMs: GENERATED_BUSINESS_CASE_RECOVERY_INTERVAL_MS,
+};
+
 /** Talks to the Node.js 中台 (backend/server.js), never directly to the balance-component microservice — the UI only ever sees orchestrated business-case results. */
 @Injectable({ providedIn: 'root' })
 export class BalanceCaseApiService {
   constructor(private readonly http: HttpClient) {}
 
   listCases(): Observable<BusinessCaseSummary[]> {
-    return this.http.get<BusinessCaseSummary[]>('/api/business-cases');
+    const context = new HttpContext().set(SKIP_SAFE_READ_RETRY, true);
+    return this.http.get<BusinessCaseSummary[]>('/api/business-cases', { context });
+  }
+
+  /**
+   * Business Case Runner readiness probe. It owns a slower, bounded recovery policy and bypasses the
+   * generic interceptor so one logical probe never expands into nested bursts of GET retries.
+   */
+  listCasesWhenReady(policy: BusinessCaseRecoveryPolicy = DEFAULT_RECOVERY_POLICY): Observable<BusinessCaseSummary[]> {
+    const context = new HttpContext().set(SKIP_SAFE_READ_RETRY, true);
+    return this.http.get<BusinessCaseSummary[]>('/api/business-cases', { context }).pipe(
+      retry({
+        count: policy.maxRetries,
+        delay: (error) => (isTransientHttpError(error) ? timer(policy.intervalMs) : throwError(() => error)),
+      }),
+    );
   }
 
   runCase(id: string): Observable<BusinessCaseRunResult> {

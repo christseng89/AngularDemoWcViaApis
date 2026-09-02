@@ -7,9 +7,11 @@ import type { BalanceCaseApiService, BusinessCaseRunResult, BusinessCaseSummary,
  * business-case-runner.component.spec.ts) — no DOM rendering needed since
  * this component's own .html template is excluded from the coverage config.
  */
-function makeApi(overrides: { listCases?: jest.Mock; runCase?: jest.Mock; resetDatabase?: jest.Mock } = {}) {
+function makeApi(overrides: { listCases?: jest.Mock; listCasesWhenReady?: jest.Mock; runCase?: jest.Mock; resetDatabase?: jest.Mock } = {}) {
+  const listCases = overrides.listCases ?? jest.fn(() => of([]));
   return {
-    listCases: overrides.listCases ?? jest.fn(() => of([])),
+    listCases,
+    listCasesWhenReady: overrides.listCasesWhenReady ?? listCases,
     runCase: overrides.runCase ?? jest.fn(() => of({} as BusinessCaseRunResult)),
     resetDatabase: overrides.resetDatabase ?? jest.fn(() => of({ status: 'ok' })),
   } as unknown as BalanceCaseApiService;
@@ -54,7 +56,8 @@ describe('BusinessCaseRunnerComponent', () => {
 
     it('sets loadError from the error message when the request fails', () => {
       const listCases = jest.fn(() => throwError(() => new Error('network down')));
-      const api = makeApi({ listCases });
+      const listCasesWhenReady = jest.fn(() => of(cases));
+      const api = makeApi({ listCases, listCasesWhenReady });
       const component = makeComponent(api);
 
       component.ngOnInit();
@@ -62,6 +65,10 @@ describe('BusinessCaseRunnerComponent', () => {
       expect(component.loadError).toBe('Could not reach the 中台 (backend) at /api/business-cases — is it running? network down');
       expect(component.cases).toEqual([]);
       expect(component.fields).toEqual([]);
+      expect(component.loadingCases).toBe(false);
+      expect(component.resettingDatabase).toBe(false);
+      expect(listCases).toHaveBeenCalledTimes(1);
+      expect(listCasesWhenReady).not.toHaveBeenCalled();
     });
 
     it('falls back to the raw error value when it has no .message', () => {
@@ -72,6 +79,34 @@ describe('BusinessCaseRunnerComponent', () => {
       component.ngOnInit();
 
       expect(component.loadError).toBe('Could not reach the 中台 (backend) at /api/business-cases — is it running? boom');
+    });
+
+    it('checks only once on initial load and reserves automatic readiness polling for post-Cleanup recovery', () => {
+      const listCases = jest.fn(() => of(cases));
+      const listCasesWhenReady = jest.fn(() => of(cases));
+      const component = makeComponent(makeApi({ listCases, listCasesWhenReady }));
+
+      component.ngOnInit();
+
+      expect(listCases).toHaveBeenCalledTimes(1);
+      expect(listCasesWhenReady).not.toHaveBeenCalled();
+    });
+
+    it('allows the user to manually retry a failed initial load', () => {
+      const listCases = jest
+        .fn()
+        .mockReturnValueOnce(throwError(() => new Error('network down')))
+        .mockReturnValueOnce(of(cases));
+      const component = makeComponent(makeApi({ listCases }));
+
+      component.ngOnInit();
+      component.retryLoadCases();
+
+      expect(listCases).toHaveBeenCalledTimes(2);
+      expect(component.loadError).toBeNull();
+      expect(component.cases).toEqual(cases);
+      expect(component.loadingCases).toBe(false);
+      expect(component.cases.length).toBeGreaterThan(0);
     });
   });
 
@@ -283,7 +318,7 @@ describe('BusinessCaseRunnerComponent', () => {
 
       expect(resetDatabase).toHaveBeenCalledTimes(1);
       expect(component.resettingDatabase).toBe(false);
-      expect(component.resetDatabaseMessage).toBe('Database tables cleaned up.');
+      expect(component.resetDatabaseMessage).toBe('Database tables cleaned up. Services are ready.');
       expect(component.result).toBeNull();
       expect(component.allResults).toEqual([]);
       expect(component.loadError).toBeNull();
@@ -301,6 +336,29 @@ describe('BusinessCaseRunnerComponent', () => {
 
       expect(component.resettingDatabase).toBe(true);
       expect(component.resetDatabaseMessage).toBeNull();
+    });
+
+    it('keeps actions disabled while waiting for services after Cleanup and recovers automatically', () => {
+      confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(true);
+      const readiness = new Subject<BusinessCaseSummary[]>();
+      const component = makeComponent(
+        makeApi({ resetDatabase: jest.fn(() => of({ status: 'ok' })), listCasesWhenReady: jest.fn(() => readiness) }),
+      );
+
+      component.resetDatabase();
+
+      expect(component.resettingDatabase).toBe(true);
+      expect(component.recoveringAfterCleanup).toBe(true);
+      expect(component.loadingCases).toBe(true);
+      expect(component.resetDatabaseMessage).toContain('Waiting for services');
+
+      readiness.next(cases);
+      readiness.complete();
+      expect(component.resettingDatabase).toBe(false);
+      expect(component.recoveringAfterCleanup).toBe(false);
+      expect(component.loadingCases).toBe(false);
+      expect(component.cases).toEqual(cases);
+      expect(component.resetDatabaseMessage).toBe('Database tables cleaned up. Services are ready.');
     });
 
     it('clears resettingDatabase and sets an error message on failure', () => {

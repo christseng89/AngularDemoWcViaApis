@@ -5,7 +5,15 @@
     Run All finishes by retaining one eligible prerequisite each for manual A4, A6, and B4 testing.
   </p>
 
-  <div *ngIf="loadError" class="alert alert-danger">{{ loadError }}</div>
+  <div *ngIf="loadError" class="alert alert-danger" role="alert">
+    <div>{{ loadError }}</div>
+    <button type="button" class="btn btn-sm btn-outline-light mt-2" (click)="retryLoadCases()" [disabled]="loadingCases">
+      Try again
+    </button>
+  </div>
+  <div *ngIf="loadingCases" class="alert alert-info" role="status" aria-live="polite">
+    {{ recoveringAfterCleanup ? 'Cleanup completed. Waiting for backend and Balance services to become ready…' : 'Connecting to the Business Case service…' }}
+  </div>
 
   <div class="card mb-4">
     <div class="card-body">
@@ -13,14 +21,14 @@
         <formly-form [form]="form" [fields]="fields" [model]="model"></formly-form>
       </form>
       <div class="d-flex gap-2">
-        <button class="btn btn-primary" (click)="run()" [disabled]="!model.caseId || running">
+        <button class="btn btn-primary" (click)="run()" [disabled]="!model.caseId || running || loadingCases || resettingDatabase">
           {{ running ? 'Running…' : 'Run Selected Case' }}
         </button>
-        <button class="btn btn-outline-secondary" (click)="runAll()" [disabled]="runningAll || !cases.length">
+        <button class="btn btn-outline-secondary" (click)="runAll()" [disabled]="runningAll || !cases.length || loadingCases || resettingDatabase">
           {{ runningAll ? 'Running all…' : 'Run All Cases' }}
         </button>
-        <button class="btn btn-outline-danger" (click)="resetDatabase()" [disabled]="resettingDatabase">
-          {{ resettingDatabase ? 'Cleaning up…' : 'Cleanup Database Tables' }}
+        <button class="btn btn-outline-danger" (click)="resetDatabase()" [disabled]="resettingDatabase || loadingCases">
+          {{ recoveringAfterCleanup ? 'Waiting for services…' : resettingDatabase ? 'Cleaning up…' : 'Cleanup Database Tables' }}
         </button>
       </div>
       <div class="alert alert-info mt-2" *ngIf="resetDatabaseMessage">{{ resetDatabaseMessage }}</div>

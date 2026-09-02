@@ -83,6 +83,16 @@ export class InquireEventsComponent {
     };
   }
 
+  /** A selected LC with no event rows is a valid empty result, rendered consistently with the two indexes. */
+  get eventsEmptyFeedback(): UiMessage {
+    return {
+      severity: 'INFO',
+      title: 'No events available',
+      message: 'No events found under this LC.',
+      retryable: false,
+    };
+  }
+
   /** Thin delegations to the same pure shared functions `TransactionBuilderComponent` itself calls for its own remaining sections (Look Up panel) — assigned directly rather than re-declared as wrapper methods, since these never touch `this`. */
   readonly displayStatus = displayStatusShared;
   readonly statusBadgeClass = statusBadgeClassShared;

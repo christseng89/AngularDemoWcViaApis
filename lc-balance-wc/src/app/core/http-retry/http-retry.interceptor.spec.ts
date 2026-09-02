@@ -1,7 +1,7 @@
-import { HttpErrorResponse, HttpRequest, HttpResponse } from '@angular/common/http';
+import { HttpContext, HttpErrorResponse, HttpRequest, HttpResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { defer, firstValueFrom, of, throwError } from 'rxjs';
-import { HTTP_RETRY_POLICY, safeReadRetryInterceptor } from './http-retry.interceptor';
+import { HTTP_RETRY_POLICY, SKIP_SAFE_READ_RETRY, safeReadRetryInterceptor } from './http-retry.interceptor';
 
 describe('safeReadRetryInterceptor', () => {
   beforeEach(() => {
@@ -41,6 +41,22 @@ describe('safeReadRetryInterceptor', () => {
     await expect(
       firstValueFrom(TestBed.runInInjectionContext(() => safeReadRetryInterceptor(new HttpRequest('POST', '/balance-component/test', {}), next))),
     ).rejects.toBeInstanceOf(HttpErrorResponse);
+    expect(attempts).toBe(1);
+  });
+
+  it('honours a request-owned retry policy without nesting the generic GET retries', async () => {
+    let attempts = 0;
+    const next = jest.fn(() =>
+      defer(() => {
+        attempts += 1;
+        return throwError(() => new HttpErrorResponse({ status: 0 }));
+      }),
+    );
+    const request = new HttpRequest('GET', '/api/business-cases', {
+      context: new HttpContext().set(SKIP_SAFE_READ_RETRY, true),
+    });
+
+    await expect(firstValueFrom(TestBed.runInInjectionContext(() => safeReadRetryInterceptor(request, next)))).rejects.toBeInstanceOf(HttpErrorResponse);
     expect(attempts).toBe(1);
   });
 });

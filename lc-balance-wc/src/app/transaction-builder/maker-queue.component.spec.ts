@@ -76,6 +76,35 @@ describe('MakerQueueComponent', () => {
     });
   });
 
+  describe('emptyFeedback', () => {
+    it('uses the shared informational empty state when this Maker has no records', () => {
+      const c = new MakerQueueComponent();
+      c.makerQueue = new MakerQueueService({} as BalanceComponentApiService);
+
+      expect(c.emptyFeedback).toEqual({
+        severity: 'INFO',
+        title: 'No transactions available',
+        message: 'Nothing PENDING or REJECTED under this Maker on the Import LC side right now.',
+        nextAction: undefined,
+        retryable: false,
+      });
+    });
+
+    it('uses the shared warning empty state for an explicit LC Number search miss', () => {
+      const c = new MakerQueueComponent();
+      c.makerQueue = new MakerQueueService({} as BalanceComponentApiService);
+      c.makerQueue.lcNumberSearch = 'IMP-404';
+
+      expect(c.emptyFeedback).toMatchObject({
+        severity: 'WARNING',
+        title: 'No matching transaction',
+        message: 'IMP-404 not found',
+        nextAction: 'Check the LC number and search again.',
+        retryable: false,
+      });
+    });
+  });
+
   describe('thin pure-function delegations (same shared balance-component.model.ts rules the rest of this sub-project uses)', () => {
     it('displayStatus()', () => {
       const c = new MakerQueueComponent();

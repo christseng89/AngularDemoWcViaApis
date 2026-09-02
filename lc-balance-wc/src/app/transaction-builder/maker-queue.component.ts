@@ -65,6 +65,17 @@ export class MakerQueueComponent {
     return presentApiError(this.makerQueue.errorCause ?? { message: this.makerQueue.error }, 'SEARCH', this.makerQueue.lcNumberSearch || undefined);
   }
 
+  /** Shared empty-state presentation used by the inquiry screens; only an explicit search miss is a warning. */
+  get emptyFeedback(): UiMessage {
+    return {
+      severity: this.makerQueue.emptyStateIsError ? 'WARNING' : 'INFO',
+      title: this.makerQueue.emptyStateIsError ? 'No matching transaction' : 'No transactions available',
+      message: this.makerQueue.emptyStateMessage,
+      nextAction: this.makerQueue.emptyStateIsError ? 'Check the LC number and search again.' : undefined,
+      retryable: false,
+    };
+  }
+
   /**
    * Business-confirmed 2026-08-27 ("改成 Delete Pending 統一名稱") — the visible button text is always
    * plain "Delete Pending" (see the template), regardless of which action it routes to underneath

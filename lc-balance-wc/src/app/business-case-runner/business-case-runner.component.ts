@@ -28,6 +28,8 @@ export class BusinessCaseRunnerComponent implements OnInit {
   runningAll = false;
   allResults: BusinessCaseRunResult[] = [];
   loadError: string | null = null;
+  loadingCases = false;
+  recoveringAfterCleanup = false;
 
   /** "Cleanup Database Tables" button state — independent of run()/runAll()'s own busy/error state. */
   resettingDatabase = false;
@@ -36,7 +38,14 @@ export class BusinessCaseRunnerComponent implements OnInit {
   constructor(private readonly api: BalanceCaseApiService) {}
 
   ngOnInit(): void {
-    this.api.listCases().subscribe({
+    this.loadCases();
+  }
+
+  private loadCases(afterCleanup = false): void {
+    this.loadingCases = true;
+    this.loadError = null;
+    const request = afterCleanup ? this.api.listCasesWhenReady() : this.api.listCases();
+    request.subscribe({
       next: (cases) => {
         this.cases = cases;
         this.fields = [
@@ -51,11 +60,25 @@ export class BusinessCaseRunnerComponent implements OnInit {
             },
           },
         ];
+        this.loadingCases = false;
+        if (afterCleanup) {
+          this.resettingDatabase = false;
+          this.recoveringAfterCleanup = false;
+          this.resetDatabaseMessage = 'Database tables cleaned up. Services are ready.';
+        }
       },
       error: (err) => {
+        this.loadingCases = false;
+        this.resettingDatabase = false;
+        this.recoveringAfterCleanup = false;
         this.loadError = `Could not reach the 中台 (backend) at /api/business-cases — is it running? ${err.message ?? err}`;
+        if (afterCleanup) this.resetDatabaseMessage = 'Database tables were cleaned, but the services did not become ready before the recovery timeout.';
       },
     });
+  }
+
+  retryLoadCases(): void {
+    this.loadCases();
   }
 
   run(): void {
@@ -106,14 +129,16 @@ export class BusinessCaseRunnerComponent implements OnInit {
     this.resetDatabaseMessage = null;
     this.api.resetDatabase().subscribe({
       next: () => {
-        this.resettingDatabase = false;
         this.result = null;
         this.allResults = [];
         this.loadError = null;
-        this.resetDatabaseMessage = 'Database tables cleaned up.';
+        this.recoveringAfterCleanup = true;
+        this.resetDatabaseMessage = 'Database tables cleaned up. Waiting for services to become ready…';
+        this.loadCases(true);
       },
       error: (err) => {
         this.resettingDatabase = false;
+        this.recoveringAfterCleanup = false;
         this.resetDatabaseMessage = `Cleanup failed: ${err.message ?? err}`;
       },
     });

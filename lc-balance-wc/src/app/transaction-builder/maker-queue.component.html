@@ -123,11 +123,9 @@
       (previousRequested)="makerQueue.prevPage()"
       (nextRequested)="makerQueue.nextPage()"
     ></app-transaction-pagination>
-    <div class="tb-error tb-error--fit mt-2" role="alert" aria-live="polite" *ngIf="!makerQueue.loading && !makerQueue.sideFilteredItems.length && !makerQueue.error && makerQueue.emptyStateIsError">
-      {{ makerQueue.emptyStateMessage }}
-    </div>
-    <div class="tb-hint mt-2" *ngIf="!makerQueue.loading && !makerQueue.sideFilteredItems.length && !makerQueue.error && !makerQueue.emptyStateIsError">
-      {{ makerQueue.emptyStateMessage }}
-    </div>
+    <app-feedback-message
+      *ngIf="!makerQueue.loading && !makerQueue.sideFilteredItems.length && !makerQueue.error"
+      [message]="emptyFeedback"
+    ></app-feedback-message>
   </div>
 </section>
