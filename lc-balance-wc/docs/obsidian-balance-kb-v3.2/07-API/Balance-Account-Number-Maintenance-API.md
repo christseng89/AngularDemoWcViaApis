@@ -12,10 +12,14 @@ Balance Account Number 維護是一張 DB-backed 固定路由表，不是每筆�
 
 Account Number 的 regex、最短、最長長度由根目錄 `.env` 的 `BALANCE_ACCOUNT_NUMBER_REGEX`、`BALANCE_ACCOUNT_NUMBER_MIN_LEN`、`BALANCE_ACCOUNT_NUMBER_MAX_LEN` 控制；MIN=MAX 表示固定長度。JSON 是空 DB 的 seed，SQLite 才是執行期真實來源；JSON 內的 11 組預設 Account Number／Description 已與目前維護資料同步。
 
-UI 採同頁 master-detail：先在可搜尋的 `Account Set Index` 選擇 Product／Risk Class，再進入單筆唯讀 Detail。`Edit` 才開放修改，`Save Account Set` 僅在 dirty 時出現；`Cancel` 或 `Back to Account Set Index` 會還原未儲存資料。此導覽狀態完全位於前端，不新增 API route，也不改 OAS schema。
+UI 採同頁 master-detail：先在可搜尋的 `Account Set Index` 選擇 Product／Risk Class，再進入單筆唯讀 Detail。Index 的 `VERSION` 欄位內容只顯示版本數字，Detail 才顯示 `Version {number}`。`Edit` 才開放修改，`Save Account Set` 僅在 dirty 時出現；`Cancel` 或 `Back to Account Set Index` 會還原未儲存資料。此導覽狀態完全位於前端，不新增 API route，也不改 OAS schema。
 
 新 movement 會把科目號、科目說明、mapping key/version 寫入 `contingentAccountEntry`。既有 movement 保留建立時快照，維護新 mapping 不追溯改寫歷史 voucher。這是帳務稽核與可重演性的必要界線。
 
 維護 UI 以最後一次 GET／成功 PUT 的 Account A/B 為 per-row baseline。預設欄位唯讀並顯示 `Edit`；進入 Edit 後顯示 `Cancel`，只有欄位變更時才額外顯示 `Save Account Set`。Cancel 還原 baseline；改回 baseline 或 PUT 成功後清除 dirty state，成功後並離開 Edit。
+
+## Test evidence
+
+Focused Jest coverage 包含 maintenance component 與 API service，共 2 個 test suites、15 個 tests：Statements 100%、Branches 97.22%（35/36）、Functions 100%、Lines 100%。分支測試涵蓋搜尋與空結果、未知 mapping、Detail 外 Edit、unchanged Save、dirty Cancel/Back、儲存中禁止返回、單筆更新不影響相鄰 mapping，以及 HTTP 400/409/500。
 
 關聯：[[contingentaccountentry-generated-once-at-creation-immutable-thereafter]]、[[contingent-account-entry-vs-pass-through-account-entry-gl-ownership-bo]]、[[Function-API Integration Map]]。
