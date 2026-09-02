@@ -12,8 +12,7 @@ relevant project before running any command.
 |---|---|---|
 | `lc-issue-angular/` | yes | Angular 17 + Formly demo for LC (Letter of Credit) **Issue** — charge calculation, balance/tolerance commission. |
 | `lc-payment-wc/` | yes | Angular 17 demo for LC **Payment** journal entries + a Formly-driven Payment Component Business Case Simulator. Contains a nested, independently-versioned TypeScript microservice under `microservices/payment-component/`. |
-| `lc-balance/` | yes | Angular 17 demo for the **Balance Component** — contingent-liability/on-balance-sheet ledger (BalanceContract/BalanceMovement) for LC, Shipping Guarantee, Acceptance/DPU, UPAS, Export Confirmation. Contains a nested TypeScript microservice under `microservices/balance-component/` and its own Node orchestrator under `backend/`. |
-| `lc-balance-wc/` | yes | Full duplicate of `lc-balance/` (same Angular Maker/Checker UI, `backend/` orchestrator, `microservices/balance-component/` ledger) plus a **Web Component packaging layer** on top — publishes the Transaction Builder/Business Case Runner UI as a framework-agnostic `<balance-component-app>` custom element with Angular/React/Vue adapters. Publishable npm package (`private: false`, an `exports` map, optional peerDependencies). |
+| `lc-balance-wc/` | yes | Angular 17 demo for the **Balance Component** — contingent-liability/on-balance-sheet ledger (BalanceContract/BalanceMovement) for LC, Shipping Guarantee, Acceptance/DPU, UPAS, Export Confirmation. Contains a nested TypeScript microservice under `microservices/balance-component/` and its own Node orchestrator under `backend/`, plus a **Web Component packaging layer** on top — publishes the Transaction Builder/Business Case Runner UI as a framework-agnostic `<balance-component-app>` custom element with Angular/React/Vue adapters. Publishable npm package (`private: false`, an `exports` map, optional peerDependencies). Originally a duplicate of a sibling `lc-balance/` project; that sibling was deleted outright (commit `91a3229`, 2026-09-02) and this is now the only Balance Component project in the repo. |
 | `lc-issue/` | **no (gitignored)** | Older, plain JS/HTML scratch version of the LC Issue demo (`lc-issue-demo*.html`, `gen-spec.js`). Superseded by `lc-issue-angular/`; treat as reference only, not a place to build new work. |
 | `*.docx` at root | yes | MVV architecture design docs (LcIssueElement / BalanceComponent), bilingual EN/CN. |
 
@@ -37,12 +36,13 @@ than belongs here; treat entries marked "reviewer-confirmed"/"business-requireme
 settled, don't re-litigate them without new information from the user, and check that file directly rather
 than assuming a specific past decision is still current — it changes frequently.
 
-`lc-balance/` has an analogous nested `CLAUDE.md` of its own (same solution-architect persona,
-same "reviewer-confirmed" decision-log convention), covering the Balance Component's own domain model
+`lc-balance-wc/` (the sole surviving Balance Component project — see the repo-shape table above) has an
+analogous nested `CLAUDE.md` of its own (same solution-architect persona, same "reviewer-confirmed"
+decision-log convention), covering the Balance Component's own domain model
 (`InstrumentType`/`MovementStatus`/`ExposureNature`), balance-derivation direction table, Tolerance
 conversion, off-balance-sheet exposure hardening (incl. the Present Docs Earmark), SHGT/Acceptance
 redemption, and the Maker/Checker service-layer guards (re-ISSUE, tenor routing, SG issue cap,
-idempotency) — check that file directly before touching anything under `lc-balance/`, same caveats
+idempotency) — check that file directly before touching anything under `lc-balance-wc/`, same caveats
 as above (entries supersede each other; don't assume a decision is still current without checking). It
 does **not** have its own leg-allocator or an OAS Reference/Event model decision log (both are
 `lc-payment-wc/`-specific — the Balance Component has no per-leg split grid, and no analogous D-1…D-N
@@ -52,12 +52,16 @@ are cited by section number throughout the microservice's source but, like `lc-p
 RDD note, were never committed as files — the nested `CLAUDE.md`'s own decision log is the only
 place that captures them.
 
-`lc-balance-wc/` has its own nested `CLAUDE.md` too, but it's a leftover copy from `lc-balance/`'s —
-it still opens with "本文件是 `lc-balance` 的仓库级开发入口" and its 常用命令/文档导航 sections don't
-mention the Web Component layer at all (not yet reworded since the duplication). Its cross-layer
-business rules and decision-log content are still current (the underlying domain logic is untouched),
-but for anything about the packaging layer itself, use the `## lc-balance-wc/` section below and
-`lc-balance-wc/docs/web-component*.md` instead — don't expect the nested file to know about them.
+`lc-balance-wc/CLAUDE.md` is itself a leftover copy from a now-deleted sibling `lc-balance/` project's own
+copy — it still opens with "本文件是 `lc-balance` 的仓库级开发入口" and its 常用命令/文档导航 sections
+don't mention the Web Component layer at all (never reworded since the original duplication, and now
+stale in a different way since the thing it was duplicated *from* no longer exists). Its cross-layer
+business rules and decision-log content are still current (the underlying domain logic is untouched), but
+for anything about the packaging layer itself, use the `## lc-balance-wc/` section below and
+`lc-balance-wc/docs/web-component*.md` instead. Five more nested `CLAUDE.md` files have since been added
+under `lc-balance-wc/` on top of this one (`src/app/transaction-builder/`, `microservices/balance-component/`
+and its own `src/domain/`, `src/db/`, `test/` subdirectories) — read the nearest one before touching that
+area; the `## lc-balance-wc/` section below lists what each covers rather than restating their content here.
 
 Also relevant to trade finance accounting entries/exposure-transformation questions in general
 (not tied to either project's specific code): the `cs-tf-balance-knowhow` skill.
@@ -278,14 +282,21 @@ touching this logic):
   `Debit_Chk_Total_Pct()` screen check verbatim, because the single-POST request shape has no equivalent
   shared total field.
 
-## `lc-balance/` — LC Balance Component demo
+## `lc-balance-wc/` — Balance Component demo + Web Component packaging
+
+Originally created as a duplicate of a sibling `lc-balance/` project (commit `d99bf31`, "Duplicate
+lc-balance to lc-balance-ws" — note the commit message's own typo; the directory is `lc-balance-wc/`)
+plus a Web Component packaging layer on top. `lc-balance/` was deleted outright in commit `91a3229`
+("Remove lc-balance folder", 2026-09-02) — directory, its own nested `CLAUDE.md`, everything — so
+`lc-balance-wc/` is now the **only** Balance Component project in this repo; nothing here duplicates a
+still-living sibling anymore.
 
 **Three-process** dev setup, same shape as `lc-payment-wc/`:
 
 | Process | Port | Serves |
 |---|---|---|
 | `ng serve` (this project) | 4200 | The Angular app itself |
-| `backend/` (Express) | 4300 | Node.js 中台 orchestrator — sequences calls into the microservice per a declarative Business Case Registry (Import/Export Cases, `backend/data/businessCases.js`) so the UI can run/replay a whole scenario in one click (`GET /api/business-cases`, `POST /api/business-cases/:id/run`) — the exact case count grows frequently, check `lc-balance/CLAUDE.md`'s own decision log for the current total rather than assuming a number here is still accurate |
+| `backend/` (Express) | 4300 | Node.js 中台 orchestrator — sequences calls into the microservice per a declarative Business Case Registry (Import/Export Cases, `backend/data/businessCases.js`) so the UI can run/replay a whole scenario in one click (`GET /api/business-cases`, `POST /api/business-cases/:id/run`) — the exact case count grows frequently, check `lc-balance-wc/CLAUDE.md`'s own decision log for the current total rather than assuming a number here is still accurate |
 | `microservices/balance-component/` (Express/TS) | 4100 | `POST /balance-movements` + `GET /balance-contracts/*` — the actual Balance Component ledger |
 
 `proxy.conf.json` forwards `/api/*` → `:4300` and `/balance-component/*` → `:4100` (rewriting the prefix
@@ -294,88 +305,82 @@ or hangs with no obvious hint — check the process before assuming a bug.
 
 There's a fourth, standalone microservice not part of the three-process setup above:
 `microservices/business-days-mock/` (port 4500, `cd microservices/business-days-mock && npm start`) — a
-minimal Taiwan-calendar `POST /business-days/add` mock built for the F1 proposal §13.5 "Auto Close Grace
-Period" **Phase 2**. It is **not** wired into `dev:all` and **not** yet consumed by anything —
-`domain/autoCloseGracePeriod.ts`'s `addBusinessDays()` still uses Phase-1 weekend-only logic in-repo.
-Treat it as reference-only scaffolding until Phase 2 lands.
+minimal Taiwan-calendar `POST /business-days/add` mock originally built for the F1 proposal §13.5 "Auto
+Close Grace Period" **Phase 2**. It is still **not** wired into `dev:all` and still not called over HTTP
+by anything — `domain/autoCloseGracePeriod.ts`'s `addBusinessDays()` is still the unchanged Phase-1
+weekend-only stand-in. Its `data/calendar.json` has since gained a second, unrelated consumer at build
+time (not runtime) — see "Codegen runs before almost everything" below — but that doesn't make the mock
+service itself "wired in"; don't conflate the two.
 
 ```bash
-cd lc-balance
 npm install
-cd backend && npm install && cd ..
-cd microservices/balance-component && npm install && cd ../..
+npm install --prefix backend
+npm install --prefix microservices/balance-component
 
 npm run dev:all   # runs all three concurrently (concurrently, color-coded per process)
 ```
 
 Or individually: `microservices/balance-component && npm run dev` (Terminal 1, `node --watch -r
 ts-node/register src/server.ts` — auto-restarts on save), `backend && npm start` (Terminal 2), `npm
-start` i.e. `ng serve --open` (Terminal 3).
+start` i.e. `ng serve lc-balance-wc --open` (Terminal 3).
 
 ### Testing
 
-Unlike `lc-issue-angular/`, **all three processes have their own Jest suite here** — the Angular app and
-`backend/` were bootstrapped later (jest-preset-angular / plain Jest respectively, mirroring
-`lc-payment-wc/`'s own setup) specifically to close that gap. All three are gated at a **95%**
-`coverageThreshold` (statements/branches/functions/lines) in their own `jest.config.js` — higher than
-`lc-payment-wc/`'s 90% floor; a change that drops any of the four metrics below 95% in any of the three
-fails `npm test`, and per `lc-balance/CLAUDE.md`'s own standing rule, all three must be re-run and
-green (not just the one you touched) before a change counts as complete.
+Unlike `lc-issue-angular/`, **all three processes have their own Jest suite here**, all gated at a
+**95%** `coverageThreshold` (statements/branches/functions/lines) in their own `jest.config.js` — higher
+than `lc-payment-wc/`'s 90% floor; a change that drops any of the four metrics below 95% in any of the
+three fails `npm test`, and per `lc-balance-wc/CLAUDE.md`'s own standing rule, all three must be re-run
+and green (not just the one you touched) before a change counts as complete.
 
 ```bash
-# Angular app (from lc-balance/)
-npm test                    # jest — src/app/**/*.ts
+npm test                    # jest — src/app/**/*.ts (Angular app)
 npm run test:coverage       # jest --coverage
 npx tsc -p tsconfig.app.json --noEmit   # typecheck (no dedicated "typecheck" npm script for this project)
 
-# backend/ (中台 orchestrator)
-cd lc-balance/backend
-npm test
-npm run test:coverage
+npm test --prefix backend                              # 中台 orchestrator
+npm run test:coverage --prefix backend
 
-# microservices/balance-component/
-cd lc-balance/microservices/balance-component
-npm run typecheck        # tsc --noEmit
-npm test                  # Jest (test/unit/) — domain logic, schema, and full case-walkthrough tests
-npm run test:coverage
-npm run build              # tsc -p tsconfig.build.json → dist/
+npm run typecheck --prefix microservices/balance-component   # tsc --noEmit
+npm test --prefix microservices/balance-component             # Jest (test/unit/) — domain logic, schema, full case-walkthrough tests
+npm run test:coverage --prefix microservices/balance-component
+npm run build --prefix microservices/balance-component        # tsc -p tsconfig.build.json → dist/
 ```
 
 Same single-test syntax as `lc-payment-wc/` throughout (`npm test -- <file-or--t-pattern>`), and the same
 **never let the two Jest configs cross** caveat applies between the Angular app and the microservice
 (this project's `tsconfig.json` also sets `noPropertyAccessFromIndexSignature`) — always `cd` into
-`microservices/balance-component` before running its own Jest commands.
+`microservices/balance-component` before running its own Jest commands directly (rather than `--prefix`).
 
 `npm run lint` (eslint) and `npm run format:check` (prettier) exist in all three of this project's
-sub-projects (Angular app, `backend/`, `microservices/balance-component/`) — baseline-only, not wired
-into CI or `npm test`. Neither `lc-issue-angular/` nor `lc-payment-wc/` has equivalent scripts.
+sub-projects — baseline-only, not wired into CI or `npm test`. Neither `lc-issue-angular/` nor
+`lc-payment-wc/` has equivalent scripts.
 
 Coverage-tracking is inconsistent across this project's own three sub-projects, unlike `lc-payment-wc/`
 (same "tracked in git, not gitignored" convention for the whole project): `microservices/balance-component/coverage/`
 has its own `.gitignore` entry excluding it entirely. The Angular app's `coverage/` and `backend/coverage/`
-are a middle case (2026-08-22) — `lc-balance/.gitignore` (a new file; this sub-project previously had none)
-excludes only `**/coverage/lcov-report/` (the bulky generated HTML report, regenerated on every test run);
-`lcov.info` (the compact text summary) stays tracked as before, so `git status` will still show it as
-modified after a `test:coverage` run — that alone isn't a sign something broke, but a plain `lcov-report/`
-diff should no longer appear. Don't assume the same behavior across all three.
+are a middle case — `lc-balance-wc/.gitignore` excludes only `**/coverage/lcov-report/` (the bulky
+generated HTML report, regenerated on every test run); `lcov.info` (the compact text summary) stays
+tracked, so `git status` will still show it as modified after a `test:coverage` run — that alone isn't a
+sign something broke, but a plain `lcov-report/` diff should no longer appear. Don't assume the same
+behavior across all three.
 
 The Angular app's test suite is split across multiple spec files per source file where the source is
-large. `transaction-builder.component.ts` is still covered by four spec files
+large. `transaction-builder.component.ts` is covered by four spec files
 (`transaction-builder.component.spec.ts` for function/mode selection, `.actions.spec.ts` for
 Maker/Checker action-dispatch wiring, `.gaps.spec.ts` for leftover getters/error branches, and
 `.inquire.spec.ts` for Inquire Events wiring) — a holdover from when the component itself was much larger
-(see Source layout below: it's grown back to 846 lines as of 2026-09-01, still well below its 2,923-line
-peak and still a thin orchestration layer, not a God Component), not a project-wide pattern.
+(see Source layout below), not a project-wide pattern.
 
-`lc-balance/Quality-report-balance.md` is a SonarQube-style static/structural code-quality review of
-this project (bugs, vulnerabilities, code smells, duplication, coverage) with prioritized findings and a
-remediation log — check it before assuming an area is unreviewed; it records what's already been fixed
-(and what was deliberately deferred, and why) rather than needing to be re-derived from scratch.
+`Quality-report-balance.md` is a SonarQube-style static/structural code-quality review of this project
+(bugs, vulnerabilities, code smells, duplication, coverage) with prioritized findings and a remediation
+log — check it before assuming an area is unreviewed; it records what's already been fixed (and what was
+deliberately deferred, and why) rather than needing to be re-derived from scratch.
 
-`lc-balance/TODO.md` is the actual outstanding-work tracker for this sub-project — production gate
-conditions (auth, Angular CVEs, SQLite locking), findings from any external BA/expert review, and other
-known-but-not-yet-fixed items — kept append-only with dated resolution notes rather than deleted-and-
-forgotten; check it, not just `Quality-report-balance.md`, before assuming something is unaddressed.
+`TODO.md` is the actual outstanding-work tracker for this sub-project — production gate conditions
+(auth, Angular CVEs, SQLite locking), findings from any external BA/expert review, and other
+known-but-not-yet-fixed items — kept append-only with dated resolution notes rather than
+deleted-and-forgotten; check it, not just `Quality-report-balance.md`, before assuming something is
+unaddressed.
 
 ### Source layout
 
@@ -388,45 +393,56 @@ forgotten; check it, not just `Quality-report-balance.md`, before assuming somet
   (kept in sync manually, same convention `balance-component.model.ts`'s own design-doc field tables
   already use) — every mutating/listing method is typed against it rather than `Observable<any>`.
   `transaction-builder.component.ts` was once this repo's single largest file (2,923 lines at its peak);
-  a sequence of BAL-003 extractions logged in `lc-balance/CLAUDE.md` — most recently a
+  a sequence of BAL-003 extractions logged in `lc-balance-wc/CLAUDE.md` — most recently a
   "Feature Components + Facade" pilot moving Maker-side logic into `MakerPanelComponent` and Checker
   search/queue into `CheckerPanelComponent` — brought it down to 436 lines before subsequent feature work
-  grew it back to 846 lines (2026-09-01); it's still not the largest file in this sub-project —
-  `maker-panel.component.ts` (2,039 lines as of the same date) is. Both counts drift often; treat them as
-  approximate. `transaction-builder.component.ts` remains a thin orchestration/wiring layer, not a God
-  Component again: mode/function-side selection, wiring `MakerPanelComponent` ↔
-  `CheckerPanelComponent` ↔ `LookUpPanelService` ↔ `InquireEventsService` together via signal/context
-  objects, the Account Entries dialog's own open/close state, and the Checker action-dispatch methods
-  (`release()`/`reject()`/`checkerAct()`/`deleteMakerPending()`/`acknowledgeArrival()`, each a thin call
-  into `CheckerActionsService`) — no longer owns the 3 paginated pickers (now `CatalogPickerService`/
-  `PickerSelectionService`) or the Maker `submit()` dispatch across all 17 named business functions (now
-  `MakerPanelComponent`, via `MakerSubmitService`). Its ~30 API-calling methods still share one
-  `describeApiError()` helper, extracted to close a duplication finding in `Quality-report-balance.md`.
+  grew it back further; it's still not the largest file in this sub-project — `maker-panel.component.ts`
+  is. Both counts drift often and this directory has kept growing (inquire-events, maker-queue,
+  inquire-delete-pending, maker-action-bar, and several policy/strategy modules have all been added
+  since); treat exact line counts as approximate. `transaction-builder.component.ts` remains a thin
+  orchestration/wiring layer, not a God Component again: mode/function-side selection, wiring
+  `MakerPanelComponent` ↔ `CheckerPanelComponent` ↔ `LookUpPanelService` ↔ `InquireEventsService`
+  together via signal/context objects, the Account Entries dialog's own open/close state, and the
+  Checker action-dispatch methods (`release()`/`reject()`/`checkerAct()`/`deleteMakerPending()`/
+  `acknowledgeArrival()`, each a thin call into `CheckerActionsService`) — no longer owns the 3 paginated
+  pickers (now `CatalogPickerService`/`PickerSelectionService`) or the Maker `submit()` dispatch across
+  all 17 named business functions (now `MakerPanelComponent`, via `MakerSubmitService`). Its
+  API-calling methods still share one `describeApiError()` helper, extracted to close a duplication
+  finding in `Quality-report-balance.md`. This directory has its own nested `CLAUDE.md` (see below) —
+  read it before touching any file in here.
+- `src/app/balance-account-maintenance/` — new since the `lc-balance/` fork: see "Balance Account Number
+  Maintenance" below.
+- `src/app/core/http-retry/` — new since the fork: see "HTTP retry policy" below.
 - `backend/server.js` — the Node.js 中台 orchestrator; `backend/data/businessCases.js` is the
   declarative registry of Import/Export cases it replays.
-- `microservices/balance-component/` — the real Balance Component microservice:
+- `microservices/balance-component/` — the real Balance Component microservice (its own nested
+  `CLAUDE.md`, plus deeper ones under `src/domain/` and `src/db/` — see below):
   - `src/service/balanceService.ts` — orchestrates the routes; `src/routes/balanceContracts.ts` /
     `balanceMovements.ts` are the two Express routers (contract lookup/catalog/balance/movements-history
     vs. movement post/release/reject/cancel/maker-submit — a maker-checker-style lifecycle per movement;
     the `acknowledge` endpoint that used to sit here was removed 2026-08-18 — B3 now uses the standard
-    release path, see `lc-balance/CLAUDE.md`'s own decision log for the redesign).
+    release path, see `lc-balance-wc/CLAUDE.md`'s own decision log for the redesign).
   - `src/domain/` — `balanceDerivation.ts`, `tolerance.ts`, `statusTransition.ts`, `amendDecrease.ts`,
-    `offBalanceExposure.ts` — the actual accounting/exposure logic, cited to
-    `analysis/TF_Balance_Component_Spec-{en,zh}.docx` / `TF_Contingent_Liability_Lifecycle-{en,zh}.docx`
-    the same way `lc-payment-wc/`'s microservice cites its own FSD.
+    `offBalanceExposure.ts`, `balanceAccountMapping.ts`, `domesticCalendar.ts` (new — see below), and
+    others — the actual accounting/exposure logic, cited to `analysis/TF_Balance_Component_Spec-{en,zh}.docx`
+    / `TF_Contingent_Liability_Lifecycle-{en,zh}.docx` the same way `lc-payment-wc/`'s microservice cites
+    its own FSD. Has its own nested `CLAUDE.md` (pure-function/no-I/O boundary, plus a responsibility map
+    of existing domain files — check it before adding a new one so you don't duplicate an existing formula).
   - `src/db/` — **Node's built-in `node:sqlite` (`DatabaseSync`)**, not `better-sqlite3` (this machine
     has no C++ build toolchain for native modules) — `':memory:'` for tests, a real file otherwise.
     `db/index.ts`'s own doc comment records a known limitation worth knowing before touching concurrency
     logic: SQLite locks at the whole-database-file level (even under WAL), so it cannot demonstrate true
     per-instrument (per-`logicalContractId`) non-blocking concurrency the way the design doc's §6
     requires — safe/over-conservative for this single-process prototype, but flagged as a **must-replace**
-    (PostgreSQL row-level locking) before that requirement is actually validated in production.
+    (PostgreSQL row-level locking) before that requirement is actually validated in production. Has its
+    own nested `CLAUDE.md` (schema/migration rules).
   - `src/store/` — `balanceContractStore.ts` / `balanceMovementStore.ts`, the SQL-backed persistence
     layer the service reads/writes through.
-- `analysis/` — source-of-truth spec documents: `balance-component-api.yaml` (OAS),
-  `TF_Balance_Component_Spec-{en,zh}.docx`, `TF_Balance_Component_Mapping-{en,zh}.xlsx`,
-  `TF_Contingent_Liability_Lifecycle-{en,zh}.docx`. Code comments citing a spec section refer here,
-  same convention as `lc-payment-wc/analysis/`.
+  - `test/` — its own nested `CLAUDE.md` covers microservice test conventions.
+- `analysis/` — source-of-truth spec documents: `balance-component-api.yaml` (OAS, at v1.45.0 as of the
+  Balance Account Number Maintenance work — see below), `TF_Balance_Component_Spec-{en,zh}.docx`,
+  `TF_Balance_Component_Mapping-{en,zh}.xlsx`, `TF_Contingent_Liability_Lifecycle-{en,zh}.docx`. Code
+  comments citing a spec section refer here, same convention as `lc-payment-wc/analysis/`.
 - `docs/obsidian-balance-kb-v3.2/` — a generated Obsidian vault mirroring `lc-payment-wc/docs/
   obsidian-payment-kb/`'s role for this project: reverse-engineers the Balance Component's business
   knowledge (~700+ notes covering business rules, decision tables, and test scenarios — the exact count
@@ -434,33 +450,79 @@ forgotten; check it, not just `Quality-report-balance.md`, before assuming somet
   APIs, and tests, self-scored against a 9-dimension quality rubric; start from
   `00-Home/Balance-Knowledge-Home.md`. **Tracked in git**, unlike `lc-payment-wc/`'s own
   `obsidian-payment-kb/` — root `.gitignore` has an `obsidian-balance-kb*/` wildcard rule that would
-  cover this directory, but that line is commented out (verified 2026-08-31), so all ~740 files in it
-  are committed and `git status` will show them as modified whenever the vault regenerates. Don't assume
-  this is gitignored without re-checking `.gitignore` first. No `docs/obsidian-balance-kb-v3.2.zip`
-  companion currently exists on disk (verified 2026-08-31) — if one reappears, check whether it's tracked
-  before assuming the untracked-backup behavior described for `lc-payment-wc/`'s own zip companion also
-  applies here. Supersedes an
-  earlier unversioned `docs/obsidian-balance-kb/` vault (683 files, written in English) — that directory
-  and its own companion zip have since been deleted from disk, not merely renamed; don't go looking for
-  them. The current vault is written primarily in **Simplified Chinese**. See `lc-balance/CLAUDE.md`'s
-  own "Balance Knowledge Base (Obsidian)" section for its evidence-status convention
-  (CONFIRMED/INFERRED/UNCLEAR/CONFLICT) and staleness caveat before trusting it over the code or this
-  file's decision log.
+  cover this directory, but that line is commented out, so all files in it are committed and `git status`
+  will show them as modified whenever the vault regenerates. Don't assume this is gitignored without
+  re-checking `.gitignore` first. See `lc-balance-wc/CLAUDE.md`'s own "Balance Knowledge Base (Obsidian)"
+  section for its evidence-status convention (CONFIRMED/INFERRED/UNCLEAR/CONFLICT) and staleness caveat
+  before trusting it over the code or this file's decision log.
 
-## `lc-balance-wc/` — Balance Component Web Component packaging
+### Codegen runs before almost everything — `prepare:app`
 
-Created as a duplicate of `lc-balance/` (commit `d99bf31`, "Duplicate lc-balance to lc-balance-ws" —
-note the commit message's own typo; the directory is `lc-balance-wc/`) and still shares its three-process
-dev setup, `npm install`/`dev:all` steps, Jest testing commands, 95% coverage floor, and full source
-layout (`src/app/transaction-builder/`, `src/app/business-case-runner/`, `backend/`,
-`microservices/balance-component/`, `analysis/`) byte-for-byte — see the `lc-balance/` section above for
-all of that; it isn't repeated here. Because the ports are identical (`:4200`/`:4300`/`:4100`), don't run
-`lc-balance/`'s and `lc-balance-wc/`'s `dev:all` at the same time — whichever starts second will fail to
-bind. Everything below is what `lc-balance-wc/` adds on top: a layer that
-packages the Angular UI as a standalone, framework-agnostic Web Component, built up incrementally across
-six phases logged in `docs/plans/2026-08-31-web-component-phase-{1..6}.md`.
+`package.json`'s `pretest`/`prebuild`/`prebuild:wc`/`prestart`/`prewatch`/`predev:all` hooks all run
+`npm run prepare:app` (`generate:calendar && generate:config`) first, so `npm test`, `npm run build`,
+`npm start`, and `npm run dev:all` silently regenerate two files before doing anything else:
+
+- `scripts/generate-runtime-config.mjs` reads `.env` (falling back to defaults: 3 retries, 250ms initial /
+  2000ms max backoff, 15 recovery retries every 2000ms) and writes
+  `src/app/core/http-retry/http-retry.config.generated.ts` — a **build-time** constant, not a per-instance
+  DOM property. Changing `.env` requires re-running this (or any of the hooks above) and, for the Web
+  Component bundle specifically, a rebuild — a stale `dist/` won't pick up a new `.env` on its own.
+- `scripts/generate-domestic-calendar.mjs` copies `microservices/business-days-mock/data/calendar.json`
+  verbatim into two generated files: `src/app/transaction-builder/domestic-holidays.generated.ts` and
+  `microservices/balance-component/src/domain/domesticHolidays.generated.ts`. This feeds a different
+  feature than the mock service's original purpose — A1/B1 Expiry Date domestic-holiday validation
+  (`domain/domesticCalendar.ts`, added 2026-08-26) — via a build-time codegen copy, never a live HTTP call
+  to the mock service; the microservice's own `prebuild`/`pretest` re-run this independently (its own
+  script at `../../scripts/generate-domestic-calendar.mjs`), so the two generated copies can't drift as
+  long as both projects' hooks run.
+- Both generated files are marked "generated, do not edit by hand" in their own header comment.
+
+### New since the `lc-balance/` fork: Balance Account Number Maintenance
+
+`src/app/balance-account-maintenance/` — a searchable/filterable index + single-record detail editor for
+the fixed two-account (`accountA`/`accountB`, shown to users as Contingent Liability / Liability) routing
+table used by every Instrument Type × Tenor/Risk Class combination; users can edit Account Number/
+Description but can't add or remove routes. Reachable at the `balance-accounts` route (`app.routes.ts`)
+ahead of Transaction Builder and Business Case Runner, and surfaced identically inside
+`<balance-component-app>`. `balance-account-maintenance-api.service.ts` is its client; SQLite
+`balance_account_mappings` is the sole runtime source of truth (the JSON seed at
+`microservices/balance-component/config/balance-account-mappings.json` only seeds an empty DB, never
+overwrites a maintained value); each transaction snapshots the mapping it used into
+`contingentAccountEntry` at creation/Fix-Pending time, so editing a mapping never rewrites historical
+vouchers. Optimistic concurrency via a required `expectedVersion` on PUT (`409
+ACCOUNT_MAPPING_VERSION_CONFLICT` on a stale write). Full detail:
+`docs/balance-account-number-maintenance.md`.
+
+### HTTP retry policy
+
+`src/app/core/http-retry/http-retry.interceptor.ts`, config generated as described above. Retries only
+`GET`/`HEAD`/`OPTIONS` on network failure, `408`, `429`, or `5xx` — `POST` commands (Submit, Release,
+Approve, Fix Pending, Delete Pending, Cleanup Database) are never auto-retried, since the UI doesn't
+assume every Balance command is idempotent. Business Case Runner's post-Cleanup backend-recovery probe is
+a separate, lower-frequency mechanism that deliberately bypasses the global fast-retry interceptor to
+avoid two retry layers stacking. Full policy, `.env` keys, and the safety-boundary rationale:
+`docs/http-retry-policy.md`.
+
+### Directory-level `CLAUDE.md` files
+
+Beyond `lc-balance-wc/CLAUDE.md` itself (see the intro paragraphs above — it's a leftover copy from the
+deleted `lc-balance/` sibling, still current for cross-layer business rules/decision log, not for the
+packaging layer), five more nested `CLAUDE.md` files exist — read the nearest one before touching that
+area rather than relying on this section:
+
+- `src/app/transaction-builder/CLAUDE.md` — Angular Maker/Checker UI ownership boundaries (Components
+  display/coordinate only; cross-Function differences belong in `function-strategy.ts`/`function-policy.ts`/
+  `builder-fields.ts`/`submit-rules.ts`, not template conditionals).
+- `microservices/balance-component/CLAUDE.md` — the microservice's layering rules (`routes/` → `service/` →
+  `domain/` → `store/`/`db/`) and server-side-authority checklist.
+- `microservices/balance-component/src/domain/CLAUDE.md` — pure-function/no-I/O boundary for domain logic,
+  plus a responsibility map of existing domain files.
+- `microservices/balance-component/src/db/CLAUDE.md` — SQLite/schema/migration rules.
+- `microservices/balance-component/test/CLAUDE.md` — microservice test conventions.
 
 ### The Web Component itself
+
+Built up incrementally across six phases logged in `docs/plans/2026-08-31-web-component-phase-{1..6}.md`.
 
 `src/web-component.ts` + `src/app/web-component/` wrap the existing `TransactionBuilderComponent`/
 business-case-runner UI as a single `<balance-component-app>` custom element (Angular Elements,
@@ -503,13 +565,25 @@ npm run e2e               # playwright test — e2e/framework-hosts.spec.ts driv
 `package.json` is `private: false` with an `exports` map (`./wc`, `./wc/styles.css`, `./manifest`,
 `./contract`, `./adapters`, `./adapters/angular`, `./adapters/react`, `./adapters/vue`) pointing at the
 built `dist/` output — don't hand-edit those paths without re-running `release:verify` afterward.
+`release:prepare`/`build:wc`/`build:adapters` all inherit the `prepare:app` codegen step above via their
+`pre*` hooks, so a release build always regenerates the retry config and holiday data first.
 
 ### Docs
 
-`docs/web-component.md` is the entry point; `web-component-contract.md`, `web-component-styling.md`,
-`web-component-governance.md`, `web-component-operations.md`, `web-component-testing.md`,
-`web-component-usage.md`, and `framework-integrations.md` split out the formalized reference set (added
-phase 6, 2026-08-31), plus `docs/migrations/web-component-v1.md` and dated entries under
-`docs/decisions/` for that phase's OAS-impact and doc-formalization decisions. Two further docs sit
-outside that phase-6 set but are current and referenced from both `README.md` and `package.json`'s
-`files` array: `docs/http-retry-policy.md` and `docs/releasing-web-component.md`.
+`README.md` (bilingual EN/中文) is the project entry point — 5-minute quick start, doc index, and
+verification commands; start there before the docs below.
+
+For the Web Component packaging layer specifically: `docs/web-component.md` is the entry point;
+`web-component-contract.md`, `web-component-styling.md`, `web-component-governance.md`,
+`web-component-operations.md`, `web-component-testing.md`, `web-component-usage.md`, and
+`framework-integrations.md` split out the formalized reference set (added phase 6, 2026-08-31), plus
+`docs/migrations/web-component-v1.md` and dated entries under `docs/decisions/` for that phase's
+OAS-impact and doc-formalization decisions. `docs/http-retry-policy.md` and `docs/releasing-web-component.md`
+sit outside that phase-6 set but are current and referenced from both `README.md` and `package.json`'s
+`files` array.
+
+For the Balance Component domain itself (ported over from the deleted `lc-balance/`'s equivalents, still
+current): `docs/architecture.md`, `docs/balance-business-rules.md`, `docs/engineering-standards.md`,
+`docs/current-behavior.md`, `docs/history/` — `lc-balance-wc/CLAUDE.md`'s own 文档导航 section is the
+index. `docs/balance-account-number-maintenance.md` and `docs/http-retry-policy.md` are the newest
+additions (see "Balance Account Number Maintenance" and "HTTP retry policy" above).
