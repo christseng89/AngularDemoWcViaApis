@@ -992,7 +992,10 @@ export class BalanceService {
       const remarks = patch.remarks?.trim();
       if (!remarks) throw new RequestValidationError('Remarks is required for Remarks-only Fix Pending.');
       const editedAt = this.now();
-      const after = { ...old, remarks, editedBy: patch.editedBy, editedAt };
+      // A Fix Pending save is a resubmission boundary. The audit's after image must match the live
+      // movement written below, including REJECTED -> PENDING, so Checker review can resume and the
+      // immutable audit never describes a state that did not actually result from this correction.
+      const after = { ...old, status: 'PENDING' as const, remarks, editedBy: patch.editedBy, editedAt };
       this.db.exec('BEGIN');
       try {
         this.fixPendingAudit.insert({

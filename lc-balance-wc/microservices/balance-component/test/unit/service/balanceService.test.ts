@@ -3296,6 +3296,33 @@ describe('BalanceService.editPending — Remarks-only mode', () => {
     expect((audit[0]!.afterSnapshot as { remarks: string }).remarks).toBe('checked docs');
   });
 
+  test('returns a rejected Remarks-only correction to PENDING for Checker review and audits the transition', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const pending = pendingStandaloneA9(service, 'FIXP-A9-REJECTED');
+    const rejected = service.reject(pending.movementId, 'checker1', 'DOC_DISCREPANCY');
+
+    const corrected = service.editPending(rejected.movementId, {
+      amount: rejected.amount,
+      editedBy: 'maker1',
+      editMode: 'REMARKS_ONLY',
+      remarks: 'documents corrected',
+    });
+
+    expect(corrected).toMatchObject({
+      movementId: rejected.movementId,
+      amount: rejected.amount,
+      currency: rejected.currency,
+      status: 'PENDING',
+      remarks: 'documents corrected',
+      editedBy: 'maker1',
+    });
+    const audit = service.listFixPendingAudit(rejected.movementId);
+    expect(audit).toHaveLength(1);
+    expect(audit[0]).toMatchObject({ statusBefore: 'REJECTED' });
+    expect(audit[0]!.afterSnapshot).toMatchObject({ status: 'PENDING', remarks: 'documents corrected' });
+    expect(service.release(corrected.movementId, 'checker1').status).toBe('RELEASED');
+  });
+
   test('rejects amount changes and blank remarks, and accepts any pending function', () => {
     const service = new BalanceService(createDb(':memory:'));
     const a9 = pendingStandaloneA9(service, 'FIXP-A9-002');

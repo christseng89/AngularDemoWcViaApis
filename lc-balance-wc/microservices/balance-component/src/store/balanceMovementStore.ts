@@ -719,10 +719,15 @@ export class BalanceMovementStore {
       });
   }
 
-  /** Remarks-only Fix Pending updates no monetary, status, accounting, or identity column. */
+  /**
+   * Remarks-only Fix Pending owns the same workflow resubmission invariant as a standard correction:
+   * a REJECTED movement returns to PENDING for a fresh Checker decision. Persistence owns that invariant
+   * so every service/UI caller gets identical lifecycle semantics; monetary, accounting and identity
+   * columns remain untouched.
+   */
   applyRemarksOnlyCorrection(params: { movementId: string; remarks: string | null; editedBy: string; editedAt: string }): void {
     this.db
-      .prepare('UPDATE balance_movements SET remarks = @remarks, edited_by = @editedBy, edited_at = @editedAt WHERE movement_id = @movementId')
+      .prepare("UPDATE balance_movements SET status = 'PENDING', remarks = @remarks, edited_by = @editedBy, edited_at = @editedAt WHERE movement_id = @movementId")
       .run(params);
   }
 
