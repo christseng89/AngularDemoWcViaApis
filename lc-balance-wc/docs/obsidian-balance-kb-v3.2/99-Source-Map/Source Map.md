@@ -4,7 +4,7 @@ type: source-map
 domain: documentation
 status: verified
 source_of_truth: source-code
-source_revision: "bad2f0c"
+source_revision: "c7e9884"
 verified_date: 2026-09-03
 generated: true
 aliases: []
@@ -48,4 +48,4 @@ source_files:
 | Microservice OAS | `analysis/balance-component-api.yaml` |
 | Channel OAS | `analysis/balance-component-channel-api.yaml` |
 
-Generated at revision `bad2f0c`. Working-tree changes are included because generation reads files directly from disk.
+Generated at revision `c7e9884`. Working-tree changes are included because generation reads files directly from disk.

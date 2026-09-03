@@ -4,7 +4,7 @@ type: architecture
 domain: architecture
 status: verified
 source_of_truth: source-code
-source_revision: "bad2f0c"
+source_revision: "c7e9884"
 verified_date: 2026-09-03
 generated: true
 aliases: []
@@ -29,4 +29,4 @@ source_files:
 - Domain layer：純計算與 eligibility policies。
 - Store layer：SQLite persistence ports。
 
-本頁只定義分層與依賴方向。物件設計原則的 canonical 說明見 [[OOP OOD SOLID]]；個別業務規則一律連結其 canonical rule note，避免複製。
+本頁只定義分層與依賴方向。物件設計原則的 canonical 說明見 [[OOP OOD SOLID]]；產品擴充與 generic Balance action 的已接受 target architecture 見 [[ADR-001 Generic Balance Action Model]]；個別業務規則一律連結其 canonical rule note，避免複製。

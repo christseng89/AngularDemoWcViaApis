@@ -4,7 +4,7 @@ type: reference
 domain: accounting
 status: verified
 source_of_truth: source-code
-source_revision: "bad2f0c"
+source_revision: "c7e9884"
 verified_date: 2026-09-03
 generated: true
 aliases: []
@@ -25,8 +25,7 @@ source_files:
 
 - 下表的 Dr／Cr 是 server-derived `contingentAccountEntry`，在 movement creation 時生成一次並持久化；Account Entries 畫面讀取該歷史 voucher，不重新計算。
 - Runtime Balance Account Mapping 存在時，account number／description 取代下列 fallback family names，並保存 mapping key／version。
-- `accountEntries` 是外送 downstream Accounting 的 payload。統一 posting gate 為：`EARMARKING`／`EARMARKED` 一律 `accountEntries=null`、不送；所有 `APPROVED` movement／leg 一律依其 Dr／Cr 送 Accounting。
-- Compound business event 逐 leg 套用 posting gate；不得把 APPROVED leg 與 EARMARKED leg 合併成同一 posting 判斷。
+- `accountEntries` 是另一個 caller-supplied downstream payload。只有 source 明確提供它時才可能送 Accounting；本 repository 不能證明外部 Accounting component 已實際入帳。
 - Direction=Decrease／Utilize／Settle／Redeem／Close／Expire 時，Dr／Cr 對調。零額 CLOSE／EXPIRE／REOPEN 不產生 placeholder voucher。
 
 ## Import transactions
@@ -35,10 +34,10 @@ source_files:
 |---|---|---|---|
 | A1 | IPLC_LC ISSUE | Dr Customers' Liability under DC；Cr Documentary Credits Outstanding（依 tenor suffix） | Maker=PENDING；Checker Release 後 APPROVED |
 | A2 | AMEND_INCREASE／AMEND_DECREASE | Increase 同 A1；Decrease Dr／Cr 對調 | Expiry Date on ACTIVE 無 voucher；EXPIRED extension 產生原 EXPIRE 的反向 restoration voucher |
-| A3 | IPLC_LC UTILIZE | Dr Documentary Credits Outstanding；Cr Customers' Liability under DC | 建立時為 EARMARKING／PENDING 虛帳；acknowledge 後 EARMARKED，尚未 Release；`accountEntries=null`，不送 Accounting |
-| A3S | SHGT FULL_REDEEM + IPLC_LC UTILIZE | SG pair 對調 + LC pair 對調，兩 legs 同 business event | 逐 leg 判斷：APPROVED SG `FULL_REDEEM` leg 送 Accounting；EARMARKED LC arrival leg `accountEntries=null`、不送，留待 A4／A6 finalize |
-| A4 | finalize existing A3/A3S UTILIZE | 不建立新 voucher；使用 A3/A3S 已保存的 LC UTILIZE voucher | Checker Release 同一 arrival movement，從 Pending 轉 APPROVED，並送 Accounting |
-| A6 | IPLC_ACCEPTANCE CREATE + finalize arrival | Dr Acceptances & DPU — Customers' Liability (memo)；Cr Acceptances & DPU — Outstanding (memo) | 同一 Checker action 完成來源 arrival 與 Acceptance；成為 APPROVED 的各 leg 均送 Accounting |
+| A3 | IPLC_LC UTILIZE | Dr Documentary Credits Outstanding；Cr Customers' Liability under DC | 建立時為 EARMARKING／PENDING 虛帳；acknowledge 後 EARMARKED，尚未 Release |
+| A3S | SHGT FULL_REDEEM + IPLC_LC UTILIZE | SG pair 對調 + LC pair 對調，兩 legs 同 business event | Checker release SG leg、acknowledge arrival；LC UTILIZE 留待 A4／A6 finalize |
+| A4 | finalize existing A3/A3S UTILIZE | 不建立新 voucher；使用 A3/A3S 已保存的 LC UTILIZE voucher | Checker Release 同一 arrival movement，從 Pending 轉 Approved |
+| A6 | IPLC_ACCEPTANCE CREATE + finalize arrival | Dr Acceptances & DPU — Customers' Liability (memo)；Cr Acceptances & DPU — Outstanding (memo) | 同一 Checker action 完成來源 arrival 與 Acceptance；on-balance accounting 不由此 internal family證明 |
 | A7 | IPLC_ACCEPTANCE FULL/PARTIAL_SETTLE | Acceptance family Dr／Cr 對調 | 只結算所選 Acceptance，不改 LC Balance |
 | A8 | SHGT ISSUE | Dr Customers' Liability under Shipping Guarantees；Cr Shipping Guarantees Outstanding | Checker Release 後 approved SG contingent |
 | A9 | SHGT FULL_REDEEM | SG family Dr／Cr 對調 | Full redeem；不另行沖銷 A3 earmark |
@@ -51,7 +50,7 @@ source_files:
 |---|---|---|---|
 | B1 | EPLC_CONFIRMATION ISSUE | Dr Issuing Bank Confirmation Exposure；Cr Confirmation Undertakings Outstanding（Sight／Usance suffix） | Checker Release 後 approved Confirmation |
 | B2 | EPLC_CONFIRMATION AMEND | Increase 使用 establishment pair；Decrease 對調 | Expiry Date 的 ACTIVE／EXPIRED semantics 同 A2 |
-| B3 | EPLC_EXAMINATION CREATE | Dr Export Bills — Received, Under Examination (memo)；Cr Export Bills — Contra (memo) | EARMARKED internal memo only；`accountEntries=null`，不送下游 Accounting，也不建立 reversal |
+| B3 | EPLC_EXAMINATION CREATE | Dr Export Bills — Received, Under Examination (memo)；Cr Export Bills — Contra (memo) | internal memo only；`accountEntries=null`，不送下游 Accounting，也不建立 reversal |
 | B4 Sight | Confirmation HONOUR + Due from Issuing Bank CREATE | HONOUR 對調 Confirmation pair；on-balance asset leg不產生 contingent voucher | compound release 並 consume B3 earmark |
 | B4 Usance | Confirmation ACCEPT + EPLC_ACCEPTANCE CREATE + Reimbursement Receivable CREATE | ACCEPT 對調 Confirmation pair；Acceptance 建立 memo pair；receivable asset無 contingent pair | 三 legs 同 business event；consume B3 earmark |
 | B5 | EPLC_ACCEPTANCE FULL_SETTLE | Export Acceptance memo family Dr／Cr 對調 | 不結算 Reimbursement Receivable |
@@ -67,4 +66,4 @@ source_files:
 
 ## Source boundary requiring external confirmation
 
-Balance Component 的規則要求所有 APPROVED movement／leg 送出 `accountEntries`，並禁止 EARMARKING／EARMARKED legs 外送。外部 Accounting system 的 posting acknowledgement、retries、reconciliation 仍須由該 integration contract／service 補證。
+Balance Component 能證明 internal voucher、movement status 與是否保存 caller-supplied `accountEntries`；外部 Accounting system 的 posting acknowledgement、retries、reconciliation 不在本 repository，須由該 integration contract／service 補證。

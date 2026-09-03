@@ -4,7 +4,7 @@ type: test-reference
 domain: testing
 status: verified
 source_of_truth: source-code
-source_revision: "bad2f0c"
+source_revision: "c7e9884"
 verified_date: 2026-09-03
 generated: true
 aliases: []

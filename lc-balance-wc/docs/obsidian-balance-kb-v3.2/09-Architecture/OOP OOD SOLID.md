@@ -4,7 +4,7 @@ type: architecture
 domain: architecture
 status: verified
 source_of_truth: source-code
-source_revision: "bad2f0c"
+source_revision: "c7e9884"
 verified_date: 2026-09-03
 generated: true
 aliases: []
@@ -14,7 +14,6 @@ source_files:
   - "microservices/balance-component/src/service/unitOfWork.ts"
   - "microservices/balance-component/src/service/movementReleasePolicyService.ts"
   - "microservices/balance-component/src/service/movementReleaseSideEffectService.ts"
-  - "microservices/balance-component/src/store/balanceMovementStore.ts"
   - "src/app/transaction-builder/function-strategy.ts"
   - "src/app/transaction-builder/balance-component.model.ts"
 ---
@@ -45,9 +44,3 @@ source_files:
 ## DRY without hiding domain meaning
 
 DRY 不是把不同 lifecycle 強迫共用同一流程。A3 acknowledge、A4 finalize、A6 acceptance、B3 earmark、B4 consume 保持各自語意；共用的是 money、status transition、validation、persistence 與 rendering primitives。業務規則只在對應 canonical note 定義，本頁只說設計原則。
-
-## Fix Pending lifecycle ownership
-
-`BalanceService.editPending()` 負責 use-case orchestration：驗證 request、開啟 transaction、先寫 append-only audit，再委派 persistence。`BalanceMovementStore` 封裝 correction 的持久化 invariant：`STANDARD` 與 `REMARKS_ONLY` Fix Pending 都把可重新送審的 movement 恢復為 `PENDING`。Angular 只依 function strategy 控制可編輯欄位，不自行實作 `REJECTED → PENDING`。
-
-這個責任切分維持 SRP／DIP，並避免 UI、route 與 service 各自硬寫狀態更新；新增 Fix Pending mode 時只需遵守相同 store contract 與 audit contract。

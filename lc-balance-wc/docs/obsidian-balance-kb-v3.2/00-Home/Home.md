@@ -4,7 +4,7 @@ type: moc
 domain: balance
 status: verified
 source_of_truth: source-code
-source_revision: "bad2f0c"
+source_revision: "c7e9884"
 verified_date: 2026-09-03
 generated: true
 aliases: ["Home", "Balance KB"]
@@ -33,6 +33,7 @@ source_files:
 - [[Data Model]]
 - [[Architecture]]
 - [[OOP OOD SOLID]]
+- [[ADR-001 Generic Balance Action Model]]
 - [[Test Coverage and Business Cases]]
 - [[Decision Tables]]
 - [[Traceability Matrix]]
@@ -42,7 +43,7 @@ source_files:
 
 ## 維護原則
 
-1. Source Code、測試及 OAS 是唯一內容來源。
+1. Source Code、測試及 OAS 是唯一內容來源；已接受但尚未完成的 target architecture 以 ADR 明確標示。
 2. 每個概念只有一篇 canonical note；其他頁面以 Wiki link 引用。
 3. tags 用於狀態與橫切分類，folder 用於穩定領域。
 4. 不把歷史 implementation log 當成目前行為。

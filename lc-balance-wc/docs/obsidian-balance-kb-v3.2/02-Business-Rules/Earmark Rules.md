@@ -4,7 +4,7 @@ type: rule
 domain: exposure
 status: verified
 source_of_truth: source-code
-source_revision: "bad2f0c"
+source_revision: "c7e9884"
 verified_date: 2026-09-03
 generated: true
 aliases: []
@@ -38,25 +38,16 @@ source_files:
 
 A4 不建立第二筆 Document Arrival。Maker 對已 acknowledged、仍 PENDING 的 A3/A3S UTILIZE 呼叫 `submitByMaker()`，只寫入 `makerSubmittedBy/At`；Checker 再 Release 同一 movement，才把 LC Balance 從 Pending 轉成 Approved／Utilized。Inquire Events 將 create 與 finalize 分成兩行，finalize 行使用一般 PENDING／APPROVED，不再顯示 EARMARKING／EARMARKED。
 
-同一 A3/A3S UTILIZE 在 EARMARKING／EARMARKED 階段一律不送 Accounting；A4 Checker Release 使該 movement 成為 APPROVED 後，才依其已保存的 Dr／Cr 產生並外送 `accountEntries`。
-
 ### A6 Acceptance (Usance)
 
 A6 建立新的 `IPLC_ACCEPTANCE/CREATE`，並以 `referencedTransactionId` 指向已 acknowledged 的 A3/A3S UTILIZE。建立 A6 時會把來源 arrival 標記為 Maker Submitted。Checker 的單一 Release 動作同時完成被引用的 Document Arrival 與新 Acceptance；Amount、Currency、Tenor 由來源交易帶入且受保護。
 
-A6 Release 後成為 APPROVED 的各 accounting leg 均送 Accounting；Release 前仍為 EARMARKED 的 Document Arrival leg 不送。
-
 ## Export consume
 
 B3 Checker Release 後雖已 EARMARKED，仍占用 Present Docs earmark。B4 只能選取已 RELEASED、尚未 consumed 的 B3；B4 Release 才設定來源 B3 的 `presentDocsConsumedAt/By` 並解除該 earmark。
-
-B3 EARMARKED leg 的 `accountEntries=null`，不送 Accounting；B4 Release 產生的 APPROVED Honour／Acceptance legs 依各 leg 分錄送 Accounting。
 
 ## Queue and accounting semantics
 
 - 已 acknowledged 的 A3/A3S 不再出現在 A3/A3S Checker 或普通 Maker Queue；A4/A6 透過專屬 eligibility 使用它。
 - Earmark 是容量控制與稽核狀態，不等於 downstream Accounting posting。
 - Internal `contingentAccountEntry` 與外送 `accountEntries` 是不同欄位，必須分開說明。
-- 統一 posting gate：`EARMARKING`／`EARMARKED` 一律不送 Accounting，`accountEntries=null`；所有 `APPROVED` movement／leg 一律依其 Dr／Cr 送 Accounting。
-- A3、A3S、B3 必須逐 leg 套用 posting gate，不得以整個 business event 的單一狀態決定。
-- A3S 是 compound event：LC Document Arrival leg 為 EARMARKED，不送；SG `FULL_REDEEM` leg 在 APPROVED 後送 Accounting。

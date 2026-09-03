@@ -32,8 +32,8 @@ function allFiles(dir) {
 }
 
 function yamlString(value) { return JSON.stringify(value); }
-function note({ title, type, domain, sources, body, aliases = [], tags = [] }) {
-  return `---\ntitle: ${yamlString(title)}\ntype: ${type}\ndomain: ${domain}\nstatus: verified\nsource_of_truth: source-code\nsource_revision: ${yamlString(gitRevision)}\nverified_date: ${today}\ngenerated: true\naliases: [${aliases.map(yamlString).join(', ')}]\ntags: [${tags.map(yamlString).join(', ')}]\nsource_files:\n${sources.map((s) => `  - ${yamlString(s)}`).join('\n')}\n---\n\n# ${title}\n\n> [!important] Source of truth\n> 本筆記由目前 repository 產生。若文件與程式不一致，以 Source Code、測試及 OAS 為準。\n\n${body.trim()}\n`;
+function note({ title, type, domain, sources, body, aliases = [], tags = [], status = 'verified', sourceOfTruth = 'source-code', sourceNotice = '本筆記由目前 repository 產生。若文件與程式不一致，以 Source Code、測試及 OAS 為準。' }) {
+  return `---\ntitle: ${yamlString(title)}\ntype: ${type}\ndomain: ${domain}\nstatus: ${status}\nsource_of_truth: ${sourceOfTruth}\nsource_revision: ${yamlString(gitRevision)}\nverified_date: ${today}\ngenerated: true\naliases: [${aliases.map(yamlString).join(', ')}]\ntags: [${tags.map(yamlString).join(', ')}]\nsource_files:\n${sources.map((s) => `  - ${yamlString(s)}`).join('\n')}\n---\n\n# ${title}\n\n> [!important] Source of truth\n> ${sourceNotice}\n\n${body.trim()}\n`;
 }
 
 const catalogSource = read('src/app/transaction-builder/balance-component.model.ts');
@@ -141,7 +141,7 @@ const add = (path, content) => docs.set(path.split('/').join(sep), content);
 add('00-Home/Home.md', note({
   title: 'Balance Component Knowledge Base', type: 'moc', domain: 'balance', aliases: ['Home', 'Balance KB'], tags: ['moc'],
   sources: ['src/app/transaction-builder/balance-component.model.ts', 'microservices/balance-component/src/app.ts'],
-  body: `## 導航\n\n- [[System Overview]]\n- [[Domain Model]]\n- [[Business Rules MOC]]\n- [[Import Functions MOC]]\n- [[Export Functions MOC]]\n- [[Accounting and Exposure]]\n- [[Tolerance and Money]]\n- [[Maker Checker Lifecycle]]\n- [[API Reference]]\n- [[Data Model]]\n- [[Architecture]]\n- [[OOP OOD SOLID]]\n- [[Test Coverage and Business Cases]]\n- [[Decision Tables]]\n- [[Traceability Matrix]]\n- [[Documentation Coverage]]\n- [[Knowledge Gaps]]\n- [[Source Map]]\n\n## 維護原則\n\n1. Source Code、測試及 OAS 是唯一內容來源。\n2. 每個概念只有一篇 canonical note；其他頁面以 Wiki link 引用。\n3. tags 用於狀態與橫切分類，folder 用於穩定領域。\n4. 不把歷史 implementation log 當成目前行為。`,
+  body: `## 導航\n\n- [[System Overview]]\n- [[Domain Model]]\n- [[Business Rules MOC]]\n- [[Import Functions MOC]]\n- [[Export Functions MOC]]\n- [[Accounting and Exposure]]\n- [[Tolerance and Money]]\n- [[Maker Checker Lifecycle]]\n- [[API Reference]]\n- [[Data Model]]\n- [[Architecture]]\n- [[OOP OOD SOLID]]\n- [[ADR-001 Generic Balance Action Model]]\n- [[Test Coverage and Business Cases]]\n- [[Decision Tables]]\n- [[Traceability Matrix]]\n- [[Documentation Coverage]]\n- [[Knowledge Gaps]]\n- [[Source Map]]\n\n## 維護原則\n\n1. Source Code、測試及 OAS 是唯一內容來源；已接受但尚未完成的 target architecture 以 ADR 明確標示。\n2. 每個概念只有一篇 canonical note；其他頁面以 Wiki link 引用。\n3. tags 用於狀態與橫切分類，folder 用於穩定領域。\n4. 不把歷史 implementation log 當成目前行為。`,
 }));
 
 add('00-Home/System Overview.md', note({
@@ -333,7 +333,14 @@ add('08-Data-Model/Data Tables Layout.md', note({
 add('09-Architecture/Architecture.md', note({
   title: 'Architecture', type: 'architecture', domain: 'architecture', tags: ['architecture', 'solid'],
   sources: ['microservices/balance-component/src/service/balanceService.ts', 'microservices/balance-component/src/service/unitOfWork.ts', 'src/app/transaction-builder/function-strategy.ts', 'src/app/transaction-builder/transaction-builder.component.ts'],
-  body: `## Boundaries\n\n- Angular strategies／policies：畫面組態、輸入與 orchestration。\n- Route layer：HTTP parsing 與 response mapping。\n- Service layer：use-case orchestration、transaction boundary。\n- Domain layer：純計算與 eligibility policies。\n- Store layer：SQLite persistence ports。\n\n本頁只定義分層與依賴方向。物件設計原則的 canonical 說明見 [[OOP OOD SOLID]]；個別業務規則一律連結其 canonical rule note，避免複製。`,
+  body: `## Boundaries\n\n- Angular strategies／policies：畫面組態、輸入與 orchestration。\n- Route layer：HTTP parsing 與 response mapping。\n- Service layer：use-case orchestration、transaction boundary。\n- Domain layer：純計算與 eligibility policies。\n- Store layer：SQLite persistence ports。\n\n本頁只定義分層與依賴方向。物件設計原則的 canonical 說明見 [[OOP OOD SOLID]]；產品擴充與 generic Balance action 的已接受 target architecture 見 [[ADR-001 Generic Balance Action Model]]；個別業務規則一律連結其 canonical rule note，避免複製。`,
+}));
+
+add('09-Architecture/ADR-001 Generic Balance Action Model.md', note({
+  title: 'ADR-001 Generic Balance Action Model', type: 'architecture-decision', domain: 'architecture', status: 'accepted', sourceOfTruth: 'business-decision', tags: ['architecture', 'adr', 'balance-action', 'product-extension'],
+  sourceNotice: '本 ADR 記錄已接受的 target architecture；目前程式尚未完全完成此重構。現行行為仍以 Source Code、測試及 OAS 為準。',
+  sources: ['microservices/balance-component/src/types.ts', 'microservices/balance-component/src/service/balanceService.ts', 'microservices/balance-component/src/domain/balanceDerivation.ts', 'microservices/balance-component/src/domain/contingentAccountEntry.ts', 'src/app/transaction-builder/balance-component.model.ts'],
+  body: `## Context\n\nLC、SBLC 與 LG 的合約欄位、法律事件、選擇條件及 SWIFT 流程不同，但對 Balance Control 的核心影響可正規化為少數動作：增額、減額及額度保留。若 Balance Engine 直接認識每一種產品與 Function，新增產品會迫使 type union、DB constraint、UI catalog、eligibility 與 accounting switch 同步修改。\n\n## Decision\n\nBalance Engine 的 target architecture 只處理以下 normalized actions：\n\n- \`TAKE_DOWN\`：建立或增加 balance。\n- \`REPAYMENT\`：減少或清償 balance。\n- \`EARMARK\`：保留 capacity，但未完成最終 balance／accounting event。\n- \`RELEASE_EARMARK\`：取消尚未被消耗的保留。\n- \`CONSUME_EARMARK\`：把既有保留轉入其後真正的 TAKE_DOWN／REPAYMENT 流程。\n\nAmount 一律為正值，方向由 action 表達，不以正負號暗示。LC、SBLC、LG Product Policy 負責把 ISSUE、AMENDMENT、CLAIM、DRAWING、EXPIRE、CLOSE 等 business event 映射成一個或多個 normalized actions。\n\n| Business event | Normalized Balance action |\n|---|---|\n| Issue | TAKE_DOWN |\n| Amendment Increase | TAKE_DOWN |\n| Amendment Decrease | REPAYMENT |\n| Claim／Drawing received | EARMARK |\n| Claim approved／paid | CONSUME_EARMARK + REPAYMENT（依產品 liability direction） |\n| Claim cancelled／rejected | RELEASE_EARMARK |\n| Expire／Close | REPAYMENT remaining balance |\n| Reopen | TAKE_DOWN restoration |\n\n## Responsibility boundary\n\nBalance Core 共用 balance math、Maker／Checker、Pending／Rejected、audit、idempotency、snapshot、decimal money 與 posting gate。Product Policy 擁有合約欄位、selection／eligibility、parent-child relationship、business-event mapping、Account Mapping key、SWIFT strategy 與產品專屬 lifecycle。\n\n\`Business Event → Product Policy → BalanceAction[] → Generic Balance Engine → Account Mapping\`\n\n## Options considered\n\n1. 繼續以產品／Function 硬編碼：短期直接，但每個新產品都擴大 switch、enum、migration 與 regression surface。\n2. 將所有規則做成無型別自由設定：擴充快，但會犧牲編譯期檢查、DB integrity 與可稽核性。\n3. 採 typed Product Policy + normalized Balance Action：保留型別與 audit，同時隔離產品差異。採用此方案。\n\n## Consequences\n\n- 新增 SBLC／LG 的 Balance 計算應是小改；主要工作集中在 selection eligibility、合約內容、event mapping 與 Account Mapping。\n- 現有 LC Function 必須逐步改成 business-event adapter，不進行一次性重寫。\n- DB／API 仍需辨識 product identity，但 Balance direction 不再由產品 switch 決定。\n- Accounting 科目可以不同，TAKE_DOWN／REPAYMENT 的方向語意保持一致。\n\n## Implementation guardrails\n\n- 先以 characterization tests 固定現有 A／B Function 行為，再抽取 \`BalanceAction\` 與 \`BalanceProductPolicy\` contracts。\n- Import LC／Export Confirmation 先接回新 contract 並維持 coverage gate，再增加 SBLC，最後增加 LG。\n- Product Policy 不得繞過 Maker／Checker、audit、decimal money、posting gate 或 idempotency。\n- 本 ADR 不代表 SBLC／LG 已實作，也不改變目前 source-backed lifecycle。`,
 }));
 
 add('09-Architecture/OOP OOD SOLID.md', note({
@@ -370,7 +377,7 @@ const documentationInventory = [
   ['Movement status values', movementStatuses.length],
   ['Exposure nature values', exposureNatures.length],
   ['Tenor type values', tenorTypes.length],
-  ['Canonical cross-cutting topics', 13],
+  ['Canonical cross-cutting topics', 14],
 ];
 const documentationInventoryTotal = documentationInventory.reduce((sum, [, count]) => sum + count, 0);
 const documentationCoveragePct = 100;
