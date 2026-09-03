@@ -445,6 +445,11 @@ unaddressed.
   Balance Account Number Maintenance work — see below), `TF_Balance_Component_Spec-{en,zh}.docx`,
   `TF_Balance_Component_Mapping-{en,zh}.xlsx`, `TF_Contingent_Liability_Lifecycle-{en,zh}.docx`. Code
   comments citing a spec section refer here, same convention as `lc-payment-wc/analysis/`.
+- `SBLC_LG_業務種類與Balance帳務_不含Charge.docx` (project root, not under `analysis/`) — a Standby LC /
+  Letter of Guarantee business-types-and-Balance-accounting reference doc, added 2026-09-04. Nothing in
+  `microservices/balance-component/src/` or `src/app/` references SBLC/Standby yet (grep confirms) — treat
+  this as forward-looking scope material for a not-yet-started SBLC/LG `InstrumentType`, not a spec for
+  existing behavior.
 - `docs/obsidian-balance-kb-v3.2/` — a generated Obsidian vault mirroring `lc-payment-wc/docs/
   obsidian-payment-kb/`'s role for this project: reverse-engineers the Balance Component's business
   knowledge out of source, APIs, and tests. **Rewritten 2026-09-03** (commit `bad2f0c` onward) from a
@@ -567,6 +572,12 @@ npm run docs:verify       # scripts/validate-wc-docs.mjs — structure/links/OAS
 npm run e2e               # playwright test — e2e/framework-hosts.spec.ts drives real Angular/React/Vue host pages
                            # against the built element in system Chrome (playwright.config.ts uses channel: 'chrome',
                            # not a Playwright-managed browser download)
+npm run e2e:live          # playwright test --config playwright.live.config.ts — e2e/live/business-case-run-all.spec.ts,
+                           # a separate suite that drives the real `ng serve` app (localhost:4200) through every
+                           # registered Business Case via "Run All Cases", routed against the three dev:all backends
+                           # (:4300 backend, :4100 microservice) instead of the built element/dist — start dev:all
+                           # first, there's no webServer auto-start here. playwright.config.ts excludes e2e/live/**
+                           # from the plain `npm run e2e` run (testIgnore), so the two suites never overlap.
 ```
 
 `package.json` is `private: false` with an `exports` map (`./wc`, `./wc/styles.css`, `./manifest`,
