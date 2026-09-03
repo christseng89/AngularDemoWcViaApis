@@ -1,6 +1,6 @@
 # Balance Component Submit APIs examples
 
-This guide shows the Maker Submit API used by the `lc-balance` reference UI for Import functions A1–A11 and Export functions B1–B7. A5 has been removed and has no API.
+This guide shows the Maker Submit API used by the `lc-balance-wc` reference UI for Import functions A1–A11 and Export functions B1–B7. A5 has been removed and has no API.
 
 The examples call the Balance Component microservice directly:
 
@@ -9,6 +9,16 @@ BASE="http://localhost:4100"
 ```
 
 Replace every `<...>` placeholder with an ID returned by the Catalog, lookup, movement, or snapshot APIs. `eventSeq` must be unique within the target Balance Contract. Monetary values are unformatted decimal strings on the wire.
+
+For A2/B2 monetary amendments, send the non-negative whole-number change magnitude in `toleranceChangePct`
+and its direction in `toleranceChangeDirection`. A PENDING Movement returns the old approved value in
+`tolerancePct` and echoes both change fields; after Checker Release, Movement/Contract `tolerancePct`
+contains the calculated final value.
+The service recalculates the old and new full-contract upper limits, rounds each to the currency minor unit with
+`ROUND_HALF_UP`, and posts their difference. Do not send `tolerancePct` on `AMEND_EXPIRY_DATE`.
+A2/B2 may change Amount only, Tolerance only, or both. For Tolerance-only, keep the required wire field as
+`"amount":"0"`; zero Amount plus an omitted/zero Tolerance Change is rejected as a no-op. A1/B1
+`tolerancePct` and A2/B2 `toleranceChangePct` accept integer strings only.
 
 ## API routing summary
 
@@ -67,12 +77,34 @@ curl -X POST "$BASE/balance-movements" -H "Content-Type: application/json" -d '{
   "eventSeq":1002,
   "amount":"10000.00",
   "currency":"USD",
+  "toleranceChangePct":"5",
+  "toleranceChangeDirection":"INCREASE",
   "sourceTransactionRef":"A01",
   "createdBy":"maker1"
 }'
 ```
 
-Decrease uses `AMEND_DECREASE` with a positive magnitude. Expiry Date Amendment:
+Decrease uses `AMEND_DECREASE` with a positive Amount magnitude. Tolerance-only Decrease from 20% to 15% sends a change of 5:
+
+```bash
+curl -X POST "$BASE/balance-movements" -H "Content-Type: application/json" -d '{
+  "instrumentType":"IPLC_LC",
+  "balanceContractId":"<IPLC_LC_ID>",
+  "movementType":"AMEND_DECREASE",
+  "eventSeq":1003,
+  "amount":"0",
+  "currency":"USD",
+  "toleranceChangePct":"5",
+  "toleranceChangeDirection":"DECREASE",
+  "sourceTransactionRef":"A02",
+  "createdBy":"maker1"
+}'
+```
+
+Expiry Date Amendment must not contain `tolerancePct`; the caller always sends `amount:"0"`. For ACTIVE
+this stays date-only. For EXPIRED, the server replaces the persisted movement amount with the latest
+RELEASED EXPIRE restoration amount and exposes Account Entries while PENDING; cancelled/rejected attempts
+are ignored when finding that basis:
 
 ```bash
 curl -X POST "$BASE/balance-movements" -H "Content-Type: application/json" -d '{
@@ -86,6 +118,9 @@ curl -X POST "$BASE/balance-movements" -H "Content-Type: application/json" -d '{
   "createdBy":"maker1"
 }'
 ```
+
+Do not submit a compensating `AMEND_INCREASE` after an EXPIRED Extension. Checker Release of this same
+`AMEND_EXPIRY_DATE` restores Confirmed/Tight Available Balance and reactivates the contract.
 
 ### A3 — Document Arrival
 
@@ -282,12 +317,33 @@ curl -X POST "$BASE/balance-movements" -H "Content-Type: application/json" -d '{
   "eventSeq":1002,
   "amount":"10000.00",
   "currency":"USD",
+  "toleranceChangePct":"5",
+  "toleranceChangeDirection":"INCREASE",
   "sourceTransactionRef":"B02-1",
   "createdBy":"maker1"
 }'
 ```
 
-B2 Decrease uses `AMEND` with a negative wire amount. Expiry Date Amendment:
+B2 Decrease uses `AMEND` with a negative wire amount. For Tolerance-only B2, `amount` is `"0"`;
+for example decrease 20% to 15% by 5:
+
+```bash
+curl -X POST "$BASE/balance-movements" -H "Content-Type: application/json" -d '{
+  "instrumentType":"EPLC_CONFIRMATION",
+  "balanceContractId":"<EPLC_CONFIRMATION_ID>",
+  "movementType":"AMEND",
+  "eventSeq":1003,
+  "amount":"0",
+  "currency":"USD",
+  "toleranceChangePct":"5",
+  "toleranceChangeDirection":"DECREASE",
+  "sourceTransactionRef":"B02-2",
+  "createdBy":"maker1"
+}'
+```
+
+Expiry Date Amendment follows the same dual-mode rule as A2: request `amount:"0"`, no `tolerancePct`;
+ACTIVE is date-only, while EXPIRED derives the protected restore voucher from the latest RELEASED EXPIRE:
 
 ```bash
 curl -X POST "$BASE/balance-movements" -H "Content-Type: application/json" -d '{
@@ -301,6 +357,9 @@ curl -X POST "$BASE/balance-movements" -H "Content-Type: application/json" -d '{
   "createdBy":"maker1"
 }'
 ```
+
+Checker Release restores the expired Confirmation through this same reviewed movement; do not add a
+separate B2 monetary Increase for the restoration.
 
 ### B3 — Present Documents
 

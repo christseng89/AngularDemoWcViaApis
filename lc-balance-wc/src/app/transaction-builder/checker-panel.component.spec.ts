@@ -240,7 +240,7 @@ describe('CheckerPanelComponent', () => {
         },
       });
 
-      expect(api.resolveContract).toHaveBeenCalledWith('IPLC_LC', { lcNumber: 'LC-SYNC', ibNumber: null, sgNumber: null }, false);
+      expect(api.resolveContract).toHaveBeenCalledWith('IPLC_LC', { lcNumber: 'LC-SYNC', ibNumber: null, sgNumber: null }, true);
     });
 
     it('an unrelated change (neither key present) is a no-op', () => {
@@ -341,7 +341,7 @@ describe('CheckerPanelComponent', () => {
 
       c.searchCheckerLc();
 
-      expect(api.resolveContract).toHaveBeenCalledWith('IPLC_LC', { lcNumber: 'LC1', ibNumber: null, sgNumber: null }, false);
+      expect(api.resolveContract).toHaveBeenCalledWith('IPLC_LC', { lcNumber: 'LC1', ibNumber: null, sgNumber: null }, true);
       expect(c.checkerContract?.balanceContractId).toBe('C1');
       expect(c.checkerSearching).toBe(false);
       expect(c.checkerItems).toEqual([pendingMovement]); // loadCheckerQueue() side effect, PENDING-only
@@ -373,6 +373,33 @@ describe('CheckerPanelComponent', () => {
       c.searchCheckerLc();
 
       expect(api.resolveContract).toHaveBeenCalledWith('IPLC_LC', { lcNumber: 'U01', ibNumber: null, sgNumber: null }, true);
+    });
+
+    it('passes includeAnyStatus=true for A2/B2 because AMEND_EXPIRY_DATE may be PENDING against an EXPIRED contract', () => {
+      for (const [code, instrumentType] of [
+        ['A2', 'IPLC_LC'],
+        ['B2', 'EPLC_CONFIRMATION'],
+      ] as const) {
+        const api = mockApi();
+        const c = new CheckerPanelComponent(api);
+        c.selectedFunction = fn(code);
+        c.checkerLcNumber = 'S01';
+
+        c.searchCheckerLc();
+
+        expect(api.resolveContract).toHaveBeenCalledWith(instrumentType, { lcNumber: 'S01', ibNumber: null, sgNumber: null }, true);
+      }
+    });
+
+    it('keeps ordinary functions on ACTIVE-only resolution', () => {
+      const api = mockApi();
+      const c = new CheckerPanelComponent(api);
+      c.selectedFunction = fn('A3');
+      c.checkerLcNumber = 'S01';
+
+      c.searchCheckerLc();
+
+      expect(api.resolveContract).toHaveBeenCalledWith('IPLC_LC', { lcNumber: 'S01', ibNumber: null, sgNumber: null }, false);
     });
 
     it('sets checkerSearchError from the server message on a resolve failure', () => {

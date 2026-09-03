@@ -1,10 +1,10 @@
-import { BATCH_MAKER_ACTOR } from '../config';
 import { IllegalStateTransitionError } from '../errors';
 import type { BalanceContractStore } from '../store/balanceContractStore';
 import type { BalanceMovementStore } from '../store/balanceMovementStore';
 import type { BalanceContract, BalanceMovement } from '../types';
 import type { CreateMovementRequest, CreateMovementResult } from './balanceService';
 import { ContractLifecycleEligibilityService } from './contractLifecycleEligibilityService';
+import { MONETARY_AMENDMENT_TYPES } from '../domain/tolerance';
 
 export interface ReleaseSideEffectCommandPort {
   createMovement(request: CreateMovementRequest): CreateMovementResult;
@@ -23,6 +23,11 @@ export class MovementReleaseSideEffectService {
 
   applyStandard(movement: BalanceMovement, contract: BalanceContract, releasedBy: string, releasedAt: string): void {
     this.applyReferencedMovementEffect(movement, releasedBy, releasedAt);
+
+    if (MONETARY_AMENDMENT_TYPES.has(movement.movementType)) {
+      // release() passes the Amendment movement with its just-activated final tolerance.
+      this.contracts.updateTolerancePct(contract.balanceContractId, movement.tolerancePct as string | null);
+    }
 
     if (movement.movementType === 'CLOSE') {
       this.contracts.markClosed(contract.balanceContractId, releasedAt);
@@ -56,10 +61,6 @@ export class MovementReleaseSideEffectService {
 
     if (contract.status === 'EXPIRED') {
       this.assertExpiryExtensionHasNoOpenEvents(movement, contract);
-      const expireMovement = this.findTrailingReleasedExpiry(movement, contract);
-      if (expireMovement) {
-        this.createAndReleaseReversal(expireMovement, releasedBy, movement.businessEventId ?? movement.movementId);
-      }
     }
     this.contracts.reactivate(contract.balanceContractId, 'ACTIVE', releasedAt, newExpiryDate);
   }
@@ -89,28 +90,4 @@ export class MovementReleaseSideEffectService {
     }
   }
 
-  private findTrailingReleasedExpiry(movement: BalanceMovement, contract: BalanceContract): BalanceMovement | undefined {
-    const ownMovements = this.movements.listByContract(contract.balanceContractId).filter((candidate) => candidate.movementId !== movement.movementId);
-    const trailing = [...ownMovements].sort((left, right) => left.eventSeq - right.eventSeq).pop();
-    return trailing?.status === 'RELEASED' && trailing.movementType === 'EXPIRE' ? trailing : undefined;
-  }
-
-  private createAndReleaseReversal(original: BalanceMovement, releasedBy: string, businessEventId: string): void {
-    const originalContract = this.contracts.findById(original.balanceContractId)!;
-    const result = this.commands.createMovement({
-      instrumentType: originalContract.instrumentType,
-      balanceContractId: original.balanceContractId,
-      movementType: 'REVERSAL',
-      eventSeq: this.nextEventSeq(),
-      amount: original.ceilingAmount,
-      currency: original.currency,
-      reversalOfMovementId: original.movementId,
-      businessEventId,
-      createdBy: BATCH_MAKER_ACTOR,
-    });
-    if (!result.created) {
-      throw new Error(`Unexpected idempotency conflict creating a REVERSAL for movement "${original.movementId}".`);
-    }
-    this.commands.release(result.movement.movementId, releasedBy);
-  }
 }

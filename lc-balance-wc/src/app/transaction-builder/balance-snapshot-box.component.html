@@ -23,6 +23,27 @@
   <div class="tb-balance-row" *ngIf="variant === 'full'">
     <span class="tb-balance-row__label">Pending Earmark Total</span><span class="tb-balance-row__value">{{ snapshot.pendingEarmarkTotal | monetaryAmount: snapshot.currency }}</span>
   </div>
+  <div class="tb-balance-row" *ngIf="variant === 'full' && pendingAmendmentBalanceEffect !== null">
+    <span class="tb-balance-row__label">{{ amendmentIsPending ? 'Pending Amendment Balance Effect' : 'Amendment Balance Effect' }}</span
+    ><span class="tb-balance-row__value">{{ pendingAmendmentBalanceEffect | monetaryAmount: snapshot.currency }}</span>
+  </div>
+  <div class="tb-balance-row" *ngIf="variant === 'full' && amendmentTolerancePct !== null">
+    <span class="tb-balance-row__label">Amendment Tolerance</span
+    ><span class="tb-balance-row__value"
+      >{{ amendmentToleranceBeforePct === null ? '—' : amendmentToleranceBeforePct + '%' }} → {{ amendmentTolerancePct }}%</span
+    >
+  </div>
+  <ng-container *ngFor="let amendment of pendingAmendments">
+    <div class="tb-balance-row">
+      <span class="tb-balance-row__label"
+        >{{ amendment.isPending ? 'Pending Amendment Balance Effect' : 'Amendment Balance Effect' }}<span *ngIf="amendment.reference"> ({{ amendment.reference }})</span></span
+      ><span class="tb-balance-row__value">{{ amendment.balanceEffect | monetaryAmount: snapshot.currency }}</span>
+    </div>
+    <div class="tb-balance-row" *ngIf="amendment.toleranceAfterPct !== null">
+      <span class="tb-balance-row__label">Amendment Tolerance<span *ngIf="amendment.reference"> ({{ amendment.reference }})</span></span
+      ><span class="tb-balance-row__value">{{ amendment.toleranceBeforePct }}% → {{ amendment.toleranceAfterPct }}%</span>
+    </div>
+  </ng-container>
   <!-- 2026-08-17 ("REFER TO DB S01") — a redirected snapshot's own before→after lands on whichever
        field below its own redirectedImpact.label names, never on Confirmed Balance above (that
        field didn't move — see the microservice's own doc comment for why). -->

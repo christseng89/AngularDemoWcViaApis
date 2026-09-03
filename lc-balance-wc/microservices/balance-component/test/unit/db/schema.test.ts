@@ -107,6 +107,17 @@ describe('SQLite schema (Design doc §3.1/§3.2/§8)', () => {
     expect(allIplc.total).toBe(2);
   });
 
+  test('Catalog multi-status query returns ACTIVE and EXPIRED but excludes CLOSED — A2/B2 Expiry Date picker regression', () => {
+    contracts.insert(makeContract({ balanceContractId: 'bc-active', logicalContractId: 'lc-active', naturalKey: { lcNumber: 'S-ACTIVE' }, status: 'ACTIVE' }));
+    contracts.insert(makeContract({ balanceContractId: 'bc-expired', logicalContractId: 'lc-expired', naturalKey: { lcNumber: 'S-EXPIRED' }, status: 'EXPIRED' }));
+    contracts.insert(makeContract({ balanceContractId: 'bc-closed', logicalContractId: 'lc-closed', naturalKey: { lcNumber: 'S-CLOSED' }, status: 'CLOSED' }));
+
+    const result = contracts.listCatalog({ instrumentType: 'IPLC_LC', statuses: ['ACTIVE', 'EXPIRED'] });
+
+    expect(result.items.map((contract) => contract.naturalKey.lcNumber)).toEqual(['S-ACTIVE', 'S-EXPIRED']);
+    expect(result.total).toBe(2);
+  });
+
   test('Catalog pagination (business instruction 2026-08-14) — page/pageSize slice a larger result set, ordered by Reference', () => {
     for (let i = 1; i <= 15; i++) {
       contracts.insert(

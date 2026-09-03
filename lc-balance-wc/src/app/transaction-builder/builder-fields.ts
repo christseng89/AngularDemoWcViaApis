@@ -1,8 +1,11 @@
+import { AbstractControl } from '@angular/forms';
 import { FormlyFieldConfig } from '@ngx-formly/core';
 import { BalanceContract, BalanceMovement, BalanceSnapshot } from './balance-component-api.service';
 import { CURRENCY_OPTIONS, TransactionFunction, decimalPlacesForCurrency, tenorTypeLabel } from './balance-component.model';
+import { AMOUNT_SHORTHAND_ERROR, parseAmountShorthand } from './amount-shorthand';
 import { BuilderModel, carriedCurrency, hasParent, isCreatingMovement, toleranceApplicable } from './function-policy';
 import { FixPendingEditableField, deriveFunctionStrategy, functionSupportsFixPending } from './function-strategy';
+import { amendmentDirection, resultingTolerancePct } from './tolerance-change';
 
 /**
  * BAL-003 (God Component) — the Transaction Builder's own Formly field factory, extracted from
@@ -19,6 +22,7 @@ export interface BuilderFieldsContext {
   selectedContractSnapshot: BalanceSnapshot | null;
   selectedParent: BalanceContract | null;
   dynamicSecondaryRefLabel: string | null;
+  amendDirection?: 'INCREASE' | 'DECREASE' | null;
   /**
    * Fix Pending (analysis/Balance-Component-FixPending-DeletePending-Proposal-zh.md §2.2/§15/§19,
    * 2026-08-27; UX redesign per direct user feedback; shared-derivation redesign 2026-08-28, "頁面配置檔
@@ -74,6 +78,7 @@ function deriveFixPendingLockFlags(
     return {
       amount: true,
       tolerancePct: true,
+      toleranceChangePct: true,
       tenorType: true,
       tenorDays: true,
       expiryDate: true,
@@ -90,10 +95,10 @@ function deriveFixPendingLockFlags(
     // Tolerance is ALSO genuinely applicable to a non-creating AMEND_INCREASE/AMEND_DECREASE/AMEND edit
     // (toleranceApplicable(ctx.model), the SAME check already gating whether this field is even SHOWN —
     // see that field's own `hide` a few lines below), not exclusively a creating-movement-owns-the-
-    // contract fact. User-confirmed scope: the edited value only affects THIS movement's own
-    // ceilingAmount/contingentAccountEntry, never the contract's own stored tolerancePct — see
-    // balanceService.ts's own buildEditedRequest() doc comment for the server-side half of this.
-    tolerancePct: enabled && !toleranceApplicable(ctx.model),
+    // contract fact. The edited proposal is captured on THIS movement and becomes the contract's
+    // latest tolerance only when the Checker releases the amendment.
+    tolerancePct: enabled && (!toleranceApplicable(ctx.model) || ['AMEND_INCREASE', 'AMEND_DECREASE', 'AMEND'].includes(ctx.model.movementType ?? '')),
+    toleranceChangePct: enabled && !['AMEND_INCREASE', 'AMEND_DECREASE', 'AMEND'].includes(ctx.model.movementType ?? ''),
     tenorType: enabled && (tenorLocked || !contractLevelEditable),
     tenorDays: enabled && (tenorLocked || !contractLevelEditable),
     expiryDate: enabled && !contractLevelEditable,
@@ -203,6 +208,16 @@ function amountFieldLabel(
   return 'Amount (face-level, per Design doc §6.2)';
 }
 
+function amountShorthandIsValid(control: AbstractControl): boolean {
+  const value = control.value;
+  return value === null || value === undefined || value === '' || parseAmountShorthand(value).ok;
+}
+
+function toleranceIsWholeNumber(control: AbstractControl): boolean {
+  const value = control.value;
+  return value === null || value === undefined || value === '' || /^\d+$/.test(String(value));
+}
+
 export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
   const { model, selectedFunction, selectedContractSnapshot } = ctx;
   const strategy = selectedFunction ? deriveFunctionStrategy(selectedFunction) : null;
@@ -214,6 +229,9 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
   // construction, same reasoning as amountFromFixed above) — the Amount field is swapped out entirely for
   // the new newExpiryDate date field below, not merely locked in place like amountFromClose/amountFromFixed.
   const isAmendExpiryDate = model.movementType === 'AMEND_EXPIRY_DATE';
+  const isMonetaryAmendment = ['AMEND_INCREASE', 'AMEND_DECREASE', 'AMEND'].includes(model.movementType ?? '');
+  const toleranceDirection = amendmentDirection(model.movementType, ctx.amendDirection ?? null);
+  const currentTolerance = ctx.selectedContract?.tolerancePct ?? '0';
   // F1 proposal §13.1 item 4 (CLOSE)/item 3(a) (REOPEN), BA-ratified 2026-08-25 — A10/B6/A11/B7 only.
   const requiresReasonCode = !!selectedFunction?.requiresCloseEligibility || !!selectedFunction?.requiresReopenEligibility;
   // A1/B1 only — F1's own new optional Expiry Date input (UCP 600 Art.6(d)); mailFloatGraceDays is
@@ -240,7 +258,9 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
   const fixPendingLocked = !!ctx.fixPendingMode;
   const fixPendingFlags = deriveFixPendingLockFlags(ctx, strategy, amountLocked, tenorLocked, requiresReasonCode, isAmendExpiryDate);
   const amountFixPendingLocked = fixPendingFlags.amount;
+  const amountEditable = !amountLocked && !amountFixPendingLocked;
   const tolerancePctFixPendingLocked = fixPendingFlags.tolerancePct;
+  const toleranceChangePctFixPendingLocked = fixPendingFlags.toleranceChangePct;
   const tenorTypeFixPendingLocked = fixPendingFlags.tenorType;
   const tenorDaysFixPendingLocked = fixPendingFlags.tenorDays;
   const expiryDateFixPendingLocked = fixPendingFlags.expiryDate;
@@ -277,21 +297,34 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
     },
     {
       key: 'amount',
-      type: amountLocked || amountFixPendingLocked ? 'protected-monetary' : 'input',
+      type: amountLocked || amountFixPendingLocked ? 'protected-monetary' : 'formatted-amount',
       props: {
         label: amountFixPendingLocked
           ? 'Amount (not editable via Fix Pending for this Function)'
-          : amountFieldLabel({ amountFromFullSettle, amountFromSgRedeem, amountCappedAtAcceptance, amountFromClose, amountLocked }, strategy),
-        required: !isAmendExpiryDate && !amountFromFixed,
-        type: 'number',
+          : isMonetaryAmendment
+            ? 'Amount (optional — enter Amount, Tolerance, or both)'
+            : amountFieldLabel({ amountFromFullSettle, amountFromSgRedeem, amountCappedAtAcceptance, amountFromClose, amountLocked }, strategy),
+        required: !isAmendExpiryDate && !amountFromFixed && !isMonetaryAmendment,
+        // The shared Amount field shows live thousands separators for plain digits while keeping the
+        // FormControl/API value comma-free. Exact h/k/m shorthand remains raw until blur expands it.
+        type: amountEditable ? 'text' : 'number',
+        attributes: amountEditable ? { inputmode: 'decimal', autocomplete: 'off', spellcheck: 'false' } : undefined,
         disabled: amountLocked || amountFixPendingLocked,
         max: amountCappedAtAcceptance && selectedContractSnapshot ? Number(selectedContractSnapshot.availableBalance) : undefined,
         // Smallest representable positive value for the typed Currency — refuses 0/negative before the
         // real submit-time backstop (validateSubmit()'s "Amount must be greater than 0.").
-        min: Math.pow(10, -decimalPlacesForCurrency(model.currency)),
+        min: isMonetaryAmendment ? 0 : Math.pow(10, -decimalPlacesForCurrency(model.currency)),
         // Keeps the spinner/step granularity in sync with the typed Currency (e.g. JPY -> step 1).
         step: Math.pow(10, -decimalPlacesForCurrency(model.currency)),
       },
+      validators: amountEditable
+        ? {
+            amountShorthand: {
+              expression: amountShorthandIsValid,
+              message: AMOUNT_SHORTHAND_ERROR,
+            },
+          }
+        : undefined,
       // Hidden outright for A2/B2's third subChoice option (AMEND_EXPIRY_DATE — swapped for newExpiryDate
       // below) and for A11/B7 (amountFromFixed — see that flag's own doc comment above: nothing for a
       // Maker to see or type, the real amount is entirely server-computed at Submit).
@@ -388,11 +421,50 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
       props: {
         label: tolerancePctFixPendingLocked
           ? 'Tolerance % (not editable via Fix Pending for this Function)'
-          : 'Tolerance % (Maximum Exposure Basis, only on ISSUE/AMEND*)',
+          : 'Tolerance % (Maximum Exposure Basis, ISSUE only)',
         type: 'number',
+        min: 0,
+        step: 1,
         disabled: tolerancePctFixPendingLocked,
       },
-      hide: !toleranceApplicable(model),
+      validators: {
+        wholeNumber: {
+          expression: toleranceIsWholeNumber,
+          message: 'Tolerance % must be a whole number.',
+        },
+      },
+      hide: !toleranceApplicable(model) || isMonetaryAmendment,
+    },
+    {
+      key: 'toleranceChangePct',
+      type: 'input',
+      props: {
+        label: toleranceDirection === 'DECREASE' ? 'Decrease Tolerance By %' : 'Increase Tolerance By %',
+        type: 'number',
+        min: 0,
+        step: 1,
+        max: toleranceDirection === 'DECREASE' ? Number(currentTolerance) : undefined,
+        description: `Current Tolerance: ${currentTolerance}% · Resulting Tolerance: ${currentTolerance}% (protected)`,
+        disabled: toleranceChangePctFixPendingLocked,
+      },
+      expressions: {
+        'props.description': (field: FormlyFieldConfig) => {
+          const preview = resultingTolerancePct(currentTolerance, field.model?.toleranceChangePct || '0', toleranceDirection);
+          return `Current Tolerance: ${currentTolerance}% · Resulting Tolerance: ${preview.ok ? preview.value : 'Invalid'}% (protected)`;
+        },
+      },
+      validators: {
+        wholeNumber: {
+          expression: toleranceIsWholeNumber,
+          message: 'Tolerance Change % must be a whole number.',
+        },
+        decreaseWithinCurrent: {
+          expression: (control: AbstractControl) =>
+            toleranceDirection !== 'DECREASE' || control.value == null || control.value === '' || resultingTolerancePct(currentTolerance, control.value, toleranceDirection).ok,
+          message: `Decrease Tolerance cannot exceed the current Tolerance of ${currentTolerance}%.`,
+        },
+      },
+      hide: !isMonetaryAmendment,
     },
     {
       key: 'tenorType',
@@ -505,7 +577,8 @@ const MODEL_FIELD_SOURCES: { [K in keyof Required<BuilderModel>]: (movement: Bal
   movementType: (movement) => movement.movementType,
   amount: (movement) => movement.amount,
   currency: (movement) => movement.currency,
-  tolerancePct: (_movement, contract) => contract.tolerancePct ?? undefined,
+  tolerancePct: (movement, contract) => movement.tolerancePct ?? contract.tolerancePct ?? undefined,
+  toleranceChangePct: (movement) => movement.toleranceChangePct ?? undefined,
   eventSeq: (movement) => movement.eventSeq,
   createdBy: (movement) => movement.createdBy,
   secondaryRef: (movement) => movement.sourceTransactionRef ?? undefined,

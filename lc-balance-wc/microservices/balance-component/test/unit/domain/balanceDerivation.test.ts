@@ -52,6 +52,11 @@ describe('REVERSAL dynamic direction (F1, external BA review §11.2)', () => {
     const reversal = m('REVERSAL', '100000', '100000', 'RELEASED', 'does-not-exist');
     expect(() => computeConfirmedBalance([reversal])).toThrow(/no resolvable reversalOfMovementId/);
   });
+
+  test('throws when a REVERSAL omits reversalOfMovementId', () => {
+    const reversal = m('REVERSAL', '100000', '100000', 'RELEASED');
+    expect(() => computeConfirmedBalance([reversal])).toThrow(/no resolvable reversalOfMovementId/);
+  });
 });
 
 describe('computeFaceAmount (Design doc §3.3/§6.2)', () => {

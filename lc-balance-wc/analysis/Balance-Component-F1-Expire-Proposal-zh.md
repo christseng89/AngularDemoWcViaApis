@@ -1,5 +1,14 @@
 # Balance Component — F1（到期 / UCP 600 第16(f)條自動釋放）實作提案
 
+> **2026-09-03 現行實作取代說明（以最新 source code 為準）**：本文件保留 2026-08-25 的提案與
+> UAT 決策歷史，不再代表完整現況。對 EXPIRED 合約提交 `AMEND_EXPIRY_DATE` 時，外部 request Amount
+> 仍固定為 0；服務端忽略 CANCELLED／REJECTED 嘗試，只取最後一筆有效 RELEASED movement。若該筆為
+> EXPIRE，同一筆 PENDING Amendment 會攜帶受保護復原金額、`reversalOfMovementId` 與反向 Account
+> Entries，供 Checker 先審核；Release 才恢復餘額並轉回 ACTIVE，不建立 linked `REVERSAL`。ACTIVE
+> 合約的 Expiry Date Amendment 仍是零金額、無分錄的日期修改。現行規格見
+> `docs/current-behavior.md`、`analysis/balance-component-api.yaml` 與 Obsidian
+> `MOVEMENT-RULE-066`／`MOVEMENT-RULE-068`／`EXPOSURE-RULE-030`。
+
 **日期**：2026-08-25　**狀態**：待 BA 核准（尚未動手實作）
 **觸發**：外部 BA 專家評審 `analysis/TF-Balance-Component-BA-Review-{en,zh}.docx` F1（高嚴重度）——
 微服務目前完全沒有到期觸發的自動釋放機制，只有人工、Maker/Checker 觸發的 `CLOSE`（A10/B6）。
@@ -1245,7 +1254,6 @@ README 的 smoke test 宣稱經 BA 獨立起服務複驗**屬實**，且本輪�
 確認未再變動，§18 的結論（範圍收斂完成、程式邏輯正確、行事曆測試資料 100% 吻合、尚未接進
 `microservices/balance-component/` 本身、日期範圍涵蓋缺口已記錄為非阻擋）維持有效，本輪未發現
 新問題。
-
 
 
 

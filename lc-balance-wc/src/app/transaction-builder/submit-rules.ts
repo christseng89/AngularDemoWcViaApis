@@ -12,6 +12,7 @@ import {
   toleranceApplicable,
 } from './function-policy';
 import { domesticNonBusinessDayReason } from './domestic-calendar';
+import { amendmentDirection, resultingTolerancePct } from './tolerance-change';
 
 /**
  * BAL-003 (God Component) — Maker Submit's own validation and request assembly, extracted from
@@ -62,7 +63,10 @@ export interface SubmitValidation {
  */
 function validateMandatoryFields(ctx: SubmitRulesContext, isAmendExpiryDate: boolean): string | null {
   const { model, selectedFunction } = ctx;
-  if (!model.instrumentType || !model.movementType || (!isAmendExpiryDate && !model.amount) || !model.currency || !model.createdBy) {
+  const isMonetaryAmendment = ['AMEND_INCREASE', 'AMEND_DECREASE', 'AMEND'].includes(model.movementType ?? '');
+  const toleranceDirection = amendmentDirection(model.movementType, ctx.amendDirection);
+  const amountWasEntered = model.amount != null && String(model.amount).trim() !== '';
+  if (!model.instrumentType || !model.movementType || (!isAmendExpiryDate && !isMonetaryAmendment && !amountWasEntered) || !model.currency || !model.createdBy) {
     return 'Fill in amount, currency, createdBy.';
   }
   if (isAmendExpiryDate && !model.newExpiryDate) {
@@ -90,7 +94,7 @@ function validateMandatoryFields(ctx: SubmitRulesContext, isAmendExpiryDate: boo
       return `Expiry Date ${model.expiryDate} falls on a domestic non-business day (${reason}) — pick a genuine business day.`;
     }
   }
-  if (!isAmendExpiryDate && amountExceedsCurrencyDecimals(model.amount, model.currency)) {
+  if (!isAmendExpiryDate && amountWasEntered && amountExceedsCurrencyDecimals(model.amount, model.currency)) {
     return `Amount ${model.amount} has more decimal places than ${model.currency.toUpperCase()} allows (${decimalPlacesForCurrency(model.currency)}).`;
   }
   // Applies uniformly, including B2 (which used to accept a negative Amount to express Decrease — now
@@ -103,14 +107,37 @@ function validateMandatoryFields(ctx: SubmitRulesContext, isAmendExpiryDate: boo
   // AMEND_EXPIRY_DATE (F1) exempted too — both are always exactly 0 by construction (see
   // builder-fields.ts's own amountFromFixed/isAmendExpiryDate). Every OTHER function still means "0 isn't
   // a real transaction" here.
-  if (model.movementType !== 'CLOSE' && model.movementType !== 'REOPEN' && !isAmendExpiryDate && Number(model.amount) <= 0) {
+  if (model.movementType !== 'CLOSE' && model.movementType !== 'REOPEN' && !isAmendExpiryDate && !isMonetaryAmendment && Number(model.amount) <= 0) {
     return 'Amount must be greater than 0.';
+  }
+  if (isMonetaryAmendment && amountWasEntered && Number(model.amount) < 0) {
+    return 'Amount must not be negative; use Increase or Decrease to choose the direction.';
   }
   // User-directed 2026-08-28 ("Tolerance MUST >= 0") — mirrors the microservice's own
   // BalanceService.assertToleranceNonNegative(); empty/absent is untouched (Tolerance stays optional even
   // where applicable, see builder-fields.ts's own tolerancePct field) — this only rejects a typed negative.
   if (toleranceApplicable(model) && model.tolerancePct != null && model.tolerancePct !== '' && Number(model.tolerancePct) < 0) {
     return 'Tolerance % must not be negative.';
+  }
+  if (toleranceApplicable(model) && model.tolerancePct != null && model.tolerancePct !== '' && !/^\d+$/.test(String(model.tolerancePct))) {
+    return 'Tolerance % must be a whole number.';
+  }
+  if (isMonetaryAmendment && model.toleranceChangePct != null && model.toleranceChangePct !== '' && Number(model.toleranceChangePct) < 0) {
+    return 'Tolerance Change % must not be negative.';
+  }
+  if (isMonetaryAmendment && model.toleranceChangePct != null && model.toleranceChangePct !== '' && !/^\d+$/.test(String(model.toleranceChangePct))) {
+    return 'Tolerance Change % must be a whole number.';
+  }
+  if (isMonetaryAmendment && toleranceDirection === 'DECREASE' && model.toleranceChangePct != null && model.toleranceChangePct !== '' && !resultingTolerancePct(ctx.selectedContract?.tolerancePct ?? '0', model.toleranceChangePct, toleranceDirection).ok) {
+    return `Decrease Tolerance cannot exceed the current Tolerance of ${ctx.selectedContract?.tolerancePct ?? '0'}%.`;
+  }
+  if (isMonetaryAmendment) {
+    const amountChanged = amountWasEntered && Number(model.amount) !== 0;
+    const toleranceWasEntered = model.toleranceChangePct != null && String(model.toleranceChangePct).trim() !== '';
+    const toleranceChanged = toleranceWasEntered && Number(model.toleranceChangePct) !== 0;
+    if (!amountChanged && !toleranceChanged) {
+      return 'Enter an Amount change, a Tolerance change, or both.';
+    }
   }
   return null;
 }
@@ -312,17 +339,22 @@ export function validateSubmit(ctx: SubmitRulesContext): SubmitValidation {
  */
 export function buildSubmitRequest(ctx: SubmitRulesContext): { request: CreateMovementRequest | null; error: string | null } {
   const { model, selectedFunction } = ctx;
+  const isMonetaryAmendment = ['AMEND_INCREASE', 'AMEND_DECREASE', 'AMEND'].includes(model.movementType ?? '');
+  const toleranceDirection = amendmentDirection(model.movementType, ctx.amendDirection);
   const strategy = selectedFunction ? deriveFunctionStrategy(selectedFunction) : null;
   // F1 — AMEND_EXPIRY_DATE's own Amount is always '0' by construction, regardless of whatever
   // model.amount currently holds (the field is hidden — see builder-fields.ts's own isAmendExpiryDate).
+  const typedAmount = model.amount == null || String(model.amount).trim() === '' ? 0 : Number(model.amount);
   const wireAmount =
     model.movementType === 'AMEND_EXPIRY_DATE'
       ? '0'
       : selectedFunction?.subChoice?.key === 'amendDirection'
         ? ctx.amendDirection === 'DECREASE'
-          ? String(-Math.abs(Number(model.amount)))
-          : String(Math.abs(Number(model.amount)))
-        : String(model.amount);
+          ? String(-Math.abs(typedAmount))
+          : String(Math.abs(typedAmount))
+        : ['AMEND_INCREASE', 'AMEND_DECREASE'].includes(model.movementType ?? '')
+          ? String(typedAmount)
+          : String(model.amount);
   const request: CreateMovementRequest = {
     instrumentType: model.instrumentType!,
     movementType: model.movementType!,
@@ -331,7 +363,13 @@ export function buildSubmitRequest(ctx: SubmitRulesContext): { request: CreateMo
     currency: model.currency!,
     createdBy: model.createdBy!,
   };
-  if (toleranceApplicable(model) && model.tolerancePct) request.tolerancePct = String(model.tolerancePct);
+  if (!isMonetaryAmendment && toleranceApplicable(model) && model.tolerancePct != null && String(model.tolerancePct).trim() !== '') {
+    request.tolerancePct = String(model.tolerancePct);
+  }
+  if (isMonetaryAmendment && model.toleranceChangePct != null && String(model.toleranceChangePct).trim() !== '') {
+    request.toleranceChangePct = String(model.toleranceChangePct);
+    request.toleranceChangeDirection = toleranceDirection;
+  }
   if (model.secondaryRef) request.sourceTransactionRef = model.secondaryRef;
   if (selectedFunction?.tenorTypeOptions?.length) {
     request.tenorType = model.tenorType;

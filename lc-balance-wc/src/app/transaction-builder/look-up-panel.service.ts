@@ -5,6 +5,8 @@ import { InstrumentType, TransactionFunction, defaultLcInstrumentTypeForSide } f
 import { describeApiError } from './api-error';
 import { InquiredEvent, childMovementsOf$, functionForEvent, mergeAccountingEventRows, movementsOf$, primaryReferenceForEvent, secondaryReferenceForEvent, systemLabelForEvent } from './inquire-events.service';
 import { PagedListState } from './paged-list-state';
+import type { PendingAmendmentDisplay } from './balance-snapshot-box.component';
+import { amendmentDirection, resultingTolerancePct } from './tolerance-change';
 
 /**
  * Owns the "Look Up Current Balance" panel's own search criteria, results (LC/Acceptance/SG tabs), and
@@ -106,6 +108,47 @@ export class LookUpPanelService {
     if (this.lookupTab === 'ACCEPTANCE') return this.selectedLookupAcceptance;
     if (this.lookupTab === 'SG') return this.selectedLookupSg;
     return this.lookupResult?.contract ?? null;
+  }
+
+  /**
+   * Current Balance companion rows for every pending A2/B2 amendment on the active ledger. Keeping all
+   * rows (rather than selecting the latest one) is important because one LC may legitimately carry
+   * several independently referenced pending amendments.
+   */
+  get activeDisplayedAmendments(): readonly PendingAmendmentDisplay[] {
+    const all = this.activeLookupMovements.filter((event) => ['AMEND_INCREASE', 'AMEND_DECREASE', 'AMEND'].includes(event.movement.movementType));
+    const pending = all.filter((event) => event.eventStatus === 'PENDING');
+    const latestReleased = [...all].reverse().find((event) => event.eventStatus === 'RELEASED');
+    const displayed = pending.length ? pending : latestReleased ? [latestReleased] : [];
+    return displayed.map((event) => {
+        const movement = event.movement;
+        let toleranceBeforePct = '0';
+        for (const candidate of this.activeLookupMovements) {
+          if (candidate.movement.movementId === movement.movementId && candidate.phase === event.phase) break;
+          if (candidate.eventStatus !== 'RELEASED' || candidate.movement.balanceContractId !== movement.balanceContractId) continue;
+          if (candidate.movement.movementType === 'ISSUE' || ['AMEND_INCREASE', 'AMEND_DECREASE', 'AMEND'].includes(candidate.movement.movementType)) {
+            toleranceBeforePct = candidate.movement.tolerancePct ?? toleranceBeforePct;
+          }
+        }
+        const balanceEffect =
+          movement.movementType === 'AMEND_DECREASE' && Number(movement.ceilingAmount) !== 0
+            ? movement.ceilingAmount.startsWith('-')
+              ? movement.ceilingAmount.slice(1)
+              : `-${movement.ceilingAmount}`
+            : movement.ceilingAmount;
+        const pendingResult = resultingTolerancePct(
+          movement.tolerancePct ?? toleranceBeforePct,
+          movement.toleranceChangePct ?? '0',
+          amendmentDirection(movement.movementType, movement.toleranceChangeDirection ?? null),
+        );
+        return {
+          reference: movement.sourceTransactionRef ?? null,
+          balanceEffect,
+          toleranceBeforePct,
+          toleranceAfterPct: event.eventStatus === 'PENDING' && movement.toleranceChangePct != null && pendingResult.ok ? pendingResult.value : (movement.tolerancePct ?? null),
+          isPending: event.eventStatus === 'PENDING',
+        };
+      });
   }
 
   /** Delegates to the same `functionForEvent()` free function `InquireEventsService.functionFor()` uses, so both screens resolve the Function badge identically by construction. */

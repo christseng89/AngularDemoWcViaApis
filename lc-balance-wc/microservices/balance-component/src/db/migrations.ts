@@ -685,6 +685,24 @@ export const MIGRATIONS: Migration[] = [
       )`);
     },
   },
+  {
+    id: 24,
+    description:
+      'Capture the tolerance proposed by each ISSUE/monetary amendment on balance_movements so Checker Release can atomically make the latest tolerance effective and stale pending amendments can be revalidated.',
+    up: (db) => {
+      const columns = (db.prepare('PRAGMA table_info(balance_movements)').all() as { name: string }[]).map((c) => c.name);
+      if (!columns.includes('tolerance_pct')) db.exec('ALTER TABLE balance_movements ADD COLUMN tolerance_pct TEXT');
+    },
+  },
+  {
+    id: 25,
+    description: 'Persist amendment-only tolerance change magnitude and direction alongside the protected resulting tolerance.',
+    up: (db) => {
+      const columns = (db.prepare('PRAGMA table_info(balance_movements)').all() as { name: string }[]).map((c) => c.name);
+      if (!columns.includes('tolerance_change_pct')) db.exec('ALTER TABLE balance_movements ADD COLUMN tolerance_change_pct TEXT');
+      if (!columns.includes('tolerance_change_direction')) db.exec("ALTER TABLE balance_movements ADD COLUMN tolerance_change_direction TEXT CHECK (tolerance_change_direction IS NULL OR tolerance_change_direction IN ('INCREASE','DECREASE'))");
+    },
+  },
 ];
 
 export function runMigrations(db: DatabaseSync): void {

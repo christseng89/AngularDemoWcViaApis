@@ -14,6 +14,11 @@
 import type { Db } from '../db';
 import type { AccountEntry, BalanceMovement, BalanceSnapshot, ContingentAccountEntry, ExposureNature, MovementStatus, MovementWarning } from '../types';
 
+/** One canonical SQL-JSON boundary for the four nullable snapshot columns. */
+function serializeNullableSnapshot(snapshot: BalanceSnapshot | null): string | null {
+  return snapshot === null ? null : JSON.stringify(snapshot);
+}
+
 interface MovementRow {
   movement_id: string;
   balance_contract_id: string;
@@ -23,6 +28,9 @@ interface MovementRow {
   exposure_nature: ExposureNature;
   amount: string;
   ceiling_amount: string;
+  tolerance_pct: string | null;
+  tolerance_change_pct: string | null;
+  tolerance_change_direction: 'INCREASE' | 'DECREASE' | null;
   currency: string;
   leg_ref: string | null;
   account_entries: string | null;
@@ -79,6 +87,9 @@ function rowToMovement(row: MovementRow): BalanceMovement {
     exposureNature: row.exposure_nature,
     amount: row.amount,
     ceilingAmount: row.ceiling_amount,
+    tolerancePct: row.tolerance_pct,
+    toleranceChangePct: row.tolerance_change_pct,
+    toleranceChangeDirection: row.tolerance_change_direction,
     currency: row.currency,
     legRef: row.leg_ref,
     accountEntries: row.account_entries ? (JSON.parse(row.account_entries) as AccountEntry[]) : null,
@@ -141,7 +152,7 @@ export class BalanceMovementStore {
         .prepare(
           `INSERT INTO balance_movements (
             movement_id, balance_contract_id, event_seq, business_event_id, movement_type,
-            exposure_nature, amount, ceiling_amount, currency, leg_ref, account_entries,
+            exposure_nature, amount, ceiling_amount, tolerance_pct, tolerance_change_pct, tolerance_change_direction, currency, leg_ref, account_entries,
             contingent_account_entry,
             lmts_reservation_id, status, reversal_of_movement_id,
             reason_code, remarks, new_expiry_date, transaction_date, business_date, value_date,
@@ -152,7 +163,7 @@ export class BalanceMovementStore {
             amendment_approved, amendment_effective, consent_status
           ) VALUES (
             @movementId, @balanceContractId, @eventSeq, @businessEventId, @movementType,
-            @exposureNature, @amount, @ceilingAmount, @currency, @legRef, @accountEntries,
+            @exposureNature, @amount, @ceilingAmount, @tolerancePct, @toleranceChangePct, @toleranceChangeDirection, @currency, @legRef, @accountEntries,
             @contingentAccountEntry,
             @lmtsReservationId, @status, @reversalOfMovementId,
             @reasonCode, @remarks, @newExpiryDate, @transactionDate, @businessDate, @valueDate,
@@ -172,6 +183,9 @@ export class BalanceMovementStore {
           exposureNature: movement.exposureNature,
           amount: movement.amount,
           ceilingAmount: movement.ceilingAmount,
+          tolerancePct: movement.tolerancePct ?? null,
+          toleranceChangePct: movement.toleranceChangePct ?? null,
+          toleranceChangeDirection: movement.toleranceChangeDirection ?? null,
           currency: movement.currency,
           legRef: movement.legRef ?? null,
           accountEntries: movement.accountEntries ? JSON.stringify(movement.accountEntries) : null,
@@ -454,6 +468,8 @@ export class BalanceMovementStore {
   updateStatus(params: {
     movementId: string;
     status: MovementStatus;
+    /** Present only when Release activates an Amendment's calculated final Tolerance. */
+    tolerancePct?: string | null;
     /**
      * Bug fix (BA code-review finding ahead of Balance-Component-DeletePending-TestPlan-zh.md §8 step 3,
      * defect registered under that document's own §0.3 Test Governance Rule) — COALESCE(@releasedBy,
@@ -538,6 +554,7 @@ export class BalanceMovementStore {
       .prepare(
         `UPDATE balance_movements
          SET status = @status,
+             tolerance_pct = CASE WHEN @hasTolerancePct = 1 THEN @tolerancePct ELSE tolerance_pct END,
              released_by = COALESCE(@releasedBy, released_by), released_at = COALESCE(@releasedAt, released_at),
              reason_code = COALESCE(@reasonCode, reason_code), remarks = @remarks,
              balance_before = @balanceBefore, balance_after = @balanceAfter,
@@ -554,6 +571,8 @@ export class BalanceMovementStore {
       .run({
         movementId: params.movementId,
         status: params.status,
+        tolerancePct: params.tolerancePct ?? null,
+        hasTolerancePct: 'tolerancePct' in params ? 1 : 0,
         releasedBy: params.releasedBy ?? null,
         releasedAt: params.releasedAt ?? null,
         reasonCode: params.reasonCode ?? null,
@@ -621,6 +640,9 @@ export class BalanceMovementStore {
     exposureNature: ExposureNature;
     amount: string;
     ceilingAmount: string;
+    tolerancePct: string | null;
+    toleranceChangePct: string | null;
+    toleranceChangeDirection: 'INCREASE' | 'DECREASE' | null;
     legRef: string | null;
     accountEntries: AccountEntry[] | null;
     contingentAccountEntry: ContingentAccountEntry | null;
@@ -636,6 +658,10 @@ export class BalanceMovementStore {
     amendmentApproved: boolean | null;
     amendmentEffective: string | null;
     consentStatus: string | null;
+    eventSnapshot: BalanceSnapshot;
+    rootEventSnapshot: BalanceSnapshot | null;
+    acceptanceEventSnapshot: BalanceSnapshot | null;
+    sgEventSnapshot: BalanceSnapshot | null;
     createdBy: string;
     createdAt: string;
     editedBy: string;
@@ -645,13 +671,16 @@ export class BalanceMovementStore {
       .prepare(
         `UPDATE balance_movements
          SET business_event_id = @businessEventId, exposure_nature = @exposureNature, amount = @amount,
-             ceiling_amount = @ceilingAmount, leg_ref = @legRef, account_entries = @accountEntries,
+             ceiling_amount = @ceilingAmount, tolerance_pct = @tolerancePct, tolerance_change_pct = @toleranceChangePct,
+             tolerance_change_direction = @toleranceChangeDirection, leg_ref = @legRef, account_entries = @accountEntries,
              contingent_account_entry = @contingentAccountEntry, status = 'PENDING',
              reason_code = @reasonCode, warnings = @warnings, new_expiry_date = @newExpiryDate,
              transaction_date = @transactionDate, business_date = @businessDate, value_date = @valueDate,
              source_module = @sourceModule, source_function = @sourceFunction,
              referenced_transaction_id = @referencedTransactionId, amendment_approved = @amendmentApproved,
              amendment_effective = @amendmentEffective, consent_status = @consentStatus,
+             event_snapshot = @eventSnapshot, root_event_snapshot = @rootEventSnapshot,
+             acceptance_event_snapshot = @acceptanceEventSnapshot, sg_event_snapshot = @sgEventSnapshot,
              created_by = @createdBy, created_at = @createdAt, edited_by = @editedBy, edited_at = @editedAt
          WHERE movement_id = @movementId`,
       )
@@ -661,6 +690,9 @@ export class BalanceMovementStore {
         exposureNature: params.exposureNature,
         amount: params.amount,
         ceilingAmount: params.ceilingAmount,
+        tolerancePct: params.tolerancePct,
+        toleranceChangePct: params.toleranceChangePct,
+        toleranceChangeDirection: params.toleranceChangeDirection,
         legRef: params.legRef,
         accountEntries: params.accountEntries ? JSON.stringify(params.accountEntries) : null,
         contingentAccountEntry: params.contingentAccountEntry ? JSON.stringify(params.contingentAccountEntry) : null,
@@ -676,6 +708,10 @@ export class BalanceMovementStore {
         amendmentApproved: params.amendmentApproved === null ? null : params.amendmentApproved ? 1 : 0,
         amendmentEffective: params.amendmentEffective,
         consentStatus: params.consentStatus,
+        eventSnapshot: JSON.stringify(params.eventSnapshot),
+        rootEventSnapshot: serializeNullableSnapshot(params.rootEventSnapshot),
+        acceptanceEventSnapshot: serializeNullableSnapshot(params.acceptanceEventSnapshot),
+        sgEventSnapshot: serializeNullableSnapshot(params.sgEventSnapshot),
         createdBy: params.createdBy,
         createdAt: params.createdAt,
         editedBy: params.editedBy,

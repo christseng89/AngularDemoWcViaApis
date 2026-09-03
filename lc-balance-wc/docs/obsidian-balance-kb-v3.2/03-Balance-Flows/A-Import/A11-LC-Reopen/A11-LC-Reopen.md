@@ -68,7 +68,7 @@ tags:
 
 - **Business Decision（業務決策）**：A11/B7 的設計於 F1 提案上線當天（2026-08-25）經歷了完整的重新設計過程，本節依 `balance-component-api.yaml` 自身的變更記錄逐版摘要，供理解「為何是現在這個形狀」：
   - **v1.19.0（原始設計，已被取代）**：REOPEN 本身是零金額移動（`MOVEMENT_DIRECTION.REOPEN` 曾經是 `0`），真正的餘額復原透過 Release 時額外產生一筆或多筆獨立的 `REVERSAL` 移動作為副作用。現場 UAT 發現此設計的兩個問題：(a) Checker 核准 REOPEN 當下看到的是一筆零金額、無分錄的移動，看不到真實影響（"REOPEN Submit 出 Account Entries (Pending)... 不應該有兩筆"）；(b) Inquire Events/Look Up 對「概念上同一個業務事件」顯示成兩筆獨立記錄。
-  - **v1.20.0（2026-08-25，同日重新設計，現行行為）**：REOPEN 改為在 Maker Submit 當下就由伺服端計算出真實、正數的復原金額（`domain/reopenRestoration.ts` 的 `computeReopenRestoreAmount()`），同時產生真實的 `contingentAccountEntry`，讓 Checker 在核准**之前**就能檢視實際的 Dr/Cr 分錄與金額；`MOVEMENT_DIRECTION.REOPEN` 同步由 `0` 改為 `1`（與 ISSUE/AMEND_INCREASE 相同的「建立/增加」方向）。REOPEN 自此**不再產生任何 REVERSAL 移動**作為自己的副作用——`REVERSAL` movementType 本身仍然存在，但僅供 Expiry Extension Amendment（`AMEND_EXPIRY_DATE` 作用於 EXPIRED 合約時）自己的復原機制使用，與 REOPEN 完全脫鉤。此為本筆記描述的**現行、最終行為**，已直接讀取 `domain/reopenRestoration.ts`（全文）、`domain/balanceDerivation.ts:56`（`REOPEN: 1`）核實。CONFIRMED。
+  - **v1.20.0（2026-08-25，同日重新設計，現行行為）**：REOPEN 改為在 Maker Submit 當下就由伺服端計算出真實、正數的復原金額（`domain/reopenRestoration.ts` 的 `computeReopenRestoreAmount()`），同時產生真實的 `contingentAccountEntry`，讓 Checker 在核准**之前**就能檢視實際的 Dr/Cr 分錄與金額；`MOVEMENT_DIRECTION.REOPEN` 同步由 `0` 改為 `1`。REOPEN 自此不再產生任何 REVERSAL。2026-09-03 起 EXPIRED Expiry Extension 也改為在同一筆 PENDING Amendment 顯示分錄，不另建 REVERSAL；兩者均符合 Checker 先審後核准原則。CONFIRMED。
   - **v1.21.0（同日）**：AUTO EXPIRY/AUTO CLOSE 新增「跳過最近被 Reopen 的合約一個掃描週期」防護（見 [[STATUS-RULE-034]]）。
   - **v1.23.0（同日）**：修正 Expiry Extension Amendment 路徑上的一個「雙重復原」實際重現的線上 bug（見 [[MOVEMENT-RULE-066]] 的驗證說明）。
   - **v1.24.0（同日）**：新增 Auto Close Grace Period（見 [[STATUS-RULE-033]]）與強制 `reasonCode`（見 [[MAKER-CHECKER-RULE-059]]）。
@@ -124,7 +124,7 @@ flowchart TD
 相關業務規則：
 - [[MOVEMENT-RULE-064]] — REOPEN 復原金額由 `computeReopenRestoreAmount()` 在 Submit 時伺服端計算，反轉整條尚未反轉的 RELEASED EXPIRE/CLOSE 沖銷鏈，非僅最後一筆
 - [[MOVEMENT-RULE-065]] — `MOVEMENT_DIRECTION.REOPEN = 1`，REOPEN 直接以自身簽署金額建立餘額，2026-08-25 起不再產生任何 REVERSAL 副作用
-- [[MOVEMENT-RULE-066]] — `REVERSAL` 為動態方向（反轉其指向移動的固定方向），現行僅供 Expiry Extension Amendment 自身復原使用，REOPEN 不再使用
+- [[MOVEMENT-RULE-066]] — 動態反轉方向；EXPIRED Extension 在同一筆 PENDING Amendment 上使用，REOPEN 不使用且不另建 REVERSAL
 - [[MOVEMENT-RULE-067]] — CLOSE/EXPIRE/REOPEN 共用的「0 合法、負數拒絕」金額校驗豁免
 - [[MOVEMENT-RULE-063]] — EXPIRE 資格判定刻意不比照 CLOSE 的 SG/Acceptance 餘額歸零條件（REOPEN 復原鏈的上游事件）
 - [[STATUS-RULE-032]] — REOPEN 對合約狀態的重啟規則：CLOSED → ACTIVE（原到期日未到）或 EXPIRED（已到）

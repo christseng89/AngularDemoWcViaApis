@@ -106,6 +106,8 @@ export class CatalogPickerService {
     qualifies?: () => number;
     /** Override for a non-Maker-action caller. Omitted defaults to `'ACTIVE'`; pass `null` explicitly to request NO status filter (every status a legitimate candidate — e.g. a read-only inquiry browse). */
     status?: string | null;
+    /** Multi-status action filter; used by AMEND_EXPIRY_DATE to offer ACTIVE and EXPIRED contracts only. */
+    statuses?: string[];
     /** Override for a non-Maker-action caller; defaults to `true`. */
     requireIssueReleased?: boolean;
     /** Override HTTP q; null fetches all rows while `search` remains available for client-side multi-column filtering. */
@@ -124,8 +126,20 @@ export class CatalogPickerService {
     // BalanceComponentApiService.catalog()'s own doc comment for why this is opt-in.
     const status = args.status === undefined ? 'ACTIVE' : (args.status ?? undefined);
     const requireIssueReleased = args.requireIssueReleased ?? true;
-    this.api
-      .catalog(
+    const request = args.statuses?.length
+      ? this.api.catalog(
+          args.instrumentType,
+          undefined,
+          args.query === undefined ? this.search || undefined : (args.query ?? undefined),
+          1,
+          this.fetchSize,
+          args.lcNumber,
+          args.tenorFamily,
+          requireIssueReleased,
+          undefined,
+          args.statuses,
+        )
+      : this.api.catalog(
         args.instrumentType,
         status,
         args.query === undefined ? this.search || undefined : (args.query ?? undefined),
@@ -134,8 +148,8 @@ export class CatalogPickerService {
         args.lcNumber,
         args.tenorFamily,
         requireIssueReleased,
-      )
-      .subscribe({
+      );
+    request.subscribe({
         next: (result) => {
           this.contracts = result.items;
           this.total = args.qualifies ? args.qualifies() : result.items.length;

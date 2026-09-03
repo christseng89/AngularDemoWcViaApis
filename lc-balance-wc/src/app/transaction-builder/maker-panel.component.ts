@@ -56,6 +56,7 @@ import { BalanceSnapshotBoxComponent } from './balance-snapshot-box.component';
 import { MakerBalanceWarningsComponent } from './maker-balance-warnings.component';
 import { deriveMakerBalanceWarnings } from './maker-balance-warning.policy';
 import { MonetaryAmountPipe } from './monetary-amount.pipe';
+import { parseAmountShorthand } from './amount-shorthand';
 
 /**
  * The fields `TransactionBuilderComponent.buildCheckerActionContext()` needs from this panel's own
@@ -364,6 +365,15 @@ export class MakerPanelComponent implements OnChanges {
     });
   }
 
+  /**
+   * A2/B2 already establish their target through the Amendment index before the entry form opens.
+   * Repeating the LC Number above Direction adds no actionable information there; the selected
+   * contract remains locked in component state and is still used for validation/request building.
+   */
+  get showProtectedTransactionIdentity(): boolean {
+    return this.naturalKeyLocked && this.selectedFunction?.code !== 'A2' && this.selectedFunction?.code !== 'B2';
+  }
+
   get balanceWarningMessages(): string[] {
     const snapshot = this.selectedContractSnapshot;
     if (!snapshot) return [];
@@ -509,6 +519,20 @@ export class MakerPanelComponent implements OnChanges {
   }
   get requiredNaturalKeyFields(): ('ibNumber' | 'sgNumber')[] {
     return policy.requiredNaturalKeyFields(this.model);
+  }
+  /**
+   * A8's SG Number belongs to the new transaction input, not the parent-LC selection screen.
+   * A successful Checker Release resets both selected references, so keep the field hidden until
+   * the Maker picks the parent LC for the next A8. `selectedContract` deliberately remains a valid
+   * signal here because Maker Queue -> Fix Pending reconstructs the existing A8 transaction without
+   * reconstructing `selectedParent` (the SG Number must stay available for that edit flow).
+   */
+  get showCreatingSgNumberInput(): boolean {
+    return this.requiredNaturalKeyFields.includes('sgNumber') && !!(this.selectedParent || this.selectedContract);
+  }
+  /** B3's EB Number follows the same parent-selection lifecycle as A8's SG Number. */
+  get showCreatingIbNumberInput(): boolean {
+    return this.requiredNaturalKeyFields.includes('ibNumber') && !!(this.selectedParent || this.selectedContract);
   }
   get ibNumberLabel(): string {
     return policy.ibNumberLabel(this.activeFunctionSide);
@@ -813,9 +837,10 @@ export class MakerPanelComponent implements OnChanges {
       instrumentType: this.model.instrumentType!,
       tenorFamily: this.selectedFunction?.catalogTenorFilter,
       query: this.selectedFunctionStrategy?.checkerRelease.releasesExistingMovementInPlace ? null : undefined,
-      // A11/B7 (Reopen, F1) only — its own candidates are CLOSED, not ACTIVE like every other flat
-      // Catalog picker this service backs; every other function keeps the default (undefined -> 'ACTIVE').
-      status: this.selectedFunction?.requiresReopenEligibility ? 'CLOSED' : undefined,
+      // A11/B7 targets CLOSED. AMEND_EXPIRY_DATE deliberately spans ACTIVE (ordinary amendment) and
+      // EXPIRED (Expiry Extension); every other flat action keeps the ACTIVE default.
+      status: this.selectedFunction?.requiresReopenEligibility ? 'CLOSED' : this.model.movementType === 'AMEND_EXPIRY_DATE' ? null : undefined,
+      statuses: this.model.movementType === 'AMEND_EXPIRY_DATE' ? ['ACTIVE', 'EXPIRED'] : undefined,
       qualifies: () => this.filteredCatalogContracts.length,
       onLoaded: (items) => {
         // hintsPending — see eligiblePickersLoading's own doc comment for why each of these 5 branches
@@ -1603,6 +1628,7 @@ export class MakerPanelComponent implements OnChanges {
       selectedContractSnapshot: this.selectedContractSnapshot,
       selectedParent: this.selectedParent,
       dynamicSecondaryRefLabel: this.dynamicSecondaryRefLabel,
+      amendDirection: this.amendDirection,
       fixPendingMode: this.fixPendingMode,
     };
   }
@@ -1633,6 +1659,15 @@ export class MakerPanelComponent implements OnChanges {
   /** A7 settlement type is a routing choice; after its Acceptance is selected it is no longer an input field. */
   get showSubChoice(): boolean {
     return !!this.selectedFunction?.subChoice && !(this.selectedFunction.code === 'A7' && this.hasEligibleTargetSelected);
+  }
+
+  /** Once an Amendment target is picked, Direction is identity/context, not another editable input. */
+  get showAmendmentDirectionSummary(): boolean {
+    return (this.selectedFunction?.code === 'A2' || this.selectedFunction?.code === 'B2') && this.naturalKeyLocked && !!this.subChoiceValue;
+  }
+
+  get selectedSubChoiceLabel(): string {
+    return this.selectedFunction?.subChoice?.options.find((option) => option.value === this.subChoiceValue)?.label ?? this.subChoiceValue;
   }
 
   get eligibleCandidateCount(): number {
@@ -1684,7 +1719,8 @@ export class MakerPanelComponent implements OnChanges {
   }
 
   get isSubmitReady(): boolean {
-    return this.hasEligibleTargetSelected && validateSubmitRules(this.submitRulesContext).error === null;
+    const context = this.normalizedSubmitRulesContext();
+    return context !== null && this.hasEligibleTargetSelected && validateSubmitRules(context).error === null;
   }
 
   get displayFields(): FormlyFieldConfig[] {
@@ -1692,6 +1728,18 @@ export class MakerPanelComponent implements OnChanges {
   }
 
   private validateSubmit(): boolean {
+    const amount = this.model.amount;
+    if (amount != null && String(amount).trim() !== '') {
+      const parsed = parseAmountShorthand(amount);
+      if (!parsed.ok) {
+        this.submitError = parsed.error;
+        this.submitErrorCause = null;
+        return false;
+      }
+      // Blur normally performs this normalization. Repeating it here also covers the user typing a
+      // shorthand and immediately pressing Submit before the Amount control has emitted blur.
+      this.model.amount = parsed.value;
+    }
     const { error, patch } = validateSubmitRules(this.submitRulesContext);
     Object.assign(this.model, patch);
     if (error) {
@@ -1700,6 +1748,22 @@ export class MakerPanelComponent implements OnChanges {
       return false;
     }
     return true;
+  }
+
+  /**
+   * Read-only Submit-button validation must understand the same shorthand as the editable Amount
+   * control, without mutating the form merely because Angular ran change detection.
+   */
+  private normalizedSubmitRulesContext(): SubmitRulesContext | null {
+    const amount = this.model.amount;
+    if (amount == null || String(amount).trim() === '') return this.submitRulesContext;
+
+    const parsed = parseAmountShorthand(amount);
+    if (!parsed.ok) return null;
+    return {
+      ...this.submitRulesContext,
+      model: { ...this.model, amount: parsed.value },
+    };
   }
 
   private get submitRulesContext(): SubmitRulesContext {
@@ -1997,6 +2061,7 @@ export class MakerPanelComponent implements OnChanges {
    */
   private static readonly FIX_PENDING_PATCH_FIELDS: readonly Exclude<FixPendingEditableField, 'amount'>[] = [
     'tolerancePct',
+    'toleranceChangePct',
     'tenorType',
     'tenorDays',
     'expiryDate',
@@ -2030,8 +2095,9 @@ export class MakerPanelComponent implements OnChanges {
       // amount's own submit-rules.ts coercion already guards against), which the backend's `EditMovement
       // RequestSchema` (z.string()) rejects with "Expected string, received number". tenorDays is the
       // one other numeric field here, but its own schema genuinely expects z.number() — left uncoerced.
-      patch[field] = field === 'tolerancePct' && value != null ? String(value) : (value ?? null);
+      patch[field] = (field === 'tolerancePct' || field === 'toleranceChangePct') && value != null ? String(value) : (value ?? null);
     }
+    if (patch['toleranceChangePct'] != null) patch['toleranceChangeDirection'] = this.amendDirection;
     this.submitError = null;
     this.submitErrorCause = null;
     this.fixPendingRequested.emit(patch as Record<string, unknown> & { movementId: string });

@@ -76,7 +76,7 @@ export interface SelectionFlowStrategy {
  * them for every Function unconditionally, so the type system rules out a Function ever declaring one
  * editable, rather than relying on every Function's own config to correctly omit them.
  */
-export type FixPendingEditableField = 'amount' | 'tolerancePct' | 'tenorType' | 'tenorDays' | 'expiryDate' | 'newExpiryDate' | 'reasonCode' | 'remarks';
+export type FixPendingEditableField = 'amount' | 'tolerancePct' | 'toleranceChangePct' | 'tenorType' | 'tenorDays' | 'expiryDate' | 'newExpiryDate' | 'reasonCode' | 'remarks';
 export type FixPendingMode = 'STANDARD' | 'REMARKS_ONLY';
 
 export type MakerResultSiblingKey =

@@ -57,7 +57,7 @@ function setup() {
     movements,
     lifecycle,
     commands,
-    service: new MovementReleaseSideEffectService(contracts, movements, lifecycle, commands, () => 777),
+    service: new MovementReleaseSideEffectService(contracts, movements, lifecycle, commands),
   };
 }
 
@@ -86,6 +86,17 @@ describe('MovementReleaseSideEffectService standard effects', () => {
     service.applyStandard(movement('CREATE', { referencedTransactionId: 'a3' }), contract('IPLC_ACCEPTANCE'), 'checker1', '2026-01-02');
 
     expect(commands.release).toHaveBeenCalledWith('a3', 'checker1');
+  });
+
+  it('does not apply a referenced effect when the persisted reference cannot be resolved', () => {
+    const { service, contracts, movements, commands } = setup();
+    jest.mocked(movements.findById).mockReturnValue(undefined);
+
+    service.applyStandard(movement('HONOUR', { referencedTransactionId: 'missing' }), contract('EPLC_CONFIRMATION'), 'checker1', '2026-01-02');
+
+    expect(contracts.findById).not.toHaveBeenCalled();
+    expect(movements.markPresentDocsConsumed).not.toHaveBeenCalled();
+    expect(commands.release).not.toHaveBeenCalled();
   });
 
   it('applies Close, Expire and both Reopen target statuses', () => {
@@ -141,39 +152,17 @@ describe('MovementReleaseSideEffectService expiry amendment', () => {
     ).toThrow('not yet fully resolved');
   });
 
-  it('creates and releases a REVERSAL only when RELEASED EXPIRE is the trailing event', () => {
+  it('reactivates an EXPIRED extension without creating an unseen linked REVERSAL at Release', () => {
     const { service, contracts, movements, commands } = setup();
     const expired = contract('IPLC_LC', { status: 'EXPIRED' });
     const expire = movement('EXPIRE', { movementId: 'expire', eventSeq: 2 });
-    const amendment = movement('AMEND_EXPIRY_DATE', { movementId: 'amend', eventSeq: 3, newExpiryDate: '2026-03-01', businessEventId: 'event-1' });
+    const amendment = movement('AMEND_EXPIRY_DATE', { movementId: 'amend', eventSeq: 3, newExpiryDate: '2026-03-01', reversalOfMovementId: 'expire' });
     jest.mocked(movements.listByContract).mockReturnValue([movement('ISSUE', { eventSeq: 1 }), expire, amendment]);
-    jest.mocked(contracts.findById).mockReturnValue(expired);
-    jest.mocked(commands.createMovement).mockReturnValue({ created: true, movement: movement('REVERSAL', { movementId: 'reversal' }) });
 
     service.applyExpiryAmendment(amendment, expired, 'checker', '2026-01-02');
 
-    expect(commands.createMovement).toHaveBeenCalledWith(
-      expect.objectContaining({
-        movementType: 'REVERSAL',
-        eventSeq: 777,
-        reversalOfMovementId: 'expire',
-        businessEventId: 'event-1',
-      }),
-    );
-    expect(commands.release).toHaveBeenCalledWith('reversal', 'checker');
-    expect(contracts.reactivate).toHaveBeenCalledWith('contract-1', 'ACTIVE', '2026-01-02', '2026-03-01');
-  });
-
-  it('reports a REVERSAL idempotency conflict and does not release it', () => {
-    const { service, contracts, movements, commands } = setup();
-    const expired = contract('IPLC_LC', { status: 'EXPIRED' });
-    const expire = movement('EXPIRE', { movementId: 'expire', eventSeq: 1 });
-    const amendment = movement('AMEND_EXPIRY_DATE', { movementId: 'amend', eventSeq: 2, newExpiryDate: '2026-03-01' });
-    jest.mocked(movements.listByContract).mockReturnValue([expire, amendment]);
-    jest.mocked(contracts.findById).mockReturnValue(expired);
-    jest.mocked(commands.createMovement).mockReturnValue({ created: false, existing: movement('REVERSAL') });
-
-    expect(() => service.applyExpiryAmendment(amendment, expired, 'checker', '2026-01-02')).toThrow('Unexpected idempotency conflict');
+    expect(commands.createMovement).not.toHaveBeenCalled();
     expect(commands.release).not.toHaveBeenCalled();
+    expect(contracts.reactivate).toHaveBeenCalledWith('contract-1', 'ACTIVE', '2026-01-02', '2026-03-01');
   });
 });

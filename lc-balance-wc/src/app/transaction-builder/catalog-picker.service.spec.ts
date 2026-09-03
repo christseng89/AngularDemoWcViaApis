@@ -45,6 +45,27 @@ describe('CatalogPickerService — load() status/requireIssueReleased override (
     expect(catalogSpy).toHaveBeenCalledWith('IPLC_LC', 'CLOSED', undefined, 1, 100, undefined, undefined, true);
   });
 
+  it('passes a multi-status filter for actions that legitimately target more than one lifecycle state', () => {
+    const catalogSpy = jest.fn(() => of({ items: [], total: 0, page: 1, pageSize: 100 }));
+    const api = { catalog: catalogSpy } as unknown as BalanceComponentApiService;
+    const svc = new CatalogPickerService(100, api);
+
+    svc.load({ guardFails: false, instrumentType: 'IPLC_LC', status: null, statuses: ['ACTIVE', 'EXPIRED'] });
+
+    expect(catalogSpy).toHaveBeenCalledWith('IPLC_LC', undefined, undefined, 1, 100, undefined, undefined, true, undefined, ['ACTIVE', 'EXPIRED']);
+  });
+
+  it('honors an explicit query override alongside a multi-status filter', () => {
+    const catalogSpy = jest.fn(() => of({ items: [], total: 0, page: 1, pageSize: 100 }));
+    const api = { catalog: catalogSpy } as unknown as BalanceComponentApiService;
+    const svc = new CatalogPickerService(100, api);
+    svc.search = 'ignored-when-query-set';
+
+    svc.load({ guardFails: false, instrumentType: 'IPLC_LC', status: null, statuses: ['ACTIVE', 'EXPIRED'], query: 'LC-Q' });
+
+    expect(catalogSpy).toHaveBeenCalledWith('IPLC_LC', undefined, 'LC-Q', 1, 100, undefined, undefined, true, undefined, ['ACTIVE', 'EXPIRED']);
+  });
+
   it('supports a null query override for a client-side multi-column index', () => {
     const catalogSpy = jest.fn(() => of({ items: [], total: 0, page: 1, pageSize: 100 }));
     const api = { catalog: catalogSpy } as unknown as BalanceComponentApiService;

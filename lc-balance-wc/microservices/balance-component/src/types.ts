@@ -160,8 +160,22 @@ export interface BalanceMovement {
   exposureNature: ExposureNature;
   /** Face-level amount as typed by the caller — see ceilingAmount for the §6.2-converted figure. */
   amount: string;
-  /** §6.2 — amount × (1+tolerancePct/100) for IPLC_LC/EPLC_LC ISSUE/AMEND_*, else equal to amount. */
+  /**
+   * ISSUE: face amount converted to the upper limit. Monetary amendment:
+   * the balance effect needed to move the previous upper limit to the newly
+   * recalculated upper limit (stored inverse-signed for AMEND_DECREASE because
+   * that movement type already carries a -1 direction). Other events: amount.
+   */
   ceilingAmount: string;
+  /**
+   * Tolerance proposed/captured by this event. For a monetary amendment this
+   * is the latest applicable tolerance that becomes the contract tolerance
+   * only on Checker Release. AMEND_EXPIRY_DATE must always leave it null.
+   */
+  tolerancePct?: string | null;
+  /** Amendment-only audit magnitude entered by the Maker; tolerancePct is the protected result. */
+  toleranceChangePct?: string | null;
+  toleranceChangeDirection?: 'INCREASE' | 'DECREASE' | null;
   currency: string;
   legRef?: string | null;
   accountEntries?: AccountEntry[] | null;

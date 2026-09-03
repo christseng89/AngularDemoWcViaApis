@@ -1,12 +1,12 @@
 ---
 knowledge_id: MOVEMENT-RULE-066
-title: "REVERSAL 方向為動態解析（反轉其指向移動的固定方向），現行僅供 Expiry Extension Amendment 自身復原使用，REOPEN 自 2026-08-25 起不再使用"
+title: "動態反轉方向：REVERSAL 與 EXPIRED AMEND_EXPIRY_DATE 皆以 reversalOfMovementId 解析"
 domain: Balance
 category: Business Rule
 status: CONFIRMED
-source_repository: Balance Component (lc-balance)
+source_repository: Balance Component (lc-balance-wc)
 last_verified_commit: "N/A — no .git history in the analyzed snapshot, see [[Source-to-Knowledge-Map]]"
-snapshot_date: 2026-08-26
+snapshot_date: 2026-09-03
 tags:
   - balance
   - movement
@@ -14,39 +14,40 @@ tags:
   - confirmed
 ---
 
-# MOVEMENT-RULE-066 — REVERSAL 方向為動態解析（反轉其指向移動的固定方向），現行僅供 Expiry Extension Amendment 自身復原使用，REOPEN 自 2026-08-25 起不再使用
+# MOVEMENT-RULE-066 — 動態反轉方向：REVERSAL 與 EXPIRED AMEND_EXPIRY_DATE 皆以 reversalOfMovementId 解析
 
 ## Status
 CONFIRMED
 
 ## Business Rule
-`REVERSAL` 是 F1 新增的 movementType，其 `reversalOfMovementId` 欄位早在 schema v1.0.0 就已存在但從未被任何端點真正填入，直至 F1 才第一次被實際使用。與其他 movementType 不同，`REVERSAL` **沒有**固定的 `MOVEMENT_DIRECTION` 表項——其方向是動態解析：取得 `reversalOfMovementId` 指向的原始移動的固定方向後，將其反轉（`domain/contingentAccountEntry.ts` 的 `deriveContingentAccountEntry()` 以 `reversedDirection` 參數接收呼叫端已解析好的原始方向並取負；`domain/balanceDerivation.ts` 的 `signedAmount()` 對餘額計算做相同的動態反轉）。永遠只在服務內部產生，從未有外部呼叫端可直接提交（`reversalShaped` 校驗要求 `reversalOfMovementId` 必須指向同一合約上一筆真實存在、狀態為 RELEASED、且尚未被反轉過的移動，金額必須與被反轉移動的 `ceilingAmount` 完全相等）。目前唯一仍在使用 `REVERSAL` 的業務流程是 **Expiry Extension Amendment**（`AMEND_EXPIRY_DATE` 作用於 EXPIRED 合約時）——Release 時由 `createAndReleaseReversal()` 針對該合約自身最近一筆 RELEASED `EXPIRE` 產生一筆連結的 REVERSAL，恢復被 EXPIRE 沖銷掉的 Confirmed Balance。**REOPEN 不再使用 REVERSAL**（v1.20.0 重新設計後，見 [[MOVEMENT-RULE-065]]），這與 F1 提案文件 §9.3 原始設計（「對當初那筆被沖銷的 CLOSE movement 觸發一筆 REVERSAL」）已不一致——`analysis/Balance-Component-F1-Expire-Proposal-zh.md` 屬提案／決策記錄文件而非即時同步的權威規格，本規則以目前實際程式碼行為（v1.20.0 之後）為準。
+**2026-09-03 現行規則：** 動態方向機制仍存在，但 Expiry Extension 不再於 Checker Release 另生一筆 REVERSAL。伺服器在 Maker Submit 時把 `reversalOfMovementId` 設於同一筆 PENDING `AMEND_EXPIRY_DATE`，指向最後一筆有效的 RELEASED EXPIRE；CANCELLED／REJECTED 嘗試不參與此判斷。Balance 與 Account Entry 推導都反轉該原始方向。Checker 可先審核，Release 才啟用餘額效果。以下 2026-08-26 所述「Extension Release 另生 REVERSAL」為歷史行為，已被取代。
 
-v1.23.0（2026-08-25，同日）曾修正一個現場重現的真實雙重復原 bug：合約可能經由「真正的 EXPIRE」或「REOPEN 重啟回 EXPIRED」兩種路徑到達 EXPIRED 狀態，而 REOPEN 自 v1.20.0 起直接以自身簽署金額復原、不留下任何 REVERSAL 痕跡——Extension Amendment 原本的復原邏輯仍假設「REOPEN 必留下 REVERSAL」這個舊有不變量，因而反覆找到同一筆未被反轉標記的 EXPIRE 並二次反轉它，造成餘額從 10000 誤增為 20000（使用者現場回報："這整個有問題 CLOSE時 餘額10000 REOPEN回復10000 為什麼REVERSAL又回復一次 變成20000餘額?"）。修正後的邏輯改為只看「排除本次 Amendment 自身後，合約自己最近一筆移動是否為 RELEASED 的 EXPIRE」——若是，才是唯一真正需要反轉的對象；若是其他移動（最常見是一筆 REOPEN），代表先前的動作已經完成復原，Extension 不再產生任何 REVERSAL。
+`REVERSAL` 是 F1 新增的 movementType；它沒有固定方向，必須由 `reversalOfMovementId` 指向的原始 movement 取反。現行 EXPIRED Expiry Extension 重用同一套動態方向推導，但不建立另一筆 `REVERSAL`：Maker Submit 將受保護的 reference、EXPIRE `ceilingAmount` 與反向 Account Entries 寫入 PENDING `AMEND_EXPIRY_DATE`。外部仍不能直接提交 `REVERSAL`；REOPEN 也不使用它（見 [[MOVEMENT-RULE-065]]）。
+
+v1.23.0（2026-08-25，同日）曾修正一個現場重現的真實雙重復原 bug：合約可能經由「真正的 EXPIRE」或「REOPEN 重啟回 EXPIRED」兩種路徑到達 EXPIRED 狀態，而 REOPEN 自 v1.20.0 起直接以自身簽署金額復原、不留下任何 REVERSAL 痕跡——Extension Amendment 原本的復原邏輯仍假設「REOPEN 必留下 REVERSAL」這個舊有不變量，因而反覆找到同一筆未被反轉標記的 EXPIRE 並二次反轉它，造成餘額從 10000 誤增為 20000。現行判定只看「排除本次 Amendment 且排除 CANCELLED／REJECTED 稽核嘗試後，最後一筆 RELEASED movement 是否為 EXPIRE」；若是才復原，若是 REOPEN 等其他有效 movement，表示先前動作已完成復原，不得再重複恢復。
 
 ## Conditions
-`movementType === 'REVERSAL'`（`service/balanceService.ts` 的 `reversalShaped` 校驗、`createAndReleaseReversal()` 輔助函式、`release()` 內 `AMEND_EXPIRY_DATE` 對 EXPIRED 合約的分支）
+`movementType === 'REVERSAL'`，或 `movementType === 'AMEND_EXPIRY_DATE' && reversalOfMovementId != null`
 
 ## Result
-`REVERSAL` 僅由 `createAndReleaseReversal()` 內部產生，唯一呼叫來源是 Expiry Extension Amendment 的 Release 端；REOPEN 的 Release 端不再呼叫此輔助函式。
+只有 EXPIRED Extension 的 PENDING Amendment 帶 `reversalOfMovementId` 與恢復分錄；ACTIVE 到期日修改不帶。Checker Release 啟用同一筆 movement，不另建隱藏 movement。
 
 ## Example
-合約 A：真正 EXPIRE 沖銷 10000 → EXPIRED；提交 Expiry Extension Amendment → Release 時偵測到最近一筆移動是 RELEASED EXPIRE → 產生一筆 REVERSAL（金額 10000）→ 恢復餘額、狀態轉 ACTIVE。合約 B：CLOSE 沖銷 10000 → CLOSED；REOPEN 復原 10000（自身簽署金額，無 REVERSAL）→ 若原到期日已過，狀態回到 EXPIRED；此時再提交 Expiry Extension Amendment → Release 時偵測到最近一筆移動是 REOPEN（既非 EXPIRE 也非 CLOSE）→ 不產生任何 REVERSAL，直接恢復 ACTIVE，避免雙重復原。
+合約 A：EXPIRE 沖銷 10000 → EXPIRED；Maker 提交 Extension 時，同一筆 PENDING Amendment 即顯示 10000 的反向 Dr/Cr，餘額仍為 0；Checker Release 後該筆轉 RELEASED、餘額恢復 10000、狀態轉 ACTIVE，事件列表沒有第二筆 REVERSAL。合約 B：ACTIVE 純修改到期日，PENDING Amendment 無 Account Entries，Release 只改日期。
 
 ## Verification Note
-已直接阅读 `domain/balanceDerivation.ts` 第 1-16 行的頂部文件註解（明確記載 REVERSAL 方向動態解析的設計理由）；已直接阅读 `service/balanceService.ts` 的 `reversalShaped`（第 424-436 行）、`createAndReleaseReversal()`（第 2085-2110 行，明確記載「REOPEN (§9) no longer uses this helper」）、`AMEND_EXPIRY_DATE` 對 EXPIRED 合約的 Release 分支（第 2010-2073 行，內含 v1.23.0 修正的完整邏輯與註解）。已由專屬測試直接核實：`test/unit/service/expiryExtensionAndReopen.test.ts:738-772`（「Expiry Extension Amendment after A11 Reopen reactivated the contract to EXPIRED does NOT double-restore the balance」）。亦於 `analysis/balance-component-api.yaml` 自身 v1.23.0 變更記錄（第 649-666 行）中有完整記載。
+2026-09-03 已由 `balanceDerivation.ts`、`contingentAccountEntry.ts`、`balanceService.ts`、`movementReleasePolicyService.ts` 與 `movementReleaseSideEffectService.ts` 交叉核實；專屬測試涵蓋 PENDING 分錄可審、Release 才恢復、無額外 REVERSAL，以及防止重複恢復。
 
 ## Source Evidence
 
 实现:
-- `microservices/balance-component/src/domain/balanceDerivation.ts:1-16`
-- `microservices/balance-component/src/service/balanceService.ts:424-436`
-- `microservices/balance-component/src/service/balanceService.ts:2010-2073`
-- `microservices/balance-component/src/service/balanceService.ts:2085-2110`
+- `microservices/balance-component/src/domain/balanceDerivation.ts`（reference-based direction）
+- `microservices/balance-component/src/domain/contingentAccountEntry.ts`（ACTIVE-null／EXPIRED voucher）
+- `microservices/balance-component/src/service/balanceService.ts`（Submit 只取最後一筆 RELEASED movement）
+- `microservices/balance-component/src/service/movementReleasePolicyService.ts`（Checker 複查 restoration basis）
 
 测试:
-- `microservices/balance-component/test/unit/service/expiryExtensionAndReopen.test.ts:200-224` (Extension 正常路徑的 REVERSAL)
-- `microservices/balance-component/test/unit/service/expiryExtensionAndReopen.test.ts:738-772` (v1.23.0 雙重復原修正)
+- `microservices/balance-component/test/unit/service/expiryExtensionAndReopen.test.ts`（同一筆 PENDING Amendment 復原、cancelled retry、stale basis、無 linked REVERSAL）
 
 ## Related Knowledge
 - [[MOVEMENT-RULE-065]]

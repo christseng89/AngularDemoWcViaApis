@@ -30,6 +30,51 @@ info:
     and called the microservice directly could not evade it).
 
 
+    v1.15.0 (2026-09-03, EXPIRED Expiry Date restoration clarification;
+    no channel wire-shape change): the reference Angular client still calls
+    Microservice API v1.49.0 directly for `AMEND_EXPIRY_DATE`. Its request Amount
+    remains `"0"`; the Microservice persists a protected restoration voucher only
+    for EXPIRED targets and ignores CANCELLED/REJECTED retry attempts when locating
+    the latest RELEASED EXPIRE. This channel façade still has no dedicated Expiry
+    Date command surface; the Microservice OAS is authoritative for that flow.
+
+    v1.14.0 (2026-09-03, Amendment Tolerance change contract): A1/B1
+    `tolerancePct` and A2/B2 `toleranceChangePct` accept non-negative whole-
+    number strings. A2/B2 requests use `toleranceChangePct` plus direction;
+    PENDING response `tolerancePct` is the old approved value; after Release,
+    Contract queries return the Microservice-calculated final value.
+    MT707 final Tolerance must be converted to change by an upstream adapter.
+
+    v1.13.2 (2026-09-03, Amount-or-Tolerance monetary amendments): A2/B2
+    may change Amount, Tolerance, or both. `amount` remains present in the
+    channel request and is `"0"` for Tolerance-only; zero with no actual
+    Tolerance change is rejected as a no-op. The reference UI makes Amount
+    optional on A2/B2 and performs this zero normalization before calling
+    the API.
+
+
+    v1.13.1 (2026-09-03, Fix Pending snapshot consistency; no wire-shape
+    change): after a successful A2/B2 correction, the Microservice API
+    v1.46.1 response carries the newly recomputed PENDING Event Snapshot.
+    Reference clients may display `ceilingAmount` as the amendment's own
+    balance effect and the tolerance transition. The former statement that
+    PENDING `tolerancePct` itself was the proposed value is superseded by
+    v1.14.0: PENDING keeps the old value and the change fields carry the proposal.
+    `eventSnapshot.pendingEarmarkTotal` is the net of all pending movements;
+    no Checker Release or extra refresh is required.
+
+
+    v1.13.0 (2026-09-03, amendment amount/tolerance recalculation): A2/B2
+    may carry `tolerancePct` on ChannelDerivedTransactionRequest. This input
+    shape is superseded by v1.14.0's change fields. The legacy adapter passed
+    it through to Microservice API v1.46.0, which recalculates
+    the full amended Current LC Amount's Upper/Lower Limits, ROUND_HALF_UP at
+    the Currency's ISO decimal places, and persists the proposal on the
+    transaction. It becomes the contract's latest tolerance only on Checker
+    Release. Amount Increase/Decrease and Tolerance Increase/Decrease are
+    independent dimensions; existing utilization/earmarks are not recalculated.
+
+
     v1.12.0 (2026-09-02, Balance Account Number snapshot passthrough):
     `ChannelTransaction.contingentAccountEntry` may now carry the optional
     account number, account description, mapping key and mapping version
@@ -197,7 +242,7 @@ info:
     operation and must not cancel its A3/A3S source. Transaction Processing
     reset behavior and Maker Queue separation are reference-client concerns,
     not new channel response fields.
-  version: "1.12.0"
+  version: "1.15.0"
 servers:
   - url: https://channel-api.bank.example/balance-component/v1
     description: Production-style contract root for a web/mobile origination channel. This prototype's own reference implementation is the Transaction Builder Angular app under lc-balance-wc/src/app/transaction-builder/, which today calls the Microservice API directly rather than through a built channel layer — this file specifies the intended channel contract for that same business capability, not (yet) a running service.
@@ -516,6 +561,10 @@ paths:
         it does not rely on the earlier Maker Submit or Checker queue snapshot.
         A state change between Submit and Approve therefore returns 409, keeping
         UI Checker behavior and direct API behavior consistent.
+        The Checker business interaction identifies the item by Function,
+        Transaction Key and Secondary Reference; the channel resolves that
+        selection to `transactionId` before this low-level call. Amendment
+        Release never sends final tolerancePct or repeats the saved change.
       parameters:
         - name: transactionId
           in: path
@@ -835,6 +884,9 @@ components:
         instrumentType: { $ref: '#/components/schemas/InstrumentType' }
         movementType: { type: string }
         amount: { $ref: '#/components/schemas/MonetaryAmount' }
+        tolerancePct: { type: string, pattern: '^\d+$', nullable: true, description: "A2/B2 PENDING returns the old approved value; after Release the stored Movement/Contract value is the calculated final tolerance." }
+        toleranceChangePct: { type: string, pattern: '^\d+$', nullable: true, description: "A2/B2 request change magnitude retained for audit." }
+        toleranceChangeDirection: { type: string, enum: [INCREASE, DECREASE], nullable: true }
         currency: { type: string, description: Always equal to the resolved contract's own currency — see CURRENCY CODE. }
         secondaryRef: { type: string, nullable: true }
         status: { type: string, enum: [PENDING, RELEASED, REJECTED, CANCELLED] }
@@ -866,7 +918,7 @@ components:
         currency:
           type: string
           description: REQUIRED, freely typed — becomes this new LC/Confirmation's own permanent Currency Code, carried forward by every A2-A9/B2-B5 transaction against it or anything created under it as parent.
-        tolerancePct: { type: string, nullable: true }
+        tolerancePct: { type: string, pattern: '^\d+$', nullable: true, description: "A1/B1 only; non-negative whole-number opening Tolerance." }
         tenorType: { type: string, nullable: true, enum: [SIGHT, SELLERS_USANCE, BUYERS_USANCE] }
         eventSeq: { type: integer }
         businessEventId: { type: string, format: uuid, nullable: true }
@@ -906,7 +958,25 @@ components:
           type: string
           nullable: true
           description: Required when GET /channel/functions reports a non-null movementTypeChoice for this functionCode (A2 — AMEND_INCREASE/AMEND_DECREASE; A7 — FULL_SETTLE/PARTIAL_SETTLE). Ignored otherwise.
-        amount: { $ref: '#/components/schemas/MonetaryAmount' }
+        amount:
+          allOf: [{ $ref: '#/components/schemas/MonetaryAmount' }]
+          description: >
+            For A2/B2, use `"0"` for a Tolerance-only amendment. A2/B2 must
+            change Amount, Tolerance, or both; zero with omitted/unchanged
+            Tolerance is rejected. Other functions retain their existing
+            Amount requirements.
+        toleranceChangePct:
+          type: string
+          pattern: '^\d+$'
+          nullable: true
+          description: >
+            A2/B2 monetary amendments only. Non-negative whole-number change
+            magnitude used to calculate the protected final tolerancePct.
+        toleranceChangeDirection:
+          type: string
+          enum: [INCREASE, DECREASE]
+          nullable: true
+          description: Required when toleranceChangePct is supplied.
         secondaryRef:
           type: string
           nullable: true

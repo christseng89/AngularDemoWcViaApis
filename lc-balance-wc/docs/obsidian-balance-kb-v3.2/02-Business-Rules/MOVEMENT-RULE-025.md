@@ -1,6 +1,6 @@
 ---
 knowledge_id: MOVEMENT-RULE-025
-title: "提交时的通用『金额 > 0』校验，CLOSE 是唯一豁免的情况"
+title: "提交时的 Amount 校验与 monetary amendment 的 Tolerance-only 例外"
 domain: Balance
 category: Business Rule
 status: CONFIRMED
@@ -13,25 +13,27 @@ tags:
   - confirmed
 ---
 
-# MOVEMENT-RULE-025 — 提交时的通用『金额 > 0』校验，CLOSE 是唯一豁免的情况
+# MOVEMENT-RULE-025 — 提交时的 Amount 校验与 monetary amendment 的 Tolerance-only 例外
 
 ## Status
 CONFIRMED
 
 ## Business Rule
-每种功能所输入的 Amount 都必须严格大于 0，该检查在 validateSubmit() 中较早的位置进行——唯一的例外是 movementType 为 CLOSE（A10/B6）的情况，此时 0 是一个合法的核销值，甚至负数金额也不会被这一特定的客户端校验捕获（此时改由更严格的服务端『必须与 Confirmed Balance 精确相等』的检查来处理，而服务端的 assertValidAmount() 确实会拒绝负数的 CLOSE 金额）。
+一般功能的 Amount 必须严格大于 0。A2／B2 monetary amendment 可输入 Amount、Tolerance 或两者；只改
+Tolerance 时 Amount 可留空并由客户端送为 `"0"`，但 Amount 为 0 且 Tolerance 未改变的 no-op 会被拒绝。
+CLOSE／REOPEN／AMEND_EXPIRY_DATE 等系统零金额规则另由各 movementType 专属逻辑处理。
 
 ## Conditions
-model.movementType !== 'CLOSE'
+非 monetary amendment 依各 movementType 的既有规则；monetary amendment 必须 Amount 非零或 Tolerance 有实际变化。
 
 ## Result
-Number(model.amount) <= 0 -> fail('Amount must be greater than 0.')；CLOSE 绕过这一特定校验
+普通功能 `Amount <= 0` 拒绝；A2／B2 负的画面输入拒绝，空白／0 仅在 Tolerance 改变时通过。
 
 ## Example
-A1 amount='0' -> 被拒绝。A10 CLOSE amount='0' -> 通过这一客户端校验；A10 CLOSE amount='-1' -> 同样通过这一特定校验（而是被服务端的 assertValidAmount() 拒绝）
+A1 `amount='0'` 被拒绝；A2 `amount=''`、Tolerance 20→15 通过并送 `amount:'0'`；A2 Amount 0、Tolerance 20→20 被拒绝。
 
 ## Verification Note
-已直接阅读 validateSubmit() 中的具体分支；与声明内容完全一致。
+已直接阅读 `validateMandatoryFields()`／`buildSubmitRequest()` 并以三种输入组合及 no-op 测试核实。
 
 ## Source Evidence
 

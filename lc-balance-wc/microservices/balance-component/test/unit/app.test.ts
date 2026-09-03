@@ -117,6 +117,22 @@ describe('HTTP integration — Import Case 1 (Sight, no SHGT)', () => {
     expect(res.body.pageSize).toBe(10);
   });
 
+  test('catalog accepts the ACTIVE,EXPIRED multi-status filter used by A2/B2 Expiry Date', async () => {
+    const res = await request(app)
+      .get('/balance-contracts/catalog')
+      .query({ instrumentType: 'IPLC_LC', statuses: 'ACTIVE,EXPIRED' })
+      .expect(200);
+    expect(res.body.items.map((contract: { naturalKey: { lcNumber: string } }) => contract.naturalKey.lcNumber)).toContain('LC0001');
+  });
+
+  test('catalog rejects conflicting single-status and multi-status filters', async () => {
+    const res = await request(app)
+      .get('/balance-contracts/catalog')
+      .query({ instrumentType: 'IPLC_LC', status: 'ACTIVE', statuses: 'ACTIVE,EXPIRED' })
+      .expect(400);
+    expect(res.body.message).toMatch(/mutually exclusive/);
+  });
+
   test('AMEND_DECREASE exceeding Available Balance is rejected with a disambiguated error message', async () => {
     const res = await request(app)
       .post('/balance-movements')
@@ -137,6 +153,233 @@ describe('HTTP integration — Import Case 1 (Sight, no SHGT)', () => {
 
   test('unknown Logical Contract 404s', async () => {
     await request(app).get('/balance-contracts').query({ instrumentType: 'IPLC_LC', lcNumber: 'DOES-NOT-EXIST' }).expect(404);
+  });
+});
+
+describe('HTTP integration — same LC, repeated amount/tolerance amendments', () => {
+  const app = createApp(createDb(':memory:'));
+  let contractId: string;
+  let nextEventSeq = 1;
+
+  const submitAndRelease = async (movementType: string, amount: string, toleranceChangePct: string, reference: string) => {
+    const submitted = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        balanceContractId: contractId,
+        movementType,
+        eventSeq: nextEventSeq++,
+        amount,
+        currency: 'USD',
+        toleranceChangePct,
+        toleranceChangeDirection: movementType === 'AMEND_DECREASE' ? 'DECREASE' : 'INCREASE',
+        sourceTransactionRef: reference,
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    const oldTolerance = await request(app).get('/balance-contracts').query({ instrumentType: 'IPLC_LC', lcNumber: 'LC-AMEND-MATRIX-1' }).expect(200);
+    expect(submitted.body.tolerancePct).toBe(oldTolerance.body.tolerancePct);
+    const released = await request(app).post(`/balance-movements/${submitted.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+    return released.body;
+  };
+
+  test('runs all four Amount × Tolerance combinations on one LC without recalculating the existing utilization', async () => {
+    const issue = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'LC-AMEND-MATRIX-1' },
+        movementType: 'ISSUE',
+        expiryDate: '2099-12-31',
+        eventSeq: nextEventSeq++,
+        amount: '100000',
+        currency: 'USD',
+        tolerancePct: '10',
+        tenorType: 'SIGHT',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    contractId = issue.body.balanceContractId;
+    await request(app).post(`/balance-movements/${issue.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+
+    const utilize = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        balanceContractId: contractId,
+        movementType: 'UTILIZE',
+        eventSeq: nextEventSeq++,
+        amount: '40000',
+        currency: 'USD',
+        sourceTransactionRef: 'IB-MATRIX-1',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    await request(app).post(`/balance-movements/${utilize.body.movementId}/maker-submit`).send({ makerSubmittedBy: 'maker1' }).expect(200);
+    await request(app).post(`/balance-movements/${utilize.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+
+    const cases = [
+      ['AMEND_INCREASE', '20000', '5', '15', 'AMD-MATRIX-1', '28000', '98000'],
+      ['AMEND_INCREASE', '10000', '5', '20', 'AMD-MATRIX-2', '18000', '116000'],
+      ['AMEND_DECREASE', '20000', '5', '15', 'AMD-MATRIX-3', '29500', '86500'],
+      ['AMEND_DECREASE', '10000', '15', '0', 'AMD-MATRIX-4', '26500', '60000'],
+    ] as const;
+
+    for (const [movementType, amount, toleranceChangePct, expectedTolerancePct, reference, expectedStoredCeiling, expectedBalance] of cases) {
+      const amendment = await submitAndRelease(movementType, amount, toleranceChangePct, reference);
+      expect(amendment.toleranceChangePct).toBe(toleranceChangePct);
+      expect(amendment.tolerancePct).toBe(expectedTolerancePct);
+      expect(amendment.ceilingAmount).toBe(expectedStoredCeiling);
+      const snapshot = await request(app).get(`/balance-contracts/${contractId}/balance`).expect(200);
+      expect(snapshot.body.confirmedBalance).toBe(expectedBalance);
+      const contract = await request(app).get('/balance-contracts').query({ instrumentType: 'IPLC_LC', lcNumber: 'LC-AMEND-MATRIX-1' }).expect(200);
+      expect(contract.body.tolerancePct).toBe(expectedTolerancePct);
+    }
+  });
+
+  test('AMEND_EXPIRY_DATE rejects tolerancePct and leaves monetary terms untouched', async () => {
+    await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        balanceContractId: contractId,
+        movementType: 'AMEND_EXPIRY_DATE',
+        eventSeq: nextEventSeq++,
+        amount: '0',
+        currency: 'USD',
+        tolerancePct: '3',
+        newExpiryDate: '2100-12-31',
+        sourceTransactionRef: 'AMD-EXP-BAD',
+        createdBy: 'maker1',
+      })
+      .expect(400);
+
+    const contract = await request(app).get('/balance-contracts').query({ instrumentType: 'IPLC_LC', lcNumber: 'LC-AMEND-MATRIX-1' }).expect(200);
+    expect(contract.body.tolerancePct).toBe('0');
+    const snapshot = await request(app).get(`/balance-contracts/${contractId}/balance`).expect(200);
+    expect(snapshot.body.confirmedBalance).toBe('60000');
+  });
+
+  test('Checker rejects a concurrent amendment whose released face/tolerance basis became stale', async () => {
+    const first = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        balanceContractId: contractId,
+        movementType: 'AMEND_INCREASE',
+        eventSeq: nextEventSeq++,
+        amount: '10000',
+        currency: 'USD',
+        toleranceChangePct: '10',
+        toleranceChangeDirection: 'INCREASE',
+        sourceTransactionRef: 'AMD-CONCURRENT-1',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    const stale = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        balanceContractId: contractId,
+        movementType: 'AMEND_INCREASE',
+        eventSeq: nextEventSeq++,
+        amount: '20000',
+        currency: 'USD',
+        toleranceChangePct: '15',
+        toleranceChangeDirection: 'INCREASE',
+        sourceTransactionRef: 'AMD-CONCURRENT-2',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+
+    expect(first.body.ceilingAmount).toBe('21000');
+    expect(stale.body.ceilingAmount).toBe('38000');
+    await request(app).post(`/balance-movements/${first.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+
+    const rejected = await request(app)
+      .post(`/balance-movements/${stale.body.movementId}/release`)
+      .send({ releasedBy: 'checker1' })
+      .expect(409);
+    expect(rejected.body.code).toBe('ILLEGAL_STATE_TRANSITION');
+    expect(rejected.body.message).toMatch(/changed since submit/i);
+  });
+
+  test('AMEND_EXPIRY_DATE without tolerance changes only the expiry date', async () => {
+    const before = await request(app).get(`/balance-contracts/${contractId}/balance`).expect(200);
+    const amendment = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        balanceContractId: contractId,
+        movementType: 'AMEND_EXPIRY_DATE',
+        eventSeq: nextEventSeq++,
+        amount: '0',
+        currency: 'USD',
+        newExpiryDate: '2100-12-31',
+        sourceTransactionRef: 'AMD-EXP-GOOD',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    expect(amendment.body.tolerancePct).toBeNull();
+    expect(amendment.body.ceilingAmount).toBe('0');
+    await request(app).post(`/balance-movements/${amendment.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+
+    const contract = await request(app).get('/balance-contracts').query({ instrumentType: 'IPLC_LC', lcNumber: 'LC-AMEND-MATRIX-1' }).expect(200);
+    expect(contract.body.expiryDate).toBe('2100-12-31');
+    expect(contract.body.tolerancePct).toBe('10');
+    const after = await request(app).get(`/balance-contracts/${contractId}/balance`).expect(200);
+    expect(after.body.confirmedBalance).toBe(before.body.confirmedBalance);
+  });
+});
+
+describe('HTTP integration — B2 signed amendment with tolerance', () => {
+  test('recalculates the full Confirmation upper limit and activates tolerance only on release', async () => {
+    const app = createApp(createDb(':memory:'));
+    const issue = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'EPLC_CONFIRMATION',
+        naturalKey: { lcNumber: 'EXP-AMEND-1' },
+        movementType: 'ISSUE',
+        expiryDate: '2099-12-31',
+        eventSeq: 1,
+        amount: '100000',
+        currency: 'USD',
+        tolerancePct: '10',
+        tenorType: 'SIGHT',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    await request(app).post(`/balance-movements/${issue.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+
+    const amendment = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'EPLC_CONFIRMATION',
+        balanceContractId: issue.body.balanceContractId,
+        movementType: 'AMEND',
+        eventSeq: 2,
+        amount: '20000',
+        currency: 'USD',
+        toleranceChangePct: '5',
+        toleranceChangeDirection: 'INCREASE',
+        sourceTransactionRef: 'B02-EXP-1',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+    expect(amendment.body.ceilingAmount).toBe('28000');
+    expect(amendment.body.tolerancePct).toBe('10');
+    expect(amendment.body.toleranceChangePct).toBe('5');
+
+    const beforeRelease = await request(app).get('/balance-contracts').query({ instrumentType: 'EPLC_CONFIRMATION', lcNumber: 'EXP-AMEND-1' }).expect(200);
+    expect(beforeRelease.body.tolerancePct).toBe('10');
+    const released = await request(app).post(`/balance-movements/${amendment.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+    expect(released.body.tolerancePct).toBe('15');
+
+    const afterRelease = await request(app).get('/balance-contracts').query({ instrumentType: 'EPLC_CONFIRMATION', lcNumber: 'EXP-AMEND-1' }).expect(200);
+    expect(afterRelease.body.tolerancePct).toBe('15');
+    const snapshot = await request(app).get(`/balance-contracts/${issue.body.balanceContractId}/balance`).expect(200);
+    expect(snapshot.body.confirmedBalance).toBe('138000');
   });
 });
 
@@ -4104,7 +4347,7 @@ describe('HTTP integration — contingent-liability account entries (analysis/co
       .expect(201);
     expect(res.body.contingentAccountEntry).toMatchObject({
       drAccount: "Customers' Liability under DC — Sight",
-      crAccount: 'Documentary Credits Outstanding — Sight',
+      crAccount: 'DC Outstanding — Sight',
       currency: 'USD',
       amount: '100000',
     });
@@ -4136,7 +4379,7 @@ describe('HTTP integration — contingent-liability account entries (analysis/co
       })
       .expect(201);
     expect(decrease.body.contingentAccountEntry).toMatchObject({
-      drAccount: 'Documentary Credits Outstanding — Sight',
+      drAccount: 'DC Outstanding — Sight',
       crAccount: "Customers' Liability under DC — Sight",
       currency: 'USD',
       amount: '10000',
@@ -4157,7 +4400,7 @@ describe('HTTP integration — contingent-liability account entries (analysis/co
       })
       .expect(201);
     expect(utilize.body.contingentAccountEntry).toMatchObject({
-      drAccount: 'Documentary Credits Outstanding — Sight',
+      drAccount: 'DC Outstanding — Sight',
       crAccount: "Customers' Liability under DC — Sight",
       currency: 'USD',
       amount: '30000',
@@ -4198,8 +4441,8 @@ describe('HTTP integration — contingent-liability account entries (analysis/co
       })
       .expect(201);
     expect(issue.body.contingentAccountEntry).toMatchObject({
-      drAccount: 'Issuing Bank Confirmation Exposure — Usance',
-      crAccount: 'Confirmation Undertakings Outstanding — Usance',
+      drAccount: "Confirmed Usance — Issuing Bank's Liability",
+      crAccount: 'Confirmed Outstanding — Usance',
       currency: 'USD',
       amount: '80000',
     });
@@ -4219,8 +4462,8 @@ describe('HTTP integration — contingent-liability account entries (analysis/co
       })
       .expect(201);
     expect(decrease.body.contingentAccountEntry).toMatchObject({
-      drAccount: 'Confirmation Undertakings Outstanding — Usance',
-      crAccount: 'Issuing Bank Confirmation Exposure — Usance',
+      drAccount: 'Confirmed Outstanding — Usance',
+      crAccount: "Confirmed Usance — Issuing Bank's Liability",
       currency: 'USD',
       amount: '5000',
     });
@@ -4242,8 +4485,8 @@ describe('HTTP integration — contingent-liability account entries (analysis/co
       })
       .expect(201);
     expect(issue.body.contingentAccountEntry).toMatchObject({
-      drAccount: "Customers' Liability under Shipping Guarantees — Sight",
-      crAccount: 'Shipping Guarantees Outstanding — Sight',
+      drAccount: "Customers' Liability under SG — Sight",
+      crAccount: 'SG Outstanding — Sight',
       currency: 'USD',
       amount: '20000',
     });
@@ -4262,8 +4505,8 @@ describe('HTTP integration — contingent-liability account entries (analysis/co
       })
       .expect(201);
     expect(redeem.body.contingentAccountEntry).toMatchObject({
-      drAccount: 'Shipping Guarantees Outstanding — Sight',
-      crAccount: "Customers' Liability under Shipping Guarantees — Sight",
+      drAccount: 'SG Outstanding — Sight',
+      crAccount: "Customers' Liability under SG — Sight",
       currency: 'USD',
       amount: '20000',
     });
@@ -4293,7 +4536,7 @@ describe('HTTP integration — contingent-liability account entries (analysis/co
     expect(issue.body.ceilingAmount).toBe('110000');
     expect(issue.body.contingentAccountEntry).toMatchObject({
       drAccount: "Customers' Liability under DC — Sight",
-      crAccount: 'Documentary Credits Outstanding — Sight',
+      crAccount: 'DC Outstanding — Sight',
       currency: 'USD',
       amount: '110000', // LC Balance = 100000 × 1.10, not the face amount 100000
     });
@@ -4315,7 +4558,7 @@ describe('HTTP integration — contingent-liability account entries (analysis/co
     expect(increase.body.ceilingAmount).toBe('5500');
     expect(increase.body.contingentAccountEntry).toMatchObject({
       drAccount: "Customers' Liability under DC — Sight",
-      crAccount: 'Documentary Credits Outstanding — Sight',
+      crAccount: 'DC Outstanding — Sight',
       currency: 'USD',
       amount: '5500', // A2 (AMEND_INCREASE) — LC Balance = 5000 × 1.10
     });
@@ -4376,8 +4619,8 @@ describe('HTTP integration — contingent-liability account entries (analysis/co
       .expect(201);
     expect(decrease.body.ceilingAmount).toBe('-5500'); // sign preserved through computeCeilingAmount()
     expect(decrease.body.contingentAccountEntry).toMatchObject({
-      drAccount: 'Confirmation Undertakings Outstanding — Usance', // Decrease direction — same as the no-tolerance B2 test above, unaffected by this fix
-      crAccount: 'Issuing Bank Confirmation Exposure — Usance',
+      drAccount: 'Confirmed Outstanding — Usance', // Decrease direction — same as the no-tolerance B2 test above, unaffected by this fix
+      crAccount: "Confirmed Usance — Issuing Bank's Liability",
       currency: 'USD',
       amount: '5500', // magnitude only — B2 (AMEND, Decrease) — LC Balance = 5000 × 1.10, not the face amount 5000
     });

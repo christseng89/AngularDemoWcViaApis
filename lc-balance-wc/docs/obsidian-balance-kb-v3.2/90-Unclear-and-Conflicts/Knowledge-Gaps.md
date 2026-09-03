@@ -33,7 +33,7 @@ microservices/balance-component/src/domain/balanceDerivation.ts 第 5-11 行
 **待确认的问题：**
 REVERSAL 这个 movementType 在当前生产系统中是否真的有被使用？如果有，它"对原始记录符号取反"的逻辑究竟实现在哪里（显然不在本次读取的 balanceDerivation.ts 中）？
 
-**2026-08-26 更新（已解决）：** 是，REVERSAL 现已在生产中真实使用——F1 新增的 Expiry Extension Amendment（AMEND_EXPIRY_DATE 作用于 EXPIRED 合约时）会以 REVERSAL 反转其指向的原始 EXPIRE/CLOSE，方向为动态解析（`reversalOfMovementId` 反查后取反），逻辑实现于 `service/balanceService.ts`。REOPEN 本身自 2026-08-25 redesign 起不再产生 REVERSAL（直接以自身簽署金額入帳）。详见 [[MOVEMENT-RULE-066]]。
+**2026-09-03 更新（已解决并取代 2026-08-26 实作）：** 动态反转方向仍由 `reversalOfMovementId` 解析；EXPIRED Expiry Extension 现在把 reference 与反向 Account Entries 放在同一笔 PENDING `AMEND_EXPIRY_DATE` 供 Checker 审核，Release 不再另建 REVERSAL。ACTIVE 到期日修改无 Account Entries；REOPEN 也不产生 REVERSAL。详见 [[MOVEMENT-RULE-066]]。
 
 ---
 

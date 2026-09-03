@@ -1,6 +1,6 @@
 ---
 knowledge_id: MOVEMENT-RULE-011
-title: "assertValidAmount() —服务端『金额必须 > 0』的兜底校验，在 Submit 与 Release 两处都会检查，并有两个具名例外"
+title: "assertValidAmount() 与 monetary amendment no-op 的服务端兜底校验"
 domain: Balance
 category: Business Rule
 status: CONFIRMED
@@ -13,25 +13,29 @@ tags:
   - confirmed
 ---
 
-# MOVEMENT-RULE-011 — assertValidAmount() —服务端『金额必须 > 0』的兜底校验，在 Submit 与 Release 两处都会检查，并有两个具名例外
+# MOVEMENT-RULE-011 — assertValidAmount() 与 monetary amendment no-op 的服务端兜底校验
 
 ## Status
 CONFIRMED
 
 ## Business Rule
-每种 movementType 都要求金额严格为正，唯有以下两个例外：(1) AMEND（仅 B2，方向由金额自身的正负号决定）——仅拒绝金额恰好为 0 的情况，负号是合法的；(2) CLOSE（A10/B6 核销）——仅拒绝负数金额，金额恰好为 0 是合法的（已完全被利用的 LC 会以 0 结清）。该校验在 createMovement() 中于 resolveOrCreateContract() 之前被调用（因此一个被拒绝的 ISSUE/CREATE 请求不会留下孤立的合同记录），并在 release() 中作为纵深防御再次被调用。
+一般 movementType 要求金额严格为正。Monetary amendment（AMEND_INCREASE／AMEND_DECREASE／AMEND）
+允许 0，以支援 Tolerance-only；A2 两个 movementType 拒绝负数，B2 AMEND 保留 signed wire Amount。
+`assertMonetaryAmendmentChangesTerms()` 再以当前 contract Tolerance 拒绝 Amount=0 且 Tolerance 未改变的 no-op。
+CLOSE／EXPIRE／REOPEN／AMEND_EXPIRY_DATE／REVERSAL 保留各自既有规则。Submit、Fix Pending 与 Release
+均有相应服务端复查。
 
 ## Conditions
-参见 businessRule 中关于 AMEND/CLOSE 分支的说明；其余所有 movementType 均要求金额严格 > 0
+参见上述 monetary amendment 与系统 movementType 例外；其余 movementType 金额严格 > 0。
 
 ## Result
-针对普通 ISSUE 提交 amount:'0' 或 amount:'-5000' 都会抛出 RequestValidationError；AMEND '0' 抛出异常，AMEND '-5000' 通过；CLOSE '0' 通过，CLOSE '-5000' 抛出异常
+普通 ISSUE 的 0／负数拒绝；AMEND 的 0 可进入 Tolerance/no-op 校验、负数合法；AMEND_INCREASE／DECREASE 的 0 合法、负数拒绝。
 
 ## Example
-assertValidAmount('AMEND','0') 抛出异常；assertValidAmount('AMEND','-5000') 通过；assertValidAmount('CLOSE','0') 通过；assertValidAmount('CLOSE','-1') 抛出异常；assertValidAmount('UTILIZE','0') 抛出异常
+`AMEND amount='0', tolerance 20→15` 通过；`AMEND amount='0', tolerance 20→20` 被 no-op 校验拒绝；`UTILIZE amount='0'` 被拒绝。
 
 ## Verification Note
-已直接阅读函数完整实现；每个分支（AMEND 仅零值、CLOSE 仅负值、通用正数校验）均逐字对照声明内容确认，包括两个调用点。
+已直接阅读 validator 与 BalanceService 调用点，并由 validator、domain 及 service regression tests 核实。
 
 ## Source Evidence
 

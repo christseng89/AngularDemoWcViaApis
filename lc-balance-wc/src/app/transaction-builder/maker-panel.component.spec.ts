@@ -3010,6 +3010,20 @@ describe('MakerPanelComponent', () => {
       expect(comp.isSubmitReady).toBe(true);
     });
 
+    it('A1 — accepts a valid shorthand before blur and rejects malformed shorthand', () => {
+      const { comp } = setupC();
+      triggerSelectFunction(comp, A1);
+      comp.naturalKey.lcNumber = 'LC001';
+      comp.model.expiryDate = '2028-12-28';
+
+      comp.model.amount = '1m';
+      expect(comp.isSubmitReady).toBe(true);
+      expect(comp.model.amount).toBe('1m'); // readiness checks must not mutate the edit in progress
+
+      comp.model.amount = '1t';
+      expect(comp.isSubmitReady).toBe(false);
+    });
+
     it('A2 — false before an eligible target is picked (mandatory fields otherwise valid)', () => {
       const { comp } = setupC();
       triggerSelectFunction(comp, A2);
@@ -3085,6 +3099,33 @@ describe('MakerPanelComponent', () => {
   // submit() — request-building + happy/error paths
   // ---------------------------------------------------------------------
   describe('submit() — request building', () => {
+    it('normalizes shorthand before request construction even when Amount has not blurred', () => {
+      const { comp, api } = setupC();
+      triggerSelectFunction(comp, A1);
+      comp.naturalKey.lcNumber = 'LC-SHORT';
+      comp.model.amount = '1k.25';
+      comp.model.expiryDate = '2028-12-28';
+
+      comp.submit();
+
+      expect(api.createMovement).toHaveBeenCalledTimes(1);
+      expect(lastReqC(api).amount).toBe('1000.25');
+      expect(comp.model.amount).toBe('1000.25');
+    });
+
+    it('rejects malformed shorthand on submit() itself, before any request is built', () => {
+      const { comp, api } = setupC();
+      triggerSelectFunction(comp, A1);
+      comp.naturalKey.lcNumber = 'LC-BAD';
+      comp.model.amount = '1t';
+      comp.model.expiryDate = '2028-12-28';
+
+      comp.submit();
+
+      expect(api.createMovement).not.toHaveBeenCalled();
+      expect(comp.submitError).toContain('Enter a positive amount');
+    });
+
     it('A1 LC Issue: builds via the natural-key path, Sight omits tenorDays from the wire, and handles success', () => {
       const { comp, api } = setupC();
       triggerSelectFunction(comp, A1);
@@ -3649,6 +3690,53 @@ describe('MakerPanelComponent', () => {
       expect(c.requiredNaturalKeyFields).toEqual(['ibNumber']);
     });
 
+    it('shows A8 SG Number only after an LC is selected, and hides it again after the post-Approve reset', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      triggerSelectFunction(c, fn('A8'));
+
+      expect(c.requiredNaturalKeyFields).toEqual(['sgNumber']);
+      expect(c.showCreatingSgNumberInput).toBe(false);
+
+      c.selectedParent = contract({ instrumentType: 'IPLC_LC' });
+      expect(c.showCreatingSgNumberInput).toBe(true);
+
+      triggerSelectFunction(c, fn('A8'));
+      expect(c.selectedParent).toBeNull();
+      expect(c.selectedContract).toBeNull();
+      expect(c.showCreatingSgNumberInput).toBe(false);
+    });
+
+    it('keeps A8 SG Number available when Fix Pending reconstructs selectedContract without selectedParent', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      triggerSelectFunction(c, fn('A8'));
+      c.selectedContract = contract({ instrumentType: 'SHGT', naturalKey: { lcNumber: 'S001', sgNumber: 'G01' } });
+
+      expect(c.selectedParent).toBeNull();
+      expect(c.showCreatingSgNumberInput).toBe(true);
+    });
+
+    it('applies the same post-Approve reset rule to B3 EB Number', () => {
+      const c = new MakerPanelComponent(mockApiD());
+      triggerSelectFunction(c, fn('B3'));
+
+      expect(c.requiredNaturalKeyFields).toEqual(['ibNumber']);
+      expect(c.showCreatingIbNumberInput).toBe(false);
+
+      c.selectedParent = contract({ instrumentType: 'EPLC_CONFIRMATION' });
+      expect(c.showCreatingIbNumberInput).toBe(true);
+
+      triggerSelectFunction(c, fn('B3'));
+      expect(c.showCreatingIbNumberInput).toBe(false);
+    });
+
+    it.each(['A2', 'A3', 'A3S', 'B2'])('%s keeps its Amendment/IB Number input behind the shared transaction-selection gate after reset', (code) => {
+      const c = new MakerPanelComponent(mockApiD());
+      triggerSelectFunction(c, fn(code));
+
+      expect(c.requiresEligibleTarget).toBe(true);
+      expect(c.naturalKeyLocked).toBe(false);
+    });
+
     it('ibNumberLabel reads "IB Number" on the Import side and "EB Number" on the Export side', () => {
       const c = new MakerPanelComponent(mockApiD());
       c.activeFunctionSide = 'IMPORT';
@@ -4010,6 +4098,50 @@ describe('MakerPanelComponent', () => {
       expect(api.reopenEligible).toHaveBeenCalledTimes(1);
       expect(api.reopenEligible).toHaveBeenCalledWith('IPLC_LC');
       expect(c.documentArrivalHints.catalogReopenEligible).toEqual(new Set(['c1']));
+    });
+
+    it('A2 Expiry Date queries both ACTIVE and EXPIRED contracts so an expired LC can be extended', () => {
+      const api = mockApiD({ catalog: jest.fn(() => of({ items: [], total: 0, page: 1, pageSize: 10 })) });
+      const c = new MakerPanelComponent(api);
+      triggerSelectFunction(c, fn('A2'));
+      c.subChoiceValue = 'AMEND_EXPIRY_DATE';
+
+      c.onSubChoice();
+
+      expect(api.catalog).toHaveBeenLastCalledWith(
+        'IPLC_LC',
+        undefined,
+        undefined,
+        1,
+        c.catalogPageSize,
+        undefined,
+        undefined,
+        true,
+        undefined,
+        ['ACTIVE', 'EXPIRED'],
+      );
+    });
+
+    it('B2 Expiry Date applies the same ACTIVE plus EXPIRED catalog rule to Confirmations', () => {
+      const api = mockApiD({ catalog: jest.fn(() => of({ items: [], total: 0, page: 1, pageSize: 10 })) });
+      const c = new MakerPanelComponent(api);
+      triggerSelectFunction(c, fn('B2'));
+      c.subChoiceValue = 'EXPIRY_DATE';
+
+      c.onSubChoice();
+
+      expect(api.catalog).toHaveBeenLastCalledWith(
+        'EPLC_CONFIRMATION',
+        undefined,
+        undefined,
+        1,
+        c.catalogPageSize,
+        undefined,
+        undefined,
+        true,
+        undefined,
+        ['ACTIVE', 'EXPIRED'],
+      );
     });
 
     it("F1: A10 (Close) still queries the default ACTIVE status — the CLOSED override applies only to A11/B7's own requiresReopenEligibility", () => {
@@ -5088,6 +5220,34 @@ describe('MakerPanelComponent', () => {
       expect(comp.hasEligibleTargetSelected).toBe(true);
       expect(comp.isExternalReviewMode).toBe(false);
       expect(comp.naturalKeyLocked).toBe(true);
+    });
+
+    it.each(['A2', 'B2'] as const)('%s keeps the picked contract locked but does not repeat LC Number on the Amendment input screen', (code) => {
+      const comp = makeComponentB(code === 'A2' ? getFn('A2') : findFn(EXPORT_FUNCTIONS, 'B2'), makeApi());
+      comp.subChoiceValue = code === 'A2' ? 'AMEND_INCREASE' : 'INCREASE';
+      comp.selectedContract = makeContract({ balanceContractId: 'C1' });
+
+      expect(comp.naturalKeyLocked).toBe(true);
+      expect(comp.showProtectedTransactionIdentity).toBe(false);
+      expect(comp.showAmendmentDirectionSummary).toBe(true);
+      expect(comp.selectedSubChoiceLabel).toBe('Increase');
+      expect(comp.selectedContract.balanceContractId).toBe('C1');
+    });
+
+    it('keeps the Amendment Direction selector editable until an LC is selected', () => {
+      const comp = makeComponentB(getFn('A2'), makeApi());
+      comp.subChoiceValue = 'AMEND_DECREASE';
+
+      expect(comp.naturalKeyLocked).toBe(false);
+      expect(comp.showAmendmentDirectionSummary).toBe(false);
+      expect(comp.selectedSubChoiceLabel).toBe('Decrease');
+    });
+
+    it('continues to show the protected LC Number for non-Amendment transaction input', () => {
+      const comp = makeComponentB(getFn('A3'), makeApi());
+      comp.selectedContract = makeContract({ balanceContractId: 'C1' });
+
+      expect(comp.showProtectedTransactionIdentity).toBe(true);
     });
 
     it('naturalKeyLocked is true during Fix Pending review even before hasEligibleTargetSelected would independently be true', () => {

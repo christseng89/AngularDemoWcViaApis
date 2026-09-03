@@ -374,7 +374,9 @@ pre.step-detail {
 // kept deliberately distinct from the amount/currency figures' own `--navy` so an LC Number is never
 // mistaken for a monetary value at a glance.
 .tb-natural-key--emphasized,
-.tb-natural-key--emphasized .form-control {
+.tb-natural-key--emphasized .form-control,
+.tb-natural-key--emphasized .form-label,
+.tb-natural-key--emphasized .tb-field__label {
   font-size: 17px !important;
   font-weight: 700 !important;
   color: var(--blue-dark) !important;

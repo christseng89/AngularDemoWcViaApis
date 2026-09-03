@@ -25,7 +25,12 @@ export class MovementReleasePolicyService {
   ) {}
 
   assertSubmitGuards(movement: BalanceMovement, contract: BalanceContract, isUtilizeFinalize: boolean): void {
-    this.validator.assertValidAmount(movement.movementType, movement.amount);
+    // The client-facing AMEND_EXPIRY_DATE request is always amount=0. For an EXPIRED contract the server
+    // replaces it at Submit with the protected EXPIRE restoration amount and target reference, so the
+    // generic "exactly 0" request guard must not reject that persisted, server-derived review record.
+    if (!(movement.movementType === 'AMEND_EXPIRY_DATE' && movement.reversalOfMovementId)) {
+      this.validator.assertValidAmount(movement.movementType, movement.amount);
+    }
     if (SECONDARY_REF_REQUIRED_MOVEMENT_TYPES.has(movement.movementType) && !movement.sourceTransactionRef) {
       throw new RequestValidationError(`sourceTransactionRef is required for ${movement.movementType}.`);
     }
@@ -93,6 +98,10 @@ export class MovementReleasePolicyService {
       this.assertReopenEligibility(movement, contract);
     }
 
+    if (movement.movementType === 'AMEND_EXPIRY_DATE' && contract.status === 'EXPIRED') {
+      this.assertExpiryExtensionRestoration(movement, contract);
+    }
+
     if (contract.instrumentType === 'SHGT' && movement.movementType === 'PARTIAL_REDEEM' && !movement.businessEventId) {
       throw new IllegalStateTransitionError(
         `Cannot release movement ${movement.movementId} — A9 (Shipping Guarantee Redemption) must be Full Redeem only; ` +
@@ -106,6 +115,35 @@ export class MovementReleasePolicyService {
     if (!lifecycleExceptions.has(movement.movementType) && contract.status !== 'ACTIVE') {
       throw new IllegalStateTransitionError(
         `Cannot release movement ${movement.movementId} — contract status is now ${contract.status}, no longer ACTIVE. Refresh the Transaction Index.`,
+      );
+    }
+  }
+
+  private assertExpiryExtensionRestoration(movement: BalanceMovement, contract: BalanceContract): void {
+    const { hasOpenEvents } = this.lifecycleEligibility.gatherEventTree(contract, movement.movementId);
+    if (hasOpenEvents) {
+      throw new IllegalStateTransitionError(
+        `Cannot release Expiry Extension Amendment ${movement.movementId} — one or more Events under this LC are not yet fully resolved.`,
+      );
+    }
+    const own = this.movements
+      .listByContract(contract.balanceContractId)
+      .filter((candidate) => candidate.movementId !== movement.movementId && candidate.status === 'RELEASED');
+    // Match Submit's balance-history rule: cancelled/rejected attempts cannot replace the RELEASED
+    // EXPIRE restoration basis while this transaction waits for Checker review.
+    const trailing = [...own].sort((left, right) => left.eventSeq - right.eventSeq).pop();
+    const expire = trailing?.status === 'RELEASED' && trailing.movementType === 'EXPIRE' ? trailing : undefined;
+    if (!expire) {
+      if (movement.reversalOfMovementId || !parseMonetaryAmount(movement.ceilingAmount).isZero()) {
+        throw new IllegalStateTransitionError(
+          `Cannot release Expiry Extension Amendment ${movement.movementId} — the EXPIRE restoration basis has changed since Submit. Cancel it and re-submit.`,
+        );
+      }
+      return;
+    }
+    if (movement.reversalOfMovementId !== expire.movementId || !parseMonetaryAmount(movement.ceilingAmount).equals(parseMonetaryAmount(expire.ceilingAmount))) {
+      throw new IllegalStateTransitionError(
+        `Cannot release Expiry Extension Amendment ${movement.movementId} — the EXPIRE restoration basis has changed since Submit. Cancel it and re-submit.`,
       );
     }
   }

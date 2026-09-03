@@ -107,7 +107,7 @@ flowchart TD
 相關業務規則（與 A11 共用同一批規則，Import/Export 對稱）：
 - [[MOVEMENT-RULE-064]] — REOPEN 復原金額計算（`computeReopenRestoreAmount()`，對 instrumentType 無分支）
 - [[MOVEMENT-RULE-065]] — `MOVEMENT_DIRECTION.REOPEN = 1`，不再產生 REVERSAL 副作用
-- [[MOVEMENT-RULE-066]] — `REVERSAL` 動態方向，現僅供 Expiry Extension Amendment 使用
+- [[MOVEMENT-RULE-066]] — 動態反轉方向；EXPIRED Extension 在同一筆 PENDING Amendment 上使用，不另建 REVERSAL
 - [[MOVEMENT-RULE-067]] — CLOSE/EXPIRE/REOPEN 共用的金額校驗豁免（0 合法、負數拒絕）
 - [[MOVEMENT-RULE-063]] — EXPIRE 資格判定不比照 CLOSE 的餘額歸零條件
 - [[STATUS-RULE-032]] — REOPEN 對合約狀態的重啟規則
@@ -117,7 +117,7 @@ flowchart TD
 - [[STATUS-RULE-036]] — 合約狀態徽標色彩與 Checker Queue `includeAnyStatus`
 - [[MAKER-CHECKER-RULE-058]] — `BATCH_MAKER_ACTOR`/`BATCH_CHECKER_ACTOR` 保留真實四眼原則
 - [[MAKER-CHECKER-RULE-059]] — CLOSE／REOPEN 強制 `reasonCode`
-- [[EXPOSURE-RULE-030]] — `AMEND_EXPIRY_DATE` 明確回傳 null 的 contingentAccountEntry（與 REOPEN 真實產生分錄形成對照）
+- [[EXPOSURE-RULE-030]] — ACTIVE `AMEND_EXPIRY_DATE` 無分錄；EXPIRED Extension 在 PENDING 即攜帶可供 Checker 審核的復原分錄
 - [[STATUS-RULE-004]] — B6 關閉資格判定（B7 的「反面」條件）
 
 支援技術細節與背景文件：

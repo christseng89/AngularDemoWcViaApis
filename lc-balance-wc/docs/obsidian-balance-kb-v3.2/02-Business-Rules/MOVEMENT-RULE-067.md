@@ -6,7 +6,7 @@ category: Business Rule
 status: CONFIRMED
 source_repository: Balance Component (lc-balance)
 last_verified_commit: "N/A — no .git history in the analyzed snapshot, see [[Source-to-Knowledge-Map]]"
-snapshot_date: 2026-08-26
+snapshot_date: 2026-09-03
 tags:
   - balance
   - movement
@@ -20,13 +20,13 @@ tags:
 CONFIRMED
 
 ## Business Rule
-既有規則 [[MOVEMENT-RULE-025]] 記載 CLOSE 是 Submit 時通用「Amount > 0」校驗的唯一豁免（0 為合法的核銷值，只拒絕負數）。F1 上線後，`assertValidAmount()` 的這個豁免分支擴大為同時涵蓋 `CLOSE`、`EXPIRE`、`REOPEN` 三者，共用同一段程式碼與同一個判斷式（`if (movementType === 'CLOSE' || movementType === 'EXPIRE' || movementType === 'REOPEN') { if (amt.isNegative()) throw ...; return; }`）。三者的「0 合法」各有不同的業務含意：CLOSE 的 0 代表核銷一筆已經完全動用完畢的 LC；EXPIRE 的 0 代表一筆已到期、且早已完全動用完畢的 LC 到期時沒有餘額可沖銷；REOPEN 的 0 則代表重啟一筆「其自身沖銷鏈的沖銷金額本來就是 0」的合約（例如 EXPIRE→AUTO CLOSE 鏈中 AUTO CLOSE 那一筆的沖銷金額已因 EXPIRE 先行沖銷而歸零，REOPEN 若只反轉這最後一筆會合法地算出 0，但實務上這種情形不會單獨發生——真正會出現 REOPEN 金額為 0 的情境，是整條沖銷鏈本身加總即為 0）。另新增 `AMEND_EXPIRY_DATE` 專屬分支：其金額必須「恰好等於 0」（而非「非負」），因為該 movementType 從不承載任何真實金額，見 [[EXPOSURE-RULE-030]]。
+既有規則 [[MOVEMENT-RULE-025]] 記載 CLOSE 是 Submit 時通用「Amount > 0」校驗的唯一豁免（0 為合法的核銷值，只拒絕負數）。F1 上線後，`assertValidAmount()` 的這個豁免分支擴大為 `CLOSE`、`EXPIRE`、`REOPEN`。`AMEND_EXPIRY_DATE` 的外部 Maker 請求必須傳 `amount: '0'`。只有目標合約為 EXPIRED 時，伺服器才在合約解析後把 persisted movement 改為受保護的原 EXPIRE 恢復金額，讓 Checker 審核真實分錄；呼叫端不能自行傳入該金額，見 [[EXPOSURE-RULE-030]]。
 
 ## Conditions
 `movementType` 為 `CLOSE`、`EXPIRE`、或 `REOPEN`（`service/balanceService.ts` 的 `assertValidAmount()`）
 
 ## Result
-三者的金額皆允許為 0，但拒絕任何負數；`AMEND_EXPIRY_DATE` 則要求金額必須恰好為 `'0'`（非零一律拒絕）；`REVERSAL` 另有自己的分支，同樣只拒絕負數（金額是否精確等於被反轉移動的 `ceilingAmount` 由 `reversalShaped` 另行校驗，不在 `assertValidAmount()` 職責範圍）。
+三者的金額皆允許為 0，但拒絕任何負數；`AMEND_EXPIRY_DATE` 的外部請求要求 `'0'`，ACTIVE persisted movement 仍為 0，而 EXPIRED persisted movement 由伺服器改為受保護的恢復金額。
 
 ## Example
 一筆已完全動用完畢（Confirmed Balance = 0）的 LC 到期，AUTO EXPIRY 提交 `amount: '0'` 的 EXPIRE → 通過；提交 `amount: '-100'` 的 EXPIRE → 拒絕（不論金額來源為系統批次或人工繞過）。

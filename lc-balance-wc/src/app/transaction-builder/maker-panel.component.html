@@ -22,7 +22,7 @@
     ></app-maker-workflow-notices>
 
     <app-protected-transaction-identity
-      [visible]="naturalKeyLocked"
+      [visible]="showProtectedTransactionIdentity"
       [items]="protectedIdentityItems"
     ></app-protected-transaction-identity>
     <!-- 2026-08-20: unified — B2 now shares this exact block via subChoice.key === 'amendDirection'
@@ -54,19 +54,29 @@
                  in THIS component, not a `ngx-formly`-rendered field — no ViewEncapsulation crossing to
                  work around, unlike `secondaryRef`'s own fix (see that class's own doc comment in
                  src/styles.scss for why THAT one had to move to the global stylesheet). -->
-    <div class="tb-field" *ngIf="showSubChoice">
-      <label class="tb-field__label">{{ selectedFunction?.subChoice?.label }} <span class="tb-required-mark">*</span></label>
-      <select
-        class="tb-select tb-select--required"
-        [class.tb-natural-key--emphasized]="isExternalReviewMode"
-        [(ngModel)]="subChoiceValue"
-        (change)="onSubChoice()"
-        [disabled]="formLocked"
-      >
-        <option value="">— select —</option>
-        <option *ngFor="let o of selectedFunction?.subChoice?.options" [value]="o.value">{{ o.label }}</option>
-      </select>
-    </div>
+    <ng-container *ngIf="showSubChoice">
+      <div class="tb-field tb-protected-natural-key mb-2" *ngIf="showAmendmentDirectionSummary; else editableSubChoice">
+        <span class="tb-protected-natural-key__item">
+          <span class="tb-protected-natural-key__label">Amendment Direction</span>
+          <span class="tb-protected-natural-key__value tb-natural-key--emphasized">{{ selectedSubChoiceLabel }}</span>
+        </span>
+      </div>
+      <ng-template #editableSubChoice>
+        <div class="tb-field">
+          <label class="tb-field__label">{{ selectedFunction?.subChoice?.label }} <span class="tb-required-mark">*</span></label>
+          <select
+            class="tb-select tb-select--required"
+            [class.tb-natural-key--emphasized]="isExternalReviewMode"
+            [(ngModel)]="subChoiceValue"
+            (change)="onSubChoice()"
+            [disabled]="formLocked"
+          >
+            <option value="">— select —</option>
+            <option *ngFor="let o of selectedFunction?.subChoice?.options" [value]="o.value">{{ o.label }}</option>
+          </select>
+        </div>
+      </ng-template>
+    </ng-container>
 
     <ng-container *ngIf="ready">
       <div class="tb-field" *ngIf="usesCombinedTransactionIndex && !naturalKeyLocked">
@@ -354,7 +364,7 @@
                        same footing as A1/B1's own LC Number just above: the one Natural Key field on this
                        screen that's genuinely TYPED, not picked — gets the same unconditional
                        tb-natural-key--emphasized treatment, not gated on Fix Pending/review mode. -->
-            <div *ngIf="requiredNaturalKeyFields.includes('ibNumber')">
+            <div *ngIf="showCreatingIbNumberInput">
               <label class="tb-field__label">{{ ibNumberLabel }} <span class="tb-required-mark">*</span></label>
               <input
                 class="tb-input tb-input--required tb-natural-key--emphasized"
@@ -369,7 +379,7 @@
               />
               <div id="naturalKeyIbNumberError" class="tb-error mt-1" role="alert" *ngIf="ibNumberCtrl.invalid && ibNumberCtrl.touched">{{ ibNumberLabel }} is mandatory.</div>
             </div>
-            <div *ngIf="requiredNaturalKeyFields.includes('sgNumber')">
+            <div class="tb-natural-key--emphasized" *ngIf="showCreatingSgNumberInput">
               <label class="tb-field__label">SG Number <span class="tb-required-mark">*</span></label>
               <input
                 class="tb-input tb-input--required tb-natural-key--emphasized"

@@ -55,17 +55,16 @@ export const MOVEMENT_DIRECTION: Readonly<Record<string, 1 | -1 | 0>> = {
   // increase" direction as ISSUE/AMEND_INCREASE — no longer a 0-effect movement paired with a separate
   // linked REVERSAL leg.
   REOPEN: 1,
-  // AMEND_EXPIRY_DATE (A2/B2's third amendment option, also the Expiry Extension Amendment entry
-  // point) — same "0, not absent" rationale as REOPEN above: it only ever updates the expiryDate
-  // column, amount is always '0' by construction, no balance effect of its own.
+  // AMEND_EXPIRY_DATE is 0 for a plain ACTIVE amendment. An EXPIRED extension carries
+  // reversalOfMovementId and is dynamically treated as the inverse of that EXPIRE by signedAmount().
   AMEND_EXPIRY_DATE: 0,
 };
 
 /** movementTypes whose `amount` field represents a face-level delta needing §6.2 Tolerance conversion before it contributes to Confirmed Balance — see domain/tolerance.ts. Confirmed/Available Balance derivation always uses ceilingAmount (already converted), never amount, so this list is informational/for callers assembling movements. */
-export const TOLERANCE_APPLICABLE_MOVEMENT_TYPES: ReadonlySet<string> = new Set(['ISSUE', 'AMEND_INCREASE', 'AMEND_DECREASE']);
+export const TOLERANCE_APPLICABLE_MOVEMENT_TYPES: ReadonlySet<string> = new Set(['ISSUE', 'AMEND_INCREASE', 'AMEND_DECREASE', 'AMEND']);
 
 /** Face-amount-affecting movementTypes — see computeFaceAmount. */
-const FACE_AMOUNT_MOVEMENT_TYPES: ReadonlySet<string> = new Set(['ISSUE', 'AMEND_INCREASE', 'AMEND_DECREASE']);
+const FACE_AMOUNT_MOVEMENT_TYPES: ReadonlySet<string> = new Set(['ISSUE', 'AMEND_INCREASE', 'AMEND_DECREASE', 'AMEND']);
 
 type ReversibleMovement = Pick<BalanceMovement, 'movementId' | 'movementType' | 'ceilingAmount' | 'reversalOfMovementId'>;
 
@@ -77,7 +76,7 @@ type ReversibleMovement = Pick<BalanceMovement, 'movementId' | 'movementType' | 
  * also resolve correctly if one were ever created, though nothing in this codebase does that today.
  */
 function signedAmount(m: ReversibleMovement, byId: ReadonlyMap<string, ReversibleMovement>): Decimal {
-  if (m.movementType === 'REVERSAL') {
+  if (m.movementType === 'REVERSAL' || (m.movementType === 'AMEND_EXPIRY_DATE' && m.reversalOfMovementId)) {
     const original = m.reversalOfMovementId ? byId.get(m.reversalOfMovementId) : undefined;
     if (!original) {
       throw new Error(`REVERSAL movement "${m.movementId}" has no resolvable reversalOfMovementId within the supplied movements list.`);
@@ -107,7 +106,11 @@ export function computeAvailableBalance(
   movements: readonly (ReversibleMovement & Pick<BalanceMovement, 'status'>)[],
 ): Decimal {
   const byId = byMovementId(movements);
-  const pendingDelta = movements.filter((m) => m.status === 'PENDING').reduce((acc, m) => acc.plus(signedAmount(m, byId)), ZERO);
+  // An Expiry Extension exposes its restoration voucher while PENDING for Checker review, but does not
+  // restore usable balance until Release. Other PENDING movements retain their normal reservation logic.
+  const pendingDelta = movements
+    .filter((m) => m.status === 'PENDING' && m.movementType !== 'AMEND_EXPIRY_DATE')
+    .reduce((acc, m) => acc.plus(signedAmount(m, byId)), ZERO);
   return confirmedBalance.plus(pendingDelta);
 }
 
@@ -138,16 +141,16 @@ export function computePendingDecreaseTotal(movements: readonly (ReversibleMovem
  * Design doc §3.3/§6.2 — LC 面額 faceAmount, tracked independently of
  * Confirmed Balance because UTILIZE reduces Confirmed Balance without ever
  * touching the face amount. Sums RELEASED ISSUE/AMEND_INCREASE/AMEND_DECREASE
- * movements' own `amount` (face-level, NOT ceilingAmount).
+ * movements' own `amount` (face-level, NOT ceilingAmount). EPLC_CONFIRMATION
+ * uses signed `AMEND` amounts, while IPLC_LC uses the split increase/decrease
+ * movement types.
  */
 export function computeFaceAmount(movements: readonly Pick<BalanceMovement, 'movementType' | 'amount' | 'status'>[]): Decimal {
   return movements
     .filter((m) => m.status === 'RELEASED' && FACE_AMOUNT_MOVEMENT_TYPES.has(m.movementType))
     .reduce((acc, m) => {
-      const direction = MOVEMENT_DIRECTION[m.movementType];
-      if (direction === undefined) {
-        throw new Error(`MOVEMENT_DIRECTION has no entry for movementType "${m.movementType}".`);
-      }
+      // FACE_AMOUNT_MOVEMENT_TYPES contains only values registered in MOVEMENT_DIRECTION.
+      const direction = MOVEMENT_DIRECTION[m.movementType] as 1 | -1;
       return acc.plus(parseMonetaryAmount(m.amount).times(direction));
     }, ZERO);
 }

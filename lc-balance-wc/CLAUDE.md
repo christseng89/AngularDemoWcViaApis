@@ -1,6 +1,6 @@
 # Balance Component
 
-本文件是 `lc-balance` 的仓库级开发入口，只保留跨目录约束。修改某个目录时，还必须遵循距离目标文件最近的 `CLAUDE.md`。
+本文件是 `lc-balance-wc` 的仓库级开发入口，只保留跨目录约束。修改某个目录时，还必须遵循距离目标文件最近的 `CLAUDE.md`。
 
 ## 工作范围
 
@@ -40,6 +40,18 @@
 - 规格优先于错误的既有实现；不能通过改写预期结果来掩盖缺陷。
 
 详细规则见 `docs/balance-business-rules.md` 和 `docs/engineering-standards.md`。
+
+## SWIFT Expert Certification Gate
+
+凡涉及 SWIFT 报文、字段、格式、代码字或 Trade Finance 业务语义的修改，必须按 SWIFT 专家级标准完成跨层认证检查：确认适用规则、字段格式、边界条件、API 校验、Angular 校验、持久化结果、Business Case Runner 案例及文档彼此一致。不得仅凭 UI 限制取代服务端权威校验，也不得把推测写成 SWIFT 规则；若权威资料与现有实现冲突，必须记录并升级确认。
+
+- Balance Component 与 MT7xx 系列的整合属于高风险认证范围；LC 开立、修改、保兑及相关交易的字段映射或余额效果变更，必须逐项完成上述检查。
+- 边界必须明确：MT707 对外字段表达修证后最终有效 Tolerance；这不是 Balance Component API 的字段语义。SWIFT／业务编排层必须以当前值计算 change，再传入 Balance Component 的 `toleranceChangePct` 与 `toleranceChangeDirection`，不得把 MT707 最终值直接当作 change。
+- A1／B1 的初始 `tolerancePct` 只接受非负整数字符串。
+- A2／B2 只接受非负整数的 `toleranceChangePct`；`tolerancePct` 是后端计算并保护的 Resulting Tolerance，不是 Amendment 输入字段。
+- Decrease 后的 Resulting Tolerance 可等于 0，但不得小于 0；Angular 与 API 必须使用相同规则直接拒绝。
+- Amendment Release 不接受也不重传最终 `tolerancePct`；服务端必须从已保存的 change 与当前核准 Contract 自行重算、检查 stale basis，并仅在 Release 成功后激活最终值。
+- 每项 SWIFT 相关变更必须有正向、边界及拒绝案例，并纳入相关单元／整合测试与 Business Case Runner。
 
 ## 目录级规则
 

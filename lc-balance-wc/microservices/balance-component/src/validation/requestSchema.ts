@@ -92,6 +92,8 @@ export const editMovementRequestSchema = z
     // `isCreatingEdit` gate is what actually decides whether they take effect (silently ignored for a
     // non-creating edit, same posture other passthrough-only fields already have).
     tolerancePct: z.string().nullable().optional(),
+    toleranceChangePct: z.string().nullable().optional(),
+    toleranceChangeDirection: z.enum(['INCREASE', 'DECREASE']).nullable().optional(),
     tenorType: z.enum(['SIGHT', 'SELLERS_USANCE', 'BUYERS_USANCE']).nullable().optional(),
     tenorDays: z.number().nullable().optional(),
     expiryDate: z.string().nullable().optional(),

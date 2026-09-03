@@ -23,6 +23,7 @@ export interface BuilderModel {
   amount?: string;
   currency?: string;
   tolerancePct?: string;
+  toleranceChangePct?: string;
   eventSeq?: number;
   createdBy?: string;
   /** Generic secondary reference (Amendment No./IB Number/…), required on every function except LC Issue (A1/B1). Sent as sourceTransactionRef. */

@@ -13,6 +13,14 @@ export interface BalanceSnapshotImpact {
   after: string | null | undefined;
 }
 
+export interface PendingAmendmentDisplay {
+  reference: string | null;
+  balanceEffect: string;
+  toleranceBeforePct: string;
+  toleranceAfterPct: string | null;
+  isPending: boolean;
+}
+
 /**
  * Part B (2026-08-21, "next sprint" tech-debt proposal, actioned same day at user request — "Part B 也一起做吧") —
  * extracted from the former `#balanceSnapshotBox` `ng-template` in `transaction-builder.component.html`
@@ -36,6 +44,15 @@ export class BalanceSnapshotBoxComponent {
   @Input() snapshot: BalanceSnapshot | null = null;
   /** Omitted (stays null) by the Look Up panel's own call site — that box shows plain, unannotated Confirmed Balance, unchanged. Only Inquire Events passes a real value. */
   @Input() impact: BalanceSnapshotImpact | null = null;
+  /** A2/B2 only: the selected PENDING amendment's own tolerance-adjusted balance delta, before netting other pending movements. */
+  @Input() pendingAmendmentBalanceEffect: string | null = null;
+  /** A2/B2 only: the tolerance captured on the selected amendment proposal. */
+  @Input() amendmentTolerancePct: string | null = null;
+  /** A2/B2 only: the contract tolerance still in force before the selected PENDING proposal is Released. */
+  @Input() amendmentToleranceBeforePct: string | null = null;
+  @Input() amendmentIsPending = true;
+  /** Current Balance may contain more than one independently addressable PENDING amendment. */
+  @Input() pendingAmendments: readonly PendingAmendmentDisplay[] = [];
   @Input() variant: 'full' | 'compact' = 'full';
   @Input() appearance: 'current' | 'default' = 'current';
 }

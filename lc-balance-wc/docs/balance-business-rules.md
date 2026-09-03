@@ -28,12 +28,29 @@
 
 ## Balance 与金额
 
-- 权威金额以 Decimal 处理，并按交易币种的小数位验证。
+- 权威金额以 Decimal 处理，并按交易币种的小数位验证；所有派生金额在币种边界统一采用
+  `ROUND_HALF_UP`（四舍五入），例如 JPY 0 位、USD 2 位、KWD 3 位。
 - 明确区分 face amount、ceiling／exposure amount、Available Balance、Confirmed Balance 和 Tight Available Balance。
 - Tolerance、Increase／Decrease、Utilization、Settlement、Redemption、Close 与 Reopen 必须复用 Domain 中的统一公式。
+- A2／B2 金额或 Tolerance 修改必须以修改前后的**整笔合约上限差额**入账：
+  `delta = round(newFace × (1 + newTolerance)) - round(oldFace × (1 + oldTolerance))`。
+  不得只把本次 Increase／Decrease 金额乘上新 Tolerance。Tolerance 在 Maker Submit／PENDING 阶段只记录在 movement，
+  Checker Release 后才更新 contract；Release 时必须依最新已放行基准重算并拒绝 stale amendment。
+- A1／B1 `tolerancePct` 与 A2／B2 `toleranceChangePct` 只接受非负整数字符串。
+- A2／B2 可只改 Amount、只改 Tolerance，或两者同改。Tolerance-only 以 API `amount: "0"` 表达；
+  Request 传 `toleranceChangePct` + `toleranceChangeDirection`；PENDING `tolerancePct` 保持旧核准值，交易本身保存 change。
+  Checker Release 后 Movement／Contract `tolerancePct` 才成为后端计算的最终值。
+  Amount 为 0 且 Tolerance Change 为 0／未输入的 no-op 由 UI 与微服务共同拒绝。
+- MT707 对外表达修证后的最终 Tolerance，不属于 Balance Component API 输入语义；SWIFT／业务编排层必须先以
+  当前值换算 change，禁止把 MT707 最终值直接传入 `toleranceChangePct`。
+- `AMEND_EXPIRY_DATE` 不接受 Tolerance，也不得改变 Face Amount 或合约 Tolerance。外部 request 金额固定为 0；
+  ACTIVE 合约是零金额纯日期修改。EXPIRED 合约由服务端把最后一笔 RELEASED EXPIRE 的金额和反向分录放入
+  同一笔 PENDING Amendment，Release 后才恢复 Confirmed／Tight Available Balance；CANCELLED／REJECTED
+  尝试不得遮蔽恢复依据，也不得要求用户另做 AMEND_INCREASE。
 - 会计分录必须按币种借贷平衡；UI 格式化不得改变存储或计算值。
 - 余额不足、Full Redeem 等限制必须在服务端执行，不能只依赖前端提示。
-- Tight Available Balance 在任何交易或测试案例中都不得小于 0。
+- Tight Available Balance 的操作目标不得小于 0；snapshot 可保留负值作为 over-commit 诊断，
+  Business Case Runner 必须自动建立 A02／B02 修复并验证其回到非负。
 - A2／B2 Decrease、A3、A8 和 B3 的权威上限是 Tight Available Balance；A3S 的上限是
   `Tight Available Balance + selected SG outstanding`，且 Arrival Amount 必须覆盖所选 SG redemption。
 - 上述规则必须在 UI Submit、Maker/API command 和 Checker Release 的适用阶段检查；最终服务端检查不可绕过。
@@ -61,6 +78,9 @@
 - Expiry Date 及营业日规则由服务端验证；国内营业日服务不可用时必须产生明确错误。
 - Auto Expiry／Auto Close、手动 Close 和 Reopen 必须遵守批准的资格、宽限期、原因码和审计要求。
 - Reopen 后恢复哪些余额或状态必须由确定性的 Domain 规则处理，不在 UI 中推导。
+- EXPIRED Expiry Date Extension 必须以最后一笔 RELEASED movement 判断恢复依据；若为 EXPIRE，Maker Submit
+  先产生可供 Checker 审核的 PENDING Account Entries，Release 才恢复余额并转回 ACTIVE。Submit 与 Release
+  必须使用同一判断规则。
 
 ## 规则变更
 

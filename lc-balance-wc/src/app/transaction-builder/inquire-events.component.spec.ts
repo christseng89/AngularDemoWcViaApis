@@ -107,6 +107,85 @@ describe('InquireEventsComponent', () => {
     expect(c.ibNumberLabel).toBe('EB Number');
   });
 
+  it('exposes the selected A2/B2 tolerance-adjusted balance effect with the correct direction', () => {
+    const c = new InquireEventsComponent();
+
+    expect(c.pendingAmendmentBalanceEffect(movement({ movementType: 'AMEND_INCREASE', ceilingAmount: '32000' }))).toBe('32000');
+    expect(c.pendingAmendmentBalanceEffect(movement({ movementType: 'AMEND_DECREASE', ceilingAmount: '22000' }))).toBe('-22000');
+    expect(c.pendingAmendmentBalanceEffect(movement({ movementType: 'AMEND_DECREASE', ceilingAmount: '-5000' }))).toBe('5000');
+    expect(c.pendingAmendmentBalanceEffect(movement({ movementType: 'AMEND_DECREASE', ceilingAmount: '0' }))).toBe('0');
+    expect(c.pendingAmendmentBalanceEffect(movement({ movementType: 'AMEND', ceilingAmount: '-15000' }))).toBe('-15000');
+    expect(c.amendmentTolerancePct({ movement: movement({ movementType: 'AMEND_INCREASE', ceilingAmount: '32000', tolerancePct: '20' }), eventStatus: 'RELEASED', phase: 'primary' } as InquiredEvent)).toBe('20');
+    expect(c.pendingAmendmentBalanceEffect(movement({ movementType: 'UTILIZE' }))).toBeNull();
+    expect(c.amendmentTolerancePct({ movement: movement({ movementType: 'UTILIZE', tolerancePct: '20' }), eventStatus: 'RELEASED', phase: 'primary' } as InquiredEvent)).toBeNull();
+  });
+
+  it('derives a released Decrease tolerance transition from prior released history, not the current contract value', () => {
+    const c = new InquireEventsComponent();
+    const issue = { movement: movement({ movementId: 'issue', eventSeq: 1, movementType: 'ISSUE', tolerancePct: '0' }), eventStatus: 'RELEASED', phase: 'primary' } as InquiredEvent;
+    const increase = { movement: movement({ movementId: 'inc', eventSeq: 2, movementType: 'AMEND_INCREASE', tolerancePct: '20' }), eventStatus: 'RELEASED', phase: 'primary' } as InquiredEvent;
+    const decrease = { movement: movement({ movementId: 'dec', eventSeq: 3, movementType: 'AMEND_DECREASE', tolerancePct: '15' }), eventStatus: 'RELEASED', phase: 'primary' } as InquiredEvent;
+    c.inquireEvents = { events: [issue, increase, decrease] } as never;
+
+    expect(c.amendmentToleranceBeforePct(decrease)).toBe('20');
+    expect(c.amendmentTolerancePct(decrease)).toBe('15');
+  });
+
+  it('keeps Pending movement tolerance at the old approved value and derives the displayed result from its change', () => {
+    const c = new InquireEventsComponent();
+    const pending = {
+      movement: movement({
+        movementType: 'AMEND_INCREASE',
+        tolerancePct: '10',
+        toleranceChangePct: '5',
+        toleranceChangeDirection: 'INCREASE',
+      }),
+      eventStatus: 'PENDING',
+      phase: 'primary',
+    } as InquiredEvent;
+    expect(c.amendmentTolerancePct(pending)).toBe('15');
+    expect(pending.movement.tolerancePct).toBe('10');
+  });
+
+  it('falls back to the old approved value for a Pending amendment that carries no tolerance change', () => {
+    const c = new InquireEventsComponent();
+    const pending = {
+      movement: movement({ movementType: 'AMEND_INCREASE', tolerancePct: '10', toleranceChangePct: null }),
+      eventStatus: 'PENDING',
+      phase: 'primary',
+    } as InquiredEvent;
+
+    expect(c.amendmentTolerancePct(pending)).toBe('10');
+  });
+
+  it('returns null when the derived resulting tolerance would be invalid (e.g. a decrease below zero)', () => {
+    const c = new InquireEventsComponent();
+    const pending = {
+      movement: movement({
+        movementType: 'AMEND_DECREASE',
+        tolerancePct: '10',
+        toleranceChangePct: '11',
+        toleranceChangeDirection: 'DECREASE',
+      }),
+      eventStatus: 'PENDING',
+      phase: 'primary',
+    } as InquiredEvent;
+
+    expect(c.amendmentTolerancePct(pending)).toBeNull();
+  });
+
+  it('ignores unrelated, pending, and non-amendment history while deriving the prior operative tolerance', () => {
+    const c = new InquireEventsComponent();
+    const unrelated = { movement: movement({ movementId: 'other', balanceContractId: 'bc-other', movementType: 'AMEND_INCREASE', tolerancePct: '99' }), eventStatus: 'RELEASED', phase: 'primary' } as InquiredEvent;
+    const pending = { movement: movement({ movementId: 'pending', movementType: 'AMEND_INCREASE', tolerancePct: '88' }), eventStatus: 'PENDING', phase: 'primary' } as InquiredEvent;
+    const utilize = { movement: movement({ movementId: 'utilize', movementType: 'UTILIZE', tolerancePct: '77' }), eventStatus: 'RELEASED', phase: 'primary' } as InquiredEvent;
+    const selected = { movement: movement({ movementId: 'selected', movementType: 'AMEND_DECREASE', tolerancePct: '15' }), eventStatus: 'RELEASED', phase: 'primary' } as InquiredEvent;
+    c.inquireEvents = { events: [unrelated, pending, utilize, selected] } as never;
+
+    expect(c.amendmentToleranceBeforePct(selected)).toBe('0');
+    expect(c.amendmentToleranceBeforePct(utilize)).toBeNull();
+  });
+
   describe('thin pure-function delegations (same shared balance-component.model.ts rules TransactionBuilderComponent itself uses for its own remaining sections)', () => {
     it('displayStatus()', () => {
       const c = new InquireEventsComponent();

@@ -4521,3 +4521,128 @@ Angular host 與 `<balance-component-app>` 共用的 Maker result policy 現在�
 一般、compound 與 acknowledgment Checker Release 成功後，Angular host 與 `<balance-component-app>` 現在共用同一 reset transition：保留所選 Function，但清除 Maker Result、已 RELEASED movement、selected Checker movement、Fix/Delete Pending one-shot signals 與舊同步 signal。這避免已完成 movement 再次進入 Fix Pending 所造成的 duplicate／illegal transition；Reject 與失敗結果仍保留 Maker 資料。
 
 參數化 regression 覆蓋 A1-A11／B1-B7；全套 63 suites／1,781 tests 通過，coverage 97.85%／95.10%／96.36%／98.31%。HTTP OAS、Channel OAS 與 Web Component DOM contract 均無 wire change；本資料夾的 Microservice／Channel OAS 分別維持 v1.42.1／v1.9.0。
+
+## 2026-09-03 — A2／B2 Amount × Tolerance amendment 重算
+
+依用户提供的 Amendment 反馈与 UCP／ICC 边界重新整理 A2／B2：monetary amendment 不再把单笔
+Increase／Decrease 直接乘新 Tolerance，而是分别按币别小数位以 `ROUND_HALF_UP` 算出修改前／后完整
+合约上限，再将两者差额写入 movement、余额与 Account Entry。新的 Tolerance 先保存在 PENDING movement，
+Checker Release 依最新 RELEASED history 重算，成功后才更新 contract；过期并发基准会被拒绝。
+
+`AMEND_EXPIRY_DATE` 明确定义为纯日期事件，不接受 Tolerance，不产生金额差额。Business Case Runner 新增
+`import-case-16`／`export-case-15`，在同一 LC／Confirmation 连续执行 Amount Increase／Decrease ×
+Tolerance Increase／Decrease 四种组合；Domain tests 另覆盖 JPY 0、USD 2、KWD 3 位四舍五入。
+Microservice OAS 升至 v1.46.0，Channel OAS 升至 v1.13.0；Obsidian 的 Tolerance Processing 与 freshness log 同步更新。
+
+## 2026-09-03 — Fix Pending Event Snapshot 即時重算與 A2／B2 顯示拆分
+
+現場 S01 的 A2 Fix Pending 已把 movement `ceilingAmount` 改為 32,000，但既有
+`eventSnapshot` 仍保留修改前的 Available 111,000／Pending Earmark 11,000，造成畫面看似必須等
+Checker Release 才更新。根因是 in-place correction SQL 未包含 Event／Root／Acceptance／SG snapshot
+欄位。Standard Fix Pending 現在於同一 DB transaction 以修正後 movement 重建 snapshot bundle 並覆寫，
+因此 S01 立即顯示 Available 122,000／Pending Earmark 22,000；不需等待 Release。A3S compound 的 SG leg
+亦採相同處理。
+
+Inquire Events 與 Transaction Processing Current Balance 的 A2／B2 PENDING Balance 區塊另顯示 amendment 自己的
+`Pending Amendment Balance Effect`（S01 為 32,000）與 `Amendment Tolerance` 生效值→提案值（S01 為
+原交易 `0% → 10%`，Fix Pending 後 `0% → 20%`）。同一 LC 若有多筆 pending amendments，Current Balance
+逐筆附 Reference 顯示，不任意挑選或合併。`Pending Earmark Total` 保持業務定義：同一合約全部 PENDING movement 的淨額，故另有
+10,000 UTILIZE 時為 22,000。新增 microservice S01 regression 與 Angular component/helper tests；
+Microservice／Channel OAS 升至 v1.46.1／v1.13.1。
+
+## 2026-09-03 — A2／B2 支援只改 Amount、只改 Tolerance 或兩者同改
+
+A2／B2 Amount 欄位改為 optional；只輸入 Tolerance 時 reference UI 將 API 必填 Amount 正規化為
+decimal string `"0"`。微服務允許 monetary amendment 的零 Amount，但以目前合約 Tolerance 再做
+no-op 檢查：Amount 為 0 且 Tolerance 未改變時拒絕。Amount-only、Tolerance-only、兩者同改，以及
+明確把 Tolerance 改為 0 都有前後端測試。Tolerance-only 保持 Current LC Amount 不變，仍以幣別小數位
+ROUND_HALF_UP 計算新舊完整 Upper Limit 差額。
+
+同一修正補齊 RELEASED amendment 顯示：Inquire Events／Current Balance 從按序 RELEASED history 推導
+前一個生效 Tolerance，因此 Decrease 正確顯示 `20% → 15%`；AMEND_DECREASE 的 Balance Effect 也按
+domain direction 真正反號，涵蓋 Tolerance 變動大於名義 Amount 方向的交叉情境。
+
+Microservice／Channel OAS 升至 v1.46.2／v1.13.2；Submit API curl 範例與 Obsidian Tolerance Processing 同步。
+
+驗證：Microservice 40 suites／828 tests，coverage statements 98.47%、branches 95.07%；Angular／WC
+67 suites／1,820 tests，coverage statements 97.86%、branches 95.07%。兩側 typecheck、lint（0 errors）、
+OAS／WC docs validation、Angular production build、Web Component production build與 microservice build 通過；
+前端兩個 production build 僅保留既有 SCSS budget warning。
+
+## 2026-09-03 — Checker Release 後輸入欄位 progressive disclosure
+
+A8 SG Number 與 B3 EB Number 現在只在 Maker 選定下一筆 Parent LC 後顯示；Checker Release 重設畫面時
+不再提前出現空白 required field。Maker Queue Fix Pending 只重建 `selectedContract` 的既有流程仍可顯示並
+修正該欄位。A2／A3／A3S／B2 原有共用 Transaction Input gate 加入明確 regression coverage。A8 SG Number
+外層套用 Amendment No. 相同的 `tb-natural-key--emphasized` class，label 與 input 均放大加粗。
+
+## 2026-09-03 — 全 Function Amount k／m shorthand
+
+所有可編輯 Amount 欄位共用 exact parser：`k/K` 為千、`m/M` 為百萬，多段相加並支援小數與無 suffix
+尾數，例如 `40k2k = 42000`、`1.5m2.5k = 1502500`、`1m500 = 1000500`、`1k.25 = 1000.25`、
+`15000m = 15000000000`。`t/T`、負數、逗號、科學記號、空白及 malformed decimal 在欄位層拒絕。
+Parser 以 BigInt／decimal scale 精確運算，blur 後才把標準 decimal string 寫回 Formly model；若用戶輸入後
+未離開欄位便直接 Submit，按鈕 readiness 會以不改動畫面的 normalized copy 驗證，真正送出前再將 model
+正規化，確保 API request 仍只收到 decimal string。protected／系統帶入 Amount 不受影響。API、DB、
+Microservice OAS v1.46.2、Channel OAS v1.13.2 與 WC DOM contract 均不變。
+
+驗證：Angular／WC 68 suites／1,873 tests 全通過；coverage statements 97.78%、branches 95.05%、
+functions 96.32%、lines 98.30%。Lint 0 errors、WC／adapter typecheck、WC docs/OAS validation、npm audit
+（0 vulnerabilities）、Angular production build及 Web Component production build通過；兩個 build 僅保留既有 SCSS budget warning。
+
+## 2026-09-03 — Amendment input 去除重複 identity／Direction control
+
+A2／B2 選好 Direction 與 LC 後，Transaction Input 不再重複顯示已由 Index 鎖定的 LC Number，Direction
+下拉選單也改成醒目的唯讀 `Amendment Direction` 標示；選錯方向須以 Cancel 返回 Selection Screen，避免
+在已綁定 contract 後改變 movement type。A8 SG Number 的欄位名稱與輸入值則共用 Amendment Number 的
+完整 emphasis selector（放大、加粗、藍色；required 星號保持紅色），不再只有輸入值套用樣式。
+
+驗證：Angular／WC 68 suites／1,877 tests 全通過；coverage statements 97.78%、branches 95.03%、
+functions 96.34%、lines 98.30%。Lint 0 errors、WC typecheck、WC docs／OAS validation通過。
+
+## 2026-09-03 — Amount shorthand 新增 h／H（百）
+
+既有共用 exact parser 新增 `h/H = 100`，沿用相同 additive grammar、BigInt／decimal-scale 運算、
+blur normalization 與 Submit-before-blur normalization。例：`20.5h = 2050`、`3h2h = 500`、
+`1m2k3h = 1002300`、`1h.25 = 100.25`；`t/T` 仍拒絕。所有可編輯 Amount 欄位自動支援，
+protected／系統帶入 Amount 不解析 shorthand；API、DB、OAS 與 currency rounding contract 均不變。
+
+驗證：Angular／WC 68 suites／1,884 tests 全通過；coverage statements 97.78%、branches 95.03%、
+functions 96.34%、lines 98.30%。Lint 0 errors、WC typecheck、WC docs／OAS validation通過。
+
+## 2026-09-03 — Amount Angular 即時千分位顯示
+
+所有可編輯 Amount 改用共用 `formatted-amount` Formly 欄位。純數字及小數在 Angular 畫面輸入時即時
+顯示千分位；含 h/k/m shorthand 的字串在輸入中保持原樣，blur 後以既有 exact parser 展開並顯示
+千分位。畫面值與 domain value 分離，FormControl、Formly model、驗證、計算與 API payload 始終使用
+不含逗號的 decimal string；protected／系統帶入 Amount 不變。此項沒有 API、DB 或 OAS 變更。
+
+驗證：Angular／WC 69 suites／1,891 tests 全通過；coverage statements 97.80%、branches 95.06%、
+functions 96.36%、lines 98.29%。Lint 0 errors、WC typecheck、WC docs validation、Angular production build
+及 Web Component production build通過；build 僅保留既有 budget warnings。
+
+## 2026-09-03 — EXPIRED Expiry Date Amendment 恢復 Tight Balance（S01 retry 修正）
+
+以最新 source code 為準修正 S01：Maker 對 EXPIRED 合約提交 `AMEND_EXPIRY_DATE` 時，外部 Amount 仍為
+`0`；服務端只從 RELEASED movement history 取最後一筆有效事件。若為 EXPIRE，便將其
+`ceilingAmount`、`reversalOfMovementId` 與反向 Account Entries 寫在同一筆 PENDING Amendment 上，
+讓 Checker 在核准前看見實際恢復分錄。CANCELLED／REJECTED retry 不得遮蔽 EXPIRE。Checker Release
+複查同一 restoration basis；通過後啟用該筆 movement、恢復 Confirmed／Available／Tight Balance 並將
+合約轉回 ACTIVE，不另建 hidden linked REVERSAL，也不需要補做 AMEND_INCREASE。
+
+同步更新 current behavior、business rules、calculation logic、Submit API examples、microservice OAS
+v1.49.0、channel OAS v1.15.0、F1 歷史提案 supersession、TODO 歷史註記，以及 Obsidian 規則／流程／
+traceability／freshness／source map。驗證：Balance Component microservice 40 suites／837 tests 全通過，
+branch coverage 95.03%；OAS YAML parse、build／typecheck 與文件差異檢查通過。
+
+## 2026-09-03 — 全部可輸入 Amount 與 A1 統一
+
+確認所有 Maker 可編輯 Amount 都經由同一個 `formatted-amount` Formly field：A1、A2
+Increase／Decrease、A3、A3S、A7 Partial Settle、A8、B1、B2 Increase／Decrease、B3 與 B5
+Partial Settle。因此各功能一致支援大小寫 `m/k/h`、additive shorthand、小數、純數字即時千分位、
+blur 展開，以及未 blur 直接 Submit 時的正規化。新增 registry-level matrix regression test，防止未來新增
+Function 時繞過 A1 的共用輸入方式。由交易選取或服務端帶入的 protected Amount 維持唯讀，不解析 shorthand。
+
+驗證：70 suites／1,934 tests 全通過；coverage statements 97.88%、branches 95.05%、functions 96.39%、
+lines 98.40%。Lint 0 errors（保留既有 warnings）、WC typecheck、WC docs／OAS validation 與
+`git diff --check` 通過。

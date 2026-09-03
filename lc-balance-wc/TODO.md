@@ -63,8 +63,11 @@ docx，其中無 `-en` 後綴的那份內容已同步修訂，`-en.docx` 卻是�
   最初設計（金額固定 0、Release 時另外產生連動 `REVERSAL` movement）在使用者實測後發現 Checker 在核准前看不到
   真實分錄與金額——已改為 REOPEN 自己在 Submit 當下就帶入伺服器算出的真實金額（沖銷鏈加總）並產生真實
   `contingentAccountEntry`，Checker Approve 前即可審核；Inquire Events/Look Up 現在每筆 Reopen 只顯示一筆
-  記錄，不再是兩筆。`REVERSAL` movementType 本身保留（Expiry Extension Amendment 仍在使用），只是 REOPEN
-  不再用它。三套測試套件（microservice/Angular/backend）全綠，27 筆 Business Case Registry 案例（含新增的
+  記錄，不再是兩筆。`REVERSAL` movementType 本身保留，只是 REOPEN 不再用它。**2026-09-03
+  source-code supersession：**EXPIRED Expiry Extension 也不再於 Release 另建 `REVERSAL`；Maker Submit
+  在同一筆 PENDING `AMEND_EXPIRY_DATE` 上放入最後一筆有效 RELEASED EXPIRE 的 reference、受保護復原
+  金額與反向分錄，Checker Release 只啟用這筆已審核 movement。CANCELLED／REJECTED 嘗試不屬於有效
+  餘額歷史。三套測試套件（microservice/Angular/backend）全綠，27 筆 Business Case Registry 案例（含新增的
   Import Case 13-15、Export Case #12）實測通過。
 
 - [x] ~~**F1 proposal §14.4（BA 第二輪 code review，2026-08-25 發現）— Checker 核准畫面看不到 Account
@@ -386,7 +389,10 @@ docx，其中無 `-en` 後綴的那份內容已同步修訂，`-en.docx` 卻是�
     完全在 `AMEND_EXPIRY_DATE` 分支內，REOPEN 自己的分支只做 `reactivate()`，不會建立任何額外
     movement——§12.2 原始發現引用的「REOPEN 路徑B、Approve 後產生1筆REOPEN+2筆REVERSAL、顯示3列」
     這個情境，在目前程式碼下已經**不可能發生**，不是測試剛好沒踩到。
-    (2) **Extension（`AMEND_EXPIRY_DATE`）**：`createAndReleaseReversal()` 只在「trailing movement 是
+    (2) **Extension（`AMEND_EXPIRY_DATE`）**：以下為 2026-08-25 的歷史結論；**已由 2026-09-03
+    現行 source code 取代**。現行設計不呼叫 `createAndReleaseReversal()`，而由同一筆 PENDING Amendment
+    攜帶 EXPIRE 的復原金額、reference 與 Account Entries，Release 後也只顯示／啟用這一筆。
+    舊設計中，`createAndReleaseReversal()` 只在「trailing movement 是
     RELEASED 的 EXPIRE」這個條件成立時觸發一次，不是迴圈；EXPIRE 不能自我串接（要求 ACTIVE 狀態，
     release 後立刻清掉）、CLOSE 不可能出現在 EXPIRED 合約之前（CLOSE 只會晚於 EXPIRED）——所以 Extension
     最多是「1筆 AMEND_EXPIRY_DATE ＋1筆 REVERSAL」＝2列，從未達到§12.2 原始發現的「3列以上」情境，也

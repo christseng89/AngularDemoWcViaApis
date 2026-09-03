@@ -23,6 +23,7 @@ import { FeedbackMessageComponent } from '../shared/feedback/feedback-message.co
 import { UiMessage } from '../shared/feedback/ui-message.model';
 import { presentApiError } from '../shared/feedback/api-error-presenter';
 import { MonetaryAmountPipe } from './monetary-amount.pipe';
+import { amendmentDirection, resultingTolerancePct } from './tolerance-change';
 
 /** Emitted when the "Original Transaction Screen" panel's own Account Entries button is clicked — the dialog itself stays parent-owned (`TransactionBuilderComponent`), since it's also opened from the Maker Result panel and the Look Up panel's own Event Timeline, not just from here. */
 export interface InquireOpenAccountEntriesEvent {
@@ -101,6 +102,50 @@ export class InquireEventsComponent {
   readonly statusBadgeIcon = statusBadgeIconShared;
   readonly displayMovementType = displayMovementTypeShared;
   readonly displayMovementAmount = displayMovementAmountShared;
+
+  /**
+   * A2/B2 display aid: ceilingAmount is the amendment's tolerance-adjusted balance effect before it is
+   * netted with unrelated PENDING movements in Pending Earmark Total. Import decrease stores a positive
+   * ceiling behind a movement type whose domain direction is -1; Export AMEND is already signed.
+   */
+  pendingAmendmentBalanceEffect(movement: BalanceMovement): string | null {
+    switch (movement.movementType) {
+      case 'AMEND_INCREASE':
+      case 'AMEND':
+        return movement.ceilingAmount;
+      case 'AMEND_DECREASE':
+        if (Number(movement.ceilingAmount) === 0) return movement.ceilingAmount;
+        return movement.ceilingAmount.startsWith('-') ? movement.ceilingAmount.slice(1) : `-${movement.ceilingAmount}`;
+      default:
+        return null;
+    }
+  }
+
+  amendmentTolerancePct(event: InquiredEvent): string | null {
+    const movement = event.movement;
+    if (this.pendingAmendmentBalanceEffect(movement) === null) return null;
+    if (event.eventStatus !== 'PENDING' || movement.toleranceChangePct == null) return movement.tolerancePct ?? null;
+    const result = resultingTolerancePct(
+      movement.tolerancePct ?? '0',
+      movement.toleranceChangePct,
+      amendmentDirection(movement.movementType, movement.toleranceChangeDirection ?? null),
+    );
+    return result.ok ? result.value : null;
+  }
+
+  /** Operative tolerance immediately before this event; RELEASED history only, never today's contract value. */
+  amendmentToleranceBeforePct(event: InquiredEvent): string | null {
+    if (this.pendingAmendmentBalanceEffect(event.movement) === null) return null;
+    let operative = '0';
+    for (const candidate of this.inquireEvents.events) {
+      if (candidate.movement.movementId === event.movement.movementId && candidate.phase === event.phase) break;
+      if (candidate.movement.balanceContractId !== event.movement.balanceContractId || candidate.eventStatus !== 'RELEASED') continue;
+      if (candidate.movement.movementType === 'ISSUE' || this.pendingAmendmentBalanceEffect(candidate.movement) !== null) {
+        operative = candidate.movement.tolerancePct ?? operative;
+      }
+    }
+    return operative;
+  }
 
   /**
    * Event rows are identified by movement plus display phase. A4 can project the same movement as

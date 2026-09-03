@@ -353,6 +353,10 @@
                 [status]="sel2.contract.status"
                 [snapshot]="inquireEvents.activeEventTab?.snapshot ?? null"
                 [impact]="inquireEvents.activeEventTab?.impact ?? null"
+                [pendingAmendmentBalanceEffect]="pendingAmendmentBalanceEffect(sel2.movement)"
+                [amendmentTolerancePct]="amendmentTolerancePct(sel2)"
+                [amendmentToleranceBeforePct]="amendmentToleranceBeforePct(sel2)"
+                [amendmentIsPending]="sel2.eventStatus === 'PENDING'"
               ></app-balance-snapshot-box>
             </div>
           </div>

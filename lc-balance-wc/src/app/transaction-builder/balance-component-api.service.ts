@@ -18,6 +18,8 @@ export interface CreateMovementRequest {
   amount: string;
   currency: string;
   tolerancePct?: string | null;
+  toleranceChangePct?: string | null;
+  toleranceChangeDirection?: 'INCREASE' | 'DECREASE' | null;
   parentLogicalContractId?: string | null;
   exposureNature?: 'CONTINGENT' | 'ACTUAL' | 'MEMO';
   /** Carries the Amendment No./Times or the Document Arrival's IB Number, per function (Design doc §3.3 audit reference field). */
@@ -126,6 +128,10 @@ export interface BalanceMovement {
   exposureNature: 'CONTINGENT' | 'ACTUAL' | 'MEMO';
   amount: string;
   ceilingAmount: string;
+  /** Tolerance captured on ISSUE/monetary amendment; null for AMEND_EXPIRY_DATE and unrelated events. */
+  tolerancePct?: string | null;
+  toleranceChangePct?: string | null;
+  toleranceChangeDirection?: 'INCREASE' | 'DECREASE' | null;
   currency: string;
   status: 'PENDING' | 'RELEASED' | 'REJECTED' | 'CANCELLED';
   reasonCode?: string | null;
@@ -227,6 +233,8 @@ export interface EditMovementRequest {
    * these for a non-creating movementType regardless of what's sent here.
    */
   tolerancePct?: string | null;
+  toleranceChangePct?: string | null;
+  toleranceChangeDirection?: 'INCREASE' | 'DECREASE' | null;
   tenorType?: 'SIGHT' | 'SELLERS_USANCE' | 'BUYERS_USANCE' | null;
   tenorDays?: number | null;
   expiryDate?: string | null;
@@ -344,6 +352,7 @@ export class BalanceComponentApiService {
     tenorFamily?: 'SIGHT' | 'USANCE',
     requireIssueReleased?: boolean,
     excludeCancelled?: boolean,
+    statuses?: string[],
   ): Observable<CatalogPage> {
     const params: Record<string, string | number> = { instrumentType, page, pageSize };
     if (status) params['status'] = status;
@@ -352,6 +361,7 @@ export class BalanceComponentApiService {
     if (tenorFamily) params['tenorFamily'] = tenorFamily;
     if (requireIssueReleased) params['requireIssueReleased'] = 'true';
     if (excludeCancelled) params['excludeCancelled'] = 'true';
+    if (statuses?.length) params['statuses'] = statuses.join(',');
     return this.http.get<CatalogPage>(`${this.base}/balance-contracts/catalog`, { params });
   }
 

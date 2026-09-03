@@ -1,4 +1,6 @@
-import { BuilderFieldsContext, buildFields, reconstructOriginalModel, toReadOnlyFields } from './builder-fields';
+import { FormControl } from '@angular/forms';
+import { BuilderFieldsContext, buildFields, isFixPendingFieldEditable, reconstructOriginalModel, toReadOnlyFields } from './builder-fields';
+import { AMOUNT_SHORTHAND_ERROR } from './amount-shorthand';
 import { CURRENCY_OPTIONS, IMPORT_FUNCTIONS, EXPORT_FUNCTIONS, type TransactionFunction } from './balance-component.model';
 import type { BalanceContract, BalanceMovement, BalanceSnapshot } from './balance-component-api.service';
 
@@ -78,7 +80,7 @@ describe('builder-fields', () => {
   // added newExpiryDate (hidden unless AMEND_EXPIRY_DATE) and expiryDate (A1/B1 only, shown here) as two
   // new fixed fields, always present in the array (hide toggles visibility, not presence). F1 proposal
   // §13.1 (BA-ratified 2026-08-25) added a third, reasonCode (hidden unless A10/B6/A11/B7).
-  it('returns the 11 fixed field keys, in order, for a plain A1 submission', () => {
+  it('returns the 12 fixed field keys, in order, for a plain A1 submission', () => {
     const fields = buildFields(baseCtx());
     expect(fields.map((f) => f.key)).toEqual([
       'secondaryRef',
@@ -88,11 +90,23 @@ describe('builder-fields', () => {
       'reasonCode',
       'currency',
       'tolerancePct',
+      'toleranceChangePct',
       'tenorType',
       'tenorDays',
       'eventSeq',
       'createdBy',
     ]);
+  });
+
+  it.each([
+    ['A2', 'IPLC_LC', 'AMEND_INCREASE'],
+    ['A2', 'IPLC_LC', 'AMEND_DECREASE'],
+    ['B2', 'EPLC_CONFIRMATION', 'AMEND'],
+  ])('%s monetary amendment makes Amount optional and permits zero for Tolerance-only input', (code, instrumentType, movementType) => {
+    const amount = fieldByKey(buildFields(baseCtx({ selectedFunction: fn(code), model: { instrumentType: instrumentType as any, movementType, currency: 'USD' } })), 'amount');
+    expect(amount.props?.required).toBe(false);
+    expect(amount.props?.min).toBe(0);
+    expect(amount.props?.label).toBe('Amount (optional — enter Amount, Tolerance, or both)');
   });
 
   it.each(['A4', 'A6', 'A7', 'A9', 'B4', 'B5'])(
@@ -113,13 +127,112 @@ describe('builder-fields', () => {
     expect(amount?.type).toBe('protected-monetary');
   });
 
+  describe('isFixPendingFieldEditable', () => {
+    it('uses the same lock derivation with no function selected, a parent-carried function, and a reason-code function', () => {
+      const noFunction = baseCtx({
+        selectedFunction: null,
+        fixPendingMode: true,
+        model: { instrumentType: 'IPLC_LC', movementType: 'ISSUE', tenorType: 'SIGHT' },
+      });
+      const carriedA6 = baseCtx({
+        selectedFunction: fn('A6'),
+        selectedParent: contract(),
+        fixPendingMode: true,
+        model: { instrumentType: 'IPLC_ACCEPTANCE', movementType: 'CREATE' },
+      });
+      const reopen = baseCtx({
+        selectedFunction: fn('A11'),
+        fixPendingMode: true,
+        model: { instrumentType: 'IPLC_LC', movementType: 'REOPEN' },
+      });
+
+      expect(isFixPendingFieldEditable(noFunction, 'amount')).toBe(true);
+      expect(isFixPendingFieldEditable(noFunction, 'newExpiryDate')).toBe(false);
+      expect(isFixPendingFieldEditable(carriedA6, 'tenorType')).toBe(false);
+      expect(isFixPendingFieldEditable(carriedA6, 'tenorDays')).toBe(false);
+      expect(isFixPendingFieldEditable(reopen, 'reasonCode')).toBe(true);
+
+      const carriedTenor = fieldByKey(buildFields(noFunction), 'tenorType');
+      expect(carriedTenor.hide).toBe(false);
+      expect(carriedTenor.props?.options).toEqual([{ value: 'SIGHT', label: 'Sight' }]);
+    });
+  });
+
   describe('Amount field', () => {
     it('is editable with the plain "face-level" label when nothing locks it', () => {
       const amount = fieldByKey(buildFields(baseCtx()), 'amount');
       expect(amount.props?.disabled).toBe(false);
-      expect(amount.type).toBe('input');
+      expect(amount.type).toBe('formatted-amount');
       expect(amount.props?.label).toBe('Amount (face-level, per Design doc §6.2)');
       expect(amount.props?.max).toBeUndefined();
+    });
+
+    it('uses the shared formatted decimal-text input for additive h/k/m shorthand', () => {
+      const amount = fieldByKey(buildFields(baseCtx()), 'amount');
+
+      expect(amount.type).toBe('formatted-amount');
+      expect(amount.props?.type).toBe('text');
+      expect(amount.props?.attributes).toMatchObject({ inputmode: 'decimal' });
+      expect(amount.props?.blur).toBeUndefined();
+    });
+
+    it.each([
+      ['A1', 'IPLC_LC', 'ISSUE', false],
+      ['A2 Increase', 'IPLC_LC', 'AMEND_INCREASE', false],
+      ['A2 Decrease', 'IPLC_LC', 'AMEND_DECREASE', false],
+      ['A3', 'IPLC_LC', 'UTILIZE', false],
+      ['A3S', 'IPLC_LC', 'UTILIZE', false],
+      ['A7 Partial Settle', 'IPLC_ACCEPTANCE', 'PARTIAL_SETTLE', true],
+      ['A8', 'SHGT', 'ISSUE', false],
+      ['B1', 'EPLC_CONFIRMATION', 'ISSUE', false],
+      ['B2 Increase', 'EPLC_CONFIRMATION', 'AMEND', false],
+      ['B2 Decrease', 'EPLC_CONFIRMATION', 'AMEND', false],
+      ['B3', 'EPLC_EXAMINATION', 'CREATE', false],
+      ['B5 Partial Settle', 'EPLC_ACCEPTANCE', 'PARTIAL_SETTLE', true],
+    ])('%s uses exactly the same editable Amount input and h/k/m validator as A1', (label, instrumentType, movementType, needsSnapshot) => {
+      const code = label.split(' ')[0];
+      const amount = fieldByKey(
+        buildFields(
+          baseCtx({
+            selectedFunction: fn(code),
+            model: { instrumentType: instrumentType as any, movementType, currency: 'USD' },
+            selectedContractSnapshot: needsSnapshot ? snapshot() : null,
+          }),
+        ),
+        'amount',
+      );
+      const shorthand = (amount.validators as any)?.amountShorthand;
+
+      expect(amount.hide).toBe(false);
+      expect(amount.props?.disabled).toBe(false);
+      expect(amount.type).toBe('formatted-amount');
+      expect(amount.props?.type).toBe('text');
+      expect(amount.props?.attributes).toMatchObject({ inputmode: 'decimal' });
+      expect(shorthand.expression(new FormControl('1m2k3h'))).toBe(true);
+      expect(shorthand.expression(new FormControl('1M2K3H'))).toBe(true);
+    });
+
+    it('validates malformed or unsupported shorthand while leaving empty input to the existing required validator', () => {
+      const amount = fieldByKey(buildFields(baseCtx()), 'amount');
+      const shorthand = (amount.validators as any)?.amountShorthand;
+
+      expect(shorthand.expression(new FormControl('40k2k'))).toBe(true);
+      expect(shorthand.expression(new FormControl('20.5h'))).toBe(true);
+      expect(shorthand.expression(new FormControl('1t'))).toBe(false);
+      expect(shorthand.expression(new FormControl('1.2.3m'))).toBe(false);
+      expect(shorthand.expression(new FormControl(''))).toBe(true);
+      expect(shorthand.message).toBe(AMOUNT_SHORTHAND_ERROR);
+    });
+
+    it('does not attach shorthand input behavior to a system-carried protected Amount', () => {
+      const amount = fieldByKey(
+        buildFields(baseCtx({ model: { instrumentType: 'EPLC_ACCEPTANCE', movementType: 'FULL_SETTLE' }, selectedContractSnapshot: snapshot() })),
+        'amount',
+      );
+
+      expect(amount.type).toBe('protected-monetary');
+      expect(amount.props?.blur).toBeUndefined();
+      expect(amount.validators).toBeUndefined();
     });
 
     it('is locked and labeled "carried from the Document Arrival" when settlesDocumentArrival + a picked pay movement (A6-shape)', () => {
@@ -415,31 +528,61 @@ describe('builder-fields', () => {
       expect(tolerance.hide).toBe(true);
     });
 
-    // 2026-08-28: deliberate exception to the shared contractLevelEditable Fix Pending lock — see
-    // deriveFixPendingLockFlags()'s own doc comment. A patched tolerancePct on a non-creating edit
-    // (A2/B2 Increase/Decrease) only affects THIS movement's own ceiling/contingentAccountEntry, never
-    // the contract's own stored tolerancePct (buildEditedRequest()'s updateIssueFields() write-back
-    // stays gated to creating edits only) — so it's safe to unlock even though tenorType/tenorDays/
-    // expiryDate stay locked for the exact same A2 context.
-    it('stays editable during Fix Pending for a non-creating, tolerance-applicable movement (A2 AMEND_INCREASE)', () => {
+    it('protects resulting tolerance and edits only the amendment delta during A2 AMEND_INCREASE Fix Pending', () => {
       const ctx = baseCtx({
         selectedFunction: fn('A2'),
         model: { instrumentType: 'IPLC_LC', movementType: 'AMEND_INCREASE' },
         fixPendingMode: true,
       });
       const tolerance = fieldByKey(buildFields(ctx), 'tolerancePct');
-      expect(tolerance.props?.disabled).toBe(false);
-      expect(tolerance.props?.label).toBe('Tolerance % (Maximum Exposure Basis, only on ISSUE/AMEND*)');
+      const change = fieldByKey(buildFields(ctx), 'toleranceChangePct');
+      expect(tolerance.hide).toBe(true);
+      expect(change.props?.disabled).toBe(false);
+      expect(change.props?.label).toBe('Increase Tolerance By %');
     });
 
-    it('stays editable during Fix Pending for A2 AMEND_DECREASE too', () => {
+    it('protects resulting tolerance and edits only the amendment delta during A2 AMEND_DECREASE Fix Pending', () => {
       const ctx = baseCtx({
         selectedFunction: fn('A2'),
         model: { instrumentType: 'IPLC_LC', movementType: 'AMEND_DECREASE' },
         fixPendingMode: true,
       });
       const tolerance = fieldByKey(buildFields(ctx), 'tolerancePct');
-      expect(tolerance.props?.disabled).toBe(false);
+      const change = fieldByKey(buildFields(ctx), 'toleranceChangePct');
+      expect(tolerance.hide).toBe(true);
+      expect(change.props?.disabled).toBe(false);
+      expect(change.props?.label).toBe('Decrease Tolerance By %');
+    });
+
+    it('covers every whole-number and decrease-boundary branch used by the shared amendment Tolerance field', () => {
+      const increase = fieldByKey(
+        buildFields(baseCtx({ selectedFunction: fn('A2'), model: { instrumentType: 'IPLC_LC', movementType: 'AMEND_INCREASE' } })),
+        'toleranceChangePct',
+      );
+      const decrease = fieldByKey(
+        buildFields(
+          baseCtx({
+            selectedFunction: fn('A2'),
+            selectedContract: contract({ tolerancePct: '10' }),
+            model: { instrumentType: 'IPLC_LC', movementType: 'AMEND_DECREASE' },
+          }),
+        ),
+        'toleranceChangePct',
+      );
+      const wholeNumber = (decrease.validators as any).wholeNumber.expression as (control: FormControl) => boolean;
+      const increaseLimit = (increase.validators as any).decreaseWithinCurrent.expression as (control: FormControl) => boolean;
+      const decreaseLimit = (decrease.validators as any).decreaseWithinCurrent.expression as (control: FormControl) => boolean;
+
+      expect(wholeNumber(new FormControl(null))).toBe(true);
+      expect(wholeNumber(new FormControl(undefined))).toBe(true);
+      expect(wholeNumber(new FormControl(''))).toBe(true);
+      expect(wholeNumber(new FormControl('5'))).toBe(true);
+      expect(wholeNumber(new FormControl('5.5'))).toBe(false);
+      expect(increaseLimit(new FormControl('999'))).toBe(true);
+      expect(decreaseLimit(new FormControl(null))).toBe(true);
+      expect(decreaseLimit(new FormControl(''))).toBe(true);
+      expect(decreaseLimit(new FormControl('10'))).toBe(true);
+      expect(decreaseLimit(new FormControl('11'))).toBe(false);
     });
 
     it('stays LOCKED during Fix Pending when tolerance is not applicable to this movement (A3 UTILIZE, boundary — also Fix-Pending-enabled, unlike A6)', () => {
@@ -456,6 +599,64 @@ describe('builder-fields', () => {
       const ctx = baseCtx({ fixPendingMode: true });
       const tolerance = fieldByKey(buildFields(ctx), 'tolerancePct');
       expect(tolerance.props?.disabled).toBe(false);
+    });
+
+    it('rejects a non-whole-number Tolerance % while leaving empty input to the required validator', () => {
+      const tolerance = fieldByKey(buildFields(baseCtx()), 'tolerancePct');
+      const wholeNumber = (tolerance.validators as any)?.wholeNumber;
+
+      expect(wholeNumber.expression(new FormControl('10.5'))).toBe(false);
+      expect(wholeNumber.expression(new FormControl('10'))).toBe(true);
+      expect(wholeNumber.expression(new FormControl(''))).toBe(true);
+      expect(wholeNumber.message).toBe('Tolerance % must be a whole number.');
+    });
+  });
+
+  describe('Tolerance Change % field (A2/B2 amendment)', () => {
+    function amendCtx(direction: 'INCREASE' | 'DECREASE', overrides: Partial<BuilderFieldsContext> = {}) {
+      return baseCtx({
+        selectedFunction: fn('A2'),
+        model: { instrumentType: 'IPLC_LC', movementType: direction === 'DECREASE' ? 'AMEND_DECREASE' : 'AMEND_INCREASE' },
+        selectedContract: contract({ tolerancePct: '20' }),
+        amendDirection: direction,
+        ...overrides,
+      });
+    }
+
+    it('rejects a non-whole-number Tolerance Change %', () => {
+      const change = fieldByKey(buildFields(amendCtx('INCREASE')), 'toleranceChangePct');
+      const wholeNumber = (change.validators as any)?.wholeNumber;
+
+      expect(wholeNumber.expression(new FormControl('2.5'))).toBe(false);
+      expect(wholeNumber.expression(new FormControl('5'))).toBe(true);
+      expect(wholeNumber.message).toBe('Tolerance Change % must be a whole number.');
+    });
+
+    it('rejects a Decrease that would take the resulting Tolerance below zero, but leaves Increase unconstrained', () => {
+      const decrease = fieldByKey(buildFields(amendCtx('DECREASE')), 'toleranceChangePct');
+      const decreaseWithinCurrent = (decrease.validators as any)?.decreaseWithinCurrent;
+
+      expect(decreaseWithinCurrent.expression(new FormControl('25'))).toBe(false);
+      expect(decreaseWithinCurrent.expression(new FormControl('20'))).toBe(true);
+      expect(decreaseWithinCurrent.expression(new FormControl(''))).toBe(true);
+      expect(decreaseWithinCurrent.message).toBe('Decrease Tolerance cannot exceed the current Tolerance of 20%.');
+
+      const increase = fieldByKey(buildFields(amendCtx('INCREASE')), 'toleranceChangePct');
+      expect((increase.validators as any)?.decreaseWithinCurrent.expression(new FormControl('999'))).toBe(true);
+    });
+
+    it('recomputes the live Resulting Tolerance preview from the typed change, falling back to Invalid on an out-of-range Decrease', () => {
+      const change = fieldByKey(buildFields(amendCtx('DECREASE')), 'toleranceChangePct');
+      const describe = change.expressions?.['props.description'] as (field: any) => string;
+
+      expect(describe({ model: { toleranceChangePct: '5' } })).toBe('Current Tolerance: 20% · Resulting Tolerance: 15% (protected)');
+      expect(describe({ model: { toleranceChangePct: '25' } })).toBe('Current Tolerance: 20% · Resulting Tolerance: Invalid% (protected)');
+      expect(describe({ model: {} })).toBe('Current Tolerance: 20% · Resulting Tolerance: 20% (protected)');
+    });
+
+    it('is hidden for every non-amendment movement type', () => {
+      const change = fieldByKey(buildFields(baseCtx()), 'toleranceChangePct');
+      expect(change.hide).toBe(true);
     });
   });
 
@@ -757,6 +958,7 @@ describe('builder-fields', () => {
         sourceTransactionRef: 'AMD-02',
         newExpiryDate: '2027-06-30',
         reasonCode: 'NATURAL_EXPIRY_ALL_BALANCES_CLEARED',
+        toleranceChangePct: '2',
       });
 
       const model = reconstructOriginalModel(m, c);
@@ -767,6 +969,7 @@ describe('builder-fields', () => {
         amount: '0',
         currency: 'USD',
         tolerancePct: '10',
+        toleranceChangePct: '2',
         eventSeq: 7,
         createdBy: 'maker-7',
         secondaryRef: 'AMD-02',
@@ -785,6 +988,7 @@ describe('builder-fields', () => {
       const model = reconstructOriginalModel(m, c);
 
       expect(model.tolerancePct).toBeUndefined();
+      expect(model.toleranceChangePct).toBeUndefined();
       expect(model.tenorType).toBeUndefined();
       expect(model.tenorDays).toBeUndefined();
       expect(model.expiryDate).toBeUndefined();
@@ -795,7 +999,7 @@ describe('builder-fields', () => {
 
     it('every field buildFields() can ever render ends up populated in the reconstructed model whenever the source data has a value — no field is silently dropped', () => {
       const c = contract({ tolerancePct: '5', tenorType: 'SIGHT', tenorDays: 0, expiryDate: '2026-01-01' });
-      const m = movement({ sourceTransactionRef: 'REF-1', newExpiryDate: '2026-02-02', reasonCode: 'RC-1' });
+      const m = movement({ sourceTransactionRef: 'REF-1', newExpiryDate: '2026-02-02', reasonCode: 'RC-1', toleranceChangePct: '1' });
 
       const model = reconstructOriginalModel(m, c);
       const allFieldKeys = buildFields(baseCtx({ model, selectedContract: c })).map((f) => f.key as string);

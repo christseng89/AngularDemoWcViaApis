@@ -24,11 +24,53 @@ Business Case Runner 每步都檢查 Tight Available Balance。若測試回覆�
 
 ## Tight LC Balance
 
-- Tight Available Balance 不得為負數；Domain calculation 將可用承諾額與未結表外風險一致納入。
+- Tight Available Balance 的操作目標不得為負數；Domain calculation 將可用承諾額與未結表外風險一致納入，
+  但 snapshot 可暫時保留負值作為 over-commit 診斷並觸發 A02／B02 修復。
 - A2／B2 Decrease 必須滿足 `Amount <= Tight Available Balance`。
 - A3／A8／B3 使用 Tight Available Balance 進行權威 sufficiency check。
 - A3S 的上限為 `Tight Available Balance + selected SG outstanding`，並要求 Document Arrival Amount 足以覆蓋所選 SG redemption。
 - UI Submit、Maker Submit API 與 Checker Release 都執行相應檢查；服務端檢查是權威控制。
+
+## Amendment Amount／Tolerance
+
+- A1／B1 的初始 Tolerance 與 A2／B2 的 Tolerance Change 都必須是非負整數，Angular 與 API 使用相同拒絕規則。
+- A2／B2 同時支援 Amount Increase／Decrease 與 Tolerance Increase／Decrease；Request 使用
+  `toleranceChangePct` + `toleranceChangeDirection`。PENDING Response 的 `tolerancePct` 是舊核准值；交易本身保存 change，
+  Checker Release 後 Movement／Contract `tolerancePct` 才是後端計算的最終值。
+- A2／B2 可只改 Amount、只改 Tolerance，或兩者同時修改。畫面上的 Amount 因此為 optional；只改
+  Tolerance 時 API 仍傳必填 decimal string `amount: "0"`。Amount 為 0 且 Tolerance Change 未輸入或為 0
+  屬 no-op，UI 與微服務都拒絕。
+- MT707 的 Tolerance 是修證後最終值；它由上游 SWIFT／業務編排層換算成 Balance Component change，
+  不可直接當作 `toleranceChangePct`。
+- 每次 monetary amendment 都以完整合約重算：`新面額 = 舊面額 + Increase - Decrease`，
+  `新上限 = round(新面額 × (1 + 新Tolerance/100))`，實際 Balance／Account Entry 金額是
+  `新上限 - 舊上限`。因此名義 Increase 在 Tolerance 大幅下降時也可能降低 exposure，反之亦然。
+- 舊上限與新上限各自依交易幣別小數位採 `ROUND_HALF_UP` 後才相減；JPY 0 位、USD 2 位、KWD 3 位。
+- Maker Submit 時新的 Tolerance 只保存在 movement，合約仍保留舊值；Checker Release 依最新 RELEASED history
+  重新計算，若基準已被另一筆 amendment 改變便拒絕 stale movement。Release 成功後才把新 Tolerance 寫入 contract。
+- `AMEND_EXPIRY_DATE` 不顯示／接受 Tolerance，也不改變合約 Tolerance。外部 Maker request 的
+  `amount` 固定為 `"0"`；ACTIVE 合約仍是零金額純日期事件。EXPIRED 合約則由伺服器尋找最後一筆
+  RELEASED EXPIRE，將其受保護的恢復金額、reference 與 Account Entries 寫入同一筆 PENDING Amendment；
+  CANCELLED／REJECTED 的舊嘗試不參與判斷。PENDING 不恢復餘額，Checker Release 後才恢復
+  Confirmed／Tight Available Balance 並轉回 ACTIVE，不另建隱藏 REVERSAL。
+- A2／B2 選取 Direction 與 LC 後，Transaction Input 不再重複顯示 LC Number，也不再顯示可修改的
+  Direction 下拉選單；改以醒目的 `Amendment Direction — Increase／Decrease／Expiry Date` 唯讀標示
+  保留上下文。若選錯方向，使用 Cancel 回到 Selection Screen 重新選擇。
+- UCP 600 Article 10 的修改同意流程屬上游 Trade Finance workflow；Balance Component 的責任是 Maker／Checker
+  放行前不讓新金額／Tolerance 生效。Article 30 的 amount tolerance 與 quantity tolerance 不混用。
+- 為配合既有測試修復流程，Snapshot 仍保留負的 Tight Balance 作為 over-commit 診斷；負值不是可用額，
+  Business Case Runner 會依既有規則產生 A02／B02 修復交易。
+
+## Amount shorthand input
+
+- 所有可編輯 Amount 欄位可輸入大小寫 `h`（百）、`k`（千）與 `m`（百萬），多段採相加：
+  `20.5h = 2050`、`3h2h = 500`、`1m2k3h = 1002300`、`40k2k = 42000`、
+  `1.5m2.5k = 1502500`、`1m500 = 1000500`、`1h.25 = 100.25`、`1k.25 = 1000.25`。
+- A1 與所有其他可輸入金額的功能使用完全相同的 `formatted-amount` 元件、驗證及 Submit-before-blur
+  正規化；目前涵蓋 A1、A2 Increase／Decrease、A3、A3S、A7 Partial Settle、A8、B1、B2
+  Increase／Decrease、B3、B5 Partial Settle。系統帶入的唯讀金額不視為輸入欄位。
+- `t`、負數、逗號、科學記號、空白與 malformed decimal 會在欄位層被拒絕；系統帶入／protected Amount 不解析 shorthand。
+- Blur 後以 decimal-string exact arithmetic 展開，再交給既有 Currency decimal-place、rounding、Balance 與 Submit 檢查；API/OAS 仍只接收標準 MonetaryAmount decimal string。
 
 ## Transaction Index
 
@@ -50,6 +92,7 @@ Business Case Runner 每步都檢查 Tight Available Balance。若測試回覆�
 - Maker／Checker separation、狀態轉換、金額與 eligibility 都由微服務重新驗證。
 - A3S、A6、B4 等多腿事件的建立／Release 使用 `/balance-movements/compound*`，由 SQLite transaction 保證全部成功或全部回滾。B5 只結算所選 Acceptance。
 - Fix Pending 修改原 movement 並保留 audit。A4、A6、A7、A9、B4、B5 採 Remarks-only：只能修改 Remark，不得改變金額、Balance、Account Entries 或 compound sibling。
+- Standard Fix Pending 成功時會在同一個 DB transaction 重新計算並覆寫 movement 的 Event／Root／Sibling snapshots；Inquire Events 立即顯示修正後的 PENDING Balance，不必等 Checker Release。Inquire Events 與 Transaction Processing Current Balance 的 A2／B2 都額外顯示 Amendment 自己的 tolerance-adjusted Balance Effect 及 `Amendment Tolerance` 的歷史生效值→交易值；PENDING 顯示 `Pending Amendment Balance Effect`，RELEASED 則顯示 `Amendment Balance Effect`（例如 Decrease `20% → 15%`）。同一 LC 有多筆 pending amendment 時逐筆依 Reference 顯示，不任意合併。`Pending Earmark Total` 仍是同一合約全部 PENDING movement 的淨額。
 - Fix Pending 開始、送出及成功回覆時會清除先前的 Maker submit error；成功的 A7 Remarks-only Save 不得繼續顯示舊的 `BAL-UI-UNEXPECTED`。此行為在 Angular host 與 Web Component host 一致。
 - 所有已註冊功能（A1、A2、A3、A3S、A4、A6–A11、B1–B7）在 Checker Release 成功後都重設同一 Function 的 Maker／Checker 畫面，清除舊 movement、Maker Result 與 Fix/Delete Pending signals；已 RELEASED 的 movement 不得再次進入 Fix Pending。Angular 與 Web Component host 行為一致；Reject 仍保留 Maker 資料供修正。
 - Transaction Processing 的 Maker Submit 成功後，所有已註冊功能均可在同一 session 執行 Delete Pending；這不會改變 Maker Queue／Fix Pending 的獨立流程。
@@ -75,6 +118,11 @@ Business Case Runner 每步都檢查 Tight Available Balance。若測試回覆�
 
 ## Verification baseline
 
-截至 2026-09-01：Transaction Index API eligibility 變更後 Balance microservice 為 39 suites／791 tests；coverage statements 98.79%、branches 95.06%、functions 99.75%、lines 99.32%。Web Component host 使用相同 API eligibility。
+截至 2026-09-03：Balance microservice 為 40 suites／837 tests；coverage statements 98.18%、branches 95.03%、functions 99.32%、lines 98.92%。Web Component host 使用相同 API eligibility。
 
 2026-09-02：`lc-balance-wc` 是目前唯一維護中的 Balance UI repository；舊 `lc-balance` folder 已移除。Standalone Angular 的 root route 使用 `pathMatch: 'full'`，因此 `/business-cases` 不再被空路徑的 Transaction Builder route 攔截；Web Component 仍以內部 view state 導覽三個 views。
+
+2026-09-03：新增同一 LC／Confirmation 上連續四種 Amount × Tolerance amendment 組合的
+`import-case-16`／`export-case-15`，並補上 currency-scale、Expiry-only、Maker／Checker 生效時點與 stale-release regression。
+EXPIRED Expiry Date retry 另覆蓋「先前 CANCELLED Amendment 不得遮蔽 RELEASED EXPIRE」與
+「Checker Release 前恢復依據被改動時拒絕」兩個回歸案例。

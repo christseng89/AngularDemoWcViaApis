@@ -23,6 +23,7 @@ import {
 import { DeletePendingAuditStore } from '../../../src/store/deletePendingAuditStore';
 import { BalanceMovementStore } from '../../../src/store/balanceMovementStore';
 import { BalanceContractStore } from '../../../src/store/balanceContractStore';
+import { MovementSnapshotService } from '../../../src/service/movementSnapshotService';
 
 describe('BalanceService.createMovement — parseMonetaryAmount enforcement at the service layer (BAL-115)', () => {
   test('AMEND_DECREASE with a malformed amount throws InvalidMonetaryAmountError, not a silent NaN comparison', () => {
@@ -3007,12 +3008,9 @@ describe('BalanceService.editPending — Fix Pending trial (A1 ISSUE, A3 UTILIZE
   // tolerancePct is a DELIBERATE EXCEPTION to the A3-style "contract-level fields stay locked for a
   // non-creating edit" rule above: unlike tenorType/tenorDays/expiryDate, a patched tolerancePct on a
   // non-creating, tolerance-applicable edit (A2's own AMEND_INCREASE/AMEND_DECREASE) DOES flow into
-  // buildEditedRequest()'s own merged.tolerancePct (`patch.tolerancePct ?? contract.tolerancePct`, no
-  // isCreatingEdit gate) — but updateIssueFields()'s own contract write-back a few lines below stays
-  // gated `if (isCreatingEdit)`, unchanged, so the patch only ever affects THIS movement's own
-  // ceilingAmount/contingentAccountEntry, never the contract's own stored tolerancePct. See
-  // AskUserQuestion-confirmed scope in balanceService.ts's own buildEditedRequest() doc comment.
-  test('A2 (AMEND_INCREASE, isCreatingEdit=false, tolerance-applicable) — a patched tolerancePct changes THIS movement\'s own ceilingAmount/contingentAccountEntry but the contract\'s own tolerancePct is left genuinely UNCHANGED', () => {
+  // the amendment's recalculated upper limit. It remains a proposal while PENDING; Checker Release
+  // then makes it the contract's latest tolerance.
+  test('A2 (AMEND_INCREASE) Fix Pending recalculates the full amended upper limit; tolerance becomes current only on Release', () => {
     const service = new BalanceService(createDb(':memory:'));
     const issue = service.createMovement({
       instrumentType: 'IPLC_LC',
@@ -3046,16 +3044,195 @@ describe('BalanceService.editPending — Fix Pending trial (A1 ISSUE, A3 UTILIZE
     const replacement = service.editPending(amend.movement.movementId, {
       amount: '20000',
       editedBy: 'maker2',
-      tolerancePct: '15', // patched — A2's own Fix Pending Tolerance % edit
+      toleranceChangePct: '10',
+      toleranceChangeDirection: 'INCREASE',
     });
 
-    // The PATCHED tolerancePct (15%) is used for THIS movement's own ceiling: 20000 * 1.15 = 23000.
-    expect(replacement.ceilingAmount).toBe('23000');
-    expect(replacement.contingentAccountEntry?.amount).toBe('23000'); // Ceiling, not the face amount 20000
+    // Old upper = 100000 × 1.05 = 105000; new upper = 120000 × 1.15 = 138000;
+    // the movement books the full upper-limit delta, 33000 (not 20000 × 1.15).
+    expect(replacement.ceilingAmount).toBe('33000');
+    expect(replacement.contingentAccountEntry?.amount).toBe('33000');
+    expect(replacement.tolerancePct).toBe('5');
+    expect(replacement.toleranceChangePct).toBe('10');
 
-    // The contract's own stored tolerancePct is genuinely untouched — still the original 5%, not 15%.
-    const contract = service.resolveContract('IPLC_LC', { lcNumber: 'FIXP-A2-001' })!;
-    expect(contract.tolerancePct).toBe('5');
+    // Pending proposal does not change operative terms.
+    expect(service.resolveContract('IPLC_LC', { lcNumber: 'FIXP-A2-001' })!.tolerancePct).toBe('5');
+    service.release(replacement.movementId, 'checker1');
+    expect(service.resolveContract('IPLC_LC', { lcNumber: 'FIXP-A2-001' })!.tolerancePct).toBe('15');
+  });
+
+  test('A2 Tolerance-only amendment accepts Amount 0, leaves face amount unchanged, and applies 20% -> 15% on Checker Release', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const issue = service.createMovement({
+      instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'A2-TOLERANCE-ONLY' }, movementType: 'ISSUE', eventSeq: 1,
+      amount: '100000', currency: 'USD', tenorType: 'SIGHT', expiryDate: '2099-12-31', tolerancePct: '20', createdBy: 'maker1',
+    });
+    if (!issue.created) throw new Error('expected a new movement');
+    service.release(issue.movement.movementId, 'checker1');
+
+    const amend = service.createMovement({
+      instrumentType: 'IPLC_LC', balanceContractId: issue.movement.balanceContractId, movementType: 'AMEND_DECREASE', eventSeq: 2,
+      amount: '0', currency: 'USD', toleranceChangePct: '5', toleranceChangeDirection: 'DECREASE', sourceTransactionRef: 'A01', createdBy: 'maker1',
+    });
+    if (!amend.created) throw new Error('expected a new movement');
+    expect(amend.movement.amount).toBe('0');
+    expect(amend.movement.ceilingAmount).toBe('5000');
+
+    service.release(amend.movement.movementId, 'checker1');
+    const contract = service.resolveContract('IPLC_LC', { lcNumber: 'A2-TOLERANCE-ONLY' })!;
+    expect(contract.tolerancePct).toBe('15');
+    expect(service.getBalanceSnapshot(contract.balanceContractId).confirmedBalance).toBe('115000');
+  });
+
+  test('API rejects a monetary amendment where Amount is zero and Tolerance is unchanged', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const issue = service.createMovement({
+      instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'A2-NO-OP' }, movementType: 'ISSUE', eventSeq: 1,
+      amount: '100000', currency: 'USD', tenorType: 'SIGHT', expiryDate: '2099-12-31', tolerancePct: '20', createdBy: 'maker1',
+    });
+    if (!issue.created) throw new Error('expected a new movement');
+    service.release(issue.movement.movementId, 'checker1');
+
+    expect(() => service.createMovement({
+      instrumentType: 'IPLC_LC', balanceContractId: issue.movement.balanceContractId, movementType: 'AMEND_INCREASE', eventSeq: 2,
+      amount: '0', currency: 'USD', toleranceChangePct: '0', toleranceChangeDirection: 'INCREASE', sourceTransactionRef: 'A01', createdBy: 'maker1',
+    })).toThrow('must change Amount, Tolerance, or both');
+  });
+
+  test('A2 Fix Pending refreshes the persisted PENDING event snapshot immediately (S01: 32,000 amendment effect nets to 22,000)', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const issue = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      naturalKey: { lcNumber: 'FIXP-S01-SNAPSHOT' },
+      movementType: 'ISSUE',
+      eventSeq: 1,
+      amount: '100000',
+      currency: 'USD',
+      tenorType: 'SIGHT',
+      expiryDate: '2099-12-31',
+      createdBy: 'maker1',
+    });
+    if (!issue.created) throw new Error('expected a new movement');
+    service.release(issue.movement.movementId, 'checker1');
+
+    const utilize = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      balanceContractId: issue.movement.balanceContractId,
+      movementType: 'UTILIZE',
+      eventSeq: 2,
+      amount: '10000',
+      currency: 'USD',
+      sourceTransactionRef: 'B01',
+      createdBy: 'maker1',
+    });
+    if (!utilize.created) throw new Error('expected a new movement');
+
+    const amend = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      balanceContractId: issue.movement.balanceContractId,
+      movementType: 'AMEND_INCREASE',
+      eventSeq: 3,
+      amount: '10000',
+      currency: 'USD',
+      sourceTransactionRef: 'A01',
+      toleranceChangePct: '10',
+      toleranceChangeDirection: 'INCREASE',
+      createdBy: 'maker1',
+    });
+    if (!amend.created) throw new Error('expected a new movement');
+    expect(amend.movement.eventSnapshot?.availableBalance).toBe('111000');
+    expect(amend.movement.eventSnapshot?.pendingEarmarkTotal).toBe('11000');
+
+    const corrected = service.editPending(amend.movement.movementId, {
+      amount: '10000',
+      toleranceChangePct: '20',
+      toleranceChangeDirection: 'INCREASE',
+      editedBy: 'maker2',
+    });
+
+    // Old upper = 100,000; new upper = (100,000 + 10,000) × 120% = 132,000.
+    // Amendment effect 32,000, net pending = 32,000 - the independent 10,000 UTILIZE = 22,000.
+    expect(corrected.ceilingAmount).toBe('32000');
+    expect(corrected.tolerancePct).toBeNull();
+    expect(corrected.toleranceChangePct).toBe('20');
+    expect(corrected.eventSnapshot).toMatchObject({
+      confirmedBalance: '100000',
+      availableBalance: '122000',
+      pendingEarmarkTotal: '22000',
+      offBalanceExposure: '0',
+      tightAvailableBalance: '90000',
+    });
+    expect(service.getBalanceSnapshot(issue.movement.balanceContractId)).toMatchObject({
+      confirmedBalance: '100000',
+      availableBalance: '122000',
+      pendingEarmarkTotal: '22000',
+      offBalanceExposure: '0',
+      tightAvailableBalance: '90000',
+    });
+  });
+
+  test('Fix Pending persists every non-null root/Acceptance/SG snapshot in the corrected bundle', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const issue = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      naturalKey: { lcNumber: 'FIXP-SNAPSHOT-BUNDLE' },
+      movementType: 'ISSUE',
+      eventSeq: 1,
+      amount: '100000',
+      currency: 'USD',
+      tenorType: 'SIGHT',
+      expiryDate: '2099-12-31',
+      createdBy: 'maker1',
+    });
+    if (!issue.created) throw new Error('expected a new movement');
+    service.release(issue.movement.movementId, 'checker1');
+    const amend = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      balanceContractId: issue.movement.balanceContractId,
+      movementType: 'AMEND_INCREASE',
+      eventSeq: 2,
+      amount: '1000',
+      currency: 'USD',
+      sourceTransactionRef: 'A01',
+      createdBy: 'maker1',
+    });
+    if (!amend.created) throw new Error('expected a new movement');
+
+    const snapshot = {
+      balanceContractId: issue.movement.balanceContractId,
+      logicalContractId: 'logical-1',
+      currency: 'USD',
+      confirmedBalance: '100000',
+      availableBalance: '102000',
+      pendingEarmarkTotal: '2000',
+      offBalanceExposure: '0',
+      tightAvailableBalance: '100000',
+      presentDocsEarmarkPending: null,
+      presentDocsEarmarkApproved: null,
+      redirectedImpact: null,
+    };
+    const captureSpy = jest.spyOn(MovementSnapshotService.prototype, 'captureBundle').mockReturnValueOnce({
+      eventSnapshot: snapshot,
+      rootEventSnapshot: snapshot,
+      acceptanceEventSnapshot: snapshot,
+      sgEventSnapshot: snapshot,
+    });
+    try {
+      const corrected = service.editPending(amend.movement.movementId, {
+        amount: '2000',
+        editedBy: 'maker2',
+        accountEntries: [{ accountRef: 'GL-SNAPSHOT', drCr: 'D', amount: '2000' }],
+        amendmentApproved: false,
+      });
+      expect(corrected.eventSnapshot).toEqual(snapshot);
+      expect(corrected.rootEventSnapshot).toEqual(snapshot);
+      expect(corrected.acceptanceEventSnapshot).toEqual(snapshot);
+      expect(corrected.sgEventSnapshot).toEqual(snapshot);
+      expect(corrected.accountEntries).toEqual([{ accountRef: 'GL-SNAPSHOT', drCr: 'D', amount: '2000' }]);
+      expect(corrected.amendmentApproved).toBe(false);
+    } finally {
+      captureSpy.mockRestore();
+    }
   });
 
   test('A2 (AMEND_INCREASE) — omitting tolerancePct from the patch falls back to the contract\'s own current tolerancePct (COALESCE), same as a creating edit', () => {

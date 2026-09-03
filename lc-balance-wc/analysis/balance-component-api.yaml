@@ -17,6 +17,72 @@ info:
     the discrepancy inline.
 
 
+    v1.49.0 (2026-09-03, Expiry Extension retry restoration): the EXPIRED-only
+    restoration basis is the latest RELEASED movement, not the latest audit row of any
+    status. CANCELLED/REJECTED Expiry Date attempts therefore cannot hide the RELEASED
+    EXPIRE or cause a retry to persist amount/ceiling 0. Submit and Checker Release use
+    the same rule.
+
+    v1.48.0 (2026-09-03, Expiry Extension review/accounting alignment): A2/B2
+    Expiry Date catalog requests `ACTIVE,EXPIRED`, and Checker contract lookup includes
+    non-ACTIVE targets. For an EXPIRED contract whose latest RELEASED event is EXPIRE,
+    Maker Submit persists the server-derived restoration amount, `reversalOfMovementId`,
+    and real `contingentAccountEntry` on the PENDING `AMEND_EXPIRY_DATE` itself. The
+    Checker therefore reviews the actual voucher before approval. PENDING does not restore
+    Confirmed/Available Balance; Release activates this same reviewed movement, restores
+    the balance, and reactivates the contract. No hidden linked REVERSAL is generated.
+    A plain ACTIVE expiry-date amendment remains amount 0 with no account entry.
+
+    v1.47.0 (2026-09-03, Amendment Tolerance change contract): A1/B1
+    `tolerancePct` and A2/B2 `toleranceChangePct` accept non-negative whole-
+    number strings only. A2/B2 requests send `toleranceChangePct` plus
+    `toleranceChangeDirection` and reject client-supplied `tolerancePct`.
+    A PENDING Movement `tolerancePct` remains the old approved value; the
+    Movement's change fields carry the instruction. On Release, both Movement
+    and Contract `tolerancePct` become the calculated final value. MT707's external field is
+    a final Tolerance and is outside this component contract; an upstream
+    adapter must convert it to the Balance Component change request.
+
+    v1.46.2 (2026-09-03, Amount-or-Tolerance monetary amendments): A2/B2
+    accepts an Amount change, a Tolerance change, or both. The wire `amount`
+    remains required and uses decimal string `"0"` when the Maker supplies
+    Tolerance only. A zero Amount with an omitted or unchanged Tolerance is a
+    `400` no-op; all other movement types retain their existing positive-
+    amount rules. Tolerance-only amendments keep Current LC Amount unchanged
+    and post the rounded difference between the old and new full-contract
+    Upper Limits.
+
+
+    v1.46.1 (2026-09-03, Fix Pending snapshot consistency): a successful
+    `POST /balance-movements/{movementId}/edit` now recomputes and replaces
+    the corrected movement's persisted event/root/sibling snapshot bundle in
+    the same database transaction. Inquire Events therefore exposes the
+    corrected PENDING balance immediately; callers do not wait for Checker
+    Release. For A2/B2 the response continues to expose the amendment's own
+    tolerance-adjusted balance effect as `ceilingAmount` and its proposed
+    `tolerancePct`, while `eventSnapshot.pendingEarmarkTotal` is the net of
+    all PENDING movements on the contract.
+
+
+    v1.46.0 (2026-09-03, UCP/ICC-aligned monetary amendment recalculation):
+    A2/B2 no longer applies Tolerance independently to the typed amendment
+    amount. From the currently RELEASED Current LC Amount and current
+    Tolerance, the service derives the amended Current LC Amount, then
+    recalculates Upper/Lower Limits using the amendment's latest applicable
+    Tolerance. Both limits are rounded ROUND_HALF_UP to the Currency's ISO
+    decimal places before the movement balance delta is taken. Existing
+    utilized/earmarked amounts are not retrospectively recalculated.
+    `BalanceMovement.tolerancePct` captures the proposed value; it becomes
+    `BalanceContract.tolerancePct` only on Checker Release. Release rejects a
+    stale amendment if an earlier approved amendment changed its basis.
+    `AMEND_EXPIRY_DATE` rejects tolerancePct. The external Maker request remains
+    zero-amount; an ACTIVE date-only amendment remains zero-accounting and
+    zero-balance-effect. The EXPIRED-only restoration shape is superseded by
+    v1.48.0 above. The
+    reference runner adds same-LC Import/Export cases covering all four
+    Amount Increase/Decrease × Tolerance Increase/Decrease combinations.
+
+
     v1.45.0 (2026-09-02, Balance Account Number maintenance): adds the
     database-backed GET/PUT `/balance-account-mappings` API. Each fixed
     product/risk route owns one Account A/Account B pair; movement direction
@@ -207,7 +273,9 @@ info:
     new; for ISSUE/AMEND_INCREASE/AMEND_DECREASE, `amount` is the
     caller-typed face-level delta and `ceilingAmount = amount ×
     (1+tolerancePct/100)` is what the server actually applies against
-    Confirmed Balance and checks AMEND_DECREASE sufficiency against.
+    Confirmed Balance and checks AMEND_DECREASE sufficiency against. This
+    per-delta amendment formula was superseded by v1.46.0's full-current-
+    amount recalculation; it remains accurate for ISSUE only.
 
 
     v0.4.0 (draft, 2026-08-14): SHGT's `REDEEM` movementType is replaced by
@@ -693,7 +761,8 @@ info:
         Acceptance-zero condition — see the endpoint's own description below for the full rule. The one
         genuinely new REST surface this release adds; every other addition reuses the existing generic
         movement endpoints.
-      - Amount handling: `assertValidAmount()`'s existing CLOSE zero-amount exception now also covers
+      - Amount handling (historical v1.19.0 behavior; superseded for REOPEN by v1.20.0 and for
+        EXPIRED AMEND_EXPIRY_DATE by v1.48.0): `assertValidAmount()`'s existing CLOSE zero-amount exception now also covers
         EXPIRE (an already fully-utilized LC's own remaining Confirmed Balance at expiry may legitimately
         be zero); REOPEN and AMEND_EXPIRY_DATE are both fixed at `'0'` by construction (their own balance
         effect, if any, comes entirely from a linked REVERSAL leg, never their own signed amount).
@@ -722,8 +791,8 @@ info:
       - REMOVED: REOPEN no longer generates any linked `REVERSAL` movement(s) as a Release-time side
         effect — Inquire Events/Look Up now show exactly ONE row per Reopen. `movementType: 'REVERSAL'`
         itself is UNCHANGED and still exists — Expiry Extension Amendment (`AMEND_EXPIRY_DATE` against an
-        `EXPIRED` contract) still uses it exactly as documented under v1.19.0 above; only REOPEN's own use
-        of it was removed.
+        `EXPIRED` contract) still used it as documented under v1.19.0 at that version; v1.48.0 later
+        replaced the hidden Release-time leg with a reviewable entry on the PENDING Amendment itself.
       - Amount handling: REOPEN's exact rule updated from "fixed at `'0'`" (v1.19.0 above, `assertValidAmount()`)
         to "server-computed, non-negative" — grouped with CLOSE/EXPIRE's own zero-exception rule (0 is a
         legitimate figure, e.g. reopening a CLOSE whose own write-off amount was already 0). Whatever
@@ -998,7 +1067,7 @@ info:
         callers no longer need client-side compensation for an approved multi-leg command.
       - DOCUMENTED business routing: Import A3/A3S continues to A4 for Sight or A6 for Seller's/Buyer's
         Usance; Export B3 continues to B4, whose HONOUR/ACCEPT compound shape is selected by Sight/Usance.
-  version: "1.45.0"
+  version: "1.49.0"
 x-client-retry-policy:
   configuration:
     maxRetries: BALANCE_HTTP_RETRY_COUNT
@@ -1104,7 +1173,14 @@ paths:
           schema: { $ref: '#/components/schemas/InstrumentType' }
         - name: status
           in: query
+          description: Single lifecycle status filter. Mutually exclusive with `statuses`.
           schema: { $ref: '#/components/schemas/ContractStatus' }
+        - name: statuses
+          in: query
+          description: Comma-separated lifecycle statuses. A2/B2 Expiry Date uses `ACTIVE,EXPIRED` so the same picker supports ordinary amendments and Expiry Extension Amendments without exposing CLOSED/CANCELLED contracts. Mutually exclusive with `status`.
+          schema:
+            type: string
+            example: ACTIVE,EXPIRED
         - name: q
           in: query
           description: Free-text substring filter against lcNumber (and ibNumber/sgNumber where applicable).
@@ -1792,6 +1868,14 @@ paths:
         current data; a stale approval is rejected with 409. This keeps API
         behavior aligned with the UI Checker queue and prevents a state change
         between Submit and Approve from being bypassed.
+
+        Amendment Release never accepts `tolerancePct`, `toleranceChangePct`
+        or direction. Those facts were persisted at Maker Submit; Release
+        re-reads them, recalculates against the current approved Contract and
+        rejects a stale basis. The path movementId is the microservice identity
+        resolved by the business/channel layer from Function + Transaction Key
+        + Secondary Reference. The business Release response may be a minimal
+        success result; post-Release balances/tolerance are obtained by query.
       parameters:
         - name: movementId
           in: path
@@ -1952,6 +2036,11 @@ paths:
         and accepts only the unchanged amount, editor and Remarks. It never recalculates balance, accounting
         or sibling movements. A4 applies the Remark to its underlying A3/A3S
         movement because A4 finalizes that existing movement in place.
+        A successful standard correction also replaces the movement's
+        persisted event/root/sibling snapshot bundle atomically, so the 200
+        response and subsequent Event Inquiry show the corrected PENDING
+        balance immediately rather than retaining the pre-edit snapshot until
+        Checker Release.
       parameters:
         - name: movementId
           in: path
@@ -2225,6 +2314,12 @@ paths:
                   total: { type: integer }
                   page: { type: integer }
                   pageSize: { type: integer }
+
+        '400':
+          description: "`status` and `statuses` were both supplied, or `statuses` contains an unsupported lifecycle value."
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
 
         '500':
           description: The service could not complete the Delete Pending audit query.
@@ -2552,13 +2647,15 @@ components:
           description: This contract version's own authoritative Currency Code — always caller-supplied at creation time, validated against the parent's own currency for a new child contract (see CURRENCY CONSISTENCY). Every subsequent movement against this contract must supply this same value; it is never re-typed.
         tolerancePct:
           type: string
+          pattern: '^\d+$'
           nullable: true
           description: >
             Design doc §6.2 (v0.3.0) — positive tolerance percentage (e.g.
             UCP600 "about"/"approximately" terms), IPLC_LC/EPLC_LC only.
-            Used to derive BalanceMovement.ceilingAmount from a caller-typed
-            face-level amount. Treated as fixed within a contract version;
-            not expected to change via ordinary movements.
+            Used to derive the LC Upper/Lower Limits. ISSUE establishes it;
+            a monetary amendment may replace it, but only on Checker Release.
+            While the amendment is PENDING, the contract retains its previously
+            approved value.
         tenorType: { allOf: [{ $ref: '#/components/schemas/TenorType' }], nullable: true }
         tenorDays: { type: integer, nullable: true }
         maturityDate: { type: string, format: date, nullable: true }
@@ -2615,21 +2712,50 @@ components:
           allOf: [{ $ref: '#/components/schemas/MonetaryAmount' }]
           description: >
             For IPLC_LC/EPLC_LC ISSUE/AMEND_INCREASE/AMEND_DECREASE, this is
-            the caller-typed face-level delta — see ceilingAmount (Design
-            doc §6.2, v0.3.0) for the tolerance-adjusted figure actually
-            applied against Confirmed Balance. For every other
-            movementType/instrumentType, amount and ceilingAmount are
-            identical.
+            the caller-typed face-level delta. For a Tolerance-only monetary
+            amendment it is `"0"`; Tolerance then changes while Current LC
+            Amount stays unchanged. See ceilingAmount for the full-contract
+            tolerance-adjusted balance effect. For every unrelated
+            movementType/instrumentType, amount and ceilingAmount are identical.
+            Exception: an external AMEND_EXPIRY_DATE request always sends
+            `"0"`; for an EXPIRED target, the server persists the latest
+            RELEASED EXPIRE restoration amount on the reviewed movement.
         ceilingAmount:
           allOf: [{ $ref: '#/components/schemas/MonetaryAmount' }]
           nullable: true
           description: >
-            Design doc §6.2 (v0.3.0) — amount × (1 + tolerancePct/100) for
-            IPLC_LC/EPLC_LC ISSUE/AMEND_INCREASE/AMEND_DECREASE; equal to
-            amount for every other case. AMEND_DECREASE sufficiency
-            (compared against Tight Available Balance since v1.13.0 — see
-            the top-level changelog) always uses this field, never the raw
-            amount.
+            ISSUE: face amount × (1 + tolerancePct/100). Monetary amendment
+            (v1.46.0): the balance effect required to move the old approved
+            Upper Limit to the recalculated new Upper Limit; AMEND_DECREASE
+            stores the inverse sign because that movement type already owns a
+            -1 direction. Each limit is rounded ROUND_HALF_UP to the Currency's
+            ISO decimal places before taking the delta. Other events equal
+            amount. Any amendment that reduces the Upper Limit is checked
+            against Tight Available Balance, regardless of whether its nominal
+            amount direction is Increase or Decrease. EXPIRED
+            AMEND_EXPIRY_DATE uses the latest RELEASED EXPIRE ceiling as its
+            protected restoration value; ACTIVE AMEND_EXPIRY_DATE remains 0.
+        tolerancePct:
+          type: string
+          pattern: '^\d+$'
+          nullable: true
+          description: >
+            ISSUE opening tolerance. For a PENDING monetary Amendment this is
+            the old approved Contract value; toleranceChangePct/direction carry
+            the pending instruction. On Checker Release this Movement field and
+            the Contract field become the calculated final value. Always null
+            for AMEND_EXPIRY_DATE and unrelated movement types. Clients never
+            send this field on an Amendment request.
+        toleranceChangePct:
+          type: string
+          pattern: '^\d+$'
+          nullable: true
+          description: A2/B2 Amendment input magnitude retained on the Movement for audit; null for non-Amendments.
+        toleranceChangeDirection:
+          type: string
+          enum: [INCREASE, DECREASE]
+          nullable: true
+          description: Direction applied to toleranceChangePct and retained on the Movement for audit.
         currency:
           type: string
           description: Always equal to the resolved contract's own currency at the time this movement was created (validated, not derived — see CURRENCY CONSISTENCY).
@@ -2646,11 +2772,13 @@ components:
             Server-derived at creation, persisted immutably; null for the
             three ON_BALANCE_ASSET instruments, for any unrecognized
             movementType, for `EPLC_EXAMINATION`/`CREATE` (B3 Present Docs —
-            never actually posts to the books, Design Principle D3), and for
-            `movementType: 'AMEND_EXPIRY_DATE'` (v1.22.0, F1 — never has a
-            real balance/GL effect of its own; the Expiry Extension
-            Amendment's own restoration is its separately-generated linked
-            `REVERSAL` movement's own entry, not this one's).
+            never actually posts to the books, Design Principle D3). A plain
+            ACTIVE `AMEND_EXPIRY_DATE` also has no entry. For an EXPIRED
+            Expiry Extension, however, v1.48.0 makes this PENDING movement
+            carry the real server-derived EXPIRE-restoration pair so the
+            Checker reviews it before Release. v1.49.0 clarifies that the
+            basis is the latest RELEASED movement; CANCELLED/REJECTED attempts
+            are retained for audit but ignored for restoration selection.
         lmtsReservationId:
           type: string
           nullable: true
@@ -2666,12 +2794,11 @@ components:
           format: uuid
           nullable: true
           description: >
-            v1.19.0, F1 — the movementId of the EXPIRE movement this `REVERSAL` movement negates. Reserved
-            on the schema since v1.0.0 but never populated by any endpoint until this release; now set on
-            every `movementType: 'REVERSAL'` movement, generated internally by Expiry Extension Amendment
-            only (never caller-supplied directly) — REOPEN was redesigned in v1.20.0 to carry its own
-            restoration amount directly and no longer uses REVERSAL at all. Determines REVERSAL's own
-            dynamic direction — the negation of whatever movement it points at, not a fixed value.
+            The movementId whose balance direction is being negated. For an EXPIRED Expiry Extension,
+            the server sets this on the PENDING `AMEND_EXPIRY_DATE` itself to point to the latest
+            RELEASED EXPIRE (ignoring CANCELLED/REJECTED retry attempts); it is protected from caller input and lets the reviewed movement carry the
+            final restoration direction. Internal `REVERSAL` remains supported for exceptional/internal
+            use, while REOPEN carries its own positive restoration amount directly.
         newExpiryDate:
           type: string
           format: date
@@ -2817,7 +2944,9 @@ components:
             computes on demand, captured once server-side and persisted here instead: written at
             POST /balance-movements (reflecting this movement's own still-PENDING contribution) and
             OVERWRITTEN at POST /balance-movements/{id}/release (reflecting the finalized/RELEASED
-            state) — never both at once, always the snapshot as of this movement's CURRENT status.
+            state), and replaced by a successful standard Fix Pending edit to reflect the corrected
+            PENDING content immediately — never two snapshots at once, always the snapshot as of this
+            movement's CURRENT status.
             Left untouched by reject()/cancel() (out of scope). Null for movements created before this
             field existed. Callers should prefer this field over a separate balance-as-of call when
             already holding the movement (e.g. from the Event Timeline); balance-as-of remains the
@@ -2883,7 +3012,14 @@ components:
       additionalProperties: false
       required: [amount, editedBy]
       properties:
-        amount: { $ref: '#/components/schemas/MonetaryAmount' }
+        amount:
+          allOf: [{ $ref: '#/components/schemas/MonetaryAmount' }]
+          description: >
+            Required wire value. For AMEND_INCREASE, AMEND_DECREASE or AMEND,
+            send `"0"` when changing Tolerance only. A monetary amendment must
+            change Amount, Tolerance, or both; zero plus omitted/unchanged
+            tolerance is rejected. Other movement types retain their own
+            existing amount rules.
         editedBy: { type: string, minLength: 1 }
         editMode: { type: string, enum: [STANDARD, REMARKS_ONLY], default: STANDARD }
         remarks: { type: string, minLength: 1, maxLength: 500, pattern: '.*\S.*', nullable: true, description: "Required and non-blank when editMode is REMARKS_ONLY; optional otherwise." }
@@ -2905,7 +3041,9 @@ components:
         amendmentApproved: { type: boolean, nullable: true }
         amendmentEffective: { type: string, nullable: true }
         consentStatus: { type: string, enum: [NOT_REQUIRED, OBTAINED], nullable: true }
-        tolerancePct: { type: string, nullable: true }
+        tolerancePct: { type: string, pattern: '^\d+$', nullable: true, description: "A1/B1 ISSUE Fix Pending only. Non-negative whole-number opening Tolerance; rejected for Amendment and unrelated movement types." }
+        toleranceChangePct: { type: string, pattern: '^\d+$', nullable: true, description: "A2/B2 Amendment Fix Pending only. Non-negative whole-number change magnitude." }
+        toleranceChangeDirection: { type: string, enum: [INCREASE, DECREASE], nullable: true, description: "Required when toleranceChangePct is supplied." }
         tenorType: { $ref: '#/components/schemas/TenorType' }
         tenorDays: { type: integer, nullable: true }
         expiryDate: { type: string, format: date, nullable: true }
@@ -2963,8 +3101,25 @@ components:
           description: Defaults per instrumentType/movementType when omitted (CONTINGENT for LC/SHGT earmarks, ACTUAL for Acceptance/Confirmation liabilities, MEMO for EPLC_EXAMINATION) — only needs to be supplied explicitly to override that default.
         tolerancePct:
           type: string
+          pattern: '^\d+$'
           nullable: true
-          description: IPLC_LC/EPLC_LC ISSUE only (Design doc §6.2) — becomes the new contract's own BalanceContract.tolerancePct.
+          description: >
+            A1/B1 ISSUE only. Non-negative whole-number opening Tolerance that
+            establishes BalanceContract.tolerancePct. Protected/rejected on
+            monetary Amendments, AMEND_EXPIRY_DATE and unrelated movements.
+        toleranceChangePct:
+          type: string
+          pattern: '^\d+$'
+          nullable: true
+          description: >
+            A2/B2 monetary Amendment only. Non-negative whole-number change
+            magnitude. After Checker Release, Movement/Contract tolerancePct
+            is the calculated final value; while PENDING it remains the old value.
+        toleranceChangeDirection:
+          type: string
+          enum: [INCREASE, DECREASE]
+          nullable: true
+          description: Required whenever toleranceChangePct is supplied; rejected on non-Amendment requests.
         tenorType: { allOf: [{ $ref: '#/components/schemas/TenorType' }], nullable: true, description: IPLC_LC/EPLC_CONFIRMATION ISSUE, or IPLC_ACCEPTANCE/EPLC_ACCEPTANCE CREATE (checked for consistency against the parent's own tenorType — 400 on mismatch, and 400 if the parent is Sight). }
         tenorDays: { type: integer, nullable: true }
         maturityDate: { type: string, format: date, nullable: true }

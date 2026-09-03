@@ -205,6 +205,14 @@ describe('Expiry Extension Amendment — AMEND_EXPIRY_DATE against an EXPIRED co
 
     const amend = submitAmendExpiryDate(service, expired.balanceContractId, 3, '2027-01-01', '2026-01-15');
     if (!amend.created) throw new Error('expected a new movement');
+    const movementsAtSubmit = service.listMovements(expired.balanceContractId);
+    const expireAtSubmit = movementsAtSubmit.find((m) => m.movementType === 'EXPIRE')!;
+    expect(amend.movement.status).toBe('PENDING');
+    expect(amend.movement.reversalOfMovementId).toBe(expireAtSubmit.movementId);
+    expect(amend.movement.ceilingAmount).toBe(expireAtSubmit.ceilingAmount);
+    expect(amend.movement.contingentAccountEntry).not.toBeNull(); // Checker reviews the actual restore voucher before Release.
+    expect(service.getBalanceSnapshot(expired.balanceContractId).confirmedBalance).toBe('0');
+    expect(service.getBalanceSnapshot(expired.balanceContractId).availableBalance).toBe('0'); // voucher is pending; usable balance is not restored early.
     service.release(amend.movement.movementId, 'checker1');
 
     const reactivated = service.resolveContract('IPLC_LC', { lcNumber: 'EXT-001' });
@@ -212,14 +220,57 @@ describe('Expiry Extension Amendment — AMEND_EXPIRY_DATE against an EXPIRED co
     expect(reactivated?.expiryDate).toBe('2027-01-01');
     expect(service.getBalanceSnapshot(expired.balanceContractId).confirmedBalance).toBe('10000');
 
-    // The REVERSAL leg exists, points at the EXPIRE it reverses, and shares a businessEventId with the Extension.
+    // One reviewed transaction only: AMEND_EXPIRY_DATE itself carries the EXPIRE reversal; Release does
+    // not create a second movement with entries the Checker never saw.
     const movements = service.listMovements(expired.balanceContractId);
     const expireMovement = movements.find((m) => m.movementType === 'EXPIRE')!;
-    const reversal = movements.find((m) => m.movementType === 'REVERSAL')!;
-    expect(reversal.reversalOfMovementId).toBe(expireMovement.movementId);
-    expect(reversal.status).toBe('RELEASED');
-    expect(reversal.businessEventId).toBe(amend.movement.movementId);
-    expect(reversal.ceilingAmount).toBe(expireMovement.ceilingAmount);
+    const releasedAmendment = movements.find((m) => m.movementId === amend.movement.movementId)!;
+    expect(releasedAmendment.reversalOfMovementId).toBe(expireMovement.movementId);
+    expect(releasedAmendment.status).toBe('RELEASED');
+    expect(releasedAmendment.ceilingAmount).toBe(expireMovement.ceilingAmount);
+    expect(movements.filter((m) => m.movementType === 'REVERSAL')).toHaveLength(0);
+  });
+
+  test('cancelled Expiry Extension attempts do not hide the last RELEASED EXPIRE restoration basis', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const expired = expireLc(service, 'EXT-CANCELLED-RETRY-001');
+
+    const first = submitAmendExpiryDate(service, expired.balanceContractId, 3, '2027-01-01', '2026-01-15');
+    if (!first.created) throw new Error('expected the first movement');
+    service.cancel(first.movement.movementId, 'maker1', 'MAKER_EC');
+
+    const retry = submitAmendExpiryDate(service, expired.balanceContractId, 4, '2027-02-01', '2026-01-15');
+    if (!retry.created) throw new Error('expected the retry movement');
+    const expire = service.listMovements(expired.balanceContractId).find((movement) => movement.movementType === 'EXPIRE')!;
+
+    expect(retry.movement.status).toBe('PENDING');
+    expect(retry.movement.reversalOfMovementId).toBe(expire.movementId);
+    expect(retry.movement.amount).toBe(expire.ceilingAmount);
+    expect(retry.movement.ceilingAmount).toBe(expire.ceilingAmount);
+    expect(retry.movement.contingentAccountEntry).not.toBeNull();
+    expect(service.getBalanceSnapshot(expired.balanceContractId).tightAvailableBalance).toBe('0');
+
+    service.release(retry.movement.movementId, 'checker1');
+    expect(service.getBalanceSnapshot(expired.balanceContractId).confirmedBalance).toBe('10000');
+    expect(service.getBalanceSnapshot(expired.balanceContractId).tightAvailableBalance).toBe('10000');
+    expect(service.resolveContract('IPLC_LC', { lcNumber: 'EXT-CANCELLED-RETRY-001' })?.status).toBe('ACTIVE');
+  });
+
+  test('Checker rejects when the RELEASED EXPIRE restoration basis disappears after Submit', () => {
+    const db = createDb(':memory:');
+    const service = new BalanceService(db);
+    const expired = expireLc(service, 'EXT-STALE-BASIS-001');
+    const amend = submitAmendExpiryDate(service, expired.balanceContractId, 3, '2027-01-01', '2026-01-15');
+    if (!amend.created) throw new Error('expected the amendment');
+    const expire = service.listMovements(expired.balanceContractId).find((movement) => movement.movementType === 'EXPIRE')!;
+
+    // No public workflow can rewrite a RELEASED EXPIRE. Simulate storage corruption/concurrent
+    // administrative repair to prove Checker re-validates the protected restoration basis.
+    db.exec(`UPDATE balance_movements SET status = 'CANCELLED' WHERE movement_id = '${expire.movementId}'`);
+
+    expect(() => service.release(amend.movement.movementId, 'checker1')).toThrow(
+      /EXPIRE restoration basis has changed since Submit/,
+    );
   });
 
   test('rejects Submit when there is an open (PENDING) Event anywhere in the tree — a second, concurrent Extension Submit sees the first Extension itself as an open Event', () => {

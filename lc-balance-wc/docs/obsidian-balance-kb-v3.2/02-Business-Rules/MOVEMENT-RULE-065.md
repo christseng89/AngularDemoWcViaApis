@@ -6,7 +6,7 @@ category: Business Rule
 status: CONFIRMED
 source_repository: Balance Component (lc-balance)
 last_verified_commit: "N/A — no .git history in the analyzed snapshot, see [[Source-to-Knowledge-Map]]"
-snapshot_date: 2026-08-26
+snapshot_date: 2026-09-03
 tags:
   - balance
   - movement
@@ -20,7 +20,7 @@ tags:
 CONFIRMED
 
 ## Business Rule
-REOPEN（A11/B7）原始設計（F1 提案 v1.19.0，2026-08-25 當日已被取代）是零金額移動（`MOVEMENT_DIRECTION.REOPEN` 曾是 `0`），真正的餘額復原透過 Checker Release 時另外產生一筆或多筆獨立的 `REVERSAL` 移動作為副作用。現場 UAT（"REOPEN Submit 出 Account Entries (Pending)... 不應該有兩筆"）發現這讓 Checker 核准當下看不到真實影響，且 Inquire Events/Look Up 對「概念上同一個業務事件」顯示成兩筆記錄。v1.20.0（同日）將 REOPEN 重新設計為直接攜帶自己真實、正數的復原金額（[[MOVEMENT-RULE-064]]），`MOVEMENT_DIRECTION.REOPEN` 同步由 `0` 改為 `1`（與 `ISSUE`/`AMEND_INCREASE` 相同的「建立/增加」方向）。自此 REOPEN 的 Release 端**不再產生任何 REVERSAL 移動**——`release()` 對 REOPEN 的處理僅剩「重新驗證資格與金額」+「呼叫 `reactivate()` 轉換合約狀態」兩步，沒有 `createAndReleaseReversal()` 呼叫。`REVERSAL` movementType 本身並未被移除，僅是不再被 REOPEN 使用（現行僅供 Expiry Extension Amendment 使用，見 [[MOVEMENT-RULE-066]]）。
+REOPEN（A11/B7）原始設計（F1 提案 v1.19.0，2026-08-25 當日已被取代）是零金額移動，真正的餘額復原透過 Checker Release 時另外產生 REVERSAL。現場 UAT 發現 Checker 核准前看不到真實影響，且同一事件顯示兩筆記錄。v1.20.0 將 REOPEN 改為直接攜帶伺服器計算的復原金額與 Account Entries，`MOVEMENT_DIRECTION.REOPEN` 由 `0` 改為 `1`；Release 只重新驗證並 `reactivate()`，不另建 REVERSAL。EXPIRED Expiry Extension 現在也採相同的「單筆先審」原則：不另建 REVERSAL，而在同一筆 PENDING `AMEND_EXPIRY_DATE` 上使用 `reversalOfMovementId` 推導方向，見 [[MOVEMENT-RULE-066]]。
 
 ## Conditions
 `movementType === 'REOPEN'`（`domain/balanceDerivation.ts` 的 `MOVEMENT_DIRECTION` 表；`service/balanceService.ts` 的 `release()` 內 `movement.movementType === 'REOPEN'` 分支）

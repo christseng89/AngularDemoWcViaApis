@@ -118,6 +118,13 @@ flowchart TD
     M -. Maker 可在 Checker 处理前 .-> P["cancel()（EC，终态）"]
 ```
 
+## Expiry Date Extension（EXPIRED 合約）
+
+- A2 選擇 `Expiry Date` 時，LC Index 使用 `statuses=ACTIVE,EXPIRED`；ACTIVE 是一般到期日修改，EXPIRED 是到期延展。CLOSED/CANCELLED 不列入。
+- Maker Submit 建立 `AMEND_EXPIRY_DATE` PENDING；若目標是 EXPIRED 且最後一筆 RELEASED movement 為 EXPIRE，伺服器同時寫入受保護的復原金額、`reversalOfMovementId` 與真實 Dr/Cr Account Entries，供 Checker 審核。先前 CANCELLED／REJECTED 的修改嘗試不影響恢復依據；此時尚不恢復 Confirmed/Available Balance。
+- Checker 搜尋使用跨狀態 resolver，才能找到掛在 EXPIRED 合約上的 PENDING 交易。
+- Checker Release 成功後才執行 `EXPIRED → ACTIVE` 並由同一筆已審核交易恢復到期前餘額；不再於 Release 暗中建立第二筆 REVERSAL。
+
 ## 交叉引用（Related Knowledge）
 
 **Balance / Tolerance / 充足性检查**

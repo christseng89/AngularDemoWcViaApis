@@ -20,6 +20,20 @@ sub-tables, since the two directions move every figure the opposite way.
 `GET .../balance`, the in-memory snapshot captured at `createMovement()`, and the one captured at
 `release()`) funnels through. Every formula below is quoted from that code, not re-derived.
 
+> **A2／B2 input rule, 2026-09-03.** A monetary amendment may change Amount only, Tolerance only, or
+> both. Tolerance-only uses wire `amount = "0"`, so Current LC Amount stays unchanged while the rounded
+> full-contract Upper Limit can still move. Zero Amount plus an omitted or unchanged Tolerance is a
+> rejected no-op. This exception applies only to `AMEND_INCREASE`／`AMEND_DECREASE`／`AMEND`; other
+> movement types retain their existing amount rules.
+
+> **EXPIRED Expiry Date restoration, 2026-09-03.** The external `AMEND_EXPIRY_DATE` request always
+> sends `amount = "0"` and never carries Tolerance. Against ACTIVE it remains a zero-effect date-only
+> movement. Against EXPIRED, the server finds the latest RELEASED movement (ignoring CANCELLED／REJECTED
+> audit attempts); when it is EXPIRE, the PENDING Amendment carries that EXPIRE's protected amount,
+> reference, and reversed Account Entries. Confirmed／Tight Available remain unchanged while PENDING and
+> are restored only at Checker Release. This restoration is not Face Amount growth and must not be
+> followed by a compensating AMEND_INCREASE.
+
 **Real API fields vs. derived breakdowns — read this before the tables.** Of the eight figures covered
 here, **six are genuine, persisted `BalanceSnapshot` fields** (`confirmedBalance`, `availableBalance`,
 `pendingEarmarkTotal`, `offBalanceExposure`, `tightAvailableBalance`, and — `EPLC_CONFIRMATION` only —
@@ -205,6 +219,14 @@ movement from `PENDING` → `RELEASED` has a highly specific, non-obvious effect
   Released** — only its internal composition does.
 - **Pending Earmark Total** (= Available − Confirmed) — moves by the signed `ceilingAmount` at Submit;
   returns to its pre-Submit value at Approval.
+- **A2/B2 display distinction** — `ceilingAmount` is the selected Amendment's own tolerance-adjusted
+  balance effect; `Pending Earmark Total` is the net of that effect and every other PENDING movement.
+  Example S01: old upper limit 100,000; face Increase 10,000 with proposed tolerance `0% → 20%` gives
+  new upper limit 132,000 and Amendment Balance Effect +32,000. If an independent PENDING UTILIZE
+  already consumes 10,000, the displayed Pending Earmark Total is +22,000. Standard Fix Pending
+  replaces the persisted Event Snapshot immediately, so these corrected PENDING figures do not wait
+  for Checker Release. Existing Off-Balance Exposure/Pending Earmark already booked by other events is
+  not retrospectively re-toleranced.
 - **Tight Available Balance** (2026-08-20 formula, #5/#5a above) — an **increase**-shaped movement
   (ISSUE/AMEND_INCREASE/B1/B2-Increase) is invisible to Tight at Submit (Confirmed hasn't moved yet) and
   only raises it **at Approval**, mirroring Confirmed Balance's own row exactly ("增加從嚴"). A
@@ -280,6 +302,16 @@ Direction is picked explicitly (a `subChoice` dropdown) and drives which `moveme
 `ceilingAmount` must not exceed the current **Tight** Available Balance (2026-08-20, re-based from plain
 Available Balance — see §4's own "Basis tightened" note) — never below what's already utilized, and
 never below outstanding off-balance-sheet (SHGT) exposure.
+
+#### A2 — Expiry Date (`AMEND_EXPIRY_DATE`)
+
+| Target status | At Submit (PENDING) | At Approved (RELEASED) |
+|---|---|---|
+| ACTIVE | Amount／Account Entries 0／null; balances unchanged | expiryDate changes; balances unchanged |
+| EXPIRED after RELEASED EXPIRE | Protected restore voucher is visible; Confirmed／Tight stay 0 | same movement restores the EXPIRE amount; status becomes ACTIVE |
+
+CANCELLED／REJECTED retries are audit-only and do not replace the latest RELEASED EXPIRE basis. The
+restored amount is not an amendment to Face Amount.
 
 #### A2 — Increase (`AMEND_INCREASE`)
 

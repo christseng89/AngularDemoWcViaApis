@@ -739,7 +739,7 @@ describe('submit-rules', () => {
           selectedContract: contract(),
         }),
       );
-      expect(result.error).toBe('Amount must be greater than 0.');
+      expect(result.error).toBe('Amount must not be negative; use Increase or Decrease to choose the direction.');
     });
 
     it('passes for a genuinely positive Amount', () => {
@@ -819,6 +819,10 @@ describe('submit-rules', () => {
     it('passes for a positive tolerancePct and for a zero tolerancePct', () => {
       expect(validateSubmit(ctx({ model: { tolerancePct: '10' } })).error).toBeNull();
       expect(validateSubmit(ctx({ model: { tolerancePct: '0' } })).error).toBeNull();
+    });
+
+    it('rejects decimal Tolerance for A1/B1', () => {
+      expect(validateSubmit(ctx({ model: { tolerancePct: '10.5' } })).error).toBe('Tolerance % must be a whole number.');
     });
 
     it('a null/empty tolerancePct (not applicable, or genuinely optional) is untouched', () => {
@@ -1092,7 +1096,7 @@ describe('submit-rules', () => {
       const result = validateSubmit(
         ctx({ selectedFunction: fn('B2'), model: { ...b2Model, amount: '-5000' }, selectedContract: contract(), amendDirection: 'DECREASE' }),
       );
-      expect(result.error).toBe('Amount must be greater than 0.');
+      expect(result.error).toBe('Amount must not be negative; use Increase or Decrease to choose the direction.');
     });
 
     it('buildSubmitRequest() computes the signed wire amount directly from ctx.amendDirection, WITHOUT ctx.model.amount ever being mutated — the actual bug fix, reproduced end to end', () => {
@@ -1112,6 +1116,67 @@ describe('submit-rules', () => {
         ctx({ selectedFunction: fn('A2'), model: { ...b2Model, instrumentType: 'IPLC_LC', movementType: 'AMEND_INCREASE' }, selectedContract: contract() }),
       );
       expect(request?.amount).toBe('5000');
+    });
+
+    it('supports Tolerance-only: blank Amount validates and is sent as zero', () => {
+      const c = ctx({
+        selectedFunction: fn('B2'),
+        model: { ...b2Model, amount: '', toleranceChangePct: '5' },
+        selectedContract: contract({ tolerancePct: '20' }),
+        selectedContractSnapshot: snapshot(),
+        amendDirection: 'DECREASE',
+      });
+      expect(validateSubmit(c).error).toBeNull();
+      expect(buildSubmitRequest(c).request).toMatchObject({ amount: '0', toleranceChangePct: '5', toleranceChangeDirection: 'DECREASE' });
+    });
+
+    it('rejects decimal Tolerance Change for A2/B2', () => {
+      const c = ctx({
+        selectedFunction: fn('B2'),
+        model: { ...b2Model, amount: '', toleranceChangePct: '2.5' },
+        selectedContract: contract({ tolerancePct: '20' }),
+        amendDirection: 'INCREASE',
+      });
+      expect(validateSubmit(c).error).toBe('Tolerance Change % must be a whole number.');
+    });
+
+    it('rejects a negative Tolerance Change for A2/B2', () => {
+      const c = ctx({
+        selectedFunction: fn('B2'),
+        model: { ...b2Model, amount: '', toleranceChangePct: '-5' },
+        selectedContract: contract({ tolerancePct: '20' }),
+        amendDirection: 'INCREASE',
+      });
+      expect(validateSubmit(c).error).toBe('Tolerance Change % must not be negative.');
+    });
+
+    it('rejects a Decrease Tolerance Change that would exceed the current Tolerance', () => {
+      const c = ctx({
+        selectedFunction: fn('B2'),
+        model: { ...b2Model, amount: '', toleranceChangePct: '25' },
+        selectedContract: contract({ tolerancePct: '20' }),
+        amendDirection: 'DECREASE',
+      });
+      expect(validateSubmit(c).error).toBe('Decrease Tolerance cannot exceed the current Tolerance of 20%.');
+    });
+
+    it('supports Amount-only and omits Tolerance when it was not entered', () => {
+      const c = ctx({ selectedFunction: fn('B2'), model: { ...b2Model, toleranceChangePct: undefined }, selectedContract: contract({ tolerancePct: '20' }), amendDirection: 'INCREASE' });
+      expect(validateSubmit(c).error).toBeNull();
+      expect(buildSubmitRequest(c).request).toMatchObject({ amount: '5000' });
+      expect(buildSubmitRequest(c).request?.toleranceChangePct).toBeUndefined();
+    });
+
+    it('supports changing Amount and Tolerance together, including decreasing the result to exactly zero', () => {
+      const c = ctx({ selectedFunction: fn('B2'), model: { ...b2Model, toleranceChangePct: '20' }, selectedContract: contract({ tolerancePct: '20' }), selectedContractSnapshot: snapshot(), amendDirection: 'DECREASE' });
+      expect(validateSubmit(c).error).toBeNull();
+      expect(buildSubmitRequest(c).request).toMatchObject({ amount: '-5000', toleranceChangePct: '20', toleranceChangeDirection: 'DECREASE' });
+    });
+
+    it('rejects a no-op when Amount is blank/zero and Tolerance is unchanged or absent', () => {
+      const base = { selectedFunction: fn('B2'), selectedContract: contract({ tolerancePct: '20' }), amendDirection: 'INCREASE' as const };
+      expect(validateSubmit(ctx({ ...base, model: { ...b2Model, amount: '', toleranceChangePct: '0' } })).error).toBe('Enter an Amount change, a Tolerance change, or both.');
+      expect(validateSubmit(ctx({ ...base, model: { ...b2Model, amount: '0', toleranceChangePct: undefined } })).error).toBe('Enter an Amount change, a Tolerance change, or both.');
     });
   });
 

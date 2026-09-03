@@ -8,6 +8,9 @@ import type { CreateMovementRequest } from './balanceService';
 
 export const ROOT_INSTRUMENT_TYPES: ReadonlySet<InstrumentType> = new Set(['IPLC_LC', 'EPLC_LC', 'EPLC_CONFIRMATION']);
 
+const TOLERANCE_INPUT_MOVEMENT_TYPES: ReadonlySet<string> = new Set(['ISSUE', 'AMEND_INCREASE', 'AMEND_DECREASE', 'AMEND']);
+const MONETARY_AMENDMENT_TYPES: ReadonlySet<string> = new Set(['AMEND_INCREASE', 'AMEND_DECREASE', 'AMEND']);
+
 export const NATURAL_KEY_FIELDS_BY_INSTRUMENT: Readonly<Record<InstrumentType, ReadonlyArray<'ibNumber' | 'sgNumber'>>> = {
   IPLC_LC: [],
   EPLC_LC: [],
@@ -54,12 +57,16 @@ export class MovementRequestValidator {
     this.assertSecondaryRefRequired(req);
     this.assertTenorRequired(req);
     this.assertToleranceNonNegative(req.tolerancePct);
+    this.assertToleranceAllowed(req.movementType, req.tolerancePct);
+    this.assertToleranceChangeAllowed(req.movementType, req.tolerancePct, req.toleranceChangePct, req.toleranceChangeDirection);
   }
 
   assertValidAmount(movementType: string, amount: string): void {
     const amt = parseMonetaryAmount(amount);
-    if (movementType === 'AMEND') {
-      if (amt.isZero()) throw new RequestValidationError(`amount "${amount}" must not be zero for AMEND — Direction is carried by its own sign.`);
+    if (MONETARY_AMENDMENT_TYPES.has(movementType)) {
+      if (movementType !== 'AMEND' && amt.isNegative()) {
+        throw new RequestValidationError(`amount "${amount}" must not be negative for ${movementType}.`);
+      }
       return;
     }
     if (movementType === 'CLOSE' || movementType === 'EXPIRE' || movementType === 'REOPEN') {
@@ -75,6 +82,20 @@ export class MovementRequestValidator {
       return;
     }
     if (amt.isZero() || amt.isNegative()) throw new RequestValidationError(`amount "${amount}" must be greater than 0.`);
+  }
+
+  assertMonetaryAmendmentChangesTerms(
+    movementType: string,
+    amount: string,
+    toleranceChangePct: string | null | undefined,
+    _currentTolerancePct?: string | null,
+  ): void {
+    if (!MONETARY_AMENDMENT_TYPES.has(movementType)) return;
+    const amountChanges = !parseMonetaryAmount(amount).isZero();
+    const toleranceChanges = toleranceChangePct != null && !new Decimal(toleranceChangePct).isZero();
+    if (!amountChanges && !toleranceChanges) {
+      throw new RequestValidationError('A monetary amendment must change Amount, Tolerance, or both.');
+    }
   }
 
   assertReasonCodeRequired(movementType: string, reasonCode: string | null | undefined): void {
@@ -128,9 +149,44 @@ export class MovementRequestValidator {
 
   assertToleranceNonNegative(tolerancePct: string | null | undefined): void {
     if (tolerancePct == null) return;
-    if (new Decimal(tolerancePct).isNegative()) {
+    const tolerance = new Decimal(tolerancePct);
+    if (tolerance.isNegative()) {
       throw new RequestValidationError(`tolerancePct "${tolerancePct}" must not be negative.`);
     }
+    if (!tolerance.isInteger() || !/^\d+$/.test(tolerancePct)) {
+      throw new RequestValidationError(`tolerancePct "${tolerancePct}" must be a whole number.`);
+    }
+  }
+
+  assertToleranceAllowed(movementType: string, tolerancePct: string | null | undefined): void {
+    if (tolerancePct == null) return;
+    if (!TOLERANCE_INPUT_MOVEMENT_TYPES.has(movementType)) {
+      throw new RequestValidationError(`tolerancePct is not applicable to ${movementType}.`);
+    }
+  }
+
+  assertToleranceChangeAllowed(
+    movementType: string,
+    tolerancePct: string | null | undefined,
+    toleranceChangePct: string | null | undefined,
+    direction: 'INCREASE' | 'DECREASE' | null | undefined,
+  ): void {
+    const amendment = MONETARY_AMENDMENT_TYPES.has(movementType);
+    if (amendment && tolerancePct != null) {
+      throw new RequestValidationError('tolerancePct is calculated by the system for Amendment transactions.');
+    }
+    if (!amendment && toleranceChangePct != null) {
+      throw new RequestValidationError('toleranceChangePct is only allowed for Amendment transactions.');
+    }
+    if (toleranceChangePct == null) return;
+    const toleranceChange = new Decimal(toleranceChangePct);
+    if (toleranceChange.isNegative()) {
+      throw new RequestValidationError(`toleranceChangePct "${toleranceChangePct}" must not be negative.`);
+    }
+    if (!toleranceChange.isInteger() || !/^\d+$/.test(toleranceChangePct)) {
+      throw new RequestValidationError(`toleranceChangePct "${toleranceChangePct}" must be a whole number.`);
+    }
+    if (!direction) throw new RequestValidationError('toleranceChangeDirection is required when toleranceChangePct is supplied.');
   }
 
   assertA3SBillCoversShippingGuarantee(businessEventId: string | null | undefined, billAmount: string): void {

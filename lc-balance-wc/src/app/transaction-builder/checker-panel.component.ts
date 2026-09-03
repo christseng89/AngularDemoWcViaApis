@@ -15,6 +15,7 @@ import {
 import { describeApiError as describeApiErrorShared, notFoundMessage } from './api-error';
 import * as policy from './function-policy';
 import { isCheckerActionableMovement } from './checker-eligibility-policy';
+import { movementTypeMatchesFunction } from './function-strategy';
 import { FeedbackMessageComponent } from '../shared/feedback/feedback-message.component';
 import { UiMessage } from '../shared/feedback/ui-message.model';
 import { presentApiError } from '../shared/feedback/api-error-presenter';
@@ -202,12 +203,12 @@ export class CheckerPanelComponent implements OnChanges {
       ibNumber: secondaryField === 'ibNumber' ? this.checkerSecondaryRef : null,
       sgNumber: secondaryField === 'sgNumber' ? this.checkerSecondaryRef : null,
     };
-    // F1 (external BA review, v1.19.0) — A11/B7 (Reopen) only. Every other function's own Checker search
-    // target is still ACTIVE while its movement is PENDING (a CLOSE/EXPIRE hasn't taken effect until
-    // Release) — but A11/B7's whole point is a movement PENDING against an ALREADY-CLOSED contract, so
-    // the default ACTIVE-only resolveContract() would 404 here (real bug found via live testing:
-    // "No Logical Contract exists yet for this natural key" even though a genuine PENDING REOPEN existed).
-    const includeAnyStatus = !!this.selectedFunction.requiresReopenEligibility;
+    // Lifecycle exceptions whose PENDING movement belongs to a non-ACTIVE contract must bypass the
+    // default ACTIVE-only resolver: A11/B7 targets CLOSED; A2/B2 AMEND_EXPIRY_DATE targets EXPIRED for
+    // an Expiry Extension. The queue's movementType filter below still guarantees this Function only
+    // surfaces movements it can produce, so includeAnyStatus does not widen Checker action scope.
+    const includeAnyStatus =
+      !!this.selectedFunction.requiresReopenEligibility || movementTypeMatchesFunction(this.selectedFunction, 'AMEND_EXPIRY_DATE');
     this.api.resolveContract(this.selectedFunction.instrumentType, naturalKey, includeAnyStatus).subscribe({
       next: (contract) => {
         this.checkerSearching = false;

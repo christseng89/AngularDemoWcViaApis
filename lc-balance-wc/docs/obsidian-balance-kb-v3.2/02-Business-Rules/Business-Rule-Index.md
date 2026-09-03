@@ -73,7 +73,7 @@ tags:
 | [[EXPOSURE-RULE-027]] | contingentAccountEntry / contingent_account_entry 是在变动记录创建时由服务端一次性推导并不可变地持久化，与调用方直接传入的 accountEntries 字段完全并行、彼此独立 | ✅ CONFIRMED |
 | [[EXPOSURE-RULE-028]] | 父子合约关联关系（parent_logical_contract_id：SHGT/Acceptance/EPLC_EXAMINATION → 父 LC）由应用层维护，并非由数据库的 FOREIGN KEY 强制保证 | ✅ CONFIRMED |
 | [[EXPOSURE-RULE-029]] | 事件快照（event_snapshot/root_event_snapshot/acceptance_event_snapshot/sg_event_snapshot）在写入时一次性计算，从不重新计算，唯一例外是 A4 完成 A3 的场景，该场景会写入独立的 finalize_* 列集合 | ✅ CONFIRMED |
-| [[EXPOSURE-RULE-030]] | AMEND_EXPIRY_DATE 明確回傳 null 的 contingentAccountEntry（與 EPLC_EXAMINATION/CREATE 相同待遇），無論作用於 ACTIVE 或 EXPIRED 合約 | ✅ CONFIRMED |
+| [[EXPOSURE-RULE-030]] | ACTIVE AMEND_EXPIRY_DATE 無分錄；EXPIRED Extension 在 Maker PENDING 即攜帶可供 Checker 審核的真實復原分錄 | ✅ CONFIRMED |
 
 ## MAKER-CHECKER-RULE (62)
 
@@ -160,7 +160,7 @@ tags:
 | [[MOVEMENT-RULE-008]] | 严格可用余额下的 AMEND_DECREASE 检查被断言（此处未独立重新证明）为涵盖了面值金额不得为负的下限检查 | 🟡 INFERRED |
 | [[MOVEMENT-RULE-009]] | 重复 ISSUE 防护——针对一个已处于 ACTIVE 状态的自然键执行创建型 movementType 会被拒绝 | ✅ CONFIRMED |
 | [[MOVEMENT-RULE-010]] | 重复 sourceTransactionRef 防护——在每个合约范围内唯一 | ✅ CONFIRMED |
-| [[MOVEMENT-RULE-011]] | assertValidAmount()——服务端"金额必须 > 0"的兜底检查，在 Submit 与 Release 两处都会执行，附带两个明确列出的例外 | ✅ CONFIRMED |
+| [[MOVEMENT-RULE-011]] | assertValidAmount() 与 monetary amendment Amount／Tolerance no-op 的服务端兜底校验 | ✅ CONFIRMED |
 | [[MOVEMENT-RULE-012]] | Acceptance 的 Tenor 一致性由服务端在 resolveOrCreateContract() 内部强制执行，而非仅依赖客户端约定 | ✅ CONFIRMED |
 | [[MOVEMENT-RULE-013]] | AMEND（B2 共用的 movementType）——方向取决于 amount 自身的正负号；充足性检查只在真正的减少情形下才会执行 | ✅ CONFIRMED |
 | [[MOVEMENT-RULE-014]] | tenorFamily 目录筛选——没有记录 tenorType 的历史合约，在 SIGHT 与 USANCE 两种查询中都会始终被包含在内 | ✅ CONFIRMED |
@@ -174,7 +174,7 @@ tags:
 | [[MOVEMENT-RULE-022]] | A3S SG 赎回金额/类型的客户端实时预览，与实际提交到服务端的公式完全一致 | ✅ CONFIRMED |
 | [[MOVEMENT-RULE-023]] | B5 通过比较键入的 Amount 与该 Acceptance 的可用余额，推导出 FULL_SETTLE 还是 PARTIAL_SETTLE | ✅ CONFIRMED |
 | [[MOVEMENT-RULE-024]] | movementTypeMatchesFunction 能够正确区分每一种 EPLC_CONFIRMATION 的 movementType——derivesMovementTypeFromTenor 分支只针对 B4 匹配 HONOUR/ACCEPT，不匹配 CLOSE | ✅ CONFIRMED |
-| [[MOVEMENT-RULE-025]] | Submit 时通用的 Amount > 0 防护，唯一的豁免情形是 CLOSE | ✅ CONFIRMED |
+| [[MOVEMENT-RULE-025]] | Submit Amount 校验；A2／B2 支援 Amount-only、Tolerance-only 或两者，并拒绝 no-op | ✅ CONFIRMED |
 | [[MOVEMENT-RULE-026]] | B2 的方向通过 subChoice.key='amendDirection' 传递，从不通过独立的 movementType 或对 model.amount 的改动来传递 | ✅ CONFIRMED |
 | [[MOVEMENT-RULE-027]] | isAmendDecreaseDirection 这个 getter 将 A2 真实的 AMEND_DECREASE movementType 与 B2 带负号的 AMEND，统一归入同一个"减少"预警分类器之下 | ✅ CONFIRMED |
 | [[MOVEMENT-RULE-028]] | MakerSubmitService 的分派——5 种提交形态，采用首个匹配优先的路由方式，并优雅回退到普通单分支提交 | ✅ CONFIRMED |
@@ -215,7 +215,7 @@ tags:
 | [[MOVEMENT-RULE-063]] | EXPIRE（AUTO EXPIRY）资格判定刻意不比照 CLOSE 的 SG/Acceptance 余额归零条件 | ✅ CONFIRMED |
 | [[MOVEMENT-RULE-064]] | REOPEN（A11/B7）复原金额由 computeReopenRestoreAmount() 在 Submit 时伺服端计算，反转整条尚未反转的 RELEASED EXPIRE/CLOSE 沖销链，非仅最后一笔 | ✅ CONFIRMED |
 | [[MOVEMENT-RULE-065]] | MOVEMENT_DIRECTION.REOPEN = 1：REOPEN 自 2026-08-25 起直接以自身簽署金額建立餘額，不再產生任何 REVERSAL 副作用 | ✅ CONFIRMED |
-| [[MOVEMENT-RULE-066]] | REVERSAL 方向為動態解析（反轉其指向移動的固定方向），現行僅供 Expiry Extension Amendment 自身復原使用，REOPEN 自 2026-08-25 起不再使用 | ✅ CONFIRMED |
+| [[MOVEMENT-RULE-066]] | 動態反轉方向仍受支援；Expiry Extension 已改由同一筆 AMEND_EXPIRY_DATE PENDING 攜帶 EXPIRE reference 與復原分錄 | ✅ CONFIRMED |
 | [[MOVEMENT-RULE-067]] | assertValidAmount() 的「0 合法、負數拒絕」豁免自 F1 起擴及 EXPIRE 與 REOPEN，與既有 CLOSE 豁免共用同一段程式碼 | ✅ CONFIRMED |
 | [[MOVEMENT-RULE-068]] | AMEND_EXPIRY_DATE 為雙模式 movementType：對 ACTIVE 合約是單純修改到期日，對 EXPIRED 合約則是 Expiry Extension Amendment 復原入口，由合約當前狀態而非請求旗標區分 | ✅ CONFIRMED |
 | [[MOVEMENT-RULE-075]] | A1/B1 ISSUE 的 Expiry Date 由选填改为强制必填（三层防线：Angular 表单/Submit 守卫/服务端 assertExpiryDateRequired） | ✅ CONFIRMED |
@@ -291,4 +291,4 @@ tags:
 | [[TOLERANCE-RULE-012]] | 出口 Confirmation 的 confirmed_amount 独立于其所依附 LC 自身的金额（UCP 600 第 10(b) 条） | 🟡 INFERRED |
 | [[TOLERANCE-RULE-013]] | checkAmendDecreaseSufficiency 会将经容差换算后的 ceilingAmount 与严格可用余额比对，而非与普通可用余额比对 | ✅ CONFIRMED |
 | [[TOLERANCE-RULE-014]] | 买方远期（Buyer's Usance）仅适用于进口方融资；出口/保兑行一侧的处理必须与 Sight 完全相同——这是业务分析（BA）决策，但仅在测试夹具层面实现，领域层并没有相应的防护 | ✅ CONFIRMED |
-
+| [[TOLERANCE-RULE-015]] | A2／B2 完整上限差额；支援 Amount-only／Tolerance-only／Both 并拒绝 no-op；新 Tolerance 在 Release 才生效 | ✅ CONFIRMED |

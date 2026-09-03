@@ -210,6 +210,13 @@ describe('BalanceComponentApiService', () => {
         params: { instrumentType: 'IPLC_LC', page: 1, pageSize: 10, status: 'ACTIVE' },
       });
     });
+
+    it('adds statuses as a comma-separated query value for the A2/B2 Expiry Date picker', () => {
+      service.catalog('IPLC_LC', undefined, undefined, 1, 10, undefined, undefined, true, undefined, ['ACTIVE', 'EXPIRED']);
+      expect(http.get).toHaveBeenCalledWith('/balance-component/balance-contracts/catalog', {
+        params: { instrumentType: 'IPLC_LC', page: 1, pageSize: 10, requireIssueReleased: 'true', statuses: 'ACTIVE,EXPIRED' },
+      });
+    });
   });
 
   describe('closeEligible() — A10/B6', () => {

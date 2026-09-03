@@ -2909,6 +2909,90 @@ function exportCase14(lc) {
   };
 }
 
+function importCase16(lc) {
+  const amendmentSteps = [
+    ['Increase 20,000 + Tolerance +10%', 'amend1', 'AMEND_INCREASE', '20000', '10', 'INCREASE', 'A01', 'Resulting Tolerance 10%; Upper 132,000'],
+    ['Increase 10,000 + Tolerance +5%', 'amend2', 'AMEND_INCREASE', '10000', '5', 'INCREASE', 'A02', 'Resulting Tolerance 15%; Upper 149,500'],
+    ['Decrease 20,000 + Tolerance -3%', 'amend3', 'AMEND_DECREASE', '20000', '3', 'DECREASE', 'A03', 'Resulting Tolerance 12%; Upper 123,200'],
+    ['Decrease 10,000 + Tolerance -12%', 'amend4', 'AMEND_DECREASE', '10000', '12', 'DECREASE', 'A04', 'Resulting Tolerance 0%; Upper 100,000'],
+  ];
+  return {
+    id: 'import-case-16',
+    title: 'Import Case 16 — Same LC: four Amount/Tolerance amendment combinations',
+    description:
+      'One LC keeps a released 40,000 utilization while A2 runs Increase/Decrease × Tolerance Increase/Decrease. Each Release recalculates the full amended upper/lower limits; it never reapplies tolerance to the historic utilization.',
+    steps: [
+      ...createAndRelease(
+        'A1 Issue 100,000, Tolerance 0%',
+        'lc',
+        {
+          instrumentType: 'IPLC_LC', naturalKey: { lcNumber: lc }, movementType: 'ISSUE', eventSeq: 1,
+          amount: '100000', currency: 'USD', tolerancePct: '0', tenorType: 'SIGHT', expiryDate: '2028-12-28', createdBy: MAKER,
+        },
+        'Checker releases A1',
+      ),
+      {
+        type: 'createMovement', label: 'A3 Document Arrival 40,000 — retained as existing utilization', captureAs: 'utilize',
+        request: {
+          instrumentType: 'IPLC_LC', balanceContractIdRef: 'lc', movementType: 'UTILIZE', eventSeq: 2,
+          amount: '40000', currency: 'USD', sourceTransactionRef: 'B01', createdBy: MAKER,
+        },
+      },
+      { type: 'makerSubmit', label: 'A4 Maker submits Sight Settlement', movementRef: 'utilize', makerSubmittedBy: MAKER },
+      { type: 'release', label: 'A4 Checker releases 40,000 utilization', movementRef: 'utilize', releasedBy: CHECKER },
+      ...amendmentSteps.flatMap(([label, captureAs, movementType, amount, toleranceChangePct, toleranceChangeDirection, sourceTransactionRef, expected], index) => [
+        ...createAndRelease(
+          label,
+          captureAs,
+          {
+            instrumentType: 'IPLC_LC', balanceContractIdRef: 'lc', movementType, eventSeq: index + 3,
+            amount, currency: 'USD', toleranceChangePct, toleranceChangeDirection, sourceTransactionRef, createdBy: MAKER,
+          },
+          `Checker releases ${sourceTransactionRef}`,
+        ),
+        { type: 'snapshot', label: `${expected}; utilization remains 40,000`, contractRef: 'lc' },
+      ]),
+    ],
+  };
+}
+
+function exportCase15(lc) {
+  const amendments = [
+    ['B2 Increase 20,000 + Tolerance +10%', '20000', '10', 'INCREASE', 'E01', 'Resulting Tolerance 10%; Upper 132,000'],
+    ['B2 Increase 10,000 + Tolerance +5%', '10000', '5', 'INCREASE', 'E02', 'Resulting Tolerance 15%; Upper 149,500'],
+    ['B2 Decrease 20,000 + Tolerance -3%', '-20000', '3', 'DECREASE', 'E03', 'Resulting Tolerance 12%; Upper 123,200'],
+    ['B2 Decrease 10,000 + Tolerance -12%', '-10000', '12', 'DECREASE', 'E04', 'Resulting Tolerance 0%; Upper 100,000'],
+  ];
+  return {
+    id: 'export-case-15',
+    title: 'Export Case #15 — Same Confirmation: four Amount/Tolerance amendment combinations',
+    description: 'B2 uses signed AMEND amounts but the same full-current-amount recalculation rule as Import A2.',
+    steps: [
+      ...createAndRelease(
+        'B1 Confirm LC 100,000, Tolerance 0%',
+        'conf',
+        {
+          instrumentType: 'EPLC_CONFIRMATION', naturalKey: { lcNumber: lc }, movementType: 'ISSUE', eventSeq: 1,
+          amount: '100000', currency: 'USD', tolerancePct: '0', tenorType: 'SIGHT', expiryDate: '2028-12-28', createdBy: MAKER,
+        },
+        'Checker releases B1',
+      ),
+      ...amendments.flatMap(([label, amount, toleranceChangePct, toleranceChangeDirection, sourceTransactionRef, expected], index) => [
+        ...createAndRelease(
+          label,
+          `amend${index + 1}`,
+          {
+            instrumentType: 'EPLC_CONFIRMATION', balanceContractIdRef: 'conf', movementType: 'AMEND', eventSeq: index + 2,
+            amount, currency: 'USD', toleranceChangePct, toleranceChangeDirection, sourceTransactionRef, createdBy: MAKER,
+          },
+          `Checker releases ${sourceTransactionRef}`,
+        ),
+        { type: 'snapshot', label: expected, contractRef: 'conf' },
+      ]),
+    ],
+  };
+}
+
 /**
  * Run-All readiness fixtures deliberately stop at the approved prerequisite. They are production-shaped
  * lifecycle cases, not eligibility bypasses: the normal downstream picker must discover them exactly as
@@ -3209,6 +3293,7 @@ function buildRegistry() {
     importCase13(lcNumberFor('IMP-C13')),
     importCase14(lcNumberFor('IMP-C14')),
     importCase15(lcNumberFor('IMP-C15')),
+    importCase16(lcNumberFor('IMP-C16')),
     exportCase1(lcNumberFor('EXP-C1')),
     exportCase2(lcNumberFor('EXP-C2'), 'IB0001'),
     exportCase3(lcNumberFor('EXP-C3'), 'IB0001'),
@@ -3223,6 +3308,7 @@ function buildRegistry() {
     exportCase12(lcNumberFor('EXP-C12')),
     exportCase13(lcNumberFor('EXP-C13')),
     exportCase14(lcNumberFor('EXP-C14')),
+    exportCase15(lcNumberFor('EXP-C15')),
     // Keep these LAST: each case retains one parent with three independently eligible child references.
     importA3SReady(lcNumberFor('IMP-A3S')),
     importA4Ready(lcNumberFor('IMP-A4')),

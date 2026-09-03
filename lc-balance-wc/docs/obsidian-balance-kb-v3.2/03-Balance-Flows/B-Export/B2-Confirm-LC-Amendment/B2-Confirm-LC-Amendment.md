@@ -124,6 +124,12 @@ flowchart TD
     N -. Maker 可在 Checker 处理前 .-> Q["cancel()（EC，终态）"]
 ```
 
+## Expiry Date Extension（EXPIRED Confirmation）
+
+- B2 選擇 `Expiry Date` 時，Confirmation Index 使用 `statuses=ACTIVE,EXPIRED`；CLOSED/CANCELLED 不列入。
+- Maker Submit 保持原 EXPIRED 餘額不變，但在 `AMEND_EXPIRY_DATE` PENDING 上寫入伺服器依最後一筆 RELEASED EXPIRE 計算的復原金額、reference 與真實 Account Entries；CANCELLED／REJECTED 的舊嘗試不遮蔽恢復依據，Checker 可跨狀態找到並預先審核。
+- Checker Release 成功後才執行 `EXPIRED → ACTIVE`，並由同一筆已審核交易恢復到期前餘額；不新增 Checker 未見過的 linked REVERSAL。
+
 ## 交叉引用（Related Knowledge）
 
 **Balance / Tolerance / 充足性检查**

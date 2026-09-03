@@ -27,7 +27,7 @@ BALANCE_ACCOUNT_NUMBER_MAX_LEN=128
 
 ## API
 
-權威契約為 `analysis/balance-component-api.yaml` v1.45.0。WC 經宿主 proxy 使用 `/balance-component` 前綴；直接呼叫 microservice 時使用其實際 base URL（預設示例為 `http://localhost:4100`）。
+權威契約為 `analysis/balance-component-api.yaml` v1.46.2。WC 經宿主 proxy 使用 `/balance-component` 前綴；直接呼叫 microservice 時使用其實際 base URL（預設示例為 `http://localhost:4100`）。
 
 列出固定路由與有效驗證規則：
 

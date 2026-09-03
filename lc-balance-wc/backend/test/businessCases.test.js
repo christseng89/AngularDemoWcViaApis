@@ -21,6 +21,7 @@ const EXPECTED_IDS = [
   'import-case-13',
   'import-case-14',
   'import-case-15',
+  'import-case-16',
   'export-case-1',
   'export-case-2',
   'export-case-3',
@@ -35,6 +36,7 @@ const EXPECTED_IDS = [
   'export-case-12',
   'export-case-13',
   'export-case-14',
+  'export-case-15',
   'import-a3s-ready',
   'import-a4-ready',
   'import-a6-ready',
@@ -49,8 +51,33 @@ describe('data/businessCases.js buildRegistry()', () => {
   const registry = buildRegistry();
 
   it('returns all lifecycle and manual-readiness business cases in Run All order', () => {
-    expect(registry).toHaveLength(35);
+    expect(registry).toHaveLength(37);
     expect(registry.map((c) => c.id)).toEqual(EXPECTED_IDS);
+  });
+
+  it('adds four sequential amount/tolerance amendments against the same Import LC and Export Confirmation', () => {
+    const byId = Object.fromEntries(registry.map((businessCase) => [businessCase.id, businessCase]));
+    const importAmendments = byId['import-case-16'].steps.filter(
+      (step) => step.type === 'createMovement' && (step.request?.movementType === 'AMEND_INCREASE' || step.request?.movementType === 'AMEND_DECREASE'),
+    );
+    expect(importAmendments.map((step) => [step.request.movementType, step.request.amount, step.request.toleranceChangePct])).toEqual([
+      ['AMEND_INCREASE', '20000', '10'],
+      ['AMEND_INCREASE', '10000', '5'],
+      ['AMEND_DECREASE', '20000', '3'],
+      ['AMEND_DECREASE', '10000', '12'],
+    ]);
+    expect(new Set(importAmendments.map((step) => step.request.balanceContractIdRef))).toEqual(new Set(['lc']));
+
+    const exportAmendments = byId['export-case-15'].steps.filter(
+      (step) => step.type === 'createMovement' && step.request?.movementType === 'AMEND',
+    );
+    expect(exportAmendments.map((step) => [step.request.amount, step.request.toleranceChangePct])).toEqual([
+      ['20000', '10'],
+      ['10000', '5'],
+      ['-20000', '3'],
+      ['-10000', '12'],
+    ]);
+    expect(new Set(exportAmendments.map((step) => step.request.balanceContractIdRef))).toEqual(new Set(['conf']));
   });
 
   it('Run All ends with one parent and three retained child prerequisites for each manual target', () => {

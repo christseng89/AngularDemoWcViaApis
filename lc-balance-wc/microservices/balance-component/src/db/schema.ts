@@ -150,6 +150,12 @@ CREATE TABLE IF NOT EXISTS balance_movements (
   exposure_nature         TEXT NOT NULL CHECK (exposure_nature IN (${sqlInList(EXPOSURE_NATURE_VALUES)})),
   amount                  TEXT NOT NULL,
   ceiling_amount          TEXT NOT NULL,
+  -- ISSUE captures its opening tolerance. A monetary amendment captures the
+  -- proposed latest tolerance and applies it to balance_contracts only when
+  -- Checker-Released. AMEND_EXPIRY_DATE is always NULL.
+  tolerance_pct           TEXT,
+  tolerance_change_pct    TEXT,
+  tolerance_change_direction TEXT CHECK (tolerance_change_direction IS NULL OR tolerance_change_direction IN ('INCREASE','DECREASE')),
   currency                TEXT NOT NULL,
   leg_ref                 TEXT,
   account_entries         TEXT, -- JSON

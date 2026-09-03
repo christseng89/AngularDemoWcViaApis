@@ -68,6 +68,11 @@ export interface CatalogFilter {
   instrumentType: InstrumentType;
   /** Omit to return all statuses; pass e.g. 'ACTIVE' to restrict the picker to transactable contracts. */
   status?: ContractStatus;
+  /**
+   * Multi-status alternative used by Expiry Date Amendment: an ordinary amendment targets ACTIVE,
+   * while an Expiry Extension targets EXPIRED. Mutually exclusive with `status` at the HTTP boundary.
+   */
+  statuses?: ContractStatus[];
   /** Case-insensitive substring match against lcNumber, for a typeahead. */
   q?: string;
   /**
@@ -318,6 +323,12 @@ export class BalanceContractStore {
     if (filter.status) {
       clauses.push('status = @status');
       whereParams.status = filter.status;
+    } else if (filter.statuses?.length) {
+      const placeholders = filter.statuses.map((_, index) => `@status${index}`);
+      clauses.push(`status IN (${placeholders.join(', ')})`);
+      filter.statuses.forEach((status, index) => {
+        whereParams[`status${index}`] = status;
+      });
     }
     if (filter.excludeCancelled) {
       clauses.push(`status != 'CANCELLED'`);
@@ -509,6 +520,14 @@ export class BalanceContractStore {
         expiryDate: fields.expiryDate ?? null,
         mailFloatGraceDays: fields.mailFloatGraceDays ?? null,
       });
+  }
+
+  /** Makes a monetary amendment's latest tolerance effective at Checker Release. */
+  updateTolerancePct(balanceContractId: string, tolerancePct: string | null): void {
+    this.db.prepare('UPDATE balance_contracts SET tolerance_pct = @tolerancePct WHERE balance_contract_id = @balanceContractId').run({
+      balanceContractId,
+      tolerancePct,
+    });
   }
 
   /**

@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import type { BalanceService } from '../service/balanceService';
 import { NotFoundError, RequestValidationError } from '../errors';
-import type { InstrumentType } from '../types';
+import type { ContractStatus, InstrumentType } from '../types';
+
+const CONTRACT_STATUSES = new Set<ContractStatus>(['ACTIVE', 'CLOSED', 'CANCELLED', 'EXPIRED']);
 
 export function balanceContractsRouter(service: BalanceService): Router {
   const router = Router();
@@ -30,7 +32,7 @@ export function balanceContractsRouter(service: BalanceService): Router {
     res.json(contract);
   });
 
-  // GET /balance-contracts/catalog?instrumentType=&status=&q=&lcNumber=&tenorFamily=&page=&pageSize=&requireIssueReleased=
+  // GET /balance-contracts/catalog?instrumentType=&status=&statuses=&q=&lcNumber=&tenorFamily=&page=&pageSize=&requireIssueReleased=
   // (business instruction 2026-08-14: ordered by Reference (lc_number), paginated;
   // lcNumber is an exact-match filter for the "LC Index -> IB Index" cascading picker;
   // tenorFamily filters server-side so pagination reflects the Sight/Usance-eligible set,
@@ -38,8 +40,19 @@ export function balanceContractsRouter(service: BalanceService): Router {
   // requireIssueReleased — business-reported gap 2026-08-18 ("S10 still shown in A4 function which is
   // wrong" — S10's own ISSUE was still PENDING), see CatalogFilter's own doc comment for the full rule.
   router.get('/balance-contracts/catalog', (req, res) => {
-    const { instrumentType, status, q, lcNumber, tenorFamily, page, pageSize, requireIssueReleased, excludeCancelled } = req.query;
+    const { instrumentType, status, statuses, q, lcNumber, tenorFamily, page, pageSize, requireIssueReleased, excludeCancelled } = req.query;
     if (!instrumentType) throw new RequestValidationError('instrumentType is required.');
+    if (status && statuses) throw new RequestValidationError('status and statuses are mutually exclusive.');
+    const parsedStatuses =
+      typeof statuses === 'string'
+        ? statuses
+            .split(',')
+            .map((value) => value.trim())
+            .filter(Boolean)
+        : [];
+    if (parsedStatuses.some((value) => !CONTRACT_STATUSES.has(value as ContractStatus))) {
+      throw new RequestValidationError('statuses must contain only ACTIVE, CLOSED, CANCELLED, or EXPIRED.');
+    }
     if (tenorFamily && tenorFamily !== 'SIGHT' && tenorFamily !== 'USANCE') {
       throw new RequestValidationError('tenorFamily must be SIGHT or USANCE.');
     }
@@ -47,6 +60,7 @@ export function balanceContractsRouter(service: BalanceService): Router {
       service.catalog({
         instrumentType: instrumentType as InstrumentType,
         status: status as any,
+        statuses: parsedStatuses as ContractStatus[],
         q: q as string | undefined,
         lcNumber: lcNumber as string | undefined,
         tenorFamily: tenorFamily as 'SIGHT' | 'USANCE' | undefined,

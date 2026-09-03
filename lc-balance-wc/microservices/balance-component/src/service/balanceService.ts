@@ -11,8 +11,8 @@ import { applyStatusTransition, assertMakerCheckerSeparation } from '../domain/s
 import { deriveContingentAccountEntry } from '../domain/contingentAccountEntry';
 import { mappingKeyFor } from '../domain/balanceAccountMapping';
 import { BalanceAccountMappingService } from './balanceAccountMappingService';
-import { computeCeilingAmount } from '../domain/tolerance';
-import { computeAvailableBalance, computeConfirmedBalance, computePendingDecreaseTotal, MOVEMENT_DIRECTION } from '../domain/balanceDerivation';
+import { computeCeilingAmount, computeMonetaryAmendment, computeResultingTolerancePct, MONETARY_AMENDMENT_TYPES, type ToleranceChangeDirection } from '../domain/tolerance';
+import { computeAvailableBalance, computeConfirmedBalance, computeFaceAmount, computePendingDecreaseTotal, MOVEMENT_DIRECTION } from '../domain/balanceDerivation';
 import {
   checkPresentDocsIssueSufficiency,
   checkShgtIssueSufficiency,
@@ -89,6 +89,9 @@ export interface CreateMovementRequest {
   parentLogicalContractId?: string | null;
   /** Only meaningful for IPLC_LC/EPLC_LC ISSUE — see Design doc §6.2. Ignored for every other instrumentType. */
   tolerancePct?: string | null;
+  /** Monetary amendment-only magnitude. The resulting tolerancePct is calculated and protected. */
+  toleranceChangePct?: string | null;
+  toleranceChangeDirection?: ToleranceChangeDirection | null;
   exposureNature?: ExposureNature;
   /** Acceptance tenor is audit/reporting metadata; Seller's and Buyer's Usance share balance mechanics. */
   tenorType?: TenorType | null;
@@ -136,6 +139,8 @@ export interface EditMovementRequest {
   amendmentEffective?: string | null;
   consentStatus?: 'NOT_REQUIRED' | 'OBTAINED' | null;
   tolerancePct?: string | null;
+  toleranceChangePct?: string | null;
+  toleranceChangeDirection?: ToleranceChangeDirection | null;
   tenorType?: TenorType | null;
   tenorDays?: number | null;
   expiryDate?: string | null;
@@ -234,9 +239,8 @@ export class BalanceService {
   private buildMovementTypeRegistry(): Readonly<Record<string, MovementTypeDescriptor>> {
     const noCheck: MovementSufficiencyCheck = () => null;
 
-    /** B2 AMEND encodes direction by sign; only a negative amount runs the decrease check. */
-    const amendShaped: MovementSufficiencyCheck = (ctx) => (ctx.ceilingAmount.isNegative() ? this.checkDecreaseShapedSufficiency(ctx) : null);
-    const decreaseShaped: MovementSufficiencyCheck = (ctx) => this.checkDecreaseShapedSufficiency(ctx);
+    /** Any nominal amendment can reduce the upper limit when its tolerance changes. */
+    const amendShaped: MovementSufficiencyCheck = (ctx) => this.checkAmendmentSufficiency(ctx);
     /** Design doc §6/§6.1 — sufficiency against Available Balance, plus the §6.1 off-balance check (0 exposure for non-LC instrumentTypes). */
     const utilizeShaped: MovementSufficiencyCheck = (ctx) => this.checkUtilizeShapedSufficiency(ctx);
     /** Redemption, settlement, reimbursement and reclassification cannot exceed outstanding balance. */
@@ -328,7 +332,7 @@ export class BalanceService {
       const target = ctx.existingMovements.find((m) => m.movementId === targetId);
       if (!target) return { ok: false, error: `REVERSAL target movement "${targetId}" was not found on this contract.` };
       if (target.status !== 'RELEASED') return { ok: false, error: `Cannot REVERSAL movement "${targetId}" — it is ${target.status}, not RELEASED.` };
-      if (ctx.existingMovements.some((m) => m.movementType === 'REVERSAL' && m.reversalOfMovementId === targetId)) {
+      if (ctx.existingMovements.some((m) => m.reversalOfMovementId === targetId && (m.status === 'PENDING' || m.status === 'RELEASED'))) {
         return { ok: false, error: `Movement "${targetId}" has already been reversed.` };
       }
       if (!ctx.ceilingAmount.equals(parseMonetaryAmount(target.ceilingAmount))) {
@@ -361,9 +365,9 @@ export class BalanceService {
     return {
       ISSUE: { isCreating: true, checkSufficiency: noCheck },
       CREATE: { isCreating: true, checkSufficiency: noCheck },
-      AMEND_INCREASE: { isCreating: false, checkSufficiency: noCheck },
+      AMEND_INCREASE: { isCreating: false, checkSufficiency: amendShaped },
       AMEND: { isCreating: false, checkSufficiency: amendShaped },
-      AMEND_DECREASE: { isCreating: false, checkSufficiency: decreaseShaped },
+      AMEND_DECREASE: { isCreating: false, checkSufficiency: amendShaped },
       UTILIZE: { isCreating: false, checkSufficiency: utilizeShaped },
       HONOUR: { isCreating: false, checkSufficiency: utilizeShaped },
       ACCEPT: { isCreating: false, checkSufficiency: utilizeShaped },
@@ -385,8 +389,8 @@ export class BalanceService {
     };
   }
 
-  /** A2/B2 decreases are capped by the same Tight Available Balance exposed in snapshots. */
-  private checkDecreaseShapedSufficiency(ctx: MovementSufficiencyContext): MovementSufficiencyOutcome {
+  /** Any amendment whose recalculated upper limit falls is capped by Tight Available Balance. */
+  private checkAmendmentSufficiency(ctx: MovementSufficiencyContext): MovementSufficiencyOutcome {
     const { contract, existingMovements, confirmedBalance, availableBalance, ceilingAmount, req } = ctx;
     const pendingDecreaseTotal = computePendingDecreaseTotal(existingMovements);
     let tightAvailableForDecrease = availableBalance;
@@ -398,9 +402,13 @@ export class BalanceService {
       const examinationMovements = this.movements.listExaminationMovementsForParent(contract.logicalContractId);
       tightAvailableForDecrease = confirmedBalance.minus(pendingDecreaseTotal).minus(computePresentDocsEarmark(examinationMovements));
     }
+    // The amendment registry only routes movement types present in MOVEMENT_DIRECTION.
+    const direction = MOVEMENT_DIRECTION[req.movementType] as 1 | -1;
+    const balanceDelta = ceilingAmount.times(direction);
+    const upperLimitReduction = balanceDelta.isNegative() ? balanceDelta.abs() : new Decimal(0);
     return checkAmendDecreaseSufficiency({
       amount: parseMonetaryAmount(req.amount).abs(),
-      ceilingAmount: ceilingAmount.abs(),
+      ceilingAmount: upperLimitReduction,
       tightAvailableBalance: tightAvailableForDecrease,
     });
   }
@@ -564,6 +572,51 @@ export class BalanceService {
     return this.queries.listFixPendingAudit(movementId);
   }
 
+  private deriveMovementCeilingAmount(
+    req: CreateMovementRequest,
+    contract: BalanceContract,
+    existingMovements: readonly BalanceMovement[],
+  ): Decimal {
+    if (req.movementType === 'AMEND_EXPIRY_DATE' && req.reversalOfMovementId) {
+      return parseMonetaryAmount(req.amount);
+    }
+    if (!MONETARY_AMENDMENT_TYPES.has(req.movementType)) {
+      const tolerancePct = req.movementType === 'ISSUE' ? (req.tolerancePct ?? contract.tolerancePct) : contract.tolerancePct;
+      return computeCeilingAmount(req.amount, tolerancePct, req.movementType, contract.instrumentType, contract.currency);
+    }
+
+    try {
+      return computeMonetaryAmendment({
+        currentFaceAmount: computeFaceAmount(existingMovements),
+        currentTolerancePct: contract.tolerancePct,
+        amendmentAmount: req.amount,
+        movementType: req.movementType,
+        newTolerancePct: this.resultingTolerancePct(req, contract),
+        instrumentType: contract.instrumentType,
+        currency: contract.currency,
+      }).movementCeilingAmount;
+    } catch (error) {
+      // computeMonetaryAmendment deliberately throws Error for every invalid domain input.
+      throw new RequestValidationError((error as Error).message);
+    }
+  }
+
+  private resultingTolerancePct(req: CreateMovementRequest, contract: BalanceContract): string | null {
+    if (!MONETARY_AMENDMENT_TYPES.has(req.movementType)) return req.tolerancePct ?? contract.tolerancePct ?? null;
+    if (req.toleranceChangePct == null) return contract.tolerancePct ?? null;
+    const direction: ToleranceChangeDirection =
+      req.movementType === 'AMEND_INCREASE'
+        ? 'INCREASE'
+        : req.movementType === 'AMEND_DECREASE'
+          ? 'DECREASE'
+          : req.toleranceChangeDirection!;
+    try {
+      return computeResultingTolerancePct(contract.tolerancePct, req.toleranceChangePct, direction);
+    } catch (error) {
+      throw new RequestValidationError((error as Error).message);
+    }
+  }
+
   createMovement(req: CreateMovementRequest): CreateMovementResult {
     if (req.movementType !== 'REOPEN') {
       this.requestValidator.assertValidAmount(req.movementType, req.amount);
@@ -575,11 +628,17 @@ export class BalanceService {
     this.requestValidator.assertSecondaryRefRequired(req);
     this.requestValidator.assertTenorRequired(req);
     this.requestValidator.assertToleranceNonNegative(req.tolerancePct);
+    this.requestValidator.assertToleranceAllowed(req.movementType, req.tolerancePct);
+    this.requestValidator.assertToleranceChangeAllowed(req.movementType, req.tolerancePct, req.toleranceChangePct, req.toleranceChangeDirection);
 
     const contract = this.movementContracts.resolveOrCreate(req);
 
     const existing = this.movements.findByContractAndEventSeq(contract.balanceContractId, req.eventSeq);
     if (existing) return { created: false, existing };
+
+    this.requestValidator.assertMonetaryAmendmentChangesTerms(req.movementType, req.amount, req.toleranceChangePct, contract.tolerancePct);
+
+    const existingMovements = this.movements.listByContract(contract.balanceContractId);
 
     if (req.movementType === 'REOPEN') {
       const restoreAmount = computeReopenRestoreAmount(this.movements.listByContract(contract.balanceContractId));
@@ -587,9 +646,21 @@ export class BalanceService {
       this.requestValidator.assertValidAmount(req.movementType, req.amount);
     }
 
-    const ceilingAmount = computeCeilingAmount(req.amount, contract.tolerancePct, req.movementType, contract.instrumentType, contract.currency);
+    if (req.movementType === 'AMEND_EXPIRY_DATE' && contract.status === 'EXPIRED') {
+      // Cancelled/rejected Extension attempts are audit history, not balance history. Use the latest
+      // effective RELEASED movement so a retry still finds the EXPIRE whose Tight Balance must be
+      // restored. Looking at the last row of any status incorrectly produced a zero-value Extension
+      // whenever the Maker had cancelled an earlier attempt (live S01 reproduction, 2026-09-03).
+      const trailing = existingMovements
+        .filter((movement) => movement.status === 'RELEASED')
+        .sort((left, right) => left.eventSeq - right.eventSeq)
+        .pop();
+      if (trailing?.status === 'RELEASED' && trailing.movementType === 'EXPIRE') {
+        req = { ...req, amount: trailing.ceilingAmount, reversalOfMovementId: trailing.movementId };
+      }
+    }
 
-    const existingMovements = this.movements.listByContract(contract.balanceContractId);
+    const ceilingAmount = this.deriveMovementCeilingAmount(req, contract, existingMovements);
 
     if (req.sourceTransactionRef) {
       const duplicateRef = existingMovements.find((m) => m.sourceTransactionRef === req.sourceTransactionRef && m.status !== 'CANCELLED');
@@ -621,7 +692,7 @@ export class BalanceService {
     const warnings: MovementWarning[] | null = sufficiency?.warning ? [sufficiency.warning] : null;
 
     let reversedDirection: 1 | -1 | undefined;
-    if (req.movementType === 'REVERSAL' && req.reversalOfMovementId) {
+    if ((req.movementType === 'REVERSAL' || req.movementType === 'AMEND_EXPIRY_DATE') && req.reversalOfMovementId) {
       const original = this.movements.findById(req.reversalOfMovementId);
       const originalDirection = original ? MOVEMENT_DIRECTION[original.movementType] : undefined;
       if (originalDirection === 1 || originalDirection === -1) reversedDirection = originalDirection;
@@ -646,6 +717,12 @@ export class BalanceService {
       exposureNature: req.exposureNature ?? 'CONTINGENT',
       amount: req.amount,
       ceilingAmount: ceilingAmount.toFixed(),
+      tolerancePct:
+        req.movementType === 'ISSUE' ? this.resultingTolerancePct(req, contract) : MONETARY_AMENDMENT_TYPES.has(req.movementType) ? (contract.tolerancePct ?? null) : null,
+      toleranceChangePct: MONETARY_AMENDMENT_TYPES.has(req.movementType) ? (req.toleranceChangePct ?? null) : null,
+      toleranceChangeDirection: MONETARY_AMENDMENT_TYPES.has(req.movementType)
+        ? (req.movementType === 'AMEND_INCREASE' ? 'INCREASE' : req.movementType === 'AMEND_DECREASE' ? 'DECREASE' : (req.toleranceChangeDirection ?? null))
+        : null,
       currency: req.currency,
       legRef: req.legRef ?? null,
       accountEntries: req.exposureNature === 'MEMO' ? null : (req.accountEntries ?? null),
@@ -741,11 +818,56 @@ export class BalanceService {
     this.releasePolicy.assertSubmitGuards(movement, contract, isUtilizeFinalize);
 
     const before = computeConfirmedBalance(this.movements.listByContract(contract.balanceContractId));
+    if (MONETARY_AMENDMENT_TYPES.has(movement.movementType)) {
+      this.requestValidator.assertMonetaryAmendmentChangesTerms(
+        movement.movementType,
+        movement.amount,
+        movement.toleranceChangePct,
+        contract.tolerancePct,
+      );
+      const withoutCurrent = this.movements.listByContract(contract.balanceContractId).filter((candidate) => candidate.movementId !== movement.movementId);
+      const expected = this.deriveMovementCeilingAmount(
+        {
+          instrumentType: contract.instrumentType,
+          balanceContractId: contract.balanceContractId,
+          movementType: movement.movementType,
+          eventSeq: movement.eventSeq,
+          amount: movement.amount,
+          currency: movement.currency,
+          toleranceChangePct: movement.toleranceChangePct,
+          toleranceChangeDirection: movement.toleranceChangeDirection,
+          createdBy: movement.createdBy,
+        },
+        contract,
+        withoutCurrent,
+      );
+      if (!expected.equals(parseMonetaryAmount(movement.ceilingAmount))) {
+        throw new IllegalStateTransitionError(
+          `Cannot release monetary amendment ${movement.movementId} — the LC amount or tolerance has changed since Submit ` +
+            `(stored balance effect ${movement.ceilingAmount}, now ${expected.toFixed()}). Cancel it and re-submit against the latest approved LC terms.`,
+        );
+      }
+    }
     this.releasePolicy.assertEligibility(movement, contract, before);
 
     const releasedAt = this.now();
+    const releasedTolerancePct = MONETARY_AMENDMENT_TYPES.has(movement.movementType)
+      ? this.resultingTolerancePct(
+          {
+            instrumentType: contract.instrumentType,
+            movementType: movement.movementType,
+            eventSeq: movement.eventSeq,
+            amount: movement.amount,
+            currency: movement.currency,
+            toleranceChangePct: movement.toleranceChangePct,
+            toleranceChangeDirection: movement.toleranceChangeDirection,
+            createdBy: movement.createdBy,
+          },
+          contract,
+        )
+      : movement.tolerancePct;
     const after =
-      movement.movementType === 'REVERSAL'
+      movement.movementType === 'REVERSAL' || (movement.movementType === 'AMEND_EXPIRY_DATE' && movement.reversalOfMovementId)
         ? computeConfirmedBalance(
             this.movements
               .listByContract(contract.balanceContractId)
@@ -753,7 +875,7 @@ export class BalanceService {
           )
         : before.plus(computeConfirmedBalance([{ ...movement, status: 'RELEASED' }]));
 
-    const releasedSelf = { ...movement, status: 'RELEASED' as const };
+    const releasedSelf = { ...movement, status: 'RELEASED' as const, tolerancePct: releasedTolerancePct };
     const ownMovements = this.movements.listByContract(contract.balanceContractId).map((m) => (m.movementId === movementId ? releasedSelf : m));
     const snapshotBundle = this.movementSnapshots.captureBundle(contract, ownMovements, releasedSelf);
 
@@ -768,6 +890,7 @@ export class BalanceService {
     this.movements.updateStatus({
       movementId,
       status: 'RELEASED',
+      ...(MONETARY_AMENDMENT_TYPES.has(movement.movementType) ? { tolerancePct: releasedTolerancePct } : {}),
       releasedBy,
       releasedAt,
       balanceBefore: before.toFixed(),
@@ -776,7 +899,7 @@ export class BalanceService {
       ...snapshotFields,
     });
 
-    this.releaseSideEffects.applyStandard(movement, contract, releasedBy, releasedAt);
+    this.releaseSideEffects.applyStandard(releasedSelf, contract, releasedBy, releasedAt);
     this.releaseSideEffects.applyExpiryAmendment(movement, contract, releasedBy, releasedAt);
 
     return this.movements.findById(movementId)!;
@@ -924,9 +1047,12 @@ export class BalanceService {
     this.requestValidator.assertExpiryDateRequired(merged); // both already gate on movementType === 'ISSUE' internally — a no-op for a non-creating edit (e.g. A3's own UTILIZE) regardless of isCreatingEdit
     this.requestValidator.assertExpiryDateIsBusinessDay(merged);
     this.requestValidator.assertToleranceNonNegative(merged.tolerancePct); // reflects the PATCHED value when isCreatingEdit (A1/B1 only); carried-over/already-valid otherwise, same posture as assertTenorRequired() above
+    this.requestValidator.assertToleranceAllowed(merged.movementType, merged.tolerancePct);
+    this.requestValidator.assertToleranceChangeAllowed(merged.movementType, merged.tolerancePct, merged.toleranceChangePct, merged.toleranceChangeDirection);
 
-    const ceilingAmount = computeCeilingAmount(merged.amount, merged.tolerancePct, merged.movementType, merged.instrumentType, contract.currency);
     const existingMovements = this.movements.listByContract(contract.balanceContractId).filter((m) => m.movementId !== old.movementId);
+    this.requestValidator.assertMonetaryAmendmentChangesTerms(merged.movementType, merged.amount, merged.toleranceChangePct, contract.tolerancePct);
+    const ceilingAmount = this.deriveMovementCeilingAmount(merged, contract, existingMovements);
 
 
     const descriptor = this.movementTypeRegistry[merged.movementType];
@@ -961,6 +1087,10 @@ export class BalanceService {
       exposureNature: merged.exposureNature ?? old.exposureNature,
       amount: merged.amount,
       ceilingAmount: ceilingAmount.toFixed(),
+      tolerancePct:
+        merged.movementType === 'ISSUE' ? this.resultingTolerancePct(merged, contract) : MONETARY_AMENDMENT_TYPES.has(merged.movementType) ? (contract.tolerancePct ?? null) : null,
+      toleranceChangePct: MONETARY_AMENDMENT_TYPES.has(merged.movementType) ? (merged.toleranceChangePct ?? null) : null,
+      toleranceChangeDirection: MONETARY_AMENDMENT_TYPES.has(merged.movementType) ? (merged.toleranceChangeDirection ?? null) : null,
       legRef: merged.legRef ?? null,
       accountEntries: merged.exposureNature === 'MEMO' ? null : (merged.accountEntries ?? null),
       contingentAccountEntry,
@@ -989,6 +1119,28 @@ export class BalanceService {
       });
     }
 
+    // Fix Pending changes the CURRENT content of the same movement identity, so its persisted Event
+    // Snapshot must describe that corrected PENDING movement immediately. Waiting until Checker Release
+    // leaves Inquire Events showing the pre-edit balance (for example 11,000 instead of the corrected
+    // 22,000 net Pending Earmark). Reload the contract because an ISSUE edit above may also have changed
+    // its tolerance/tenor/expiry fields inside this same transaction.
+    const snapshotContract = this.contracts.findById(contract.balanceContractId) ?? contract;
+    const correctedMovement: BalanceMovement = {
+      ...old,
+      ...correction,
+      status: 'PENDING',
+      createdBy: patch.editedBy,
+      createdAt: editedAt,
+      editedBy: patch.editedBy,
+      editedAt,
+    };
+    const snapshotBundle = this.movementSnapshots.captureBundle(
+      snapshotContract,
+      [...existingMovements, correctedMovement],
+      correctedMovement,
+    );
+    const correctionWithSnapshots = { ...correction, ...snapshotBundle };
+
     // Persist the original content before correcting the movement in place.
     this.fixPendingAudit.insert({
       auditId: randomUUID(),
@@ -1000,13 +1152,13 @@ export class BalanceService {
       originalCreatedAt: old.createdAt,
       statusBefore: old.status as 'PENDING' | 'REJECTED', // applyStatusTransition() above guarantees this
       beforeSnapshot: old as unknown as Record<string, unknown>,
-      afterSnapshot: correction as unknown as Record<string, unknown>,
+      afterSnapshot: correctionWithSnapshots as unknown as Record<string, unknown>,
       editedBy: patch.editedBy,
       editedAt,
     });
     this.movements.applyFixPendingCorrection({
       movementId: old.movementId,
-      ...correction,
+      ...correctionWithSnapshots,
       createdBy: patch.editedBy,
       createdAt: editedAt,
       editedBy: patch.editedBy,
@@ -1056,6 +1208,7 @@ export class BalanceService {
       exposureNature: oldSg.exposureNature,
       amount: newSgRedeemAmount.toFixed(),
       ceilingAmount: newSgRedeemAmount.toFixed(), // SHGT is never tolerance-applicable — ceiling === amount, same as every other SHGT movement in this codebase
+      tolerancePct: null,
       legRef: oldSg.legRef ?? null,
       accountEntries: oldSg.accountEntries ?? null,
       contingentAccountEntry: sgContingentEntry,
@@ -1073,6 +1226,23 @@ export class BalanceService {
       consentStatus: oldSg.consentStatus ?? null,
     };
 
+    const correctedSgMovement: BalanceMovement = {
+      ...oldSg,
+      ...sgCorrection,
+      movementType: newSgMovementType,
+      status: 'PENDING',
+      createdBy: patch.editedBy,
+      createdAt: editedAt,
+      editedBy: patch.editedBy,
+      editedAt,
+    };
+    const sgSnapshotBundle = this.movementSnapshots.captureBundle(
+      sgContract,
+      [...sgExistingExcludingOld, correctedSgMovement],
+      correctedSgMovement,
+    );
+    const sgCorrectionWithSnapshots = { ...sgCorrection, ...sgSnapshotBundle };
+
     this.movements.setMovementType(oldSg.movementId, newSgMovementType);
 
     this.fixPendingAudit.insert({
@@ -1085,13 +1255,15 @@ export class BalanceService {
       originalCreatedAt: oldSg.createdAt,
       statusBefore: oldSg.status as 'PENDING' | 'REJECTED',
       beforeSnapshot: oldSg as unknown as Record<string, unknown>,
-      afterSnapshot: { ...sgCorrection, movementType: newSgMovementType } as unknown as Record<string, unknown>,
+      afterSnapshot: { ...sgCorrectionWithSnapshots, movementType: newSgMovementType } as unknown as Record<string, unknown>,
       editedBy: patch.editedBy,
       editedAt,
     });
     this.movements.applyFixPendingCorrection({
       movementId: oldSg.movementId,
-      ...sgCorrection,
+      ...sgCorrectionWithSnapshots,
+      toleranceChangePct: null,
+      toleranceChangeDirection: null,
       createdBy: patch.editedBy,
       createdAt: editedAt,
       editedBy: patch.editedBy,
@@ -1113,7 +1285,12 @@ export class BalanceService {
       accountEntries: patch.accountEntries,
       businessEventId: patch.businessEventId ?? old.businessEventId,
       exposureNature: patch.exposureNature,
-      tolerancePct: patch.tolerancePct ?? contract.tolerancePct,
+      tolerancePct:
+        old.movementType === 'ISSUE' ? (patch.tolerancePct ?? contract.tolerancePct) : null,
+      toleranceChangePct: MONETARY_AMENDMENT_TYPES.has(old.movementType) ? (patch.toleranceChangePct ?? old.toleranceChangePct) : null,
+      toleranceChangeDirection: MONETARY_AMENDMENT_TYPES.has(old.movementType)
+        ? (patch.toleranceChangeDirection ?? old.toleranceChangeDirection)
+        : null,
       tenorType: creatingOnly(isCreatingEdit, patch.tenorType, contract.tenorType),
       tenorDays: creatingOnly(isCreatingEdit, patch.tenorDays, contract.tenorDays),
       expiryDate: creatingOnly(isCreatingEdit, patch.expiryDate, contract.expiryDate),

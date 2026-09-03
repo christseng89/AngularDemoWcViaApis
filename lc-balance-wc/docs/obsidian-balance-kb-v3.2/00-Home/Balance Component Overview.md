@@ -52,7 +52,7 @@ Transaction Index 是候选清单；API 在 Maker Submit/create 与 Checker Rele
 
 ## 2026-09-01 source sync
 
-最新功能目录、B5 单一 Settlement、服务端资格重检、35 个 Business Cases 与负 Tight Balance 自动 A02/B02 修复见 [[Freshness-Update-Log-2026-09-01]]。
+最新功能目录、B5 单一 Settlement、服务端资格重检、Business Cases 与负 Tight Balance 自动 A02/B02 修复见 [[Freshness-Update-Log-2026-09-01]]；A2／B2 Amount × Tolerance 完整上限重算及币别四舍五入见 [[Freshness-Update-Log-2026-09-03]]。
 
 ## 相关知识
 

@@ -142,17 +142,15 @@ export function deriveContingentAccountEntry(params: {
   const family = accountFamilyFor(params.instrumentType);
   if (!family) return null;
 
-  // F1, user-reported 2026-08-25 ("A2 B2 extension不牽涉金額 不需要出ACCOUNT ENTRIES") — AMEND_EXPIRY_DATE
-  // never has a real balance/GL effect of its own (plain amendment, or the Expiry Extension Amendment
-  // entry point — either way it only ever updates the expiryDate column; the actual restoration on the
-  // Extension path is Checker Release's own linked REVERSAL, which generates its own separate real entry).
-  // Explicitly null, same treatment as EPLC_EXAMINATION (B3) above — not a zero-amount placeholder pair.
-  if (params.movementType === 'AMEND_EXPIRY_DATE') return null;
+  // Plain ACTIVE expiry-date amendments have no accounting effect. An EXPIRED extension supplies the
+  // original EXPIRE direction so its own PENDING row can carry the real restoration voucher for Checker
+  // review; Release then activates this same entry rather than creating an unseen linked movement.
+  if (params.movementType === 'AMEND_EXPIRY_DATE' && params.reversedDirection === undefined) return null;
 
   // Now MOVEMENT_DIRECTION's every remaining entry is genuinely fixed at 1 or -1 — AMEND_EXPIRY_DATE (the
   // one other 0-mapped entry) already returned null above, so this cast is exact, not an approximation.
   const baseDirection =
-    params.movementType === 'REVERSAL'
+    params.movementType === 'REVERSAL' || params.movementType === 'AMEND_EXPIRY_DATE'
       ? params.reversedDirection === undefined
         ? undefined
         : ((-params.reversedDirection) as 1 | -1)
