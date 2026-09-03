@@ -4706,3 +4706,7 @@ Chrome live acceptance 連接真實 Angular、backend 與 Balance microservice�
 functions 96.50%、lines 98.52%。Chrome live acceptance 1/1 通過（37 個 Business Cases 加 A4
 Fix Pending Save）；lint 0 errors（保留既有 warnings），WC／adapter typecheck、docs／OAS validation
 與 `git diff --check` 通過。
+
+## 2026-09-03 — B3 internal memo voucher restored; downstream Accounting remains null
+
+Current source restores the named `EPLC_EXAMINATION/CREATE` memo pair so B3 Maker Submit, Checker review and Inquiry can display the same immutable voucher: Dr `Export Bills — Received, Under Examination (memo)` / Cr `Export Bills — Contra (memo)`. This supersedes the earlier entry that removed B3's `contingentAccountEntry`. The accounting boundary is unchanged: `exposureNature === 'MEMO'` forces downstream `accountEntries` to `null`, so this internal voucher is never sent to Accounting and never reversed. HTTP regression coverage verifies the PENDING and RELEASED responses preserve the memo pair while `accountEntries` remains null.

@@ -71,7 +71,7 @@ UNCLEAR：兩份規範中未見到 B3 專屬（named）路徑，僅有以上通�
 
 - **Tolerance 決策**：不適用——見上方 Validation 第 4 點。CONFIRMED。
 
-- **Movement Posting Generation（過帳分錄）**：**永不產生 `contingentAccountEntry`**。`EPLC_EXAMINATION` 原本曾有一組專屬 Dr/Cr 分錄，後續設計覆核後認定 B3（D3、MEMO_ONLY）本質上從未真正過帳，該分錄對已被移除，`EPLC_EXAMINATION` 現與表內資產類 instrumentType 一同被歸入 `contingentAccountEntry.ts` 傳回 `null` 的分組（[[EXPOSURE-RULE-008]]）。單據/交單收訖不產生任何或有 GL 影響。`parent_logical_contract_id`（SHGT/Acceptance/EPLC_EXAMINATION → 父 LC/Confirmation）純屬應用層維護的邏輯關聯，資料庫 schema 並未以 FOREIGN KEY 強制約束（[[EXPOSURE-RULE-028]]）。CONFIRMED。
+- **Movement Posting Generation（虛帳／外送會計邊界）**：B3 建立並不可變地保存一組內部 memo `contingentAccountEntry`：Dr `Export Bills — Received, Under Examination (memo)`／Cr `Export Bills — Contra (memo)`，供 Maker Submit、Checker Review 與 Inquiry 顯示同一張虛帳。B3 仍為 D3、`MEMO_ONLY`，所以 `BalanceService` 強制外送會計 payload `accountEntries=null`；內部 voucher 不送 Accounting，也不建立 reversal。`parent_logical_contract_id`（SHGT/Acceptance/EPLC_EXAMINATION → 父 LC/Confirmation）純屬應用層維護的邏輯關聯，資料庫 schema 並未以 FOREIGN KEY 強制約束（[[EXPOSURE-RULE-028]]）。CONFIRMED。
 
 - **Output（輸出）**：新建一筆 `EPLC_EXAMINATION`／`CREATE` 記錄（初始 PENDING，隱式建立新的子 Logical Contract）。Checker Release 後 `status` 真正轉為 `RELEASED`（[[STATUS-RULE-009]]）——事件狀態顯示映射對此有特別規則：未 Release 前顯示為 `EARMARKING`，Release 後顯示為 `EARMARKED`，與 A3/A3S 共用同一套「佔用類功能」映射，區別於其他一般功能的 `PENDING`/`APPROVED`（[[STATUS-RULE-019]]）。RELEASED 之後該記錄仍持續佔用 Present Docs Earmark 容量，直到 B4 透過 `referencedTransactionId` 指向它、並於自身 release 的**副作用**中寫入 `presentDocsConsumedAt`（獨立於 `status` 欄位單獨追蹤，[[STATUS-RULE-009]]）——B4 自身的複合放行順序上，主 Honour/Accept 分支先於其關聯的複合分支被釋放，並在此時消耗所引用的 B3 記錄（[[MOVEMENT-RULE-039]]）；B4 自身跨合約候選項挑選時，也必須排除已經 `presentDocsConsumedAt`（或狀態非真正 RELEASED）的候選（[[MAKER-CHECKER-RULE-042]]）。若略過 B4，該記錄會停留在 `RELEASED` 但永不被消耗的狀態，並將持續阻塞 B6（Confirmed LC Close）的資格判定（[[EXPOSURE-RULE-011]]）。在「查詢目前餘額（Look Up Current Balance）」畫面中，出口保兌 LC 會把 B3 事件併入 LC 自身的分頁，B3 本身並無獨立的餘額分頁（[[MAKER-CHECKER-RULE-039]]）。
 
@@ -99,7 +99,7 @@ flowchart TD
   F -->|否| G["POST /balance-movements\ninstrumentType=EPLC_EXAMINATION,\nmovementType=CREATE, exposureNature=MEMO\n（Tolerance 不適用）"]
   G --> H["建立 PENDING EPLC_EXAMINATION 記錄\n顯示為 EARMARKING\n（隱式建立新子 Logical Contract）"]
   H --> I["Checker 於 Checker Queue\n搜尋並標準 release()"]
-  I --> J["狀態真正轉為 RELEASED\n顯示為 EARMARKED\n（不產生任何 contingentAccountEntry）"]
+  I --> J["狀態真正轉為 RELEASED\n顯示為 EARMARKED\n（保留內部 memo voucher；accountEntries=null）"]
   J --> K{"B4 是否以\nreferencedTransactionId\n引用並 release？"}
   K -->|是| L(["presentDocsConsumedAt 寫入\n（B4 release 的副作用）\nPresent Docs Earmark 釋放"])
   K -->|否，長期未消耗| M(["持續佔用 Present Docs Earmark\n並阻塞 B6 Close 資格"])
@@ -114,7 +114,7 @@ flowchart TD
 - [[EXPOSURE-RULE-004]] — B3 新交單呈現的充足性檢查，嚴格限定於 Present Docs Earmark 調整後的嚴格可用餘額，不享有臨時消耗抵扣（本功能最核心的規則）
 - [[EXPOSURE-RULE-005]] — B4 仍為 PENDING 的 HONOUR/ACCEPT 對其所引用之 B3 呈現的臨時抵扣，僅存在於 assembleSnapshot() 展示層
 - [[EXPOSURE-RULE-006]] — computePresentDocsEarmark／Pending／Approved 兩種拆分形式，均排除已消耗與臨時已消耗的呈現
-- [[EXPOSURE-RULE-008]] — EPLC_EXAMINATION 永不產生 contingentAccountEntry
+- [[EXPOSURE-RULE-008]] — EPLC_EXAMINATION 產生內部 memo voucher，但永不外送 Accounting
 - [[EXPOSURE-RULE-011]] — 已 RELEASED 但尚未被消耗的 B3 呈現會阻塞 B6 Close 資格判定
 - [[EXPOSURE-RULE-028]] — parent_logical_contract_id 為應用層邏輯關聯，非資料庫 FOREIGN KEY
 - [[BALANCE-RULE-010]] — Present Docs Earmark（Pending＋Approved）之和等於嚴格可用餘額所減去的合計指標

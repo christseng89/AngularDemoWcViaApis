@@ -1,25 +1,27 @@
 ---
 knowledge_id: eplc-examination-b3-present-docs-never-posts-a-real-account-entry
-title: "EPLC_EXAMINATION（B3 Present Docs）从不产生真实科目分录"
+title: "EPLC_EXAMINATION（B3 Present Docs）显示内部虚帐但不外送会计"
 domain: Balance
 category: Domain Concept
 status: CONFIRMED
 source_repository: Balance Component (lc-balance)
 last_verified_commit: "N/A — no .git history in the analyzed snapshot, see [[Source-to-Knowledge-Map]]"
-snapshot_date: 2026-08-22
+snapshot_date: 2026-09-03
 tags:
   - balance
   - domain-concept
 ---
 
-# EPLC_EXAMINATION（B3 Present Docs）从不产生真实科目分录
+# EPLC_EXAMINATION（B3 Present Docs）显示内部虚帐但不外送会计
 
-B3（Present Docs／提示单据，EPLC_EXAMINATION）依据设计原则 D3（"单据到达是一个物理事件……只有法律事件才会变动余额"）属于 MEMO_ONLY——它从不会真正过账到帐册中，因此无论 movementType 为何，deriveContingentAccountEntry() 针对每一笔 EPLC_EXAMINATION 异动都会回传 null。这一做法推翻了此前的一版设计——该版设计曾为其建立了一组具名的 Dr/Cr 分录（已于 2026-08-17 移除），即便源分类账自身的 Folio 1/4 中，确实以视觉方式为它命名了一行"无总账效果"（no GL effect）的记录。
+B3（Present Docs／提示单据，`EPLC_EXAMINATION/CREATE`）依据 D3 属于 `MEMO_ONLY`。当前 `deriveContingentAccountEntry()` 会建立具名内部 memo pair：Dr `Export Bills — Received, Under Examination (memo)`／Cr `Export Bills — Contra (memo)`，让 Maker Submit 后、Checker Review／Release 及 Inquiry 都能看到同一份不可变虚帐。与此同时，`BalanceService` 因 `exposureNature=MEMO` 强制将下游 `accountEntries` 设为 `null`。因此「显示虚帐」与「不外送真实会计分录」同时成立；B3 不送 Accounting，也不需要 reversal。
 
 ## 来源证据
 
-- `microservices/balance-component/src/domain/contingentAccountEntry.ts:16-29, 89-99`
-- `test/unit/domain/contingentAccountEntry.test.ts:167-172`
+- `microservices/balance-component/src/domain/contingentAccountEntry.ts`
+- `microservices/balance-component/src/service/balanceService.ts`
+- `microservices/balance-component/test/unit/domain/contingentAccountEntry.test.ts`
+- `microservices/balance-component/test/unit/app.test.ts`
 
 ## 相关知识
 

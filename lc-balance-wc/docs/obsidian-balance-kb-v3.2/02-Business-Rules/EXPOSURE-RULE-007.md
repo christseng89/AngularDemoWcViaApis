@@ -19,7 +19,7 @@ tags:
 CONFIRMED
 
 ## 业务规则
-deriveContingentAccountEntry() 依据 instrumentType 查找对应的 AccountFamily：IPLC_LC/EPLC_LC → LC_FAMILY（按 tenor 加后缀，Folio 1），SHGT → SG_FAMILY（不加后缀，Folio 2），IPLC_ACCEPTANCE → IMPORT_ACCEPTANCE_FAMILY（不加后缀，Folio 3，影子备忘性质），EPLC_CONFIRMATION → CONFIRMATION_FAMILY（按 tenor 加后缀，Folio 4），EPLC_ACCEPTANCE → EXPORT_ACCEPTANCE_FAMILY（不加后缀，Folio 5，影子备忘性质）；EPLC_EXAMINATION 以及 3 种表内资产类 instrumentType 则返回 null（无科目族、无分录）。LC/Confirmation 的 tenor 后缀使用 lcTenorLabel（Sight/买方远期/卖方远期）或 confirmationTenorLabel（仅 Sight/Usance 两种——Balance Component 的出口相关功能将三分法收缩为二分法）。
+deriveContingentAccountEntry() 依据 instrumentType 查找对应的 AccountFamily：IPLC_LC/EPLC_LC → LC_FAMILY（按 tenor 加后缀，Folio 1），SHGT → SG_FAMILY（不加后缀，Folio 2），IPLC_ACCEPTANCE → IMPORT_ACCEPTANCE_FAMILY（不加后缀，Folio 3，影子备忘性质），EPLC_CONFIRMATION → CONFIRMATION_FAMILY（按 tenor 加后缀，Folio 4），EPLC_ACCEPTANCE → EXPORT_ACCEPTANCE_FAMILY（不加后缀，Folio 5，影子备忘性质），EPLC_EXAMINATION → EXAMINATION_FAMILY（内部 memo voucher，不加后缀）；3 种表内资产类 instrumentType 返回 null。LC/Confirmation 的 tenor 后缀使用 lcTenorLabel 或 confirmationTenorLabel。
 
 ## 触发条件
 以 instrumentType 作为 switch 分支；科目族为 null 会使整个函数直接短路返回。

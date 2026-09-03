@@ -20,6 +20,8 @@ A3S、A4、A6、A7、B4、B5 不得繞過 prerequisite eligibility。Business Ca
 
 Transaction Index 只負責呈現候選項。A2–A11／B2–B7 的 API 會重新解析並驗證目前 contract status；A6 另驗證同 LC 的 acknowledged、PENDING、尚未 Maker Submit 的 A3／A3S，B4 另驗證同 Confirmation 的 RELEASED、未消耗且未被其他 pending B4 佔用的 B3。Checker Release 會再以最新狀態驗證；A6 原子 Release 允許來源仍為 PENDING，或已在同一複合動作中先轉為 RELEASED，不能依賴較早的 Index snapshot。
 
+B3（`EPLC_EXAMINATION/CREATE`）在建立時持久化內部 memo voucher：Dr `Export Bills — Received, Under Examination (memo)`／Cr `Export Bills — Contra (memo)`。Maker Submit 後顯示 `EARMARKING`，Checker Release 後顯示 `EARMARKED`，Maker、Checker 與 Inquiry 均可檢視同一份 immutable `contingentAccountEntry`。B3 的 `exposureNature=MEMO`，因此外送會計 payload `accountEntries` 固定為 `null`；虛帳不送 Accounting，也不建立 reversal。
+
 Business Case Runner 每步都檢查 Tight Available Balance。若測試回覆出現負值，Import 會透過既有 API 自動建立及釋放 A02／`AMEND_INCREASE`，Export 會建立及釋放 B02／`AMEND`，再讀取 snapshot 確認已回復非負。Cleanup Database 成功後會清除先前的單一案例、Run All 結果卡及錯誤訊息，並以預設每 2 秒一次、最多 15 次的低頻 GET 檢查等待 backend 恢復；等待期間操作按鈕停用，恢復後自動重載 case index。Cleanup POST 不會自動重送。Browser Refresh 只檢查 backend 一次，失敗後由使用者按 `Try again`，不進入自動 polling。
 
 ## Tight LC Balance

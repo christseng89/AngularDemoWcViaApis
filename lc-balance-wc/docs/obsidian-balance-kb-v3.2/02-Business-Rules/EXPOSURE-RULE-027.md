@@ -25,7 +25,7 @@ CONFIRMED
 每一笔异动在创建时刻。
 
 ## 结果
-对于 ON_BALANCE_ASSET 类工具与 EPLC_EXAMINATION（上文已独立确认），以及任何未识别的 movementType，结果为 null。一旦写入，drAccount/crAccount/currency/amount 对该笔异动而言永不改变。
+对于 ON_BALANCE_ASSET 类工具以及任何未识别的 movementType，结果为 null。EPLC_EXAMINATION/CREATE 是内部 memo 例外：会生成可见 `contingentAccountEntry`，但其下游 `accountEntries` 固定为 null。一旦写入，drAccount/crAccount/currency/amount 对该笔异动而言永不改变。
 
 ## 示例
 amount 永远是一个正数的十进制字符串（正负号/方向由 Dr 与 Cr 分别落在哪个科目来体现，而非用带符号的金额表示）——这与已独立验证过的 contingentAccountEntry.ts 代码（`.abs().toFixed()`）一致。

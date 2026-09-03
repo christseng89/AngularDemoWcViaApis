@@ -17,9 +17,9 @@ tags:
 
 `domain/contingentAccountEntry.ts` 针对每一个在范畴内的金融工具，为其每笔异动（movement）生成一组 Dr/Cr 分录；生成依据来自 `analysis/contingent-liability-ledger.html` 自身针对每一种情境所提供的、自成一体的 Dr/Cr 参考清单。分录只在建立当下生成**一次**，并以**不可变**方式存储——即使日后重新取得资料也绝不重新计算。这使得该会计记录成为真正的稽核凭证（audit artifact），而非即时运算出来的显示数值。
 
-## B3 例外情形 — 从不过账
+## B3 例外情形 — 可見虛帳、不外送 Accounting
 
-`EPLC_EXAMINATION`（B3，Present Docs／提示单据）是被刻意归入回传 `null` 分支的唯一情形：由于 B3 属于 `MEMO_ONLY`（依 D3 设计原则：只有法律事件才会真正变动余额——见 [[Off-Balance-Sheet Exposure]]），调查发现它最初上线时其实带有自己的一组 Dr/Cr 分录，后来才作为修正而被移除——B3 从来不会真正过账到帐册中，因此原本就不应该拥有一组具名的分录。
+`EPLC_EXAMINATION`（B3，Present Docs／提示单据）属于 `MEMO_ONLY`，但当前代码会生成具名的内部 `contingentAccountEntry`：Dr `Export Bills — Received, Under Examination (memo)`／Cr `Export Bills — Contra (memo)`。该 voucher 在建立时保存且不可变，供 Maker、Checker 与 Inquiry 显示。它不是外送 GL 指令：`BalanceService` 对所有 `exposureNature=MEMO` 的 movement 强制令 `accountEntries=null`，因此 B3 虚帐不会发送给 Accounting，也不产生 reversal。
 
 ## 复合分支（Compound-leg）显示缺陷（已修复）
 

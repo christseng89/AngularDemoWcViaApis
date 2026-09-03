@@ -92,3 +92,9 @@
 4. Angular Strategy、Policy、显示和输入控制。
 5. 单元、API、Business Case 和真实功能测试。
 6. `docs/decisions/` 中是否需要新的决策记录。
+
+## B3 虛帳與外送會計邊界（現行 Source Code）
+
+- B3 Submit 建立 `EPLC_EXAMINATION/CREATE` 的內部 memo Dr/Cr voucher，供 Maker、Checker 與 Inquiry 顯示及稽核。
+- 內部 voucher 儲存在 `contingentAccountEntry`；其狀態隨 B3 顯示為 `EARMARKING`／`EARMARKED`。
+- 因 B3 為 `MEMO` exposure，外送會計欄位 `accountEntries` 必須為 `null`。虛帳不送 Accounting，也不需要沖銷。

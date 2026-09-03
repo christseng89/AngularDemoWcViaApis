@@ -39,6 +39,9 @@ tags:
 - A4 Fix Pending 的 workflow action 现在正确覆盖专用 `Submit A4` mode：编辑时只显示 `Save Fix Pending`／
   `Cancel`，Remarks 改变后可 Save；Delete Pending review 同样不会残留 Submit A4。Chrome live acceptance 已跑完
   37 个 Run All cases，并实际完成 A4 合并索引选择、Maker Submit、Maker Queue Fix Pending 与 Save。
+- B3 `EPLC_EXAMINATION/CREATE` 恢復內部 memo voucher：Maker Submit 後、Checker Review／Release 與 Inquiry
+  均顯示 Dr `Export Bills — Received, Under Examination (memo)`／Cr `Export Bills — Contra (memo)`。
+  B3 仍為 `MEMO` exposure，外送會計 `accountEntries` 固定為 null；虛帳不送 Accounting、不建立 reversal。
 
 ## 证据
 

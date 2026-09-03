@@ -18,7 +18,7 @@ tags:
 | IPLC_ACCEPTANCE | 3 | 承兑汇票及信托收据垫款——客户负债（备忘） | 承兑汇票及信托收据垫款——未偿付余额（备忘） | 否 |
 | EPLC_CONFIRMATION | 4 | 开证行保兑风险敞口 | 未偿付保兑承诺 | 是——即期／远期 |
 | EPLC_ACCEPTANCE | 5 | 已保兑承兑汇票及信托收据垫款——客户负债（备忘） | 已保兑承兑汇票及信托收据垫款——未偿付余额（备忘） | 否 |
-| EPLC_EXAMINATION | 不适用 | — | — | null——从不过账（仅备忘 MEMO_ONLY，D3） |
+| EPLC_EXAMINATION | B3 内部 memo | Export Bills — Received, Under Examination (memo) | Export Bills — Contra (memo) | 否；仅供 UI／稽核显示，`accountEntries=null`，不外送 Accounting |
 | EPLC_DUE_FROM_ISSUING_BANK / EPLC_ACCEPTANCE_REIMB_RECEIVABLE / EPLC_EXPORT_BILLS_DISCOUNTED | 不适用 | — | — | null——属表内科目，不在表外范畴内 |
 
 ## 来源证据

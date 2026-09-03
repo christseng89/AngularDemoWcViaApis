@@ -23,7 +23,7 @@ SG（装船担保）让买方得以在正本单据到达前先行提货；其自
 
 ## Present Docs 圈存（Earmark） — 出口侧
 
-`EPLC_EXAMINATION`（B3，Present Docs）是 `MEMO_ONLY` 圈存——依 D3 原则：只有*法律*事件才会真正变动余额，因此 B3 本身从不产生 `contingentAccountEntry` 过账（见 [[Contingent Account Entry Rules]]）。`computePresentDocsEarmark()`／`computePresentDocsEarmarkApproved()` 净额处理的对象是*其他*仍处于 PENDING 状态的提示单据，而不仅仅是当下正在提交的这一笔。B3 经过重新设计后，会真正执行 RELEASE（而不只是"确认"）：`presentDocsConsumedAt` 单独追踪"已被后续的 B4 消耗"，与 `status` 所追踪的"已被 B3 自身释放"分开处理——Approved 圈存的判定基础是 `RELEASED && !presentDocsConsumedAt`。一笔仍处于 PENDING 状态、*引用*了某个已释放 B3 记录的 B4，会临时性地把该笔引用的消耗净额计入（`derivePresentDocsProvisionallyConsumedIds()`）——这是一旦 Submitted 后就自我平衡、板上钉钉的结果，而非一项独立风险——同时 B3 自身的新提示单据检查、以及 B2 自身的 AMEND_DECREASE 检查都始终保持严格，绝不会因为另一笔交易的临时净额处理而放宽（"增加從嚴，對 LC Balance 而言"）。
+`EPLC_EXAMINATION`（B3，Present Docs）是 `MEMO_ONLY` 圈存——依 D3 原则：只有*法律*事件才会真正变动余额。B3 会持久化供 Maker／Checker／Inquiry 显示的内部 memo `contingentAccountEntry`，但外送会计 `accountEntries` 固定为 null（见 [[Contingent Account Entry Rules]]）。`computePresentDocsEarmark()`／`computePresentDocsEarmarkApproved()` 净额处理的对象是*其他*仍处于 PENDING 状态的提示单据，而不仅仅是当下正在提交的这一笔。B3 经过重新设计后，会真正执行 RELEASE（而不只是"确认"）：`presentDocsConsumedAt` 单独追踪"已被后续的 B4 消耗"，与 `status` 所追踪的"已被 B3 自身释放"分开处理——Approved 圈存的判定基础是 `RELEASED && !presentDocsConsumedAt`。一笔仍处于 PENDING 状态、*引用*了某个已释放 B3 记录的 B4，会临时性地把该笔引用的消耗净额计入（`derivePresentDocsProvisionallyConsumedIds()`）——这是一旦 Submitted 后就自我平衡、板上钉钉的结果，而非一项独立风险——同时 B3 自身的新提示单据检查、以及 B2 自身的 AMEND_DECREASE 检查都始终保持严格，绝不会因为另一笔交易的临时净额处理而放宽（"增加從嚴，對 LC Balance 而言"）。
 
 ## Close 冲销
 

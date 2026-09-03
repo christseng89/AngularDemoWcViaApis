@@ -31,13 +31,13 @@ exposureNature === 'MEMO'。
 一张未保兑出口 LC 的 Accepted Amount 被作为 MEMO 追踪——仅用于应收/到期日追踪，因为这属于开证行的义务，而非本行自身的义务。
 
 ## 验证说明
-将 api-specs 候选（「MEMO exposureNature forces accountEntries null」）与近乎相同的 db-design-docs 候选（「MEMO exposure nature never generates account entries」）合并——两者来自不同文档来源，陈述同一规则，且都与上文已经过代码验证的 EPLC_EXAMINATION 分录为 null 的规则一致。本轮未独立重新通读所引用的两份文档文件，但由于该说法已被已验证的代码佐证，故保留 CONFIRMED，而非下调。
+2026-09-03 以现行 `balanceService.ts` 重新验证：`exposureNature === 'MEMO'` 时，外送字段 `accountEntries` 强制为 null。此规则不等于 `contingentAccountEntry` 为 null；B3 会保留内部 memo voucher 供 UI／稽核显示。
 
 ## 原始码证据
 
 实现：
 - `analysis/balance-component-api.yaml lines 1240-1254, 1284-1291（本轮未独立重新通读）`
-- `analysis/Balance-Component-DB-Design.txt §5.4（本轮未独立重新通读，但与已独立验证的 EPLC_EXAMINATION 分录为 null 的代码行为一致）`
+- `microservices/balance-component/src/service/balanceService.ts`
 
 测试：
 - （未引用直接测试证据）
