@@ -67,6 +67,7 @@
     "build:adapters": "tsc -p tsconfig.adapters.json",
     "build:e2e-hosts": "node scripts/build-e2e-hosts.mjs",
     "e2e": "playwright test",
+    "e2e:live": "playwright test --config playwright.live.config.ts",
     "release:manifest": "node scripts/generate-wc-manifest.mjs",
     "release:prepare": "npm run build:wc && npm run build:adapters && npm run release:manifest",
     "release:verify": "node scripts/verify-release.mjs",

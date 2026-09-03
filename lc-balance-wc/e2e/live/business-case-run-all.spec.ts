@@ -6,7 +6,7 @@ const EXPORT_FUNCTION_CODES = ['B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7'] as cons
 async function routeToIsolatedServices(page: import('@playwright/test').Page): Promise<void> {
   await page.route('**/api/**', async (route) => {
     const source = new URL(route.request().url());
-    const target = `http://localhost:4301${source.pathname}${source.search}`;
+    const target = `http://localhost:4300${source.pathname}${source.search}`;
     await route.continue({ url: target });
   });
   await page.route('**/balance-component/**', async (route) => {
