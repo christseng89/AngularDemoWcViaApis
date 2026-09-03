@@ -58,6 +58,23 @@ describe('IndexPickerComponent', () => {
     });
   });
 
+  describe('columnTemplate', () => {
+    it('gives the Ref column most of the available width in four-column LC indexes', () => {
+      component.columnHeaders = ['Catalog', 'Ref', 'Tight LC Balance', 'Status'];
+      expect(component.columnTemplate).toBe('minmax(68px, 0.65fr) minmax(0, 1.7fr) minmax(112px, 1fr) minmax(68px, 0.65fr)');
+    });
+
+    it('keeps Ref wider while retaining secondary-reference and amount space in five-column indexes', () => {
+      component.columnHeaders = ['Catalog', 'Ref', '2nd Ref', 'Amount', 'Status'];
+      expect(component.columnTemplate).toBe('minmax(68px, 0.65fr) minmax(0, 1.55fr) minmax(82px, 0.9fr) minmax(108px, 1fr) minmax(68px, 0.65fr)');
+    });
+
+    it('falls back to equal responsive columns for an uncommon column count', () => {
+      component.columnHeaders = ['A', 'B', 'C'];
+      expect(component.columnTemplate).toBe('repeat(3, minmax(0, 1fr))');
+    });
+  });
+
   // "Search — No Match Message" rule (business-directed) — a single shared getter, since every
   // A2–A11/B2–B7 picker routes through this one component: an actively-searched empty result reads as
   // "{query} not found", never the caller's generic emptyText (that stays reserved for the

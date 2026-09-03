@@ -1,6 +1,6 @@
 # Balance Component Current Behavior
 
-本文件是現行功能的快速基準，更新日期為 2026-09-02。詳細公式以 `balance-business-rules.md`、兩份 OAS 與自動化測試為準；歷史提案和 `docs/plans/` 不覆蓋本文件。
+本文件是現行功能的快速基準，更新日期為 2026-09-03。詳細公式以 `balance-business-rules.md`、兩份 OAS 與自動化測試為準；歷史提案和 `docs/plans/` 不覆蓋本文件。
 
 Web Component現況：Angular source由 `<balance-component-app>`重用，具 version 1 DOM contract、
 Shadow DOM、instance-local theme、Angular/React/Vue薄 adapters及可驗證 package。權威導覽為
@@ -32,7 +32,7 @@ Business Case Runner 每步都檢查 Tight Available Balance。若測試回覆�
 
 ## Transaction Index
 
-選交易時每頁 10 筆，搜尋、排序和分頁由共享 Index 行為處理。需要 LC 與 Secondary Reference 的功能必須在同一列一次選定，避免先選 LC 後選錯子交易。
+選交易時每頁 10 筆，搜尋、排序和分頁由共享 Index 行為處理。需要 LC 與 Secondary Reference 的功能必須在同一列一次選定，避免先選 LC 後選錯子交易。共用 Index Picker 的 Ref 欄位比 Catalog／Status 寬，四欄與五欄 layout 各有 responsive grid 比例；若寬度仍不足而縮略，滑鼠移入 Ref 可透過 native tooltip 讀取完整值。
 
 | Function                             | Index identity        | Amount column               |
 | ------------------------------------ | --------------------- | --------------------------- |

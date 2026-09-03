@@ -100,7 +100,7 @@
         >
           <ng-template let-row>
             <span>{{ selectedFunction?.pendingItemSourceCode || selectedFunction?.code }}</span>
-            <span class="tb-row-primary">{{ row.root.naturalKey.lcNumber }}</span>
+            <span class="tb-row-primary" [title]="row.root.naturalKey.lcNumber">{{ row.root.naturalKey.lcNumber }}</span>
             <span>{{ row.secondaryRef }}</span>
             <span>{{ row.amount | monetaryAmount: row.currency }} {{ row.currency }}</span>
             <span class="tb-row-badge">{{ row.status }}</span>
@@ -147,7 +147,7 @@
               >
                 <ng-template let-c>
                   <span>{{ c.instrumentType }}</span>
-                  <span class="tb-row-primary">{{ c.naturalKey.lcNumber }}</span>
+                  <span class="tb-row-primary" [title]="c.naturalKey.lcNumber">{{ c.naturalKey.lcNumber }}</span>
                   <span>{{ parentTightLcBalance(c) }}</span>
                   <span class="tb-row-badge">{{ c.status }}</span>
                 </ng-template>
@@ -183,7 +183,7 @@
             >
               <ng-template let-c>
                 <span>{{ c.instrumentType }}</span>
-                <span class="tb-row-primary">{{ c.naturalKey.lcNumber }}</span>
+                <span class="tb-row-primary" [title]="c.naturalKey.lcNumber">{{ c.naturalKey.lcNumber }}</span>
                 <span>{{ parentTightLcBalance(c) }}</span>
                 <span class="tb-row-badge">{{ c.status }}</span>
               </ng-template>
@@ -236,7 +236,7 @@
           >
             <ng-template let-m>
               <span>{{ selectedFunction?.pendingItemSourceCode || 'A3' }}</span>
-              <span class="tb-row-primary">{{ selectedParent.naturalKey.lcNumber || '—' }}</span>
+              <span class="tb-row-primary" [title]="selectedParent.naturalKey.lcNumber || '—'">{{ selectedParent.naturalKey.lcNumber || '—' }}</span>
               <span>{{ m.sourceTransactionRef || '—' }}</span>
               <span>{{ m.amount | monetaryAmount: m.currency }} {{ m.currency }}</span>
               <span class="tb-row-badge">{{ m.acknowledgedAt ? 'EARMARKED' : m.status }}</span>
@@ -441,7 +441,7 @@
               >
                 <ng-template let-c>
                   <span>{{ c.instrumentType }}</span>
-                  <span class="tb-row-primary">{{ c.naturalKey.lcNumber }}</span>
+                  <span class="tb-row-primary" [title]="c.naturalKey.lcNumber">{{ c.naturalKey.lcNumber }}</span>
                   <span>{{ requiredNaturalKeyFields.includes('sgNumber') ? c.naturalKey.sgNumber : c.naturalKey.ibNumber }}</span>
                   <span>{{ transactionContractAmount(c) }}</span>
                   <span class="tb-row-badge">{{ c.status }}</span>
@@ -502,7 +502,7 @@
           >
             <ng-template let-row>
               <span>A3</span>
-              <span class="tb-row-primary">{{ row.contract.naturalKey.lcNumber }}</span>
+              <span class="tb-row-primary" [title]="row.contract.naturalKey.lcNumber">{{ row.contract.naturalKey.lcNumber }}</span>
               <span>{{ row.movement.sourceTransactionRef || '—' }}</span>
               <span>{{ row.movement.amount | monetaryAmount: row.movement.currency }} {{ row.movement.currency }}</span>
               <span class="tb-row-badge">{{ row.movement.acknowledgedAt ? 'EARMARKED' : row.movement.status }}</span>
@@ -538,7 +538,7 @@
           >
             <ng-template let-c>
               <span>{{ c.instrumentType }}</span>
-              <span class="tb-row-primary">{{ c.naturalKey.lcNumber }}</span>
+              <span class="tb-row-primary" [title]="c.naturalKey.lcNumber">{{ c.naturalKey.lcNumber }}</span>
               <span>{{ catalogTightLcBalance(c) }}</span>
               <span class="tb-row-badge">{{ c.status }}{{ catalogPendingHint(c) }}</span>
             </ng-template>
@@ -615,7 +615,7 @@
         >
           <ng-template let-sg>
             <span>{{ sg.instrumentType }}</span>
-            <span class="tb-row-primary">{{ sg.naturalKey.lcNumber }}</span>
+            <span class="tb-row-primary" [title]="sg.naturalKey.lcNumber">{{ sg.naturalKey.lcNumber }}</span>
             <span>{{ sg.naturalKey.sgNumber || '—' }}</span>
             <span>{{ arrivalSgIndexAmount(sg) }}</span>
             <span class="tb-row-badge">{{ sg.status }}</span>
@@ -687,7 +687,7 @@
         >
           <ng-template let-m>
             <span>{{ selectedFunction?.pendingItemSourceCode || 'B3' }}</span>
-            <span class="tb-row-primary">{{ selectedContract.naturalKey.lcNumber || '—' }}</span>
+            <span class="tb-row-primary" [title]="selectedContract.naturalKey.lcNumber || '—'">{{ selectedContract.naturalKey.lcNumber || '—' }}</span>
             <span>{{ m.sourceTransactionRef || '—' }}</span>
             <span>{{ m.amount | monetaryAmount: m.currency }} {{ m.currency }}</span>
             <span class="tb-row-badge">{{ m.status }}</span>
@@ -735,7 +735,7 @@
         >
           <ng-template let-m>
             <span>A3</span>
-            <span class="tb-row-primary">{{ selectedContract.naturalKey.lcNumber || '—' }}</span>
+            <span class="tb-row-primary" [title]="selectedContract.naturalKey.lcNumber || '—'">{{ selectedContract.naturalKey.lcNumber || '—' }}</span>
             <span>{{ m.sourceTransactionRef || '—' }}</span>
             <span>{{ m.amount | monetaryAmount: m.currency }} {{ m.currency }}</span>
             <span class="tb-row-badge">{{ m.acknowledgedAt ? 'EARMARKED' : m.status }}</span>

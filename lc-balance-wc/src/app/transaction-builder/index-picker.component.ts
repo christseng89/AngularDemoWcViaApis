@@ -29,6 +29,20 @@ export class IndexPickerComponent {
   /** Optional compact table headings for transaction/contract selection lists. */
   @Input() columnHeaders: readonly string[] = [];
 
+  /**
+   * Reference values are materially longer than Catalog/Status labels. Keep one shared responsive
+   * column policy for every A/B-series picker instead of repeating per-screen CSS grid definitions.
+   */
+  get columnTemplate(): string {
+    if (this.columnHeaders.length === 4) {
+      return 'minmax(68px, 0.65fr) minmax(0, 1.7fr) minmax(112px, 1fr) minmax(68px, 0.65fr)';
+    }
+    if (this.columnHeaders.length === 5) {
+      return 'minmax(68px, 0.65fr) minmax(0, 1.55fr) minmax(82px, 0.9fr) minmax(108px, 1fr) minmax(68px, 0.65fr)';
+    }
+    return `repeat(${this.columnHeaders.length}, minmax(0, 1fr))`;
+  }
+
   @Input() searchable = false;
   @Input() searchValue = '';
   @Output() searchValueChange = new EventEmitter<string>();

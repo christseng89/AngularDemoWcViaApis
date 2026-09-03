@@ -30,6 +30,7 @@ Transaction Index 只提供即时候选清单。微服务在 Maker create 与 Ch
 - A6 source 必须属于同一 LC、为已 acknowledge 且尚未 Maker Submit 的 PENDING A3／A3S `UTILIZE`；Release 时再验证 source 与 compound 顺序。
 - B4 source 必须属于同一 Confirmation、为 RELEASED 且未被消费的 B3 `EPLC_EXAMINATION/CREATE`，并且不得已被另一笔 pending B4 选用。
 - A4 Maker Submit 额外要求目标合约仍为 `ACTIVE` 且 tenor 为 `SIGHT`。
+- 2026-09-03 UI 對齊：共用 Index Picker 在四欄與五欄清單中都優先分配寬度給 Ref，縮減 Catalog／Status 間距；Ref 仍縮略時可以 native tooltip 查看完整值。這是 Angular／Web Component 共用的 presentation change，不改變 API／OAS contract。
 
 ## Business Case Runner
 
@@ -54,6 +55,9 @@ Transaction Index 只提供即时候选清单。微服务在 Maker create 与 Ch
 - `src/app/transaction-builder/function-strategy.ts`
 - `src/app/transaction-builder/maker-submit.service.ts`
 - `src/app/transaction-builder/checker-actions.service.ts`
+- `src/app/transaction-builder/index-picker.component.ts`
+- `src/app/transaction-builder/index-picker.component.scss`
+- `src/app/transaction-builder/maker-panel.component.html`
 - `analysis/balance-component-api.yaml`
 - `analysis/balance-component-channel-api.yaml`
 
