@@ -106,6 +106,28 @@ describe('AccountEntriesDialogComponent', () => {
       expect(c.linkedSetStatusIcon).toBe('ok');
     });
 
+    it('A6 Submit shows both real Acceptance and LC Balance accounting sets as PENDING', () => {
+      const c = new AccountEntriesDialogComponent();
+      c.instrumentType = 'IPLC_ACCEPTANCE';
+      c.movement = movement({ movementType: 'CREATE', status: 'PENDING' });
+      c.linkedMovement = movement({ movementType: 'UTILIZE', status: 'PENDING', acknowledgedAt: '2026-09-03T00:00:00.000Z' });
+
+      expect(c.displayStatus(c.movement.status)).toBe('PENDING');
+      expect(c.linkedSetStatus).toBe('PENDING');
+      expect(c.linkedSetStatusBadgeClass).toBe('tb-status-badge--pending');
+    });
+
+    it('A6 Approve shows both real Acceptance and LC Balance accounting sets as APPROVED', () => {
+      const c = new AccountEntriesDialogComponent();
+      c.instrumentType = 'IPLC_ACCEPTANCE';
+      c.movement = movement({ movementType: 'CREATE', status: 'RELEASED' });
+      c.linkedMovement = movement({ movementType: 'UTILIZE', status: 'RELEASED', acknowledgedAt: '2026-09-03T00:00:00.000Z' });
+
+      expect(c.displayStatus(c.movement.status)).toBe('APPROVED');
+      expect(c.linkedSetStatus).toBe('APPROVED');
+      expect(c.linkedSetStatusBadgeClass).toBe('tb-status-badge--approved');
+    });
+
     it('resolves an empty status when linkedMovement is null (never actually rendered in that state)', () => {
       const c = new AccountEntriesDialogComponent();
       expect(c.linkedSetStatus).toBe('');

@@ -108,14 +108,26 @@ export class AccountEntriesDialogComponent {
    * alone, sufficient within this feature's own narrow scope (see their own doc comment).
    */
   get linkedSetStatus(): string {
-    return accountingSetStatusLabel(this.linkedMovement);
+    return accountingSetStatusLabel(this.linkedMovement, this.linkedSetPhase);
   }
 
   get linkedSetStatusBadgeClass(): string {
-    return accountingSetStatusBadgeClass(this.linkedMovement);
+    return accountingSetStatusBadgeClass(this.linkedMovement, this.linkedSetPhase);
   }
 
   get linkedSetStatusIcon() {
     return statusBadgeIconRule(this.linkedSetStatusBadgeClass);
+  }
+
+  /**
+   * A3 UTILIZE is only an internal earmark and never reaches the accounting system. When the same
+   * linked record is rendered inside the A6 voucher, the rows represent A6's real LC-balance accounting
+   * set (not a reversal of A3 accounting) and must follow the compound A6 PENDING -> APPROVED lifecycle.
+   * Outside an A6 voucher, A3/A3S keeps its EARMARKING -> EARMARKED vocabulary unchanged.
+   */
+  private get linkedSetPhase(): 'finalize' | null {
+    return this.instrumentType === 'IPLC_ACCEPTANCE' && this.movement?.movementType === 'CREATE' && this.linkedMovement?.movementType === 'UTILIZE'
+      ? 'finalize'
+      : null;
   }
 }

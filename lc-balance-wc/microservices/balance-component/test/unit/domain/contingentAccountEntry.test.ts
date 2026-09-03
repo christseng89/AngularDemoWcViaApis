@@ -164,10 +164,15 @@ describe('deriveContingentAccountEntry (analysis/contingent-liability-ledger.htm
     });
   });
 
-  describe('EPLC_EXAMINATION (B3 Present Docs) — never posts a real account-entry pair (2026-08-17)', () => {
-    test('CREATE -> null (B3 never actually posts to the books, per Design Principle D3)', () => {
+  describe('EPLC_EXAMINATION (B3 Present Docs) — visible internal memo voucher', () => {
+    test('CREATE -> Export Bills memo pair', () => {
       const entry = deriveContingentAccountEntry({ instrumentType: 'EPLC_EXAMINATION', movementType: 'CREATE', amount: '5000', currency: 'USD' });
-      expect(entry).toBeNull();
+      expect(entry).toEqual({
+        drAccount: 'Export Bills — Received, Under Examination (memo)',
+        crAccount: 'Export Bills — Contra (memo)',
+        currency: 'USD',
+        amount: '5000',
+      });
     });
   });
 

@@ -1,0 +1,13 @@
+{
+  "/api": {
+    "target": "http://localhost:4301",
+    "secure": false,
+    "changeOrigin": true
+  },
+  "/balance-component": {
+    "target": "http://localhost:4100",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": { "^/balance-component": "" }
+  }
+}

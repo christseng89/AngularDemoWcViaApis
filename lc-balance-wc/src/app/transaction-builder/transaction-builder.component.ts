@@ -36,7 +36,7 @@ import { MakerCheckerContext, MakerPanelComponent, MakerSyncRequest } from './ma
 import { deriveFunctionStrategy } from './function-strategy';
 import { FeedbackMessageComponent } from '../shared/feedback/feedback-message.component';
 import { UiMessage } from '../shared/feedback/ui-message.model';
-import { presentApiError } from '../shared/feedback/api-error-presenter';
+import { presentApiError, presentValidationError } from '../shared/feedback/api-error-presenter';
 import { MonetaryAmountPipe } from './monetary-amount.pipe';
 
 /**
@@ -70,6 +70,7 @@ export class TransactionBuilderComponent {
   readonly importFunctions = IMPORT_FUNCTIONS;
   readonly exportFunctions = EXPORT_FUNCTIONS;
 
+
   /**
    * User-reported live ("A3交易 SUBMIT後 CHECKER沒顯示" → confirmed via direct DOM inspection: the
    * Checker panel WAS always correctly rendered/populated, just positioned well below the fold on a
@@ -93,9 +94,33 @@ export class TransactionBuilderComponent {
   selectedCheckerMovement: BalanceMovement | null = null;
   checkerBusy = false;
   checkerError: string | null = null;
+  private checkerErrorCause: unknown = null;
+  private checkerErrorKind: 'API' | 'VALIDATION' | null = null;
   get checkerFeedback(): UiMessage | null {
     if (!this.checkerError) return null;
+    if (this.checkerErrorKind === 'API') return { ...presentApiError(this.checkerErrorCause, 'APPROVE'), retryable: false };
+    if (this.checkerErrorKind === 'VALIDATION') return presentValidationError(this.checkerError);
+    // Backward-compatible fallback for callers/tests that assign checkerError directly.
     return { ...presentApiError({ message: this.checkerError }, 'APPROVE'), retryable: false };
+  }
+
+  /** One OOD boundary owns Checker failure state so raw HTTP metadata is never discarded. */
+  private clearCheckerFailure(): void {
+    this.checkerError = null;
+    this.checkerErrorCause = null;
+    this.checkerErrorKind = null;
+  }
+
+  private setCheckerValidationFailure(message: string): void {
+    this.checkerError = message;
+    this.checkerErrorCause = null;
+    this.checkerErrorKind = 'VALIDATION';
+  }
+
+  private setCheckerApiFailure(cause: unknown): void {
+    this.checkerError = this.describeApiError(cause);
+    this.checkerErrorCause = cause;
+    this.checkerErrorKind = 'API';
   }
   checkerId = 'checker1';
   checkerSyncSignal: CheckerSyncSignal | null = null;
@@ -173,7 +198,7 @@ export class TransactionBuilderComponent {
       this.makerOutcomeSignal = null;
       this.checkerSyncSignal = null;
       this.selectedCheckerMovement = null;
-      this.checkerError = null;
+      this.clearCheckerFailure();
       this.releaseSuccessHint = null;
       this.arrivalApproved = false;
       // The Delete Pending review is the only workflow allowed to hide the Checker panel. If the user
@@ -196,7 +221,7 @@ export class TransactionBuilderComponent {
     if (side !== this.activeFunctionSide) {
       this.selectedFunction = null;
       this.selectedCheckerMovement = null;
-      this.checkerError = null;
+      this.clearCheckerFailure();
       this.releaseSuccessHint = null;
       this.arrivalApproved = false;
       this.accountEntryDialogMovement = null;
@@ -240,7 +265,7 @@ export class TransactionBuilderComponent {
     };
     this.checkerResetNonce++;
     this.selectedCheckerMovement = null;
-    this.checkerError = null;
+    this.clearCheckerFailure();
   }
 
   /**
@@ -655,7 +680,7 @@ export class TransactionBuilderComponent {
   }
 
   onCheckerQueueReloaded(): void {
-    this.checkerError = null;
+    this.clearCheckerFailure();
   }
 
   /** See `lastMakerSync`/`refreshLookUpForLastMakerContext()` — reads the Maker's last-known context, not the Checker's. */
@@ -787,12 +812,12 @@ export class TransactionBuilderComponent {
       this.selectedFunctionStrategy?.checkerRelease.releasesExistingMovementInPlace &&
       !this.selectedCheckerMovement.makerSubmittedAt
     ) {
-      this.checkerError = 'This Document Arrival has not been Submitted by a Maker yet (A4) — go to the Maker section above, pick it, and Submit first.';
+      this.setCheckerValidationFailure('This Document Arrival has not been Submitted by a Maker yet (A4) — go to the Maker section above, pick it, and Submit first.');
       return;
     }
 
     this.checkerBusy = true;
-    this.checkerError = null;
+    this.clearCheckerFailure();
     const obs = action === 'release' ? this.api.release(movementId, this.checkerId) : this.api.reject(movementId, this.checkerId, 'MANUAL_QUEUE_REJECT');
     obs.subscribe({
       next: (result) => {
@@ -807,7 +832,7 @@ export class TransactionBuilderComponent {
       },
       error: (err) => {
         this.checkerBusy = false;
-        this.checkerError = this.describeApiError(err);
+        this.setCheckerApiFailure(err);
       },
     });
   }

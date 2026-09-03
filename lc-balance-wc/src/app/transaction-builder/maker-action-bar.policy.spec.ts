@@ -1,4 +1,6 @@
 import { MakerActionBarState, deriveMakerActionBarView } from './maker-action-bar.policy';
+import { EXPORT_FUNCTIONS, IMPORT_FUNCTIONS } from './balance-component.model';
+import { deriveFunctionStrategy } from './function-strategy';
 
 const baseState: MakerActionBarState = {
   releasesExistingMovementInPlace: false,
@@ -50,6 +52,21 @@ describe('deriveMakerActionBarView', () => {
     expect(view.fixPendingSaveDisabled).toBe(true);
   });
 
+  it('replaces the dedicated A4 submit actions with Fix Pending Save and Cancel', () => {
+    const view = deriveMakerActionBarView({
+      ...baseState,
+      releasesExistingMovementInPlace: true,
+      hasSubmitResult: true,
+      formLocked: true,
+      fixPendingMode: true,
+    });
+    expect(view.showA4Submit).toBe(false);
+    expect(view.showA4Cancel).toBe(false);
+    expect(view.showGenericSubmit).toBe(false);
+    expect(view.showFixPendingActions).toBe(true);
+    expect(view.fixPendingSaveDisabled).toBe(false);
+  });
+
   it('shows Delete Pending actions for both ordinary and A4 review modes', () => {
     for (const releasesExistingMovementInPlace of [false, true]) {
       const view = deriveMakerActionBarView({
@@ -59,6 +76,7 @@ describe('deriveMakerActionBarView', () => {
       });
       expect(view.showDeletePendingActions).toBe(true);
       expect(view.showGenericSubmit).toBe(false);
+      expect(view.showA4Submit).toBe(false);
     }
   });
 
@@ -67,5 +85,47 @@ describe('deriveMakerActionBarView', () => {
     expect(view.genericSubmitLabel).toBe('Submitting…');
     expect(view.genericSubmitDisabled).toBe(true);
     expect(view.a4SubmitDisabled).toBe(true);
+  });
+
+  describe.each([...IMPORT_FUNCTIONS, ...EXPORT_FUNCTIONS])('$code action-mode matrix', (fn) => {
+    const releasesExistingMovementInPlace = deriveFunctionStrategy(fn).checkerRelease.releasesExistingMovementInPlace;
+
+    it('shows exactly one normal Submit path', () => {
+      const view = deriveMakerActionBarView({ ...baseState, functionCode: fn.code, releasesExistingMovementInPlace });
+      expect(Number(view.showA4Submit) + Number(view.showGenericSubmit)).toBe(1);
+      expect(view.showA4Submit).toBe(releasesExistingMovementInPlace);
+      expect(view.showFixPendingActions).toBe(false);
+      expect(view.showDeletePendingActions).toBe(false);
+    });
+
+    it('shows only Fix Pending actions while editing', () => {
+      const view = deriveMakerActionBarView({
+        ...baseState,
+        functionCode: fn.code,
+        releasesExistingMovementInPlace,
+        hasSubmitResult: true,
+        formLocked: true,
+        fixPendingMode: true,
+      });
+      expect(view.showA4Submit).toBe(false);
+      expect(view.showGenericSubmit).toBe(false);
+      expect(view.showFixPendingActions).toBe(true);
+      expect(view.showDeletePendingActions).toBe(false);
+    });
+
+    it('shows only Delete Pending actions while reviewing deletion', () => {
+      const view = deriveMakerActionBarView({
+        ...baseState,
+        functionCode: fn.code,
+        releasesExistingMovementInPlace,
+        hasSubmitResult: true,
+        formLocked: true,
+        deletePendingReviewMode: true,
+      });
+      expect(view.showA4Submit).toBe(false);
+      expect(view.showGenericSubmit).toBe(false);
+      expect(view.showFixPendingActions).toBe(false);
+      expect(view.showDeletePendingActions).toBe(true);
+    });
   });
 });

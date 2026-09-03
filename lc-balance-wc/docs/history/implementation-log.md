@@ -4646,3 +4646,63 @@ Function 時繞過 A1 的共用輸入方式。由交易選取或服務端帶入�
 驗證：70 suites／1,934 tests 全通過；coverage statements 97.88%、branches 95.05%、functions 96.39%、
 lines 98.40%。Lint 0 errors（保留既有 warnings）、WC typecheck、WC docs／OAS validation 與
 `git diff --check` 通過。
+
+## 2026-09-03 — h/k/m 即時 Balance Warning 與 Submit parser 對齊
+
+修正輸入 `500k`、而 Tight Available 為 `1,100,000` 時仍誤報超額的 Angular 問題。根因是即時警告直接
+使用 `Number(rawAmount)`；`Number('500k')` 為 `NaN`，使 sufficient guard 錯誤落入警告分支。現在
+Available／Tight Available 比較先使用 Amount 欄位及 Submit 共用的 exact `parseAmountShorthand()`。
+有效 `m/k/h` 以展開後 decimal 值比較；無效 shorthand 交由欄位 validator 顯示，不產生第二個誤導警告。
+回歸矩陣逐項涵蓋 A1–A11、B1–B7（包含 A2／B2 Increase/Decrease 與 B4 Sight/Usance 兩種分支）。
+
+驗證：70 suites／1,962 tests 全通過；coverage statements 97.88%、branches 95.05%、functions 96.39%、
+lines 98.40%。Lint 0 errors（既有 warnings）、WC typecheck 及 WC docs／OAS validation 通過。
+
+## 2026-09-03 — Protected Amount 不執行 Typed Amount 警告
+
+修正 A4 選取 Document Arrival 後，即使 Amount 已明確標示為 carried／protected，仍因 LC 當前
+Available Balance 為 `0` 而顯示 `Typed amount (...) exceeds Available Balance` 的錯誤提示。即時警告
+現在直接共用 Formly Amount 欄位的 lock derivation；凡由索引交易或服務端帶入的 protected Amount
+都不視為用戶輸入，也不再進入 Available／Tight Available 的 input-time warning。A4 尚未選取來源時
+仍維持 editable 邊界；A3 等真正可輸入 Amount 的警告保持不變。此項僅調整 Angular 顯示／提示，沒有
+API、OAS、DB 或 Balance 計算變更。
+
+## 2026-09-03 — Checker error cause 保留與 A4 Available=0 回歸
+
+Live S02 顯示 A4 B02 已 acknowledged／Maker-Submitted，卻在 Checker Release 顯示
+`BAL-UI-UNEXPECTED`。以 SQLite online backup 複製同一 DB 後，最新版 `BalanceService.release()` 對同一
+movement 成功，證實 protected Document Arrival 與 accounting release domain 規則可正常完成、正式 DB
+也未被測試改動。真正的 UI 缺口是 plain Checker path 先把 `HttpErrorResponse` 壓成字串，導致 shared
+feedback policy 看不到 status/code；compound `CheckerActionsService` 亦只保留 message。
+
+依 OOP／OOD／SOLID 將 Checker failure state 的建立／清除集中在單一 component boundary，API failure
+保留 raw cause，本地 gate 明確標記為 validation；compound failed outcome 同樣攜帶 cause 到 Maker feedback。
+status 0、409、500 現在分別顯示 service unavailable、stale transaction、`BAL-SVC-HTTP-500`，不再誤標
+client-side unexpected。新增真正 microservice HTTP regression：LC 1.1m，B01 500k 已結算，B02 100k
+與 B03 500k 仍 earmark、Available=0 時，Release 已 Maker-Submitted 的 B02 必須成功，Confirmed
+600k→500k，B03 保留使 Available 仍為 0。API／OAS／DB schema 不變。
+
+完整驗證：Angular／WC 70 suites／1,968 tests 全通過（statements 97.99%、branches 95.10%、
+functions 96.50%、lines 98.52%）；Balance Component microservice 40 suites／838 tests 全通過
+（statements 98.18%、branches 95.03%、functions 99.32%、lines 98.92%）；Business Case Runner
+backend 3 suites／64 tests 全通過（statements 99.11%、branches 97.02%、functions／lines 100%）。
+三層 lint 皆 0 errors（保留既有 warnings），WC／adapter／microservice typecheck、WC docs／OAS validation
+與 `git diff --check` 通過。
+
+## 2026-09-03 — A4 Fix Pending Action Bar mode 修正
+
+修正 A4 從 Maker Queue 進入 Remarks-only Fix Pending 後仍顯示 disabled `Submit A4`、無法 Save 的 UI
+回歸。根因是抽出的 `MakerActionBar` presentation policy 將 `releasesExistingMovementInPlace` 誤當成比
+workflow mode 更高優先：A4 Submit 沒排除 Fix／Delete mode，而 Fix actions 又只准 generic Function 顯示。
+現在 workflow mode 優先；A4 的 Fix Pending 只顯示 Save／Cancel，Delete review 只顯示 Confirm／Cancel。
+
+新增由 Import／Export Function Registry 自動產生的 action-mode matrix，逐一覆蓋全部已註冊 A／B Function
+的 normal、Fix Pending、Delete Pending 三種狀態，另以 DOM test 鎖定 A4 的實際按鈕文字與 enablement。
+Chrome live acceptance 連接真實 Angular、backend 與 Balance microservice：Run All 37 cases 全部完成，並
+實際完成 A4 合併 LC+IB Index 選取、Submit A4、Maker Queue Fix Pending、修改 Remarks、Save Fix Pending；
+無 page error／error feedback。API、OAS、DB schema 與 Balance 計算均未變更。
+
+驗證：Angular／WC 70 suites／2,024 tests 全通過；coverage statements 97.99%、branches 95.10%、
+functions 96.50%、lines 98.52%。Chrome live acceptance 1/1 通過（37 個 Business Cases 加 A4
+Fix Pending Save）；lint 0 errors（保留既有 warnings），WC／adapter typecheck、docs／OAS validation
+與 `git diff --check` 通過。

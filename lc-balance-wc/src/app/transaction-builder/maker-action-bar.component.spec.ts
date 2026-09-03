@@ -65,6 +65,22 @@ describe('MakerActionBarComponent', () => {
     expect(cancel).toHaveBeenCalledTimes(1);
   });
 
+  it('renders Save Fix Pending instead of the disabled Submit A4 during A4 Fix Pending', () => {
+    const fixture = TestBed.createComponent(MakerActionBarComponent);
+    fixture.componentRef.setInput('state', {
+      ...state,
+      releasesExistingMovementInPlace: true,
+      hasSubmitResult: true,
+      formLocked: true,
+      fixPendingMode: true,
+    });
+    fixture.detectChanges();
+
+    const buttons = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('button'));
+    expect(buttons.map((button) => button.textContent?.trim())).toEqual(['Save Fix Pending', 'Cancel']);
+    expect(buttons[0].disabled).toBe(false);
+  });
+
   it('emits Delete Pending actions in A4 review mode', () => {
     const fixture = TestBed.createComponent(MakerActionBarComponent);
     fixture.componentRef.setInput('state', { ...state, releasesExistingMovementInPlace: true, deletePendingReviewMode: true });
@@ -76,6 +92,7 @@ describe('MakerActionBarComponent', () => {
 
     const buttons = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('button'));
     expect(buttons.find((button) => button.textContent?.includes('Confirm Delete Pending'))).toBeDefined();
+    expect(buttons.find((button) => button.textContent?.includes('Submit A4'))).toBeUndefined();
     buttons.find((button) => button.textContent?.includes('Confirm Delete Pending'))?.click();
     buttons.at(-1)?.click();
     expect(confirm).toHaveBeenCalledTimes(1);

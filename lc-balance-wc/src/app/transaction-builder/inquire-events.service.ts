@@ -6,6 +6,7 @@ import { catchError, map, switchMap } from 'rxjs/operators';
 import { BalanceComponentApiService, BalanceContract, BalanceMovement, BalanceSnapshot } from './balance-component-api.service';
 import {
   BALANCE_SNAPSHOT_LABEL,
+  IMPORT_FUNCTIONS,
   InstrumentType,
   TransactionFunction,
   childInstrumentTypesOf,
@@ -48,6 +49,13 @@ export interface InquiredEvent {
    * on any other row shape.
    */
   linkedMovement?: BalanceMovement;
+  /**
+   * Compound functions can share their individual movement shapes with standalone functions. A3S,
+   * for example, owns both an IPLC_LC/UTILIZE leg (otherwise A3) and an SHGT/FULL_REDEEM leg
+   * (otherwise A9). Set only after the complete event collection is available and correlation by
+   * businessEventId proves the compound function identity.
+   */
+  functionOverride?: TransactionFunction;
 }
 
 /**
@@ -67,6 +75,7 @@ export interface InquiredEvent {
 export function functionForEvent(event: InquiredEvent): TransactionFunction | undefined {
   const { movement, contract } = event;
   return (
+    event.functionOverride ??
     (event.phase === 'finalize' ? payExistingUtilizeFunctionFor(contract.instrumentType, contract.tenorType) : undefined) ??
     resolveFunctionForMovement(contract.instrumentType, movement.movementType)
   );
@@ -272,6 +281,20 @@ export function toEventRows(movement: BalanceMovement, contract: BalanceContract
  * function (never produces a matching pair at all).
  */
 export function mergeAccountingEventRows(events: readonly InquiredEvent[]): InquiredEvent[] {
+  const a3s = IMPORT_FUNCTIONS.find((fn) => fn.code === 'A3S');
+  const isA3sLcLeg = (e: InquiredEvent) => e.contract.instrumentType === 'IPLC_LC' && e.movement.movementType === 'UTILIZE';
+  const isA3sSgLeg = (e: InquiredEvent) =>
+    e.contract.instrumentType === 'SHGT' && (e.movement.movementType === 'FULL_REDEEM' || e.movement.movementType === 'PARTIAL_REDEEM');
+  const hasA3sPartner = (event: InquiredEvent): boolean => {
+    const eventId = event.movement.businessEventId;
+    if (!eventId || (!isA3sLcLeg(event) && !isA3sSgLeg(event))) return false;
+    return events.some(
+      (candidate) =>
+        candidate !== event &&
+        candidate.movement.businessEventId === eventId &&
+        ((isA3sLcLeg(event) && isA3sSgLeg(candidate)) || (isA3sSgLeg(event) && isA3sLcLeg(candidate))),
+    );
+  };
   const cascadeOwnerOf = (finalizeMovementId: string): InquiredEvent | undefined =>
     events.find((e) => e.movement.referencedTransactionId === finalizeMovementId);
   const isConfirmationAccept = (e: InquiredEvent) => e.contract.instrumentType === 'EPLC_CONFIRMATION' && e.movement.movementType === 'ACCEPT';
@@ -294,7 +317,7 @@ export function mergeAccountingEventRows(events: readonly InquiredEvent[]): Inqu
         const linkedAccept = events.find((e) => isConfirmationAccept(e) && e.movement.businessEventId === event.movement.businessEventId);
         if (linkedAccept) return { ...event, linkedMovement: linkedAccept.movement };
       }
-      return event;
+      return a3s && hasA3sPartner(event) ? { ...event, functionOverride: a3s } : event;
     });
 }
 

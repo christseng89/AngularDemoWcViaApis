@@ -184,6 +184,16 @@ function deriveAmountLockFlags(ctx: BuilderFieldsContext, strategy: ReturnType<t
 }
 
 /**
+ * Shares the Amount field's own lock derivation with callers that must distinguish a Maker-entered
+ * amount from a carried/system-derived amount. Capacity warnings must never describe a carried amount
+ * (notably A4/A6/B4's selected Document Arrival amount) as a "Typed amount".
+ */
+export function isAmountFieldProtected(ctx: BuilderFieldsContext): boolean {
+  const strategy = ctx.selectedFunction ? deriveFunctionStrategy(ctx.selectedFunction) : null;
+  return deriveAmountLockFlags(ctx, strategy).amountLocked;
+}
+
+/**
  * `buildFields()`'s own Amount-field label — was a single 6-level-deep nested ternary (2026-08-26,
  * SonarQube-scan-report.md — flagged individually as 5 separate `typescript:S3358` findings, and the
  * single largest contributor to that function's own Cognitive Complexity 63). Converted to a flat

@@ -42,15 +42,15 @@ export type CheckerActionOutcome =
   | { kind: 'released'; result: BalanceMovement; secondary?: MakerSubmitSecondary }
   /** A3S's own acknowledgment-only path (releaseArrivalDocument's old shape) — no API call, no `result`. */
   | { kind: 'documentArrivalAcknowledged' }
-  | { kind: 'failed'; message: string };
+  | { kind: 'failed'; message: string; cause?: unknown };
 
 @Injectable({ providedIn: 'root' })
 export class CheckerActionsService {
   constructor(private readonly api: BalanceComponentApiService) {}
 
   /** Shared constructor for every `{ kind: 'failed', message }` outcome — only the message differs per call site. */
-  private fail(message: string): Observable<CheckerActionOutcome> {
-    return of<CheckerActionOutcome>({ kind: 'failed', message });
+  private fail(message: string, cause?: unknown): Observable<CheckerActionOutcome> {
+    return of<CheckerActionOutcome>({ kind: 'failed', message, ...(cause === undefined ? {} : { cause }) });
   }
 
   release(ctx: CheckerActionContext): Observable<CheckerActionOutcome> {
@@ -91,7 +91,7 @@ export class CheckerActionsService {
             checkerId,
           ).pipe(
             map(() => ({ kind: 'documentArrivalAcknowledged' as const })),
-            catchError((err) => this.fail(`Could not release the Shipping Guarantee redemption — Document Arrival NOT acknowledged: ${describeApiError(err)}`)),
+            catchError((err) => this.fail(`Could not release the Shipping Guarantee redemption — Document Arrival NOT acknowledged: ${describeApiError(err)}`, err)),
           );
         }),
       );
@@ -100,7 +100,7 @@ export class CheckerActionsService {
     const plainMovementId = ctx.selectedCheckerMovement?.movementId ?? ctx.submitResult?.movementId;
     return this.api.release(plainMovementId!, checkerId).pipe(
       switchMap((res) => of<CheckerActionOutcome>({ kind: 'released', result: res })),
-      catchError((err) => this.fail(describeApiError(err))),
+      catchError((err) => this.fail(describeApiError(err), err)),
     );
   }
 
@@ -115,7 +115,7 @@ export class CheckerActionsService {
     const checkerId = ctx.createdBy === 'maker1' ? 'checker1' : 'checker2';
     return this.acknowledgeUtilize(ctx, checkerId).pipe(
       switchMap(() => of<CheckerActionOutcome>({ kind: 'documentArrivalAcknowledged' })),
-      catchError((err) => this.fail(describeApiError(err))),
+      catchError((err) => this.fail(describeApiError(err), err)),
     );
   }
 
@@ -131,7 +131,7 @@ export class CheckerActionsService {
     const movementId = ctx.selectedCheckerMovement?.movementId ?? ctx.submitResult?.movementId;
     return this.api.reject(movementId!, 'checker1', 'MANUAL_TEST_REJECT').pipe(
       switchMap((res) => of<CheckerActionOutcome>({ kind: 'released', result: res })),
-      catchError((err) => this.fail(describeApiError(err))),
+      catchError((err) => this.fail(describeApiError(err), err)),
     );
   }
 
@@ -159,7 +159,7 @@ export class CheckerActionsService {
     const editedBy = ctx.createdBy || 'maker1';
     return this.api.editPending(ctx.submitResult.movementId, { ...patch, editedBy }).pipe(
       switchMap((res) => this.resolveArrivalSgLegAfterEdit(res).pipe(map((secondary) => ({ kind: 'released' as const, result: res, secondary })))),
-      catchError((err) => this.fail(describeApiError(err))),
+      catchError((err) => this.fail(describeApiError(err), err)),
     );
   }
 
@@ -287,7 +287,7 @@ export class CheckerActionsService {
 
     return this.api.executeCompoundActions(actions, checkerId).pipe(
       map((results) => ({ kind: 'released' as const, result: results[strategy?.checkerRelease.sourceAlreadyReleasedBeforePick ? 0 : 1]! })),
-      catchError((err) => this.fail(`Compound event failed to release atomically: ${describeApiError(err)}`)),
+      catchError((err) => this.fail(`Compound event failed to release atomically: ${describeApiError(err)}`, err)),
     );
   }
 

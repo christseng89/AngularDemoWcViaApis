@@ -71,6 +71,11 @@ Business Case Runner 每步都檢查 Tight Available Balance。若測試回覆�
   Increase／Decrease、B3、B5 Partial Settle。系統帶入的唯讀金額不視為輸入欄位。
 - `t`、負數、逗號、科學記號、空白與 malformed decimal 會在欄位層被拒絕；系統帶入／protected Amount 不解析 shorthand。
 - Blur 後以 decimal-string exact arithmetic 展開，再交給既有 Currency decimal-place、rounding、Balance 與 Submit 檢查；API/OAS 仍只接收標準 MonetaryAmount decimal string。
+- 輸入期間的 Available／Tight Available 警告也先使用同一個 parser：例如 `500k` 會以 `500000`
+  比較，不會因 JavaScript `Number('500k')` 是 `NaN` 而誤報超額；無效 shorthand 只顯示欄位驗證錯誤。
+- Available／Tight Available 是「用戶可輸入 Amount」的即時提示。由索引交易或服務端帶入的
+  protected Amount 不再顯示 `Typed amount` 警告；例如 A4 的金額取自已選 Document Arrival，該筆
+  earmark 由 release 規則結算，不會因目前 Available 已為 `0` 而在 Angular 畫面誤報。
 
 ## Transaction Index
 
@@ -92,6 +97,7 @@ Business Case Runner 每步都檢查 Tight Available Balance。若測試回覆�
 - Maker／Checker separation、狀態轉換、金額與 eligibility 都由微服務重新驗證。
 - A3S、A6、B4 等多腿事件的建立／Release 使用 `/balance-movements/compound*`，由 SQLite transaction 保證全部成功或全部回滾。B5 只結算所選 Acceptance。
 - Fix Pending 修改原 movement 並保留 audit。A4、A6、A7、A9、B4、B5 採 Remarks-only：只能修改 Remark，不得改變金額、Balance、Account Entries 或 compound sibling。
+- Action Bar 的 workflow mode 優先於 Function 的專用 Submit mode。A4 進入 Fix Pending 時只顯示 `Save Fix Pending`／`Cancel`，進入 Delete Pending review 時只顯示 Confirm／Cancel；不得殘留已 disabled 的 `Submit A4`。同一規則以 Function Registry 矩陣覆蓋全部 A1–A11／B1–B7。
 - Standard Fix Pending 成功時會在同一個 DB transaction 重新計算並覆寫 movement 的 Event／Root／Sibling snapshots；Inquire Events 立即顯示修正後的 PENDING Balance，不必等 Checker Release。Inquire Events 與 Transaction Processing Current Balance 的 A2／B2 都額外顯示 Amendment 自己的 tolerance-adjusted Balance Effect 及 `Amendment Tolerance` 的歷史生效值→交易值；PENDING 顯示 `Pending Amendment Balance Effect`，RELEASED 則顯示 `Amendment Balance Effect`（例如 Decrease `20% → 15%`）。同一 LC 有多筆 pending amendment 時逐筆依 Reference 顯示，不任意合併。`Pending Earmark Total` 仍是同一合約全部 PENDING movement 的淨額。
 - Fix Pending 開始、送出及成功回覆時會清除先前的 Maker submit error；成功的 A7 Remarks-only Save 不得繼續顯示舊的 `BAL-UI-UNEXPECTED`。此行為在 Angular host 與 Web Component host 一致。
 - 所有已註冊功能（A1、A2、A3、A3S、A4、A6–A11、B1–B7）在 Checker Release 成功後都重設同一 Function 的 Maker／Checker 畫面，清除舊 movement、Maker Result 與 Fix/Delete Pending signals；已 RELEASED 的 movement 不得再次進入 Fix Pending。Angular 與 Web Component host 行為一致；Reject 仍保留 Maker 資料供修正。
@@ -108,6 +114,10 @@ Business Case Runner 每步都檢查 Tight Available Balance。若測試回覆�
 - Maker Queue、Inquire Events 與 Inquire Delete Pending 會保留原始 HTTP error status，再交由共用 presenter 分類。
 - Maker Queue、Inquire Events 與 Inquire Delete Pending 的正常無資料狀態共用 `FeedbackMessageComponent` 藍色資訊卡；只有使用者輸入搜尋條件後無匹配資料才顯示 warning，transport/service error 仍顯示 error。
 - Maker Submit 同樣保留 raw error cause；Angular 與 Web Component host 對 HTTP 5xx 顯示 `BAL-SVC-HTTP-{status}`，network/status 0 顯示 Balance service unavailable，而非誤標為 `BAL-UI-UNEXPECTED`。
+- Checker Approve／Release／Reject 也保留原始 HTTP status、business code 與 cause；plain A1–A11／B1–B7
+  及 A3S／A6／B4 compound orchestration 都交由共用 feedback policy 分類。服務重建造成的 status 0、
+  backend 5xx 與 409 stale transaction 不再因先轉為字串而誤標 `BAL-UI-UNEXPECTED`；本地 A4
+  「尚未 Maker Submit」gate 則顯示 validation warning，不冒充 API failure。
 - Maker Submit 的本地 validation 顯示 `Check transaction details`；HTTP 400／422 顯示可安全呈現的 business validation reason，401／403／404 與其他 4xx 各有明確分類。這項共用 policy 適用所有已註冊功能、Angular host 與 Web Component host，複合與單筆 submission 的同步例外也會轉為同一個 failed outcome。
 - Network／status `0` 顯示 Balance service unavailable；HTTP `5xx` 顯示 temporarily unavailable，support code 使用 `BAL-SVC-HTTP-{status}`。
 - `BAL-UI-UNEXPECTED` 僅保留給沒有可辨識 HTTP status 或技術代碼的 client-side failure。Retry 保留原搜尋條件。

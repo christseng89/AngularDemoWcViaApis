@@ -798,6 +798,25 @@ describe('submit-rules', () => {
       expect(passes.error).toBeNull();
     });
 
+    it('B2 AMEND_EXPIRY_DATE does not require the Increase/Decrease direction used by its monetary amendment options', () => {
+      const passes = validateSubmit(
+        ctx({
+          selectedFunction: fn('B2'),
+          model: {
+            instrumentType: 'EPLC_CONFIRMATION',
+            movementType: 'AMEND_EXPIRY_DATE',
+            currency: 'USD',
+            createdBy: 'maker1',
+            newExpiryDate: '2026-09-30',
+          },
+          amendDirection: null,
+          selectedContract: contract({ instrumentType: 'EPLC_CONFIRMATION' }),
+        }),
+      );
+
+      expect(passes.error).toBeNull();
+    });
+
     it('F1: AMEND_EXPIRY_DATE still requires newExpiryDate itself', () => {
       const result = validateSubmit(
         ctx({

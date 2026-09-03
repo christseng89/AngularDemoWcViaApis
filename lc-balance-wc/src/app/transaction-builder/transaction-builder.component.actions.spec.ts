@@ -332,7 +332,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
       comp.release();
 
-      expect(comp.makerOutcomeSignal).toEqual({ kind: 'failed', message: 'ILLEGAL_STATE_TRANSITION' });
+      expect(comp.makerOutcomeSignal).toMatchObject({ kind: 'failed', message: 'ILLEGAL_STATE_TRANSITION' });
       expect(comp.actionBusy).toBe(false);
     });
 
@@ -371,7 +371,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       comp.release();
 
       expect(api.release).toHaveBeenCalledTimes(2);
-      expect(comp.makerOutcomeSignal).toEqual({
+      expect(comp.makerOutcomeSignal).toMatchObject({
         kind: 'failed',
         message: 'Compound event failed to release atomically: ILLEGAL_STATE_TRANSITION',
       });
@@ -391,7 +391,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
       comp.release();
 
-      expect(comp.makerOutcomeSignal).toEqual({
+      expect(comp.makerOutcomeSignal).toMatchObject({
         kind: 'failed',
         message: 'Compound event failed to release atomically: ILLEGAL_STATE_TRANSITION',
       });
@@ -441,7 +441,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
       comp.release();
 
-      expect(comp.makerOutcomeSignal).toEqual({
+      expect(comp.makerOutcomeSignal).toMatchObject({
         kind: 'failed',
         message: 'Could not release the Shipping Guarantee redemption — Document Arrival NOT acknowledged: ILLEGAL_STATE_TRANSITION',
       });
@@ -526,7 +526,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
       comp.release();
 
-      expect(comp.makerOutcomeSignal).toEqual({
+      expect(comp.makerOutcomeSignal).toMatchObject({
         kind: 'failed',
         message: 'Compound event failed to release atomically: ILLEGAL_STATE_TRANSITION',
       });
@@ -574,7 +574,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       comp.release();
 
       expect(api.release).toHaveBeenCalledTimes(3);
-      expect(comp.makerOutcomeSignal).toEqual({
+      expect(comp.makerOutcomeSignal).toMatchObject({
         kind: 'failed',
         message: 'Compound event failed to release atomically: ILLEGAL_STATE_TRANSITION',
       });
@@ -596,7 +596,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
       comp.release();
 
-      expect(comp.makerOutcomeSignal).toEqual({
+      expect(comp.makerOutcomeSignal).toMatchObject({
         kind: 'failed',
         message: 'Compound event failed to release atomically: ILLEGAL_STATE_TRANSITION',
       });
@@ -686,7 +686,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
       comp.reject();
 
-      expect(comp.makerOutcomeSignal).toEqual({ kind: 'failed', message: 'NOT_FOUND' });
+      expect(comp.makerOutcomeSignal).toMatchObject({ kind: 'failed', message: 'NOT_FOUND' });
       expect(comp.actionBusy).toBe(false);
     });
 
@@ -816,7 +816,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
       comp.fixPending({ movementId: 'mv-1', amount: '999999999' });
 
-      expect(comp.makerOutcomeSignal).toEqual({ kind: 'failed', message: 'INSUFFICIENT_AVAILABLE_BALANCE' });
+      expect(comp.makerOutcomeSignal).toMatchObject({ kind: 'failed', message: 'INSUFFICIENT_AVAILABLE_BALANCE' });
     });
   });
 
@@ -1361,6 +1361,11 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
       expect(api.release).not.toHaveBeenCalled();
       expect(comp.checkerError).toMatch(/has not been Submitted by a Maker yet/);
+      expect(comp.checkerFeedback).toMatchObject({
+        severity: 'WARNING',
+        title: 'Check transaction details',
+        retryable: false,
+      });
     });
 
     it('A4: reject is NOT gated by makerSubmittedAt — a Checker may decline an unsubmitted item directly', () => {
@@ -1397,6 +1402,29 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
       expect(comp.checkerError).toBe('ILLEGAL_STATE_TRANSITION');
       expect(comp.checkerBusy).toBe(false);
+    });
+
+    it.each([
+      [500, 'Balance service temporarily unavailable', 'BAL-SVC-HTTP-500'],
+      [0, 'Balance service unavailable', undefined],
+      [409, 'Transaction already processed', undefined],
+    ])('plain Checker release preserves HTTP %i for the shared feedback policy', (status, title, supportCode) => {
+      const { comp, api } = setup();
+      api.release.mockReturnValueOnce(
+        throwError(() => ({ status, message: status === 0 ? 'Http failure response: 0 Unknown Error' : `HTTP ${status}`, error: { code: 'RELEASE_FAILED' } })) as any,
+      );
+      comp.selectFunction(A4);
+      comp.selectedCheckerMovement = makeMovement({
+        movementId: 'mv-a4-failure',
+        movementType: 'UTILIZE',
+        makerSubmittedAt: '2026-09-03T00:00:00.000Z',
+      });
+
+      comp.checkerAct('release');
+
+      expect(comp.checkerFeedback).toMatchObject({ title, retryable: false });
+      if (supportCode) expect(comp.checkerFeedback?.supportCode).toBe(supportCode);
+      else expect(comp.checkerFeedback?.supportCode).toBeUndefined();
     });
   });
 

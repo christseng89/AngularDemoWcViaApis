@@ -1,5 +1,5 @@
 import { FormControl } from '@angular/forms';
-import { BuilderFieldsContext, buildFields, isFixPendingFieldEditable, reconstructOriginalModel, toReadOnlyFields } from './builder-fields';
+import { BuilderFieldsContext, buildFields, isAmountFieldProtected, isFixPendingFieldEditable, reconstructOriginalModel, toReadOnlyFields } from './builder-fields';
 import { AMOUNT_SHORTHAND_ERROR } from './amount-shorthand';
 import { CURRENCY_OPTIONS, IMPORT_FUNCTIONS, EXPORT_FUNCTIONS, type TransactionFunction } from './balance-component.model';
 import type { BalanceContract, BalanceMovement, BalanceSnapshot } from './balance-component-api.service';
@@ -252,6 +252,7 @@ describe('builder-fields', () => {
       const amount = fieldByKey(buildFields(ctx), 'amount');
       expect(amount.props?.disabled).toBe(true);
       expect(amount.props?.label).toBe('Amount (carried from the Document Arrival, protected)');
+      expect(isAmountFieldProtected(ctx)).toBe(true);
     });
 
     it('stays editable/face-level for A4 before a pay movement has been picked (boundary — the flag alone is not enough)', () => {
@@ -259,6 +260,7 @@ describe('builder-fields', () => {
       const amount = fieldByKey(buildFields(ctx), 'amount');
       expect(amount.props?.disabled).toBe(false);
       expect(amount.props?.label).toBe('Amount (face-level, per Design doc §6.2)');
+      expect(isAmountFieldProtected(ctx)).toBe(false);
     });
 
     it('is locked and labeled "Full Settle — carried..." when movementType is FULL_SETTLE with a resolved snapshot', () => {

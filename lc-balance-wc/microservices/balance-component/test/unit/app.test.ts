@@ -2158,6 +2158,14 @@ describe('HTTP integration — Export Confirmation asset-side instruments (busin
     // Confirmed 100000 (no still-PENDING decreases here) minus the 90000 still-PENDING EB03 earmark.
     expect(cnfSnapshot.body.tightAvailableBalance).toBe('10000');
     expect(exam.body.status).toBe('PENDING');
+    expect(exam.body.contingentAccountEntry).toEqual({
+      drAccount: 'Export Bills — Received, Under Examination (memo)',
+      crAccount: 'Export Bills — Contra (memo)',
+      currency: 'USD',
+      amount: '90000',
+    });
+    // The visible B3 voucher is internal MEMO only. The downstream Accounting payload stays empty.
+    expect(exam.body.accountEntries).toBeNull();
     examEb03MovementId = exam.body.movementId;
   });
 
@@ -2227,6 +2235,12 @@ describe('HTTP integration — Export Confirmation asset-side instruments (busin
     expect(released.body.status).toBe('RELEASED');
     expect(released.body.releasedBy).toBe('checker1');
     expect(released.body.presentDocsConsumedAt).toBeNull();
+    expect(released.body.contingentAccountEntry).toMatchObject({
+      drAccount: 'Export Bills — Received, Under Examination (memo)',
+      crAccount: 'Export Bills — Contra (memo)',
+      amount: '90000',
+    });
+    expect(released.body.accountEntries).toBeNull();
 
     const cnfContract = await request(app).get('/balance-contracts').query({ instrumentType: 'EPLC_CONFIRMATION', lcNumber: 'E001' }).expect(200);
     const cnfSnapshot = await request(app).get(`/balance-contracts/${cnfContract.body.balanceContractId}/balance`).expect(200);
@@ -4180,6 +4194,59 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
       const utilizeRow = movements.body.find((m: { movementId: string }) => m.movementId === utilize.body.movementId);
       expect(utilizeRow.eventSnapshot).toEqual(createTimeSnapshot);
       expect(utilizeRow.finalizeEventSnapshot.confirmedBalance).toBe('60000');
+    });
+
+    test('A4 releases the selected protected Document Arrival when Available is already 0 because other arrivals remain earmarked (live S02 regression)', async () => {
+      const lc = await request(app)
+        .post('/balance-movements')
+        .send({
+          instrumentType: 'IPLC_LC',
+          naturalKey: { lcNumber: 'LC-A4-ZERO-AVAILABLE' },
+          movementType: 'ISSUE',
+          expiryDate: '2099-12-31',
+          eventSeq: 1,
+          amount: '1100000',
+          currency: 'USD',
+          tenorType: 'SIGHT',
+          createdBy: 'maker1',
+        })
+        .expect(201);
+      await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+
+      const createArrival = async (eventSeq: number, amount: string, sourceTransactionRef: string) => {
+        const arrival = await request(app)
+          .post('/balance-movements')
+          .send({
+            instrumentType: 'IPLC_LC',
+            balanceContractId: lc.body.balanceContractId,
+            movementType: 'UTILIZE',
+            eventSeq,
+            amount,
+            currency: 'USD',
+            sourceTransactionRef,
+            createdBy: 'maker1',
+          })
+          .expect(201);
+        await request(app).post(`/balance-movements/${arrival.body.movementId}/acknowledge`).send({ acknowledgedBy: 'checker1' }).expect(200);
+        return arrival.body;
+      };
+
+      const first = await createArrival(2, '500000', 'B01');
+      await request(app).post(`/balance-movements/${first.movementId}/maker-submit`).send({ makerSubmittedBy: 'maker1' }).expect(200);
+      await request(app).post(`/balance-movements/${first.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+
+      const selected = await createArrival(3, '100000', 'B02');
+      await request(app).post(`/balance-movements/${selected.movementId}/maker-submit`).send({ makerSubmittedBy: 'maker1' }).expect(200);
+      await createArrival(4, '500000', 'B03');
+
+      const before = await request(app).get(`/balance-contracts/${lc.body.balanceContractId}/balance`).expect(200);
+      expect(before.body).toMatchObject({ confirmedBalance: '600000', availableBalance: '0' });
+
+      const released = await request(app).post(`/balance-movements/${selected.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
+      expect(released.body.status).toBe('RELEASED');
+
+      const after = await request(app).get(`/balance-contracts/${lc.body.balanceContractId}/balance`).expect(200);
+      expect(after.body).toMatchObject({ confirmedBalance: '500000', availableBalance: '0' });
     });
 
     // Widened 2026-08-27 (business-confirmed) — A6 finalizing a Usance UTILIZE now gets the EXACT SAME

@@ -161,16 +161,20 @@ describe('CheckerActionsService.release() — A3S (documentArrivalWithSg) linked
 
   it('a release() API failure on the resolved SG redemption surfaces its own distinct message', (done) => {
     const linked = [makeMovement({ movementId: 'sg-redeem-6', movementType: 'FULL_REDEEM', businessEventId: 'be-6' })];
+    const cause = { status: 500, error: { code: 'SG_RELEASE_FAILED', message: 'ILLEGAL_STATE_TRANSITION' } };
     const api = makeApi({
       findByBusinessEventId: jest.fn(() => of(linked)),
-      release: jest.fn(() => throwError(() => ({ error: { message: 'ILLEGAL_STATE_TRANSITION' } }))),
+      release: jest.fn(() => throwError(() => cause)),
     });
     const service = new CheckerActionsService(api);
     const ctx = makeContext({ selectedFunction: A3S, selectedCheckerMovement: makeMovement({ businessEventId: 'be-6' }) });
 
     service.release(ctx).subscribe((outcome) => {
       expect(outcome.kind).toBe('failed');
-      if (outcome.kind === 'failed') expect(outcome.message).toContain('Document Arrival NOT acknowledged');
+      if (outcome.kind === 'failed') {
+        expect(outcome.message).toContain('Document Arrival NOT acknowledged');
+        expect(outcome.cause).toBe(cause);
+      }
       done();
     });
   });

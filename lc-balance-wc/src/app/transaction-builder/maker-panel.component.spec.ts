@@ -162,7 +162,9 @@ describe('MakerPanelComponent', () => {
       expect(typeof comp.model.eventSeq).toBe('number');
       expect(comp.naturalKey).toEqual({ lcNumber: '', ibNumber: '', sgNumber: '' });
       expect(comp.catalogPicker.page).toBe(1);
-      expect(comp.catalogPageSize).toBe(100);
+      // Regression: A4's combined LC + IB index must include S02 even when it sorts after more than
+      // 100 retained demo contracts. Display paging remains 10 rows inside CatalogPickerService.
+      expect(comp.catalogPageSize).toBe(200);
       expect(comp.catalogPicker.contracts).toEqual([]);
       expect(comp.selectedContract).toBeNull();
       expect(comp.submitResult).toBeNull();
@@ -1517,6 +1519,28 @@ describe('MakerPanelComponent', () => {
     return comp;
   }
 
+  describe('balanceWarningMessages protected Amount boundary', () => {
+    it('does not call A4\'s carried Document Arrival amount a Typed amount when current Available is zero', () => {
+      const comp = makeComponentB(getFn('A4'), makeApi());
+      comp.selectedContract = makeContract({ balanceContractId: 'C1' });
+      comp.selectedContractSnapshot = makeSnapshot({ availableBalance: '0', tightAvailableBalance: '0' });
+      comp.model.amount = '100000';
+      (comp as any).pickerSelection.selectedPayMovement = makeMovement({ movementId: 'B02', amount: '100000', ceilingAmount: '100000' });
+
+      expect(comp.balanceWarningMessages).toEqual([]);
+    });
+
+    it('continues to warn for a genuinely editable A3 Amount over Available', () => {
+      const comp = makeComponentB(getFn('A3'), makeApi());
+      comp.selectedContract = makeContract({ balanceContractId: 'C1' });
+      comp.selectedContractSnapshot = makeSnapshot({ availableBalance: '0', tightAvailableBalance: '0' });
+      comp.model.amount = '100000';
+
+      expect(comp.balanceWarningMessages).toHaveLength(1);
+      expect(comp.balanceWarningMessages[0]).toContain('Typed amount (100000) exceeds Available Balance');
+    });
+  });
+
   describe('onSelectContract', () => {
     it("loads the picked contract's live snapshot (plain function, no special branches)", () => {
       const api = makeApi({ getSnapshot: jest.fn(() => of(makeSnapshot({ availableBalance: '5000' }))) });
@@ -1964,11 +1988,13 @@ describe('MakerPanelComponent', () => {
       const comp = makeComponentB(getFn('A2'), makeApi());
       comp.selectedContract = makeContract();
       const captured = captureSync(comp);
+      const cause = { status: 500, error: { code: 'RELEASE_FAILED' } };
 
-      comp.externalCheckerOutcome = { kind: 'failed', message: 'boom' };
+      comp.externalCheckerOutcome = { kind: 'failed', message: 'boom', cause };
       comp.ngOnChanges({ externalCheckerOutcome: makeChange(null, comp.externalCheckerOutcome) } as any);
 
       expect(captured).toHaveLength(0);
+      expect(comp.submitErrorCause).toBe(cause);
     });
 
     // Business instruction 2026-08-20 ("除了A1 & B1，其他功能當選取LC NUMBER後 Look Up Current Balance

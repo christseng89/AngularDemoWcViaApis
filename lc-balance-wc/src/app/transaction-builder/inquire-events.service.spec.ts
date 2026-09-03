@@ -1,5 +1,5 @@
 import { Subject, of, throwError } from 'rxjs';
-import { InquireEventsService, InquiredEvent, LcIndexRow, computeLcIndexRow } from './inquire-events.service';
+import { InquireEventsService, InquiredEvent, LcIndexRow, computeLcIndexRow, functionForEvent, mergeAccountingEventRows } from './inquire-events.service';
 import { BalanceComponentApiService, BalanceContract, BalanceMovement, BalanceSnapshot, CatalogPage } from './balance-component-api.service';
 
 /** Mirrors checker-actions.service.spec.ts's own mock-factory convention (no TestBed). */
@@ -277,6 +277,52 @@ describe('InquireEventsService', () => {
       // The 'finalize' row shows the SEPARATE finalizeEventSnapshot, not the (unchanged) eventSnapshot.
       expect(svc.selectedEventTabs.find((t) => t.key === 'LC')!.snapshot).toBe(a4FinalizeSnapshot);
       expect(svc.selectedEventTabs.find((t) => t.key === 'LC')!.impact).toEqual({ before: utilizeMovement.balanceBefore, after: utilizeMovement.balanceAfter });
+    });
+
+    it('identifies both unmerged legs of one documentArrivalWithSg business event as A3S, not standalone A3 and A9', () => {
+      const businessEventId = 'be-a3s-1';
+      const lcEvent: InquiredEvent = {
+        movement: makeMovement({ movementId: 'mv-utilize', movementType: 'UTILIZE', businessEventId }),
+        contract: makeContract({ instrumentType: 'IPLC_LC' }),
+        eventTime: '2026-09-03T00:00:00.000Z',
+        eventStatus: 'PENDING',
+        phase: 'primary',
+      };
+      const sgEvent: InquiredEvent = {
+        movement: makeMovement({ movementId: 'mv-redeem', balanceContractId: 'bc-sg', movementType: 'FULL_REDEEM', businessEventId }),
+        contract: makeContract({ balanceContractId: 'bc-sg', instrumentType: 'SHGT', naturalKey: { lcNumber: 'U01', sgNumber: 'G01' } }),
+        eventTime: '2026-09-03T00:00:00.000Z',
+        eventStatus: 'RELEASED',
+        phase: 'primary',
+      };
+
+      const rows = mergeAccountingEventRows([lcEvent, sgEvent]);
+
+      expect(rows).toHaveLength(2); // two economic legs remain independently visible
+      expect(rows.map((row) => functionForEvent(row)?.code)).toEqual(['A3S', 'A3S']);
+      expect(rows.every((row) => row.functionOverride?.code === 'A3S')).toBe(true);
+    });
+
+    it('does not reclassify unrelated standalone A3 and A9 movements without a shared compound event id', () => {
+      const lcEvent: InquiredEvent = {
+        movement: makeMovement({ movementId: 'mv-utilize', movementType: 'UTILIZE', businessEventId: null }),
+        contract: makeContract({ instrumentType: 'IPLC_LC' }),
+        eventTime: '2026-09-03T00:00:00.000Z',
+        eventStatus: 'PENDING',
+        phase: 'primary',
+      };
+      const sgEvent: InquiredEvent = {
+        movement: makeMovement({ movementId: 'mv-redeem', balanceContractId: 'bc-sg', movementType: 'FULL_REDEEM', businessEventId: null }),
+        contract: makeContract({ balanceContractId: 'bc-sg', instrumentType: 'SHGT', naturalKey: { lcNumber: 'U01', sgNumber: 'G01' } }),
+        eventTime: '2026-09-03T00:00:01.000Z',
+        eventStatus: 'RELEASED',
+        phase: 'primary',
+      };
+
+      const rows = mergeAccountingEventRows([lcEvent, sgEvent]);
+
+      expect(rows.map((row) => functionForEvent(row)?.code)).toEqual(['A3', 'A9']);
+      expect(rows.every((row) => row.functionOverride === undefined)).toBe(true);
     });
 
     /**

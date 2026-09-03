@@ -901,15 +901,21 @@ export function accountingSetLabel(movementType: string | null | undefined): str
  * scope), so a plain movementType-keyed hint is sufficient here without needing the linked movement's own
  * real contract.
  */
-export function accountingSetStatusLabel(movement: { movementType: string | null | undefined; status: string; acknowledgedAt?: string | null } | null | undefined): string {
+export function accountingSetStatusLabel(
+  movement: { movementType: string | null | undefined; status: string; acknowledgedAt?: string | null } | null | undefined,
+  phase: 'primary' | 'create' | 'finalize' | null = null,
+): string {
   if (!movement) return '';
-  return displayStatus(movement.status, movement.movementType === 'UTILIZE' ? 'IPLC_LC' : undefined, movement.movementType, null, movement.acknowledgedAt);
+  return displayStatus(movement.status, movement.movementType === 'UTILIZE' ? 'IPLC_LC' : undefined, movement.movementType, phase, movement.acknowledgedAt);
 }
 
 /** Badge-class counterpart to `accountingSetStatusLabel()` immediately above — same reasoning, same scope. */
-export function accountingSetStatusBadgeClass(movement: { movementType: string | null | undefined; status: string; acknowledgedAt?: string | null } | null | undefined): string {
+export function accountingSetStatusBadgeClass(
+  movement: { movementType: string | null | undefined; status: string; acknowledgedAt?: string | null } | null | undefined,
+  phase: 'primary' | 'create' | 'finalize' | null = null,
+): string {
   if (!movement) return '';
-  return statusBadgeClass(movement.status, movement.movementType === 'UTILIZE' ? 'IPLC_LC' : undefined, movement.movementType, null, movement.acknowledgedAt);
+  return statusBadgeClass(movement.status, movement.movementType === 'UTILIZE' ? 'IPLC_LC' : undefined, movement.movementType, phase, movement.acknowledgedAt);
 }
 
 // payExistingUtilizeFunctionFor() relocated to function-strategy.ts too, same circular-import reason.

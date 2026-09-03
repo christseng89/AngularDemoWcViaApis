@@ -17,7 +17,11 @@ import { EligibilityRule, applyEligibilityRule } from './eligibility-rule';
  * Three differently-sized instances need three `InjectionToken`s. Module-level `const`s, not class
  * members — the `providers` array sits outside the class body, so a class member wouldn't be visible there.
  */
-const CATALOG_PAGE_SIZE = 100;
+// The combined A4 LC + IB index qualifies candidates client-side after loading each LC's Document
+// Arrival movements. Keep the visible picker at 10 rows (CatalogPickerService.DISPLAY_PAGE_SIZE), but
+// fetch the service's established aggregate ceiling so valid LCs beyond the first 100 are not silently
+// omitted. A dedicated server-side eligible-index endpoint is the next step if the demo exceeds 200 LCs.
+const CATALOG_PAGE_SIZE = 200;
 const PARENT_PAGE_SIZE = 100;
 const IB_INDEX_PAGE_SIZE = 100;
 const CATALOG_PICKER = new InjectionToken<CatalogPickerService>('MakerPanelComponent.catalogPicker');
@@ -35,7 +39,7 @@ import {
   formatCurrencyAmount,
   groupThousands,
 } from './balance-component.model';
-import { BuilderFieldsContext, buildFields, isFixPendingFieldEditable, reconstructOriginalModel, toReadOnlyFields } from './builder-fields';
+import { BuilderFieldsContext, buildFields, isAmountFieldProtected, isFixPendingFieldEditable, reconstructOriginalModel, toReadOnlyFields } from './builder-fields';
 import {
   SubmitRulesContext,
   buildSubmitRequest as buildSubmitRequestRules,
@@ -380,6 +384,7 @@ export class MakerPanelComponent implements OnChanges {
     const usesDocumentArrivalWithSg = !!this.selectedFunctionStrategy?.compoundSubmission.possibleShapes.includes('documentArrivalWithSg');
     return deriveMakerBalanceWarnings({
       formLocked: this.formLocked,
+      amountProtected: isAmountFieldProtected(this.buildFieldsContext()),
       amount: this.model.amount,
       movementType: this.model.movementType,
       availableBalance: snapshot.availableBalance,
@@ -1843,7 +1848,7 @@ export class MakerPanelComponent implements OnChanges {
   private applyCheckerOutcome(outcome: CheckerActionOutcome): void {
     if (outcome.kind === 'failed') {
       this.submitError = outcome.message;
-      this.submitErrorCause = null;
+      this.submitErrorCause = outcome.cause ?? null;
       this.emitContext();
       return;
     }

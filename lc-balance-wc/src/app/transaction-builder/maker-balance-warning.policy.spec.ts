@@ -2,6 +2,7 @@ import { MakerBalanceWarningState, deriveMakerBalanceWarnings } from './maker-ba
 
 const state: MakerBalanceWarningState = {
   formLocked: false,
+  amountProtected: false,
   amount: '90',
   movementType: 'UTILIZE',
   availableBalance: '100',
@@ -20,6 +21,82 @@ describe('deriveMakerBalanceWarnings', () => {
     expect(deriveMakerBalanceWarnings({ ...state, amount: '' })).toEqual([]);
     expect(deriveMakerBalanceWarnings({ ...state, formLocked: true })).toEqual([]);
     expect(deriveMakerBalanceWarnings({ ...state, amount: '70' })).toEqual([]);
+  });
+
+  it('never applies a Typed amount warning to a protected carried amount', () => {
+    expect(
+      deriveMakerBalanceWarnings({
+        ...state,
+        amountProtected: true,
+        amount: '100000',
+        availableBalance: '0',
+        tightAvailableBalance: '0',
+      }),
+    ).toEqual([]);
+  });
+
+  it.each([
+    ['500k', '1100000'],
+    ['5K', '6000'],
+    ['20.5h', '3000'],
+    ['3h2h', '600'],
+    ['1m2k3h', '1002300'],
+  ])('uses the shared h/k/m parser before comparing %s with Tight Available', (amount, tightAvailableBalance) => {
+    expect(
+      deriveMakerBalanceWarnings({
+        ...state,
+        amount,
+        availableBalance: tightAvailableBalance,
+        tightAvailableBalance,
+      }),
+    ).toEqual([]);
+  });
+
+  it.each([
+    ['A1', 'ISSUE', false, false],
+    ['A2 Increase', 'AMEND_INCREASE', false, false],
+    ['A2 Decrease', 'AMEND_DECREASE', true, true],
+    ['A3', 'UTILIZE', true, true],
+    ['A3S', 'UTILIZE', true, true],
+    ['A4', 'UTILIZE', true, true],
+    ['A6', 'CREATE', false, false],
+    ['A7', 'PARTIAL_SETTLE', false, false],
+    ['A8', 'ISSUE', false, true],
+    ['A9', 'FULL_REDEEM', false, false],
+    ['A10', 'CLOSE', false, false],
+    ['A11', 'REOPEN', false, false],
+    ['B1', 'ISSUE', false, false],
+    ['B2 Increase', 'AMEND', false, false],
+    ['B2 Decrease', 'AMEND', true, true],
+    ['B3', 'CREATE', false, true],
+    ['B4 Sight', 'HONOUR', true, true],
+    ['B4 Usance', 'ACCEPT', true, true],
+    ['B5', 'FULL_SETTLE', false, false],
+    ['B6', 'CLOSE', false, false],
+    ['B7', 'REOPEN', false, false],
+  ])('%s does not misreport 500k against 1,100,000', (_functionCode, movementType, checksAgainstPlainAvailable, checksAgainstTightAvailable) => {
+    expect(
+      deriveMakerBalanceWarnings({
+        ...state,
+        amount: '500k',
+        movementType,
+        availableBalance: '1100000',
+        tightAvailableBalance: '1100000',
+        checksAgainstPlainAvailable,
+        checksAgainstTightAvailable,
+      }),
+    ).toEqual([]);
+  });
+
+  it('warns when a normalized shorthand amount really exceeds capacity', () => {
+    const warnings = deriveMakerBalanceWarnings({ ...state, amount: '2m', availableBalance: '1100000', tightAvailableBalance: '1100000' });
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('Typed amount (2m) exceeds Available Balance');
+  });
+
+  it('leaves invalid shorthand to the Amount validator instead of showing a false Balance warning', () => {
+    expect(deriveMakerBalanceWarnings({ ...state, amount: '1t' })).toEqual([]);
+    expect(deriveMakerBalanceWarnings({ ...state, amount: 'not-an-amount' })).toEqual([]);
   });
 
   it('gives the plain Available warning precedence when both ceilings are exceeded', () => {

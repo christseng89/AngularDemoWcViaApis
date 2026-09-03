@@ -249,7 +249,10 @@ function validateFunctionSpecificRules(
   // `model` is the same object the Formly form renders, so patching it would flip the visible Amount
   // negative right after Submit. The sign transform happens in buildSubmitRequest() instead, purely for
   // the outgoing wire request — `model.amount` always stays what the Maker typed.
-  if (selectedFunction?.subChoice?.key === 'amendDirection' && !ctx.amendDirection) {
+  // B2's Expiry Date option deliberately overrides the ordinary AMEND movement with
+  // AMEND_EXPIRY_DATE. It has no Increase/Decrease direction, so applying B2's direction guard to
+  // that distinct operation would leave an otherwise-valid form permanently disabled.
+  if (selectedFunction?.subChoice?.key === 'amendDirection' && model.movementType !== 'AMEND_EXPIRY_DATE' && !ctx.amendDirection) {
     return 'Pick Increase or Decrease for this Amendment.';
   }
   return null;

@@ -777,9 +777,10 @@
                  actually reached the DOM, since this whole block was still gated off for A4 — found live
                  ("A4 沒抓到2ndary number" turned out to be this, not a data problem: `model.secondaryRef`/
                  `model.amount`/`model.currency` were all already correct, the FORM itself just never
-                 rendered). Pulled out of the exclusion; the generic SUBMIT button and Fix Pending/Delete
-                 Pending action buttons below stay excluded for A4 — those still route through `submit()`/
-                 `confirmFixPending()`, never `submitA4()`. -->
+                 rendered). Pulled out of the exclusion. In ordinary workflow A4 still uses its dedicated
+                 `submitA4()` action rather than generic `submit()`; once Fix Pending or Delete Pending review
+                 is active, workflow mode takes priority and the shared action bar replaces Submit A4 with
+                 the applicable Save/Confirm + Cancel actions. -->
       <!-- "Transaction Selection and Navigation Flow" rule (business-directed) — the Transaction Input
                  Screen (this form) must not render until a Transaction/Event has actually been selected;
                  before that, only the Selection Screen (the pickers above) should show. Real gap found live
