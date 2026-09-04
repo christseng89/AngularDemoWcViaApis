@@ -16,6 +16,11 @@ Balance Component HTTP API SHALL 只提供目前 OpenAPI contract 記載的 requ
 - **THEN** API SHALL 回傳已記載的 non-success status 與 structured error body
 - **AND** SHALL NOT 洩漏 SQL、stack trace 或內部 filesystem path
 
+#### Scenario: 有效 Request
+
+- **WHEN** 呼叫端 Submit 符合目前 OAS 與 domain rules 的 request
+- **THEN** API SHALL 回傳已記載的 success status 與 response shape
+
 ### Requirement: Compound Commands 原子性
 
 Compound creation、release 與 mixed action endpoints SHALL 原子執行整組 commands。
@@ -24,6 +29,11 @@ Compound creation、release 與 mixed action endpoints SHALL 原子執行整組 
 
 - **WHEN** Compound Request 的第二個 Action 驗證失敗
 - **THEN** 第一個 Action SHALL NOT 保持已提交
+
+#### Scenario: 所有 Actions 有效
+
+- **WHEN** Compound Request 的全部 Actions 均通過驗證與 persistence
+- **THEN** 全部 Actions SHALL 在同一 transaction 提交
 
 ### Requirement: Eligibility Query 僅供提示
 
@@ -34,6 +44,11 @@ Catalog、close-eligible 與 reopen-eligible endpoints SHALL 協助 UI 選取候
 - **WHEN** 所選 contract 在 query 後變得不合資格
 - **THEN** 後續 command SHALL 依目前狀態被拒絕
 
+#### Scenario: Candidate 維持合資格
+
+- **WHEN** UI 選取 candidate 後，其 command-time 狀態仍符合 eligibility
+- **THEN** 服務 SHALL 以目前資料完成權威驗證後才接受 command
+
 ### Requirement: 查詢包含關聯 Ledgers
 
 Inquire Events SHALL 回傳 root contract 的相關 child-ledger events，包括 A3S 與 memo-only B3 events，並依 event date／time 排序。
@@ -42,6 +57,12 @@ Inquire Events SHALL 回傳 root contract 的相關 child-ledger events，包括
 
 - **WHEN** 使用者查詢包含 A3S business event 的 Import LC
 - **THEN** Event History SHALL 可找到相關 LC 與 Shipping Guarantee legs
+
+#### Scenario: 含 B3 的 Export Confirmation
+
+- **WHEN** 使用者查詢包含 B3 Presentation 的 Export Confirmation
+- **THEN** Event History SHALL 包含 memo-only B3 event 及其相關 root-ledger context
+- **AND** events SHALL 依 event date／time 排序
 
 ### Requirement: Empty State 與錯誤分離
 

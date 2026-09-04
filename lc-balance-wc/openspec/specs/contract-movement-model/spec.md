@@ -16,6 +16,11 @@
 - **THEN** 系統 SHALL 依 movement contract 解析既有邏輯合約或拒絕重複資料
 - **AND** SHALL NOT 靜默建立第二筆相同身分的邏輯合約
 
+#### Scenario: 不同 Secondary Reference
+
+- **WHEN** 相同 LC Number 依 instrument 規則搭配不同 IB Number 或 SG Number
+- **THEN** 系統 SHALL 依完整 configured natural key 解析其正確 logical contract identity
+
 ### Requirement: 事件帳本不可變性
 
 系統 SHALL 將每筆接受的業務 movement 記錄成關聯邏輯合約的事件，並保存事件發生時的 snapshot 與 voucher 事實。
@@ -24,6 +29,12 @@
 
 - **WHEN** 後續 movements 改變目前餘額或 Account Mapping
 - **THEN** 先前事件已保存的 snapshot 與 voucher SHALL 維持歷史事實
+
+#### Scenario: Movement 被 Reject 或 Delete
+
+- **WHEN** 後續 workflow action Reject 或 Delete 一筆未完成 movement
+- **THEN** 系統 SHALL 以狀態及 audit facts 表達結果
+- **AND** SHALL NOT 重寫較早事件的 snapshot
 
 ### Requirement: Movement 冪等身分
 
@@ -35,6 +46,12 @@
 - **THEN** 系統 SHALL 回傳既有結果或穩定的重複錯誤
 - **AND** SHALL NOT 重複套用餘額效果
 
+#### Scenario: 不同 Contract Context 使用相同 Event Seq
+
+- **WHEN** 兩個不同 logical contract contexts 收到相同 Event Seq
+- **THEN** 冪等判定 SHALL 包含 contract context
+- **AND** SHALL NOT 將其中一個 contract 的 movement 誤認為另一個
+
 ### Requirement: 狀態分離
 
 系統 SHALL 將合約 lifecycle status、movement workflow status、accounting payload status 與 audit history 維持為不同概念。
@@ -43,6 +60,12 @@
 
 - **WHEN** Maker 對 ACTIVE 合約送出 movement
 - **THEN** movement MAY 為 PENDING，而合約仍維持 ACTIVE
+
+#### Scenario: Workflow 完成不等於外部入帳完成
+
+- **WHEN** movement workflow status 成為 APPROVED
+- **THEN** accounting payload status 與 external posting evidence SHALL 仍按各自事實保存
+- **AND** SHALL NOT 由 APPROVED 自動推定外部 ledger 已完成
 
 ## 來源追蹤
 

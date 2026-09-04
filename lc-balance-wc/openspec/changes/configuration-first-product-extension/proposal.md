@@ -20,7 +20,7 @@
 
 ### Modified Capabilities
 
-- 無。既有 Import LC 與 Export Confirmed 行為已由 Characterization 固定，在明確 implementation change 修改前必須保持不變。
+- 無。既有 Import LC 與 Export Confirmed 行為已有 repository root `REGRESSION-BASELINE.md` 的日期化回歸證據；本 Change 的 task 1.1 將再把每個流程提升為可自動執行、failing-first 的 Characterization Tests。在明確 implementation change 修改前，既有行為必須保持不變。
 
 ## Impact
 

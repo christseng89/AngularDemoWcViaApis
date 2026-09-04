@@ -63,8 +63,10 @@
 - 每项规范性 Requirement 必须使用 SHALL／MUST，并至少包含一个可测试的 WHEN／THEN scenario；金额、状态、权限或边界规则还必须包含适用的拒绝／边界 scenario。
 - 验证必须覆盖受影响的 Angular、API、Domain、DB、Maker／Checker、accounting、Business Case Runner、OAS、Obsidian 与 OpenSpec。不得只验证 UI，也不得以改写 spec 或 expected result 掩盖缺陷。
 - OpenSpec 与较高权威来源冲突时，依本文件的“权威来源顺序”处理，记录冲突并同步修正；不得让未经验证的 spec 静默覆盖业务决策或 OAS。
-- Archive 前必须逐项对照 implementation、测试结果与 delta scenarios；只有全部完成、验证通过且 current specs 已同步，才可归档。
-- OpenSpec CLI 严格验证命令为 `openspec validate --all --strict --no-interactive`。Claude Code 使用 `/opsx:*` workflows；Codex 使用 `$openspec-*` skills。
+- Archive 前必须逐项对照 implementation、测试结果与 delta scenarios；只有 implementation、全部 tasks、artifacts 与受影响验证均完成，且 strict validation 通过，才可执行 `openspec archive <change-name> --yes`。不得建立空 change 或把未完成 change 归档来伪造 archive evidence。
+- Archive 命令必须让 delta specs 合并到 current specs，并把完整 change 保存在 `openspec/changes/archive/YYYY-MM-DD-<change-name>/`；归档后必须再次执行 strict validation、确认 current specs 已同步，并保留 proposal、design、tasks、delta specs 与验证证据作为 audit trail。
+- 本项目 OpenSpec artifacts 与生成的 `/opsx:*`、`$openspec-*` workflows 固定使用官方 `@fission-ai/openspec@1.12.0`。新环境必须执行 `npm install --global @fission-ai/openspec@1.12.0`，并以 `openspec --version` 确认输出 `1.12.0`；不得安装 npm 上无关的 `openspec` placeholder package。
+- OpenSpec CLI 严格验证命令为 `openspec validate --all --strict --no-interactive`。Claude Code 使用 `/opsx:*` workflows；Codex 使用 `$openspec-*` skills。CI／新贡献者环境必须先完成上述版本检查，不能依赖未记录的机器全局状态。
 
 ## 目录级规则
 

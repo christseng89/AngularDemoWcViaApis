@@ -17,6 +17,7 @@ rules:
   specs:
     - 每項規範性要求必須使用 SHALL 或 MUST。
     - 每項 Requirement 至少要有一個可測試的 WHEN／THEN Scenario；適用時必須加入拒絕或邊界情境。
+    - 金額、餘額、狀態轉換、權限、冪等、原子性或外部契約等高風險 Requirement，至少必須同時包含一個成功 Scenario 與一個最重要的拒絕／邊界 Scenario；若確實不適用，必須在審查證據中說明原因。
     - 受影響時必須明確說明 Maker／Checker、金額、帳務、審計、冪等與交易邊界效果。
     - 實作細節放在 design；specs 只定義可觀察契約。
   design:
@@ -33,5 +34,8 @@ operations:
       - 保留工作樹內無關修改，不得直接修改 generated files。
   archive:
     guidance:
+      - 只有 implementation、全部 tasks、受影響測試與 artifacts 均完成的 change 才可歸檔；不得以空 change 或假完成 change 測試 archive 目錄。
       - delta specs 合併至 current specs 前，必須逐項用 Scenario 驗證實作。
       - 未解決缺口必須記錄，不得降低 Requirement 來迎合缺陷。
+      - 歸檔前必須執行 strict validation 並檢查 delta 與 current specs 的衝突；使用 `openspec archive <change-name> --yes` 合併 delta 並移入 `changes/archive/YYYY-MM-DD-<change-name>/`。
+      - 歸檔後必須再次執行 strict validation、確認 current specs 已同步，並保留完整 proposal、design、tasks、delta specs 與驗證證據作為 audit trail。

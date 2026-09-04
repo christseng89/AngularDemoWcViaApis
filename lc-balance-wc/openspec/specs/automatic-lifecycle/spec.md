@@ -17,6 +17,12 @@ Auto Expiry job SHALL 對合資格的 ACTIVE Import LC 或 Export Confirmation �
 - **AND** Confirmed Balance SHALL 成為零
 - **AND** status SHALL 成為 EXPIRED
 
+#### Scenario: Contract 尚未到期
+
+- **WHEN** Expiry sweep 掃描到 Expiry Date 仍在未來的 ACTIVE root contract
+- **THEN** SHALL NOT 建立 EXPIRE movement
+- **AND** contract SHALL 維持 ACTIVE
+
 ### Requirement: Expiry Eligibility
 
 Root event tree 含有不合資格 open movement 時，Auto Expiry SHALL NOT 執行。
@@ -25,6 +31,11 @@ Root event tree 含有不合資格 open movement 時，Auto Expiry SHALL NOT 執
 
 - **WHEN** 其他條件已到期的 contract 仍有 pending movement
 - **THEN** Expiry job SHALL 在該次 sweep 保持其不變
+
+#### Scenario: Open Movement 已完成
+
+- **WHEN** 到期 contract 的 event tree 已不存在阻擋 Expiry 的 open movement
+- **THEN** Expiry job SHALL 重新依目前狀態判定其 eligibility
 
 ### Requirement: Auto Close
 
@@ -35,6 +46,11 @@ Auto Close job SHALL 在配置的 business-day grace period 後關閉合資格 E
 - **WHEN** 合資格 EXPIRED contract 的 Confirmed Balance 為零
 - **THEN** Auto Close SHALL 將其轉為 CLOSED，且不建立 placeholder zero-value voucher
 
+#### Scenario: Grace Period 尚未結束
+
+- **WHEN** EXPIRED contract 尚未超過配置的 business-day grace period
+- **THEN** Auto Close SHALL NOT 提前將其轉為 CLOSED
+
 ### Requirement: EXPIRED Contract 延長 Expiry Date
 
 針對 EXPIRED contract 核准的 Expiry Date Amendment SHALL 反轉被引用 EXPIRE 的餘額效果，並按新 Expiry Date 恢復 contract。
@@ -44,6 +60,12 @@ Auto Close job SHALL 在配置的 business-day grace period 後關閉合資格 E
 - **WHEN** Checker Release 新日期在未來的合資格 Expiry Extension
 - **THEN** 已沖減金額 SHALL 恢復
 - **AND** contract SHALL 成為 ACTIVE
+
+#### Scenario: Expiry Extension 不合資格
+
+- **WHEN** EXPIRED contract 含有阻擋 Amendment 的 open movement 或引用的 EXPIRE 已不符合 restoration 條件
+- **THEN** 服務 SHALL 拒絕 Release
+- **AND** 原 EXPIRE balance effect 與 contract status SHALL 維持不變
 
 ## 來源追蹤
 
