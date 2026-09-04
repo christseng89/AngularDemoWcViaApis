@@ -2,18 +2,15 @@
   <header class="account-maintenance__header">
     <div>
       <h1>Balance Account Number Maintenance</h1>
-      <p>Maintain the two-account set used by each product and risk class. Transaction direction determines Dr/Cr automatically.</p>
+      <p>Maintain GL account pairs by business family and its configured Tenor sub-ledgers.</p>
     </div>
-    @if (!selectedMapping()) {
-      <button type="button" class="secondary-button" (click)="reload()" [disabled]="loading()">Reload</button>
+    @if (!selectedFamily()) {
+      <button type="button" class="secondary-button" (click)="reloadConfiguration()" [disabled]="loading()" title="Immediately overwrite database mappings from configuration">Reload</button>
     }
   </header>
 
   <section class="maintenance-toolbar" aria-label="Maintenance settings">
-    <label>
-      Updated By
-      <input [ngModel]="updatedBy()" (ngModelChange)="updatedBy.set($event)" maxlength="64" />
-    </label>
+    <label>Updated By <input [ngModel]="updatedBy()" (ngModelChange)="updatedBy.set($event)" maxlength="64" /></label>
     <div class="validation-rule">
       <strong>Account Number rule</strong>
       @if (fixedLength(); as length) { Exactly {{ length }} characters } @else { {{ validation().minLength }}–{{ validation().maxLength }} characters }
@@ -21,103 +18,153 @@
     </div>
   </section>
 
+  @if (reloadMessage()) {
+    <p class="state-message state-message--success" aria-live="polite">{{ reloadMessage() }}</p>
+  }
+
   @if (loading()) {
-    <p class="state-message" aria-live="polite">Loading account sets…</p>
+    <p class="state-message" aria-live="polite">Loading account families…</p>
   } @else if (loadError()) {
     <div class="state-message state-message--error" role="alert">{{ loadError() }}</div>
-  } @else if (selectedMapping(); as mapping) {
-    <section class="mapping-detail" aria-labelledby="mapping-detail-title">
-      <button type="button" class="secondary-button back-button" (click)="backToIndex()" [disabled]="savingKeys().has(mapping.mappingKey)">
-        ← Back to Account Set Index
-      </button>
-      <section class="mapping-card">
+  } @else {
+    <nav class="category-tabs" aria-label="Balance business category">
+      @for (category of categories(); track category.categoryKey) {
+        <button
+          type="button"
+          role="tab"
+          [class.category-tabs__tab--active]="activeCategoryKey() === category.categoryKey"
+          [attr.aria-selected]="activeCategoryKey() === category.categoryKey"
+          (click)="selectCategory(category.categoryKey)"
+        >{{ category.label }}</button>
+      }
+    </nav>
+
+    @if (selectedFamily(); as family) {
+      <section class="mapping-detail" aria-labelledby="mapping-detail-title">
+        <button type="button" class="secondary-button back-button" (click)="backToIndex()" [disabled]="savingFamilyKey() === family.familyKey">
+          ← Back to GL Family Index
+        </button>
+        <section class="mapping-card">
           <header>
-            <div><strong id="mapping-detail-title">{{ mapping.instrumentType }}</strong><span>{{ mapping.riskClass }}</span></div>
-            <small>Version {{ mapping.version }} · {{ mapping.updatedBy }}</small>
+            <div>
+              <small>{{ activeCategory()?.label }}</small>
+              <strong id="mapping-detail-title">{{ family.label }}</strong>
+            </div>
+            <span class="family-code">{{ family.instrumentType }}</span>
           </header>
-          <div class="account-grid">
+
+          <div class="account-grid account-grid--gl-first">
             @for (side of accountSides; track side) {
-              <fieldset>
-                <legend>{{ accountSideLabels[side] }}</legend>
-                <label>
-                  Account Number
-                  <input
-                    [value]="mapping[side].accountNumber"
-                    (input)="updateField(mapping.mappingKey, side, 'accountNumber', $any($event.target).value)"
-                    [minLength]="validation().minLength"
-                    [maxLength]="validation().maxLength"
-                    [attr.pattern]="validation().pattern"
-                    [readOnly]="!isEditing(mapping.mappingKey)"
-                    required
-                  />
-                </label>
-                <label>
-                  Account Description
-                  <input
-                    [value]="mapping[side].accountDescription"
-                    (input)="updateField(mapping.mappingKey, side, 'accountDescription', $any($event.target).value)"
-                    maxlength="200"
-                    [readOnly]="!isEditing(mapping.mappingKey)"
-                    required
-                  />
-                </label>
-              </fieldset>
+              <section class="gl-card">
+                <section class="subledger-card gl-card__fields">
+                  <header><span class="gl-card__title">GL — {{ accountSideLabels[side] }}</span></header>
+                  <label>
+                    GL Account Number
+                    <input
+                      [value]="glValue(side, 'accountNumber')"
+                      (input)="updateGlField(side, 'accountNumber', $any($event.target).value)"
+                      [minLength]="validation().minLength"
+                      [maxLength]="validation().maxLength"
+                      [attr.pattern]="validation().pattern"
+                      [readOnly]="!isEditing(family.familyKey)"
+                      required
+                    />
+                  </label>
+                  <label>
+                    GL Account Description
+                    <input
+                      [value]="glValue(side, 'accountDescription')"
+                      (input)="updateGlField(side, 'accountDescription', $any($event.target).value)"
+                      maxlength="200"
+                      [readOnly]="!isEditing(family.familyKey)"
+                      required
+                    />
+                  </label>
+                </section>
+                <div class="gl-card__subledgers">
+                  @for (mapping of family.mappings; track mapping.mappingKey) {
+                    <section class="subledger-card">
+                      <header>
+                        <div>
+                          <span class="subledger-label">SL — {{ mapping.tenorLabel }}</span>
+                          <span class="risk-badge">{{ mapping.tenorKey }}</span>
+                        </div>
+                        <small>Version {{ mapping.version }} · {{ mapping.updatedBy }}</small>
+                      </header>
+                      <label>
+                        SL Account Number
+                        <input
+                          [value]="slValue(mapping, side, 'accountNumber')"
+                          (input)="updateSlField(mapping, side, 'accountNumber', $any($event.target).value)"
+                          [minLength]="validation().minLength"
+                          [maxLength]="validation().maxLength"
+                          [attr.pattern]="validation().pattern"
+                          [readOnly]="!isEditing(family.familyKey)"
+                          required
+                        />
+                      </label>
+                      <label>
+                        SL Account Description
+                        <input
+                          [value]="slValue(mapping, side, 'accountDescription')"
+                          (input)="updateSlField(mapping, side, 'accountDescription', $any($event.target).value)"
+                          maxlength="200"
+                          [readOnly]="!isEditing(family.familyKey)"
+                          required
+                        />
+                      </label>
+                    </section>
+                  }
+                </div>
+                <small class="composition-note">Saved Account Number and Description = GL + SL.</small>
+              </section>
             }
           </div>
+
           <footer>
             <div class="mapping-actions">
-              @if (!isEditing(mapping.mappingKey)) {
-                <button type="button" class="secondary-button" (click)="beginEdit(mapping.mappingKey)">Edit</button>
+              @if (!isEditing(family.familyKey)) {
+                <button type="button" class="secondary-button" (click)="beginEdit(family.familyKey)">Edit Family</button>
               } @else {
-                @if (isDirty(mapping)) {
-                  <button type="button" class="primary-button" (click)="save(mapping)" [disabled]="savingKeys().has(mapping.mappingKey)">
-                    {{ savingKeys().has(mapping.mappingKey) ? 'Saving…' : 'Save Account Set' }}
+                @if (isFamilyDirty(family)) {
+                  <button type="button" class="primary-button" (click)="save(family)" [disabled]="savingFamilyKey() === family.familyKey">
+                    {{ savingFamilyKey() === family.familyKey ? 'Saving…' : 'Save GL Family' }}
                   </button>
                 }
-                <button type="button" class="secondary-button" (click)="cancelEdit(mapping.mappingKey)" [disabled]="savingKeys().has(mapping.mappingKey)">
-                  Cancel
-                </button>
+                <button type="button" class="secondary-button" (click)="cancelEdit(family.familyKey)" [disabled]="savingFamilyKey() === family.familyKey">Cancel</button>
               }
             </div>
-            @if (rowMessages()[mapping.mappingKey]; as message) {
+            @if (familyMessages()[family.familyKey]; as message) {
               <span [class.success-message]="message.kind === 'success'" [class.error-message]="message.kind === 'error'" aria-live="polite">{{ message.text }}</span>
             }
           </footer>
+        </section>
       </section>
-    </section>
-  } @else {
-    <section class="mapping-index" aria-labelledby="mapping-index-title">
-      <header class="mapping-index__header">
-        <div>
-          <h2 id="mapping-index-title">Account Set Index</h2>
-          <p>Select one product and risk class to view or maintain its account pair.</p>
+    } @else if (activeCategory(); as category) {
+      <section class="mapping-index" aria-labelledby="mapping-index-title">
+        <header class="mapping-index__header">
+          <div><h2 id="mapping-index-title">{{ category.label }}</h2><p>Select a GL family to maintain its configured Tenor sub-ledgers.</p></div>
+          <label class="mapping-search">Search GL Families
+            <input type="search" [ngModel]="searchQuery()" (ngModelChange)="searchQuery.set($event)" placeholder="Family, Tenor, account or updater" />
+          </label>
+        </header>
+        <div class="mapping-index__columns" aria-hidden="true">
+          <span>GL Balance Family</span><span>Tenor Sub-ledgers</span><span>Versions</span><span>Updated By</span><span></span>
         </div>
-        <label class="mapping-search">
-          Search Account Sets
-          <input
-            type="search"
-            [ngModel]="searchQuery()"
-            (ngModelChange)="searchQuery.set($event)"
-            placeholder="Product, risk class, account or updater"
-          />
-        </label>
-      </header>
-      <div class="mapping-index__columns" aria-hidden="true">
-        <span>Product</span><span>Risk Class</span><span>Version</span><span>Updated By</span><span></span>
-      </div>
-      <div class="mapping-index__list">
-        @for (mapping of filteredMappings(); track mapping.mappingKey) {
-          <button type="button" class="mapping-index__row" (click)="viewMapping(mapping.mappingKey)" [attr.aria-label]="'View ' + mapping.instrumentType + ' ' + mapping.riskClass">
-            <strong>{{ mapping.instrumentType }}</strong>
-            <span class="risk-badge">{{ mapping.riskClass }}</span>
-            <span>{{ mapping.version }}</span>
-            <span>{{ mapping.updatedBy }}</span>
-            <span class="view-label">View →</span>
-          </button>
-        } @empty {
-          <p class="state-message">No account sets match “{{ searchQuery() }}”.</p>
-        }
-      </div>
-    </section>
+        <div class="mapping-index__list">
+          @for (family of filteredFamilies(); track family.familyKey) {
+            <button type="button" class="mapping-index__row" (click)="viewFamily(family.familyKey)" [attr.aria-label]="'View ' + family.label">
+              <strong>{{ family.label }}</strong>
+              <span class="tenor-badges">@for (mapping of family.mappings; track mapping.mappingKey) { <span class="risk-badge">{{ mapping.tenorLabel }}</span> }</span>
+              <span>{{ family.mappings.length }} SL</span>
+              <span>{{ family.mappings[0]?.updatedBy ?? '—' }}</span>
+              <span class="view-label">View →</span>
+            </button>
+          } @empty {
+            <p class="state-message">No GL families match “{{ searchQuery() }}”.</p>
+          }
+        </div>
+      </section>
+    }
   }
 </main>

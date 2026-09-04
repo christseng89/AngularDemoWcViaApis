@@ -6,7 +6,7 @@ Web Component現況：Angular source由 `<balance-component-app>`重用，具 ve
 Shadow DOM、instance-local theme、Angular/React/Vue薄 adapters及可驗證 package。權威導覽為
 [web-component.md](web-component.md)。Phase 1–6不改 HTTP contract、認證或 Balance business rules。
 
-Balance Account Number 是獨立 Angular 與 WC 的第一個 view。11 組固定 Product／Risk Class 路由各自維護 Account A/B；SQLite 為執行期真實來源，JSON 只 seed 空資料庫。新 movement 將當時的科目號、說明與 mapping version 寫入 immutable `contingentAccountEntry`，後續配置變更不追溯歷史 voucher。格式由 `.env` regex 與 min/max length 控制，MIN=MAX 代表固定長度。詳見 [Balance Account Number 維護與 API](balance-account-number-maintenance.md)。
+Balance Account Number 是獨立 Angular 與 WC 的第一個 view。第一層沿用交易畫面的 `Import LC`／`Export Confirmed`，再按配置顯示五個現行 Business Type／GL family 及其 Tenor SL。Import 有 Sight、Seller's Usance、Buyer's Usance；Export 有 Sight、Usance，共五個 category-scoped Tenor 身分。JSON 是 category/family/SL、seed 及由目前 DB 匯出的 11 組 default account identities 的唯一配置來源；SQLite 保存維護值和版本，啟動時只補新增 mapping、不覆蓋既有值。family save 以 optimistic version 在單一 transaction 更新全部 configured SL。Maintenance `Reload` 會立即以配置 defaults 原子覆寫 DB 並把 version 重設為 1；Cleanup Database 不處理 mappings。新 movement 將當時科目號、說明與 mapping version 寫入 immutable `contingentAccountEntry`，配置變更不追溯舊 voucher。詳見 [Balance Account Number 維護與 API](balance-account-number-maintenance.md)；所有 runtime、`.env`、proxy、calendar 與生成設定集中於 [Configuration Reference](configuration.md)。
 
 ## Business lifecycle
 

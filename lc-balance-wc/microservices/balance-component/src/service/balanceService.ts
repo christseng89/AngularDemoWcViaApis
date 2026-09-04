@@ -9,7 +9,6 @@ import { DeletePendingAuditStore } from '../store/deletePendingAuditStore';
 import { FixPendingAuditStore } from '../store/fixPendingAuditStore';
 import { applyStatusTransition, assertMakerCheckerSeparation } from '../domain/statusTransition';
 import { deriveContingentAccountEntry } from '../domain/contingentAccountEntry';
-import { mappingKeyFor } from '../domain/balanceAccountMapping';
 import { BalanceAccountMappingService } from './balanceAccountMappingService';
 import { computeCeilingAmount, computeMonetaryAmendment, computeResultingTolerancePct, MONETARY_AMENDMENT_TYPES, type ToleranceChangeDirection } from '../domain/tolerance';
 import { computeAvailableBalance, computeConfirmedBalance, computeFaceAmount, computePendingDecreaseTotal, MOVEMENT_DIRECTION } from '../domain/balanceDerivation';
@@ -1411,8 +1410,7 @@ export class BalanceService {
   }
 
   private accountMappingFor(contract: BalanceContract, overrideTenor?: TenorType | null) {
-    const key = mappingKeyFor(contract.instrumentType, this.accountingTenorFor(contract, overrideTenor));
-    return key ? (this.accountMappings.findByKey(key) ?? null) : null;
+    return this.accountMappings.findFor(contract.instrumentType, this.accountingTenorFor(contract, overrideTenor)) ?? null;
   }
 
   private guardSecondaryAction(

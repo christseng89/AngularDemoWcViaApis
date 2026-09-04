@@ -17,6 +17,30 @@ info:
     the discrepancy inline.
 
 
+    v1.51.0 (2026-09-04, Account Number configuration reload):
+    `POST /balance-account-mappings/reload-configuration` atomically overwrites
+    every configured Account Number mapping with the defaults in
+    `balance-account-mappings.json`. All rows reset to version 1 with actor
+    `SYSTEM_CONFIG_RELOAD`; any write failure rolls back the complete set. The
+    Angular Reload button invokes this operation immediately and then renders
+    its response. `POST /admin/reset-database` remains transaction-data-only
+    and preserves maintained Account Number mappings.
+
+
+    v1.50.0 (2026-09-04, configurable Account Number Maintenance hierarchy):
+    `GET /balance-account-mappings` now returns configuration-defined business
+    categories, GL families and category-scoped Tenor SL metadata as well as the
+    flat compatibility list. `PUT /balance-account-mappings/families/{familyKey}`
+    atomically saves every configured Tenor SL row in one family. The Angular
+    detail view presents the same persisted Account A/Account B pair GL-first
+    (Contingent Liability, Liability), with configured Tenor SL rows nested under
+    each GL. Angular derives the default GL portion from the existing Sight value
+    with Sight removed, while SL Number/Description default from that row's
+    configured Tenor Type; it composes GL + SL back into the existing account
+    fields before PUT. This presentation change does not introduce separate GL/SL columns
+    or alter movement posting, snapshot, or voucher contracts.
+
+
     v1.49.0 (2026-09-03, Expiry Extension retry restoration): the EXPIRED-only
     restoration basis is the latest RELEASED movement, not the latest audit row of any
     status. CANCELLED/REJECTED Expiry Date attempts therefore cannot hide the RELEASED
@@ -84,8 +108,10 @@ info:
 
 
     v1.45.0 (2026-09-02, Balance Account Number maintenance): adds the
-    database-backed GET/PUT `/balance-account-mappings` API. Each fixed
-    product/risk route owns one Account A/Account B pair; movement direction
+    configuration-driven GET/PUT `/balance-account-mappings` API. Categories,
+    business/GL families and category-scoped Tenor sub-ledgers come from one
+    canonical configuration; the database stores maintained values and versions.
+    Each product/risk route owns one Account A/Account B pair; movement direction
     resolves that neutral pair to Dr/Cr. Syntax and trimmed length come from
     BALANCE_ACCOUNT_NUMBER_REGEX, BALANCE_ACCOUNT_NUMBER_MIN_LEN and
     BALANCE_ACCOUNT_NUMBER_MAX_LEN. Equal minimum and maximum means fixed
@@ -1067,7 +1093,7 @@ info:
         callers no longer need client-side compensation for an approved multi-leg command.
       - DOCUMENTED business routing: Import A3/A3S continues to A4 for Sight or A6 for Seller's/Buyer's
         Usance; Export B3 continues to B4, whose HONOUR/ACCEPT compound shape is selected by Sight/Usance.
-  version: "1.49.0"
+  version: "1.51.0"
 x-client-retry-policy:
   configuration:
     maxRetries: BALANCE_HTTP_RETRY_COUNT
@@ -2382,7 +2408,7 @@ paths:
 
   /balance-account-mappings:
     get:
-      summary: List all fixed Balance Account Number mappings
+      summary: List configured Balance Account categories, business/GL families and Tenor SL mappings
       operationId: listBalanceAccountMappings
       responses:
         '200':
@@ -2390,6 +2416,49 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/BalanceAccountMappingListResponse' }
+        '500': { description: Unexpected server failure. }
+
+  /balance-account-mappings/reload-configuration:
+    post:
+      summary: Atomically overwrite all Account Number mappings from configuration defaults
+      description: >
+        Immediately replaces every active configured mapping with the identities in
+        balance-account-mappings.json. Each row is reset to version 1 and updatedBy
+        SYSTEM_CONFIG_RELOAD. The operation is all-or-nothing and is separate from
+        the transaction-data Cleanup Database endpoint.
+      operationId: reloadBalanceAccountMappingConfiguration
+      responses:
+        '200':
+          description: Configuration defaults saved to DB and returned as the complete mapping hierarchy.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BalanceAccountMappingListResponse' }
+        '500': { description: Reload failed; all Account Number mappings remain unchanged. }
+
+  /balance-account-mappings/families/{familyKey}:
+    put:
+      summary: Atomically update every configured Tenor SL in one GL family
+      operationId: updateBalanceAccountMappingFamily
+      parameters:
+        - name: familyKey
+          in: path
+          required: true
+          schema: { type: string }
+          example: IMPORT_LC_BALANCE
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateBalanceAccountFamilyRequest' }
+      responses:
+        '200':
+          description: Updated family with all separately maintained Tenor SL mappings.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BalanceAccountFamily' }
+        '400': { description: Invalid, incomplete or duplicate configured SL payload. }
+        '404': { description: Unknown configured family key. }
+        '409': { description: Atomic optimistic-version conflict; no sibling SL is changed. }
         '500': { description: Unexpected server failure. }
 
   /balance-account-mappings/{mappingKey}:
@@ -2414,7 +2483,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/BalanceAccountMapping' }
         '400': { description: Invalid account pair or actor. }
-        '404': { description: Unknown fixed mapping key. }
+        '404': { description: Unknown configured mapping key. }
         '409': { description: Optimistic mapping-version conflict. }
         '500': { description: Unexpected server failure. }
 
@@ -2431,11 +2500,22 @@ components:
 
     BalanceAccountMapping:
       type: object
-      required: [mappingKey, instrumentType, riskClass, accountA, accountB, version, updatedBy, updatedAt]
+      description: >
+        Persisted product/risk route and its neutral Account A/Account B pair.
+        The maintenance UI may render these existing fields as two GL sections
+        containing Tenor SL rows and compose their displayed GL + SL values into
+        this identity before saving; no separate GL or SL persistence fields exist.
+      required: [mappingKey, instrumentType, riskClass, categoryKey, categoryLabel, familyKey, familyLabel, tenorKey, tenorLabel, accountA, accountB, version, updatedBy, updatedAt]
       properties:
         mappingKey: { type: string, example: IPLC_LC:SIGHT }
-        instrumentType: { $ref: '#/components/schemas/InstrumentType' }
-        riskClass: { type: string, enum: [SIGHT, BUYERS_USANCE, SELLERS_USANCE, USANCE] }
+        instrumentType: { type: string, description: Configured business/instrument type. Existing transaction types continue to use InstrumentType. }
+        riskClass: { type: string, description: Persisted configured SL route key; not constrained by a database enum. }
+        categoryKey: { type: string, example: IMPORT }
+        categoryLabel: { type: string, example: Import LC }
+        familyKey: { type: string, example: IMPORT_LC_BALANCE }
+        familyLabel: { type: string, example: Import LC Balance }
+        tenorKey: { type: string, example: SIGHT }
+        tenorLabel: { type: string, example: Sight }
         accountA: { $ref: '#/components/schemas/BalanceAccountIdentity' }
         accountB: { $ref: '#/components/schemas/BalanceAccountIdentity' }
         version: { type: integer, minimum: 1 }
@@ -2444,11 +2524,15 @@ components:
 
     BalanceAccountMappingListResponse:
       type: object
-      required: [items, validation]
+      required: [items, categories, validation]
       properties:
         items:
           type: array
           items: { $ref: '#/components/schemas/BalanceAccountMapping' }
+        categories:
+          type: array
+          description: Configured presentation hierarchy. Current labels match Transaction Processing — Import LC and Export Confirmed. Future categories and business families require configuration only.
+          items: { $ref: '#/components/schemas/BalanceAccountCategory' }
         validation:
           type: object
           required: [pattern, minLength, maxLength]
@@ -2466,6 +2550,62 @@ components:
         updatedBy: { type: string, minLength: 1 }
         accountA: { $ref: '#/components/schemas/BalanceAccountIdentity' }
         accountB: { $ref: '#/components/schemas/BalanceAccountIdentity' }
+
+    BalanceAccountTenor:
+      type: object
+      required: [tenorKey, apiValue, label, behavior]
+      properties:
+        tenorKey: { type: string, description: Category-scoped SL identity. Import Sight and Export Sight are distinct configuration entries. }
+        apiValue: { type: string, description: Backward-compatible transaction API value. }
+        label: { type: string }
+        behavior: { type: string, enum: [SIGHT, USANCE], description: Existing processing behavior used by a configured Tenor. }
+
+    BalanceAccountFamily:
+      type: object
+      description: >
+        Configuration-defined maintenance family. Saving a family updates all
+        configured Tenor SL mapping rows atomically; the family itself is not a
+        new database entity.
+      required: [familyKey, categoryKey, label, instrumentType, tenorKeys, mappings]
+      properties:
+        familyKey: { type: string }
+        categoryKey: { type: string }
+        label: { type: string }
+        instrumentType: { type: string }
+        defaultTenorKey: { type: string }
+        tenorKeys: { type: array, items: { type: string } }
+        mappings: { type: array, items: { $ref: '#/components/schemas/BalanceAccountMapping' } }
+
+    BalanceAccountCategory:
+      type: object
+      required: [categoryKey, label, tenorTypes, families]
+      properties:
+        categoryKey: { type: string }
+        label: { type: string }
+        tenorTypes: { type: array, items: { $ref: '#/components/schemas/BalanceAccountTenor' } }
+        families: { type: array, items: { $ref: '#/components/schemas/BalanceAccountFamily' } }
+
+    UpdateBalanceAccountFamilyMapping:
+      type: object
+      additionalProperties: false
+      required: [mappingKey, expectedVersion, accountA, accountB]
+      properties:
+        mappingKey: { type: string }
+        expectedVersion: { type: integer, minimum: 1 }
+        accountA: { $ref: '#/components/schemas/BalanceAccountIdentity' }
+        accountB: { $ref: '#/components/schemas/BalanceAccountIdentity' }
+
+    UpdateBalanceAccountFamilyRequest:
+      type: object
+      additionalProperties: false
+      required: [updatedBy, mappings]
+      properties:
+        updatedBy: { type: string, minLength: 1 }
+        mappings:
+          type: array
+          minItems: 1
+          description: Must contain every configured SL mapping in the family exactly once. Account identities may differ by SL.
+          items: { $ref: '#/components/schemas/UpdateBalanceAccountFamilyMapping' }
 
     InstrumentType:
       type: string

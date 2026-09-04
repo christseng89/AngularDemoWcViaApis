@@ -4,8 +4,8 @@ type: traceability
 domain: documentation
 status: verified
 source_of_truth: source-code
-source_revision: "c7e9884"
-verified_date: 2026-09-03
+source_revision: "1865d80"
+verified_date: 2026-09-04
 generated: true
 aliases: []
 tags: ["traceability", "coverage"]
@@ -25,17 +25,19 @@ source_files:
 
 | Inventory | Covered | Total |
 |---|---:|---:|
-| Production source modules | 113 | 113 |
-| Exported source symbols | 403 | 403 |
+| Production source modules | 114 | 114 |
+| Exported source symbols | 418 | 418 |
 | Function catalog entries | 18 | 18 |
-| Runtime API routes | 24 | 24 |
+| Runtime API routes | 26 | 26 |
 | Business Case Runner cases | 31 | 31 |
 | Instrument type values | 10 | 10 |
 | Movement status values | 4 | 4 |
 | Exposure nature values | 3 | 3 |
 | Tenor type values | 5 | 5 |
+| Configuration sources | 17 | 17 |
+| Root environment variables | 8 | 8 |
 | Canonical cross-cutting topics | 14 | 14 |
-| **Total** | **625** | **625** |
+| **Total** | **668** | **668** |
 
 **Coverage: 100%**（required: >95%）。這個指標表示可列舉的 source knowledge inventory 均有 canonical documentation，不表示每一行 implementation 都應複製到 Obsidian。
 

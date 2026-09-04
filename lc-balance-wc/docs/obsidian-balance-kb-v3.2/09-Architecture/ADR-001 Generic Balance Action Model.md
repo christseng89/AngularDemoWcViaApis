@@ -4,8 +4,8 @@ type: architecture-decision
 domain: architecture
 status: accepted
 source_of_truth: business-decision
-source_revision: "c7e9884"
-verified_date: 2026-09-03
+source_revision: "1865d80"
+verified_date: 2026-09-04
 generated: true
 aliases: []
 tags: ["architecture", "adr", "balance-action", "product-extension"]
@@ -48,6 +48,30 @@ Amount 一律為正值，方向由 action 表達，不以正負號暗示。LC、
 | Claim cancelled／rejected | RELEASE_EARMARK |
 | Expire／Close | REPAYMENT remaining balance |
 | Reopen | TAKE_DOWN restoration |
+
+## Configuration-first product extension
+
+新增 SBLC、LG 或其他業務品種採用 **configuration-driven metadata + typed Product Policy plug-in + Generic Balance Engine**。目標是把標準行為配置化，大幅縮小新增產品的 source-code change surface，但不把複雜法律、帳務或 SWIFT 規則變成無型別自由 expression。
+
+| Product extension concern | Target mechanism | Expected change for a new product |
+|---|---|---|
+| Product／instrument identity | Typed product-definition configuration | Configuration only |
+| Contract fields／natural key | Validated field schema | Mostly configuration; custom cross-field validation stays in policy |
+| Transaction Function／lifecycle | Configured catalog and state transitions | Standard transitions by configuration; exceptional side effects in policy |
+| Selection／eligibility | Reusable predicate registry referenced by configuration | Common predicates by configuration; product-specific eligibility in policy |
+| Business Event → `BalanceAction[]` | Strongly typed action mapping | Standard TAKE_DOWN／REPAYMENT／EARMARK flows by configuration |
+| Accounting／posting and Account Mapping key | Posting templates plus Account Mapping taxonomy | Normally configuration only |
+| UI／API／DB／SWIFT／tests | Schema-driven UI and generic API; extensible persistence identity; strategy plug-ins | Shared framework remains unchanged; SWIFT and exceptional behavior may add a plug-in and explicit tests |
+
+The configuration authority should cover category, product code, instrument identity, labels, display order, Tenor Type, natural-key composition, required／optional／protected field metadata, simple lifecycle transitions, reusable eligibility predicates, normalized action mappings, GL family, Tenor SL, Account Number／Description defaults and standard debit／credit posting templates. Angular should render the same validated schema rather than maintain a second product list.
+
+The following controls remain typed code or immutable Balance Core behavior: complex exposure calculations, parent／child interactions, compound atomic release, exceptional earmark side effects, product-specific legal rules, SWIFT construction and cross-field validation, Maker／Checker, idempotency, audit, decimal rounding, posting gate and transaction integrity. Configuration selects a policy or strategy; it must not bypass these controls.
+
+### One-time framework enablement
+
+Before a future product can be added mostly by configuration, the platform must introduce a versioned Product Definition schema, generic contract-field and natural-key schema, configured function catalog and lifecycle state machine, reusable eligibility predicate registry, typed `BalanceAction[]` engine, posting templates, schema-driven Angular rendering, generic product／function API contracts, extensible persistence identity and configuration validation. Generated tests may cover schema invariants and standard actions, but product business acceptance tests remain mandatory.
+
+After that enablement, a normal new product should require one Product Definition, Account Mapping configuration, an optional small Product Policy／SWIFT Strategy for genuine differences, and product acceptance tests. This is an architectural target, not a statement that current SBLC／LG support is configuration-only today.
 
 ## Responsibility boundary
 

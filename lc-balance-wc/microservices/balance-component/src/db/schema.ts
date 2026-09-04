@@ -347,11 +347,13 @@ CREATE INDEX IF NOT EXISTS idx_fix_pending_audit_movement
 CREATE INDEX IF NOT EXISTS idx_fix_pending_audit_contract
   ON fix_pending_audit(balance_contract_id);
 
--- Runtime-maintained mapping from a fixed product/risk route to one neutral two-account set.
+-- Runtime-maintained mapping from a configured business-family/Tenor-SL route to one two-account set.
 CREATE TABLE IF NOT EXISTS balance_account_mappings (
   mapping_key             TEXT PRIMARY KEY,
-  instrument_type         TEXT NOT NULL CHECK (instrument_type IN (${sqlInList(INSTRUMENT_TYPE_VALUES)})),
-  risk_class              TEXT NOT NULL CHECK (risk_class IN ('SIGHT','BUYERS_USANCE','SELLERS_USANCE','USANCE')),
+  instrument_type         TEXT NOT NULL,
+  -- Allowed business types and category-scoped Tenor/SL routes come from
+  -- config/balance-account-mappings.json. Do not add fixed enum CHECKs here.
+  risk_class              TEXT NOT NULL,
   account_a_number        TEXT NOT NULL,
   account_a_description   TEXT NOT NULL,
   account_b_number        TEXT NOT NULL,

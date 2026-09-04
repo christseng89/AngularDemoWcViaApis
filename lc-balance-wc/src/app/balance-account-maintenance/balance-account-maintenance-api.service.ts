@@ -16,10 +16,41 @@ export interface BalanceAccountMappingDto {
   version: number;
   updatedBy: string;
   updatedAt: string;
+  categoryKey: string;
+  categoryLabel: string;
+  familyKey: string;
+  familyLabel: string;
+  tenorKey: string;
+  tenorLabel: string;
+}
+
+export interface BalanceAccountTenorDto {
+  tenorKey: string;
+  apiValue: string;
+  label: string;
+  behavior: 'SIGHT' | 'USANCE';
+}
+
+export interface BalanceAccountFamilyDto {
+  familyKey: string;
+  categoryKey: string;
+  label: string;
+  instrumentType: string;
+  defaultTenorKey?: string;
+  tenorKeys: string[];
+  mappings: BalanceAccountMappingDto[];
+}
+
+export interface BalanceAccountCategoryDto {
+  categoryKey: string;
+  label: string;
+  tenorTypes: BalanceAccountTenorDto[];
+  families: BalanceAccountFamilyDto[];
 }
 
 export interface BalanceAccountMappingsResponse {
   items: BalanceAccountMappingDto[];
+  categories: BalanceAccountCategoryDto[];
   validation: { pattern: string; minLength: number; maxLength: number };
 }
 
@@ -33,12 +64,19 @@ export class BalanceAccountMaintenanceApiService {
     return this.http.get<BalanceAccountMappingsResponse>(this.base);
   }
 
-  update(mapping: BalanceAccountMappingDto, updatedBy: string): Observable<BalanceAccountMappingDto> {
-    return this.http.put<BalanceAccountMappingDto>(`${this.base}/${encodeURIComponent(mapping.mappingKey)}`, {
-      expectedVersion: mapping.version,
+  reloadConfiguration(): Observable<BalanceAccountMappingsResponse> {
+    return this.http.post<BalanceAccountMappingsResponse>(`${this.base}/reload-configuration`, {});
+  }
+
+  updateFamily(family: BalanceAccountFamilyDto, updatedBy: string): Observable<BalanceAccountFamilyDto> {
+    return this.http.put<BalanceAccountFamilyDto>(`${this.base}/families/${encodeURIComponent(family.familyKey)}`, {
       updatedBy,
-      accountA: mapping.accountA,
-      accountB: mapping.accountB,
+      mappings: family.mappings.map((mapping) => ({
+        mappingKey: mapping.mappingKey,
+        expectedVersion: mapping.version,
+        accountA: mapping.accountA,
+        accountB: mapping.accountB,
+      })),
     });
   }
 }

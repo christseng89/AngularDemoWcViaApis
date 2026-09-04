@@ -1,6 +1,5 @@
 import type { InstrumentType, TenorType } from '../types';
-
-export type BalanceAccountRiskClass = 'SIGHT' | 'BUYERS_USANCE' | 'SELLERS_USANCE' | 'USANCE';
+import { BALANCE_ACCOUNT_TAXONOMY } from '../config/balanceAccountTaxonomy';
 
 export interface BalanceAccountIdentity {
   accountNumber: string;
@@ -9,8 +8,8 @@ export interface BalanceAccountIdentity {
 
 export interface BalanceAccountMapping {
   mappingKey: string;
-  instrumentType: InstrumentType;
-  riskClass: BalanceAccountRiskClass;
+  instrumentType: string;
+  riskClass: string;
   accountA: BalanceAccountIdentity;
   accountB: BalanceAccountIdentity;
   version: number;
@@ -24,19 +23,11 @@ export interface BalanceAccountNumberValidation {
   maxLength: number;
 }
 
-export function riskClassFor(instrumentType: InstrumentType, tenorType: TenorType | null | undefined): BalanceAccountRiskClass | null {
-  if (instrumentType === 'EPLC_CONFIRMATION' || instrumentType === 'EPLC_ACCEPTANCE') {
-    return instrumentType === 'EPLC_CONFIRMATION' && tenorType === 'SIGHT' ? 'SIGHT' : 'USANCE';
-  }
-  if (instrumentType === 'IPLC_LC' || instrumentType === 'IPLC_ACCEPTANCE' || instrumentType === 'SHGT') {
-    if (tenorType === 'BUYERS_USANCE' || tenorType === 'SELLERS_USANCE') return tenorType;
-    if (instrumentType === 'IPLC_ACCEPTANCE') return null;
-    return 'SIGHT';
-  }
-  return null;
+export function riskClassFor(instrumentType: InstrumentType, tenorType: TenorType | null | undefined): string | null {
+  const mappingKey = BALANCE_ACCOUNT_TAXONOMY.resolve(instrumentType, tenorType)?.mappingKey;
+  return mappingKey?.slice(mappingKey.indexOf(':') + 1) ?? null;
 }
 
 export function mappingKeyFor(instrumentType: InstrumentType, tenorType: TenorType | null | undefined): string | null {
-  const riskClass = riskClassFor(instrumentType, tenorType);
-  return riskClass ? `${instrumentType}:${riskClass}` : null;
+  return BALANCE_ACCOUNT_TAXONOMY.resolve(instrumentType, tenorType)?.mappingKey ?? null;
 }

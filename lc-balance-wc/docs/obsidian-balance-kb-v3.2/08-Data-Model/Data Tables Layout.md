@@ -4,8 +4,8 @@ type: reference
 domain: data
 status: verified
 source_of_truth: source-code
-source_revision: "c7e9884"
-verified_date: 2026-09-03
+source_revision: "1865d80"
+verified_date: 2026-09-04
 generated: true
 aliases: []
 tags: ["database", "schema"]
@@ -177,8 +177,8 @@ erDiagram
 | Column | SQLite type | Constraints／meaning from schema |
 |---|---|---|
 | `mapping_key` | `TEXT` | `PRIMARY KEY` |
-| `instrument_type` | `TEXT` | `NOT NULL CHECK (instrument_type IN (${sqlInList(INSTRUMENT_TYPE_VALUES)}))` |
-| `risk_class` | `TEXT` | `NOT NULL CHECK (risk_class IN ('SIGHT','BUYERS_USANCE','SELLERS_USANCE','USANCE'))` |
+| `instrument_type` | `TEXT` | `NOT NULL` |
+| `risk_class` | `TEXT` | `NOT NULL` |
 | `account_a_number` | `TEXT` | `NOT NULL` |
 | `account_a_description` | `TEXT` | `NOT NULL` |
 | `account_b_number` | `TEXT` | `NOT NULL` |

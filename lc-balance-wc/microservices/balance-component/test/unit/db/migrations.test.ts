@@ -19,6 +19,36 @@ function bareDbWithBalanceMovementsTable(): DatabaseSync {
 }
 
 describe('runMigrations (src/db/migrations.ts)', () => {
+  test('migration 26 preserves maintained mappings and permits a future configured SL value', () => {
+    const db = bareDbWithBalanceMovementsTable();
+    try {
+      for (const migration of MIGRATIONS.filter((item) => item.id <= 23)) migration.up(db);
+      db.prepare(`INSERT INTO balance_account_mappings (
+        mapping_key, instrument_type, risk_class, account_a_number, account_a_description,
+        account_b_number, account_b_description, version, updated_by, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+        'IPLC_LC:SIGHT', 'IPLC_LC', 'SIGHT', 'A-100', 'A description', 'B-100', 'B description', 7, 'ops-user', '2026-09-04T00:00:00.000Z',
+      );
+
+      MIGRATIONS.find((item) => item.id === 26)!.up(db);
+
+      expect(db.prepare('SELECT * FROM balance_account_mappings WHERE mapping_key = ?').get('IPLC_LC:SIGHT')).toMatchObject({
+        account_a_number: 'A-100',
+        account_b_number: 'B-100',
+        version: 7,
+        updated_by: 'ops-user',
+      });
+      expect(() => db.prepare(`INSERT INTO balance_account_mappings (
+        mapping_key, instrument_type, risk_class, account_a_number, account_a_description,
+        account_b_number, account_b_description, version, updated_by, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+        'FUTURE_BUSINESS:FUTURE_CONFIGURED_TENOR', 'FUTURE_BUSINESS', 'FUTURE_CONFIGURED_TENOR', 'A-200', 'A future', 'B-200', 'B future', 1, 'ops-user', '2026-09-04T00:00:00.000Z',
+      )).not.toThrow();
+    } finally {
+      db.close();
+    }
+  });
+
   test('creates the schema_migrations tracking table and records migration 1 as applied on a fresh run', () => {
     const db = bareDbWithBalanceMovementsTable();
     try {

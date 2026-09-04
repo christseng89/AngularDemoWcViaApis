@@ -4,6 +4,8 @@ import { resolve } from 'node:path';
 const root = resolve(import.meta.dirname, '..');
 const envPath = resolve(root, '.env');
 const outputPath = resolve(root, 'src/app/core/http-retry/http-retry.config.generated.ts');
+const taxonomyPath = resolve(root, 'microservices/balance-component/config/balance-account-mappings.json');
+const taxonomyOutputPath = resolve(root, 'src/app/core/balance-account-taxonomy.generated.ts');
 
 function readEnvFile(path) {
   try {
@@ -61,7 +63,24 @@ writeFileSync(
     `export const GENERATED_BUSINESS_CASE_RECOVERY_INTERVAL_MS = ${businessCaseRecoveryIntervalMs};\n`,
 );
 
+const taxonomy = JSON.parse(readFileSync(taxonomyPath, 'utf8'));
+if (!Array.isArray(taxonomy.categories) || !Array.isArray(taxonomy.families)) {
+  throw new Error('Balance Account taxonomy must define categories and families.');
+}
+const tenorOptions = Object.fromEntries(
+  taxonomy.categories.map((category) => [
+    category.categoryKey,
+    category.tenorTypes.map(({ apiValue, label, behavior, tenorKey }) => ({ value: apiValue, label, behavior, tenorKey })),
+  ]),
+);
+writeFileSync(
+  taxonomyOutputPath,
+  `// Generated from microservices/balance-component/config/balance-account-mappings.json. Do not edit manually.\n` +
+    `export const GENERATED_TENOR_OPTIONS = ${JSON.stringify(tenorOptions, null, 2)} as const;\n`,
+);
+
 console.log(
   `Generated HTTP retry configuration: ${retryCount} retries, ${initialDelayMs}-${maxDelayMs}ms backoff; ` +
     `Business Case recovery: ${businessCaseRecoveryRetryCount} retries every ${businessCaseRecoveryIntervalMs}ms.`,
 );
+console.log(`Generated Balance Account taxonomy: ${taxonomy.categories.length} categories, ${taxonomy.families.length} business/GL families.`);

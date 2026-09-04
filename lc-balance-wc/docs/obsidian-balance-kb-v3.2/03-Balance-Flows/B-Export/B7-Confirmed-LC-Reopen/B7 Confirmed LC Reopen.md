@@ -4,8 +4,8 @@ type: function
 domain: export
 status: verified
 source_of_truth: source-code
-source_revision: "c7e9884"
-verified_date: 2026-09-03
+source_revision: "1865d80"
+verified_date: 2026-09-04
 generated: true
 aliases: ["B7", "Confirmed LC Reopen"]
 tags: ["function", "export"]

@@ -2481,6 +2481,24 @@ describe('POST /admin/reset-database — dev-only Business Case Runner "Cleanup 
       .expect(201);
   });
 
+  test('preserves maintained Account Number mappings; configuration reset belongs to the Reload button', async () => {
+    const db = createDb(':memory:');
+    const app = createApp(db);
+    await request(app).put('/balance-account-mappings/IPLC_LC%3ASIGHT').send({
+      expectedVersion: 1,
+      updatedBy: 'operator',
+      accountA: { accountNumber: 'KEEP-A', accountDescription: 'Keep A' },
+      accountB: { accountNumber: 'KEEP-B', accountDescription: 'Keep B' },
+    }).expect(200);
+
+    await request(app).post('/admin/reset-database').expect(200);
+    const after = await request(app).get('/balance-account-mappings').expect(200);
+    expect(after.body.items.find((item: { mappingKey: string }) => item.mappingKey === 'IPLC_LC:SIGHT')).toMatchObject({
+      accountA: { accountNumber: 'KEEP-A' }, accountB: { accountNumber: 'KEEP-B' }, version: 2, updatedBy: 'operator',
+    });
+    db.close();
+  });
+
   // Regression test for a real bug: delete_pending_audit (added for the Fix Pending/Delete Pending
   // Phase, analysis/Balance-Component-FixPending-DeletePending-Proposal-zh.md §10) has FK REFERENCES to
   // both balance_movements and balance_contracts with no ON DELETE CASCADE, and PRAGMA foreign_keys is
@@ -4413,8 +4431,8 @@ describe('HTTP integration — contingent-liability account entries (analysis/co
       })
       .expect(201);
     expect(res.body.contingentAccountEntry).toMatchObject({
-      drAccount: "Customers' Liability under DC — Sight",
-      crAccount: 'DC Outstanding — Sight',
+      drAccount: 'Customer Liability for DC — Sight',
+      crAccount: 'DC Liability — Sight',
       currency: 'USD',
       amount: '100000',
     });
@@ -4446,8 +4464,8 @@ describe('HTTP integration — contingent-liability account entries (analysis/co
       })
       .expect(201);
     expect(decrease.body.contingentAccountEntry).toMatchObject({
-      drAccount: 'DC Outstanding — Sight',
-      crAccount: "Customers' Liability under DC — Sight",
+      drAccount: 'DC Liability — Sight',
+      crAccount: 'Customer Liability for DC — Sight',
       currency: 'USD',
       amount: '10000',
     });
@@ -4467,8 +4485,8 @@ describe('HTTP integration — contingent-liability account entries (analysis/co
       })
       .expect(201);
     expect(utilize.body.contingentAccountEntry).toMatchObject({
-      drAccount: 'DC Outstanding — Sight',
-      crAccount: "Customers' Liability under DC — Sight",
+      drAccount: 'DC Liability — Sight',
+      crAccount: 'Customer Liability for DC — Sight',
       currency: 'USD',
       amount: '30000',
     });
@@ -4508,8 +4526,8 @@ describe('HTTP integration — contingent-liability account entries (analysis/co
       })
       .expect(201);
     expect(issue.body.contingentAccountEntry).toMatchObject({
-      drAccount: "Confirmed Usance — Issuing Bank's Liability",
-      crAccount: 'Confirmed Outstanding — Usance',
+      drAccount: 'Customer Liability for Confirmed DC — Usance',
+      crAccount: 'Confirmed DC Liability — Usance',
       currency: 'USD',
       amount: '80000',
     });
@@ -4529,8 +4547,8 @@ describe('HTTP integration — contingent-liability account entries (analysis/co
       })
       .expect(201);
     expect(decrease.body.contingentAccountEntry).toMatchObject({
-      drAccount: 'Confirmed Outstanding — Usance',
-      crAccount: "Confirmed Usance — Issuing Bank's Liability",
+      drAccount: 'Confirmed DC Liability — Usance',
+      crAccount: 'Customer Liability for Confirmed DC — Usance',
       currency: 'USD',
       amount: '5000',
     });
@@ -4552,8 +4570,8 @@ describe('HTTP integration — contingent-liability account entries (analysis/co
       })
       .expect(201);
     expect(issue.body.contingentAccountEntry).toMatchObject({
-      drAccount: "Customers' Liability under SG — Sight",
-      crAccount: 'SG Outstanding — Sight',
+      drAccount: 'Customer Liability for SG — Sight',
+      crAccount: 'SG Liability — Sight',
       currency: 'USD',
       amount: '20000',
     });
@@ -4572,8 +4590,8 @@ describe('HTTP integration — contingent-liability account entries (analysis/co
       })
       .expect(201);
     expect(redeem.body.contingentAccountEntry).toMatchObject({
-      drAccount: 'SG Outstanding — Sight',
-      crAccount: "Customers' Liability under SG — Sight",
+      drAccount: 'SG Liability — Sight',
+      crAccount: 'Customer Liability for SG — Sight',
       currency: 'USD',
       amount: '20000',
     });
@@ -4602,8 +4620,8 @@ describe('HTTP integration — contingent-liability account entries (analysis/co
       .expect(201);
     expect(issue.body.ceilingAmount).toBe('110000');
     expect(issue.body.contingentAccountEntry).toMatchObject({
-      drAccount: "Customers' Liability under DC — Sight",
-      crAccount: 'DC Outstanding — Sight',
+      drAccount: 'Customer Liability for DC — Sight',
+      crAccount: 'DC Liability — Sight',
       currency: 'USD',
       amount: '110000', // LC Balance = 100000 × 1.10, not the face amount 100000
     });
@@ -4624,8 +4642,8 @@ describe('HTTP integration — contingent-liability account entries (analysis/co
       .expect(201);
     expect(increase.body.ceilingAmount).toBe('5500');
     expect(increase.body.contingentAccountEntry).toMatchObject({
-      drAccount: "Customers' Liability under DC — Sight",
-      crAccount: 'DC Outstanding — Sight',
+      drAccount: 'Customer Liability for DC — Sight',
+      crAccount: 'DC Liability — Sight',
       currency: 'USD',
       amount: '5500', // A2 (AMEND_INCREASE) — LC Balance = 5000 × 1.10
     });
@@ -4686,8 +4704,8 @@ describe('HTTP integration — contingent-liability account entries (analysis/co
       .expect(201);
     expect(decrease.body.ceilingAmount).toBe('-5500'); // sign preserved through computeCeilingAmount()
     expect(decrease.body.contingentAccountEntry).toMatchObject({
-      drAccount: 'Confirmed Outstanding — Usance', // Decrease direction — same as the no-tolerance B2 test above, unaffected by this fix
-      crAccount: "Confirmed Usance — Issuing Bank's Liability",
+      drAccount: 'Confirmed DC Liability — Usance', // Decrease direction — same as the no-tolerance B2 test above, unaffected by this fix
+      crAccount: 'Customer Liability for Confirmed DC — Usance',
       currency: 'USD',
       amount: '5500', // magnitude only — B2 (AMEND, Decrease) — LC Balance = 5000 × 1.10, not the face amount 5000
     });

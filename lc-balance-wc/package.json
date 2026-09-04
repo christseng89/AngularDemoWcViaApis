@@ -8,6 +8,7 @@
     "README.md",
     "docs/http-retry-policy.md",
     "docs/balance-account-number-maintenance.md",
+    "docs/configuration.md",
     "docs/web-component-usage.md",
     "docs/web-component.md",
     "docs/framework-integrations.md",

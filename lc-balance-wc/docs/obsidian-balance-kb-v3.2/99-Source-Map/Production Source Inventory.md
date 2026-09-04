@@ -4,8 +4,8 @@ type: source-map
 domain: documentation
 status: verified
 source_of_truth: source-code
-source_revision: "c7e9884"
-verified_date: 2026-09-03
+source_revision: "1865d80"
+verified_date: 2026-09-04
 generated: true
 aliases: []
 tags: ["source-map", "coverage"]
@@ -76,6 +76,7 @@ source_files:
   - "src/app/web-component/balance-component-element.component.ts"
   - "src/app/web-component/balance-component-element.contract.ts"
   - "microservices/balance-component/src/app.ts"
+  - "microservices/balance-component/src/config/balanceAccountTaxonomy.ts"
   - "microservices/balance-component/src/config.ts"
   - "microservices/balance-component/src/db/index.ts"
   - "microservices/balance-component/src/db/migrations.ts"
@@ -139,7 +140,7 @@ source_files:
 | `src/app/app.component.ts` | Angular | `AppComponent` | [[Architecture]] |
 | `src/app/app.config.ts` | Angular | `appConfig` | [[Architecture]] |
 | `src/app/app.routes.ts` | Angular | `routes` | [[Architecture]] |
-| `src/app/balance-account-maintenance/balance-account-maintenance-api.service.ts` | Angular | `BalanceAccountIdentityDto`<br>`BalanceAccountMappingDto`<br>`BalanceAccountMappingsResponse`<br>`BalanceAccountMaintenanceApiService` | [[Architecture]] |
+| `src/app/balance-account-maintenance/balance-account-maintenance-api.service.ts` | Angular | `BalanceAccountIdentityDto`<br>`BalanceAccountMappingDto`<br>`BalanceAccountTenorDto`<br>`BalanceAccountFamilyDto`<br>`BalanceAccountCategoryDto`<br>`BalanceAccountMappingsResponse`<br>`BalanceAccountMaintenanceApiService` | [[Architecture]] |
 | `src/app/balance-account-maintenance/balance-account-maintenance.component.ts` | Angular | `BalanceAccountMaintenanceComponent` | [[Architecture]] |
 | `src/app/business-case-runner/balance-case-api.service.ts` | Angular | `BusinessCaseSummary`<br>`TraceStep`<br>`BusinessCaseRunResult`<br>`BusinessCaseRecoveryPolicy`<br>`BalanceCaseApiService` | [[Architecture]] |
 | `src/app/business-case-runner/business-case-runner.component.ts` | Angular | `BusinessCaseRunnerComponent` | [[Architecture]] |
@@ -202,13 +203,14 @@ source_files:
 | `src/app/web-component/balance-component-element.component.ts` | Angular | `BalanceComponentElementComponent` | [[Architecture]] |
 | `src/app/web-component/balance-component-element.contract.ts` | Angular | `BALANCE_COMPONENT_CONTRACT_VERSION`<br>`BalanceComponentView`<br>`BalanceComponentTheme`<br>`BALANCE_COMPONENT_THEME_TOKENS`<br>`BalanceComponentConfig`<br>`NormalizedBalanceComponentConfig`<br>`BalanceReadyDetail`<br>`BalanceNavigationDetail`<br>`BalanceRefreshDetail`<br>`BalanceErrorDetail`<br>`BalanceComponentElement`<br>`BalanceComponentEventMap`<br>`normalizeBalanceComponentConfig`<br>`isBalanceComponentView`<br>`isBalanceComponentTheme` | [[Architecture]] |
 | `microservices/balance-component/src/app.ts` | Microservice | `createApp` | [[API Reference]] |
+| `microservices/balance-component/src/config/balanceAccountTaxonomy.ts` | Microservice | `BalanceAccountCategory`<br>`BalanceAccountFamily`<br>`BalanceAccountSeedMapping`<br>`BalanceAccountTaxonomyConfig`<br>`TenorBehavior`<br>`ResolvedBalanceAccountRoute`<br>`BalanceAccountTaxonomyReader`<br>`BalanceAccountTaxonomy`<br>`BALANCE_ACCOUNT_TAXONOMY` | [[Architecture]] |
 | `microservices/balance-component/src/config.ts` | Microservice | `IntervalUnit`<br>`SweepInterval`<br>`toIntervalMs`<br>`EXPIRY_SWEEP_INTERVAL`<br>`MAIL_FLOAT_GRACE_DAYS`<br>`BATCH_MAKER_ACTOR`<br>`BATCH_CHECKER_ACTOR`<br>`AUTO_EXPIRY_ENABLED`<br>`AUTO_CLOSE_ENABLED`<br>`AUTO_CLOSE_REASON_CODE`<br>`AUTO_CLOSE_GRACE_PERIOD_BUSINESS_DAYS`<br>`BalanceAccountNumberConfig`<br>`loadBalanceAccountNumberConfig`<br>`BALANCE_ACCOUNT_NUMBER_CONFIG` | [[Architecture]] |
 | `microservices/balance-component/src/db/index.ts` | Microservice | `createDb`<br>`Db` | [[Data Model]] |
 | `microservices/balance-component/src/db/migrations.ts` | Microservice | `Migration`<br>`MIGRATIONS`<br>`runMigrations` | [[Data Model]] |
 | `microservices/balance-component/src/db/schema.ts` | Microservice | `INSTRUMENT_TYPE_VALUES`<br>`CONTRACT_STATUS_VALUES`<br>`TENOR_TYPE_VALUES`<br>`MOVEMENT_STATUS_VALUES`<br>`EXPOSURE_NATURE_VALUES`<br>`MOVEMENT_TYPE_VALUES`<br>`SCHEMA_SQL` | [[Data Model]] |
 | `microservices/balance-component/src/domain/amendDecrease.ts` | Microservice | `AmendDecreaseCheckResult`<br>`checkAmendDecreaseSufficiency` | [[Domain Model]] |
 | `microservices/balance-component/src/domain/autoCloseGracePeriod.ts` | Microservice | `addBusinessDays`<br>`isPastAutoCloseGrace` | [[Domain Model]] |
-| `microservices/balance-component/src/domain/balanceAccountMapping.ts` | Microservice | `BalanceAccountRiskClass`<br>`BalanceAccountIdentity`<br>`BalanceAccountMapping`<br>`BalanceAccountNumberValidation`<br>`riskClassFor`<br>`mappingKeyFor` | [[Domain Model]] |
+| `microservices/balance-component/src/domain/balanceAccountMapping.ts` | Microservice | `BalanceAccountIdentity`<br>`BalanceAccountMapping`<br>`BalanceAccountNumberValidation`<br>`riskClassFor`<br>`mappingKeyFor` | [[Domain Model]] |
 | `microservices/balance-component/src/domain/balanceDerivation.ts` | Microservice | `MOVEMENT_DIRECTION`<br>`TOLERANCE_APPLICABLE_MOVEMENT_TYPES`<br>`computeConfirmedBalance`<br>`computeAvailableBalance`<br>`computePendingDecreaseTotal`<br>`computeFaceAmount` | [[Domain Model]] |
 | `microservices/balance-component/src/domain/closeEligibility.ts` | Microservice | `CloseEligibilityInputs`<br>`CloseEligibilityResult`<br>`evaluateCloseEligibility` | [[Domain Model]] |
 | `microservices/balance-component/src/domain/contingentAccountEntry.ts` | Microservice | `ContingentAccountEntry`<br>`deriveContingentAccountEntry` | [[Domain Model]] |
@@ -227,7 +229,7 @@ source_files:
 | `microservices/balance-component/src/routes/balanceMovements.ts` | Microservice | `balanceMovementsRouter` | [[API Reference]] |
 | `microservices/balance-component/src/routes/deletePendingAudit.ts` | Microservice | `deletePendingAuditRouter` | [[API Reference]] |
 | `microservices/balance-component/src/server.ts` | Microservice | module entrypoint／internal declarations | [[Architecture]] |
-| `microservices/balance-component/src/service/balanceAccountMappingService.ts` | Microservice | `BalanceAccountMappingVersionConflictError`<br>`BalanceAccountMappingService` | [[Architecture]] |
+| `microservices/balance-component/src/service/balanceAccountMappingService.ts` | Microservice | `BalanceAccountMappingVersionConflictError`<br>`BalanceAccountMappingView`<br>`BalanceAccountFamilyView`<br>`BalanceAccountCategoryView`<br>`BalanceAccountMappingRepository`<br>`BalanceAccountMappingService` | [[Architecture]] |
 | `microservices/balance-component/src/service/balanceQueryService.ts` | Microservice | `MakerMovementQuery`<br>`DeletePendingAuditQuery`<br>`BalanceQueryService` | [[Architecture]] |
 | `microservices/balance-component/src/service/balanceService.ts` | Microservice | `CreateMovementRequest`<br>`CreateMovementResult`<br>`EditMovementRequest`<br>`BalanceServiceStores`<br>`createSqliteBalanceServiceStores`<br>`BalanceService` | [[Architecture]] |
 | `microservices/balance-component/src/service/balanceSnapshotService.ts` | Microservice | `BalanceSnapshotService` | [[Architecture]] |
@@ -252,8 +254,8 @@ source_files:
 
 ## Totals
 
-- Production modules: 113
-- Exported symbols indexed: 403
+- Production modules: 114
+- Exported symbols indexed: 418
 - Module traceability: 100%
 
 對 internal implementation detail 的解釋由對應 canonical note 負責；本頁只維護完整 inventory，避免複製業務規則。

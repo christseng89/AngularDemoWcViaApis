@@ -4,8 +4,8 @@ type: source-map
 domain: documentation
 status: verified
 source_of_truth: source-code
-source_revision: "c7e9884"
-verified_date: 2026-09-03
+source_revision: "1865d80"
+verified_date: 2026-09-04
 generated: true
 aliases: []
 tags: ["source-map"]
@@ -23,6 +23,12 @@ source_files:
   - "backend/data/businessCases.js"
   - "analysis/balance-component-api.yaml"
   - "analysis/balance-component-channel-api.yaml"
+  - ".env"
+  - "scripts/generate-runtime-config.mjs"
+  - "microservices/balance-component/config/balance-account-mappings.json"
+  - "microservices/business-days-mock/data/calendar.json"
+  - "proxy.conf.json"
+  - "src/app/web-component/balance-component-element.contract.ts"
 ---
 
 # Source Map
@@ -47,5 +53,11 @@ source_files:
 | Business cases | `backend/data/businessCases.js` |
 | Microservice OAS | `analysis/balance-component-api.yaml` |
 | Channel OAS | `analysis/balance-component-channel-api.yaml` |
+| Runtime and deployment configuration | `.env` |
+| Generated runtime configuration | `scripts/generate-runtime-config.mjs` |
+| Account mapping taxonomy | `microservices/balance-component/config/balance-account-mappings.json` |
+| Domestic calendar fixture | `microservices/business-days-mock/data/calendar.json` |
+| Development proxy | `proxy.conf.json` |
+| Web Component runtime contract | `src/app/web-component/balance-component-element.contract.ts` |
 
-Generated at revision `c7e9884`. Working-tree changes are included because generation reads files directly from disk.
+Generated at revision `1865d80`. Working-tree changes are included because generation reads files directly from disk.

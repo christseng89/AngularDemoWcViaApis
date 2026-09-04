@@ -8,6 +8,8 @@
  * beyond what these tables declare.
  */
 
+import { GENERATED_TENOR_OPTIONS } from '../core/balance-account-taxonomy.generated';
+
 /** EPLC_DUE_FROM_ISSUING_BANK / EPLC_ACCEPTANCE_REIMB_RECEIVABLE / EPLC_EXPORT_BILLS_DISCOUNTED — Gap Analysis §4.1: the asset-side counterpart a Confirmation contingent transforms into once honoured (Sight)/accepted (Usance); obligor is always the issuing bank, never the exporter. */
 /** EPLC_EXAMINATION — cs-tf-balance-knowhow D3 ("only legal events move balances"): `MEMO_ONLY`, CREATE only. B3 (Present Docs) creates it; B4 (Honour/Acceptance) releases that same PENDING CREATE as the first leg of its own compound. */
 export type InstrumentType =
@@ -293,11 +295,7 @@ export interface TransactionFunction {
   requiresEligibleParentAcceptance?: boolean;
 }
 
-const ALL_TENOR_OPTIONS = [
-  { value: 'SIGHT', label: 'Sight' },
-  { value: 'SELLERS_USANCE', label: "Seller's Usance" },
-  { value: 'BUYERS_USANCE', label: "Buyer's Usance" },
-];
+const ALL_TENOR_OPTIONS = GENERATED_TENOR_OPTIONS.IMPORT.map(({ value, label }) => ({ value, label }));
 
 /** Human label for a contract's tenorType — Export labels SELLERS_USANCE as plain "Usance" (Buyer's/Seller's is Import-only); Import spells it out. Reuses A1's/B1's own option arrays. No "Mixed Tenor" support — a contract's tenorType is one fixed value (Design doc §7). */
 export function tenorTypeLabel(tenorType: string | null | undefined, side: 'IMPORT' | 'EXPORT'): string {
@@ -306,18 +304,14 @@ export function tenorTypeLabel(tenorType: string | null | undefined, side: 'IMPO
   return options.find((o) => o.value === tenorType)?.label ?? '—';
 }
 
-const USANCE_ONLY_TENOR_OPTIONS = [
-  { value: 'SELLERS_USANCE', label: "Seller's Usance" },
-  { value: 'BUYERS_USANCE', label: "Buyer's Usance" },
-];
+const USANCE_ONLY_TENOR_OPTIONS = GENERATED_TENOR_OPTIONS.IMPORT
+  .filter((option) => option.behavior === 'USANCE')
+  .map(({ value, label }) => ({ value, label }));
 
 // Buyer's vs Seller's Usance is an Import-side domestic financing-structure distinction the confirming
 // bank has no visibility into — its own undertaking only distinguishes Sight vs Usance. Stored as
 // SELLERS_USANCE (no generic USANCE enum value) but labelled plain "Usance".
-const EXPORT_TENOR_OPTIONS = [
-  { value: 'SIGHT', label: 'Sight' },
-  { value: 'SELLERS_USANCE', label: 'Usance' },
-];
+const EXPORT_TENOR_OPTIONS = GENERATED_TENOR_OPTIONS.EXPORT.map(({ value, label }) => ({ value, label }));
 
 /** A3 handles Document Arrival for every tenor; the picked LC's own tenorType routes onward to A4 or A6. */
 export const IMPORT_FUNCTIONS: TransactionFunction[] = [

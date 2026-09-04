@@ -7,6 +7,7 @@ const docs = [
   'README.md',
   'docs/http-retry-policy.md',
   'docs/balance-account-number-maintenance.md',
+  'docs/configuration.md',
   'docs/web-component-usage.md',
   'docs/web-component.md',
   'docs/framework-integrations.md',
@@ -41,6 +42,20 @@ const packageJson = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8
 for (const script of ['build:wc', 'typecheck:adapters', 'e2e', 'release:prepare', 'release:verify']) {
   if (!packageJson.scripts[script]) failures.push(`README command has no package script: ${script}`);
 }
+
+const configurationDoc = readFileSync(resolve(root, 'docs/configuration.md'), 'utf8');
+const rootEnv = readFileSync(resolve(root, '.env'), 'utf8');
+for (const line of rootEnv.split(/\r?\n/).map((entry) => entry.trim()).filter((entry) => entry && !entry.startsWith('#') && entry.includes('='))) {
+  const name = line.slice(0, line.indexOf('='));
+  const value = line.slice(line.indexOf('=') + 1);
+  if (!configurationDoc.includes(`\`${name}\``)) failures.push(`docs/configuration.md: missing .env variable ${name}`);
+  if (/(SECRET|TOKEN|PASSWORD|CREDENTIAL|PRIVATE_KEY)/i.test(name)) {
+    if (!configurationDoc.includes(`| \`${name}\` | \`${name}=...\` |`)) failures.push(`docs/configuration.md: sensitive value for ${name} is not masked`);
+  } else if (!configurationDoc.includes(`| \`${name}\` | \`${value}\` |`)) {
+    failures.push(`docs/configuration.md: stale .env value for ${name}`);
+  }
+}
+if (!configurationDoc.includes('AAA=...')) failures.push('docs/configuration.md: sensitive .env masking convention is missing');
 for (const subpath of ['./wc', './contract', './adapters/angular', './adapters/react', './adapters/vue']) {
   if (!packageJson.exports[subpath]) failures.push(`documented package export missing: ${subpath}`);
 }

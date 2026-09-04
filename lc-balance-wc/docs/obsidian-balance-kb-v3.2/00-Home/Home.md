@@ -4,8 +4,8 @@ type: moc
 domain: balance
 status: verified
 source_of_truth: source-code
-source_revision: "c7e9884"
-verified_date: 2026-09-03
+source_revision: "1865d80"
+verified_date: 2026-09-04
 generated: true
 aliases: ["Home", "Balance KB"]
 tags: ["moc"]
@@ -32,6 +32,7 @@ source_files:
 - [[API Reference]]
 - [[Data Model]]
 - [[Architecture]]
+- [[Configuration Reference]]
 - [[OOP OOD SOLID]]
 - [[ADR-001 Generic Balance Action Model]]
 - [[Test Coverage and Business Cases]]

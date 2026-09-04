@@ -1,290 +1,306 @@
-import { of, Subject, throwError } from 'rxjs';
-import type { Signal, WritableSignal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { BalanceAccountMaintenanceApiService, type BalanceAccountMappingDto, type BalanceAccountMappingsResponse } from './balance-account-maintenance-api.service';
+import type { Signal, WritableSignal } from '@angular/core';
+import { of, Subject, throwError } from 'rxjs';
+import { BalanceAccountCategoryDto, BalanceAccountFamilyDto, BalanceAccountMaintenanceApiService, BalanceAccountMappingDto, BalanceAccountMappingsResponse } from './balance-account-maintenance-api.service';
 import { BalanceAccountMaintenanceComponent } from './balance-account-maintenance.component';
 
-const mapping: BalanceAccountMappingDto = {
-  mappingKey: 'IPLC_LC:SIGHT',
-  instrumentType: 'IPLC_LC',
-  riskClass: 'SIGHT',
-  accountA: { accountNumber: '110001', accountDescription: 'Customer liability' },
-  accountB: { accountNumber: '210001', accountDescription: 'Outstanding LC' },
-  version: 1,
-  updatedBy: 'seed',
-  updatedAt: '2026-09-02T00:00:00.000Z',
-};
+function mapping(mappingKey: string, tenorKey: string, tenorLabel: string): BalanceAccountMappingDto {
+  return {
+    mappingKey, instrumentType: 'IPLC_LC', riskClass: tenorKey,
+    categoryKey: 'IMPORT', categoryLabel: 'Import LC', familyKey: 'IMPORT_LC_BALANCE', familyLabel: 'Import LC Balance', tenorKey, tenorLabel,
+    accountA: { accountNumber: `A-${tenorKey}`, accountDescription: `A ${tenorLabel}` },
+    accountB: { accountNumber: `B-${tenorKey}`, accountDescription: `B ${tenorLabel}` },
+    version: 1, updatedBy: 'seed', updatedAt: '2026-09-04T00:00:00.000Z',
+  };
+}
 
-const neighboringMapping: BalanceAccountMappingDto = {
-  ...mapping,
-  mappingKey: 'IPLC_LC:BUYERS_USANCE',
-  riskClass: 'BUYERS_USANCE',
-  accountA: { accountNumber: '110002', accountDescription: 'Buyer usance customer liability' },
-  accountB: { accountNumber: '210002', accountDescription: 'Buyer usance outstanding LC' },
+const importMappings = [mapping('IPLC_LC:SIGHT', 'SIGHT', 'Sight'), mapping('IPLC_LC:BUYERS_USANCE', 'BUYERS_USANCE', "Buyer's Usance")];
+const importFamily: BalanceAccountFamilyDto = {
+  familyKey: 'IMPORT_LC_BALANCE', categoryKey: 'IMPORT', label: 'Import LC Balance', instrumentType: 'IPLC_LC',
+  defaultTenorKey: 'SIGHT', tenorKeys: importMappings.map((item) => item.tenorKey), mappings: importMappings,
 };
-
+const exportFamily: BalanceAccountFamilyDto = {
+  familyKey: 'CONFIRMED_LC_BALANCE', categoryKey: 'EXPORT', label: 'Confirmed LC Balance', instrumentType: 'EPLC_CONFIRMATION',
+  tenorKeys: ['SIGHT'], mappings: [{ ...mapping('EPLC_CONFIRMATION:SIGHT', 'SIGHT', 'Sight'), instrumentType: 'EPLC_CONFIRMATION', categoryKey: 'EXPORT', categoryLabel: 'Export Confirmed', familyKey: 'CONFIRMED_LC_BALANCE', familyLabel: 'Confirmed LC Balance' }],
+};
+const categories: BalanceAccountCategoryDto[] = [
+  { categoryKey: 'IMPORT', label: 'Import LC', tenorTypes: [], families: [importFamily] },
+  { categoryKey: 'EXPORT', label: 'Export Confirmed', tenorTypes: [], families: [exportFamily] },
+];
 const response: BalanceAccountMappingsResponse = {
-  items: [mapping],
-  validation: { pattern: '^\\d+$', minLength: 6, maxLength: 6 },
+  items: categories.flatMap((category) => category.families.flatMap((family) => family.mappings)), categories,
+  validation: { pattern: '^.+$', minLength: 1, maxLength: 128 },
 };
 
-function makeApi(overrides: { list?: jest.Mock; update?: jest.Mock } = {}) {
+function api(overrides: { list?: jest.Mock; reloadConfiguration?: jest.Mock; updateFamily?: jest.Mock } = {}) {
   return {
     list: overrides.list ?? jest.fn(() => of(response)),
-    update: overrides.update ?? jest.fn(() => of({ ...mapping, version: 2, updatedBy: 'demo-user' })),
+    reloadConfiguration: overrides.reloadConfiguration ?? jest.fn(() => of(response)),
+    updateFamily: overrides.updateFamily ?? jest.fn(() => of({ ...importFamily, mappings: importMappings.map((item) => ({ ...item, version: 2 })) })),
   } as unknown as BalanceAccountMaintenanceApiService;
 }
 
 function exposed(component: BalanceAccountMaintenanceComponent) {
   return component as unknown as {
-    mappings: WritableSignal<BalanceAccountMappingDto[]>;
-    loading: WritableSignal<boolean>;
-    loadError: WritableSignal<string>;
+    categories: WritableSignal<BalanceAccountCategoryDto[]>;
+    activeCategoryKey: WritableSignal<string | null>;
+    selectedFamilyKey: WritableSignal<string | null>;
+    editingFamilyKey: WritableSignal<string | null>;
+    savingFamilyKey: WritableSignal<string | null>;
     updatedBy: WritableSignal<string>;
-    validation: WritableSignal<{ pattern: string; minLength: number; maxLength: number }>;
     searchQuery: WritableSignal<string>;
-    selectedMappingKey: WritableSignal<string | null>;
-    filteredMappings: Signal<BalanceAccountMappingDto[]>;
-    selectedMapping: Signal<BalanceAccountMappingDto | null>;
-    editingKeys: WritableSignal<ReadonlySet<string>>;
-    savingKeys: WritableSignal<ReadonlySet<string>>;
-    rowMessages: WritableSignal<Readonly<Record<string, { kind: 'success' | 'error'; text: string }>>>;
+    loadError: WritableSignal<string>;
+    reloadMessage: WritableSignal<string>;
+    validation: WritableSignal<{ pattern: string; minLength: number; maxLength: number }>;
+    familyMessages: WritableSignal<Readonly<Record<string, { kind: 'success' | 'error'; text: string }>>>;
+    glEditorValues: WritableSignal<unknown>;
     fixedLength: Signal<number | null>;
-    reload(): void;
-    isEditing(mappingKey: string): boolean;
-    viewMapping(mappingKey: string): void;
+    selectedFamily: Signal<BalanceAccountFamilyDto | null>;
+    filteredFamilies: Signal<BalanceAccountFamilyDto[]>;
+    selectCategory(key: string): void;
+    viewFamily(key: string): void;
+    beginEdit(key: string): void;
+    updateField(key: string, side: 'accountA' | 'accountB', field: 'accountNumber' | 'accountDescription', value: string): void;
+    glValue(side: 'accountA' | 'accountB', field: 'accountNumber' | 'accountDescription'): string;
+    slValue(mapping: BalanceAccountMappingDto, side: 'accountA' | 'accountB', field: 'accountNumber' | 'accountDescription'): string;
+    updateGlField(side: 'accountA' | 'accountB', field: 'accountNumber' | 'accountDescription', value: string): void;
+    updateSlField(mapping: BalanceAccountMappingDto, side: 'accountA' | 'accountB', field: 'accountNumber' | 'accountDescription', value: string): void;
+    isFamilyDirty(family: BalanceAccountFamilyDto): boolean;
+    cancelEdit(key: string): void;
     backToIndex(): void;
-    beginEdit(mappingKey: string): void;
-    cancelEdit(mappingKey: string): void;
-    updateField(mappingKey: string, side: 'accountA' | 'accountB', field: 'accountNumber' | 'accountDescription', value: string): void;
-    isDirty(value: BalanceAccountMappingDto): boolean;
-    save(value: BalanceAccountMappingDto): void;
+    save(family: BalanceAccountFamilyDto): void;
+    reload(): void;
+    reloadConfiguration(): void;
   };
 }
 
 describe('BalanceAccountMaintenanceComponent', () => {
-  it('opens one Index row in the same-page Detail, then reveals Save only after a field changes', async () => {
-    await TestBed.configureTestingModule({
-      imports: [BalanceAccountMaintenanceComponent],
-      providers: [{ provide: BalanceAccountMaintenanceApiService, useValue: makeApi() }],
-    }).compileComponents();
+  it('renders the same Import LC / Export Confirmed tabs and groups rows by GL family', async () => {
+    await TestBed.configureTestingModule({ imports: [BalanceAccountMaintenanceComponent], providers: [{ provide: BalanceAccountMaintenanceApiService, useValue: api() }] }).compileComponents();
     const fixture = TestBed.createComponent(BalanceAccountMaintenanceComponent);
     fixture.detectChanges();
-    const labels = () => [...fixture.nativeElement.querySelectorAll('button')].map((button: HTMLButtonElement) => button.textContent?.trim());
+    const tabs = [...fixture.nativeElement.querySelectorAll('[role=tab]')].map((item: HTMLElement) => item.textContent?.trim());
+    expect(tabs).toEqual(['Import LC', 'Export Confirmed']);
+    expect(fixture.nativeElement.textContent).toContain('Import LC Balance');
+    expect(fixture.nativeElement.querySelectorAll('.mapping-index__row')).toHaveLength(1);
 
-    expect(fixture.nativeElement.textContent).toContain('Account Set Index');
-    expect(fixture.nativeElement.textContent).not.toContain('Contingent Liability');
-    expect(fixture.nativeElement.querySelector('.mapping-index__columns').textContent).toContain('Version');
-    expect(fixture.nativeElement.querySelector('.mapping-index__row > :nth-child(3)').textContent.trim()).toBe('1');
     (fixture.nativeElement.querySelector('.mapping-index__row') as HTMLButtonElement).click();
     fixture.detectChanges();
-    const accountNumber = fixture.nativeElement.querySelector('.mapping-card input') as HTMLInputElement;
-    expect(fixture.nativeElement.textContent).toContain('Contingent Liability');
-    expect(fixture.nativeElement.textContent).toContain('Liability');
-    expect(fixture.nativeElement.textContent).not.toContain('Account A');
-    expect(fixture.nativeElement.textContent).not.toContain('Account B');
-    expect(fixture.nativeElement.querySelector('.mapping-card header small').textContent).toContain('Version 1');
-    expect(labels()).toContain('Edit');
-    expect(labels()).toContain('← Back to Account Set Index');
-    expect(labels()).not.toContain('Save Account Set');
-    expect(accountNumber.readOnly).toBe(true);
+    expect([...fixture.nativeElement.querySelectorAll('.gl-card__title')].map((item: HTMLElement) => item.textContent?.trim())).toEqual([
+      'GL — Contingent Liability',
+      'GL — Liability',
+    ]);
+    expect(fixture.nativeElement.querySelectorAll('.gl-card')).toHaveLength(2);
+    expect(fixture.nativeElement.querySelectorAll('.gl-card__subledgers .subledger-card')).toHaveLength(4);
+    expect(fixture.nativeElement.querySelectorAll('.gl-card__fields input')).toHaveLength(4);
+    expect(fixture.nativeElement.textContent).toContain('GL Account Number');
+    expect(fixture.nativeElement.textContent).toContain('SL Account Number');
+    expect(fixture.nativeElement.textContent).toContain('SL — Sight');
+    expect(fixture.nativeElement.textContent).toContain("SL — Buyer's Usance");
 
-    (fixture.nativeElement.querySelector('.mapping-card .secondary-button') as HTMLButtonElement).click();
+    (fixture.nativeElement.querySelector('.back-button') as HTMLButtonElement).click();
     fixture.detectChanges();
-    expect(labels()).toContain('Cancel');
-    expect(labels()).not.toContain('Save Account Set');
-    expect(accountNumber.readOnly).toBe(false);
 
-    accountNumber.value = '110002';
-    accountNumber.dispatchEvent(new Event('input'));
+    (fixture.nativeElement.querySelectorAll('[role=tab]')[1] as HTMLButtonElement).click();
     fixture.detectChanges();
-    expect(labels()).toContain('Save Account Set');
-
-    ([...fixture.nativeElement.querySelectorAll('button')] as HTMLButtonElement[]).find((button) => button.textContent?.trim() === 'Cancel')?.click();
-    fixture.detectChanges();
-    expect(labels()).toContain('Edit');
-    expect(labels()).not.toContain('Cancel');
-    expect((fixture.nativeElement.querySelector('.mapping-card input') as HTMLInputElement).value).toBe('110001');
+    expect(fixture.nativeElement.textContent).toContain('Confirmed LC Balance');
   });
 
-  it('filters the Index and Back restores an unsaved pair before returning to it', () => {
-    const component = new BalanceAccountMaintenanceComponent(makeApi());
+  it('edits separate Tenor SL values and saves the complete family atomically', () => {
+    const updateFamily = jest.fn(() => of({ ...importFamily, mappings: importMappings.map((item) => ({ ...item, version: 2 })) }));
+    const component = new BalanceAccountMaintenanceComponent(api({ updateFamily }));
     const state = exposed(component);
     component.ngOnInit();
+    state.viewFamily(importFamily.familyKey);
+    state.beginEdit(importFamily.familyKey);
+    expect(state.glValue('accountA', 'accountNumber')).toBe('A');
+    expect(state.slValue(state.selectedFamily()!.mappings[0], 'accountA', 'accountNumber')).toBe('SIGHT');
+    state.updateGlField('accountA', 'accountNumber', 'GL-A');
+    state.updateSlField(state.selectedFamily()!.mappings[1], 'accountA', 'accountNumber', 'BUYER-SL');
+    state.updateGlField('accountB', 'accountDescription', 'GL-B Description');
+    state.updateSlField(state.selectedFamily()!.mappings[0], 'accountB', 'accountDescription', 'Sight SL Description');
+    const edited = state.selectedFamily()!;
+    expect(edited.mappings[0].accountA.accountNumber).toBe('GL-A — SIGHT');
+    expect(edited.mappings[1].accountA.accountNumber).toBe('GL-A — BUYER-SL');
+    expect(edited.mappings[0].accountB.accountDescription).toBe('GL-B Description — Sight SL Description');
+    expect(state.isFamilyDirty(edited)).toBe(true);
 
-    state.searchQuery.set('no match');
-    expect(state.filteredMappings()).toEqual([]);
-    state.searchQuery.set('sight');
-    expect(state.filteredMappings()).toEqual([mapping]);
+    state.save(edited);
+    expect(updateFamily).toHaveBeenCalledWith(expect.objectContaining({ familyKey: 'IMPORT_LC_BALANCE', mappings: expect.any(Array) }), 'demo-user');
+    expect(state.editingFamilyKey()).toBeNull();
+  });
 
-    state.viewMapping(mapping.mappingKey);
-    expect(state.selectedMapping()).toEqual(mapping);
-    state.beginEdit(mapping.mappingKey);
-    state.updateField(mapping.mappingKey, 'accountA', 'accountNumber', 'changed');
+  it('filters within the active configured category and restores cancelled edits', () => {
+    const component = new BalanceAccountMaintenanceComponent(api());
+    const state = exposed(component);
+    component.ngOnInit();
+    state.searchQuery.set('buyer');
+    expect(state.filteredFamilies()).toEqual([importFamily]);
+    state.viewFamily(importFamily.familyKey);
+    state.beginEdit(importFamily.familyKey);
+    state.updateField(importMappings[0].mappingKey, 'accountA', 'accountNumber', 'CHANGED');
+    state.cancelEdit(importFamily.familyKey);
+    expect(state.selectedFamily()!.mappings[0].accountA.accountNumber).toBe('A-SIGHT');
     state.backToIndex();
-
-    expect(state.selectedMapping()).toBeNull();
-    expect(state.isEditing(mapping.mappingKey)).toBe(false);
-    expect(state.mappings()[0].accountA.accountNumber).toBe(mapping.accountA.accountNumber);
+    expect(state.selectedFamily()).toBeNull();
   });
 
-  it('ignores unknown selections, edit attempts outside Detail, and unchanged saves', () => {
-    const update = jest.fn();
-    const component = new BalanceAccountMaintenanceComponent(makeApi({ update }));
+  it('guards invalid navigation, missing actor, in-flight navigation, and load errors', () => {
+    const pending = new Subject<BalanceAccountFamilyDto>();
+    const component = new BalanceAccountMaintenanceComponent(api({ updateFamily: jest.fn(() => pending) }));
     const state = exposed(component);
     component.ngOnInit();
-
-    state.viewMapping('UNKNOWN');
-    expect(state.selectedMapping()).toBeNull();
-    state.beginEdit(mapping.mappingKey);
-    expect(state.isEditing(mapping.mappingKey)).toBe(false);
-    state.save(mapping);
-    expect(update).not.toHaveBeenCalled();
-
-    state.selectedMappingKey.set('REMOVED_AFTER_SELECTION');
-    expect(state.selectedMapping()).toBeNull();
-  });
-
-  it('blocks Back while saving and preserves the neighboring Index mapping', () => {
-    const subject = new Subject<BalanceAccountMappingDto>();
-    const list = jest.fn(() => of({ ...response, items: [mapping, neighboringMapping] }));
-    const component = new BalanceAccountMaintenanceComponent(makeApi({ list, update: jest.fn(() => subject) }));
-    const state = exposed(component);
-    component.ngOnInit();
-    state.viewMapping(mapping.mappingKey);
-    state.beginEdit(mapping.mappingKey);
-    state.updateField(mapping.mappingKey, 'accountA', 'accountNumber', '110009');
-    state.save(state.mappings()[0]);
-
+    state.selectCategory('UNKNOWN');
+    expect(state.activeCategoryKey()).toBe('IMPORT');
+    state.viewFamily('UNKNOWN');
+    expect(state.selectedFamily()).toBeNull();
+    state.viewFamily(importFamily.familyKey);
+    state.beginEdit(importFamily.familyKey);
+    state.updateField(importMappings[0].mappingKey, 'accountA', 'accountNumber', 'CHANGED');
+    state.updatedBy.set(' ');
+    state.save(state.selectedFamily()!);
+    expect(state.savingFamilyKey()).toBeNull();
+    state.updatedBy.set('maker1');
+    state.save(state.selectedFamily()!);
     state.backToIndex();
-    expect(state.selectedMappingKey()).toBe(mapping.mappingKey);
+    expect(state.selectedFamily()).not.toBeNull();
+    pending.error({ status: 409 });
+    expect(state.savingFamilyKey()).toBeNull();
 
-    const saved = { ...state.mappings()[0], version: 2 };
-    subject.next(saved);
-    subject.complete();
-    expect(state.mappings()).toEqual([saved, neighboringMapping]);
-    state.backToIndex();
-    expect(state.selectedMapping()).toBeNull();
+    const offline = new BalanceAccountMaintenanceComponent(api({ list: jest.fn(() => throwError(() => new Error('offline'))) }));
+    const offlineState = exposed(offline);
+    offlineState.reload();
+    expect(offlineState.loadError()).toContain('Unable to load');
   });
 
-  it('loads mappings and exposes an equal minimum/maximum as a fixed length', () => {
-    const api = makeApi();
-    const component = new BalanceAccountMaintenanceComponent(api);
-    const state = exposed(component);
-
-    component.ngOnInit();
-
-    expect(state.mappings()).toEqual([mapping]);
-    expect(state.validation()).toEqual(response.validation);
-    expect(state.fixedLength()).toBe(6);
-    expect(state.loading()).toBe(false);
-    expect(state.isDirty(state.mappings()[0])).toBe(false);
-  });
-
-  it('allows edits only in edit mode and Cancel restores the persisted account pair', () => {
-    const component = new BalanceAccountMaintenanceComponent(makeApi());
+  it('uses Reload to overwrite DB mappings from configuration and refresh the screen', () => {
+    const configured = {
+      ...response,
+      items: response.items.map((item) => ({ ...item, version: 1, updatedBy: 'SYSTEM_CONFIG_RELOAD' })),
+      categories: response.categories.map((category) => ({
+        ...category,
+        families: category.families.map((family) => ({
+          ...family,
+          mappings: family.mappings.map((item) => ({ ...item, version: 1, updatedBy: 'SYSTEM_CONFIG_RELOAD' })),
+        })),
+      })),
+    };
+    const reloadConfiguration = jest.fn(() => of(configured));
+    const component = new BalanceAccountMaintenanceComponent(api({ reloadConfiguration }));
     const state = exposed(component);
     component.ngOnInit();
+    state.reloadConfiguration();
+    expect(reloadConfiguration).toHaveBeenCalledTimes(1);
+    expect(state.categories()[0]!.families[0]!.mappings[0]!.updatedBy).toBe('SYSTEM_CONFIG_RELOAD');
+    expect(state.reloadMessage()).toContain('Configuration defaults reloaded');
 
-    state.updateField(mapping.mappingKey, 'accountA', 'accountNumber', 'blocked');
-    expect(state.mappings()[0].accountA.accountNumber).toBe(mapping.accountA.accountNumber);
-
-    state.viewMapping(mapping.mappingKey);
-    state.beginEdit(mapping.mappingKey);
-    expect(state.isEditing(mapping.mappingKey)).toBe(true);
-    state.updateField(mapping.mappingKey, 'accountA', 'accountNumber', 'changed');
-    expect(state.isDirty(state.mappings()[0])).toBe(true);
-
-    state.cancelEdit(mapping.mappingKey);
-    expect(state.isEditing(mapping.mappingKey)).toBe(false);
-    expect(state.mappings()[0].accountA.accountNumber).toBe(mapping.accountA.accountNumber);
-    expect(state.isDirty(state.mappings()[0])).toBe(false);
+    const failed = new BalanceAccountMaintenanceComponent(api({ reloadConfiguration: jest.fn(() => throwError(() => new Error('reset failed'))) }));
+    const failedState = exposed(failed);
+    failed.ngOnInit();
+    failedState.reloadConfiguration();
+    expect(failedState.loadError()).toContain('Database values were not changed');
   });
 
-  it('shows a load error while preserving a valid empty state', () => {
-    const component = new BalanceAccountMaintenanceComponent(makeApi({ list: jest.fn(() => throwError(() => new Error('offline'))) }));
+  it('covers configured filtering, empty responses, and guarded edit actions', () => {
+    const component = new BalanceAccountMaintenanceComponent(api());
     const state = exposed(component);
-
-    state.reload();
-
-    expect(state.loading()).toBe(false);
-    expect(state.loadError()).toContain('Unable to load');
-    state.validation.set({ pattern: '.*', minLength: 2, maxLength: 8 });
+    component.ngOnInit();
     expect(state.fixedLength()).toBeNull();
+    state.validation.set({ pattern: '^.+$', minLength: 12, maxLength: 12 });
+    expect(state.fixedLength()).toBe(12);
+    expect(state.filteredFamilies()).toEqual([importFamily]);
+    state.searchQuery.set('no-match');
+    expect(state.filteredFamilies()).toEqual([]);
+    state.searchQuery.set('a-sight');
+    expect(state.filteredFamilies()).toEqual([importFamily]);
+
+    state.selectedFamilyKey.set('UNKNOWN');
+    expect(state.selectedFamily()).toBeNull();
+    state.backToIndex();
+    state.beginEdit(importFamily.familyKey);
+    state.updateField(importMappings[0].mappingKey, 'accountA', 'accountNumber', 'IGNORED');
+    state.viewFamily(importFamily.familyKey);
+    state.updateField('UNKNOWN', 'accountA', 'accountNumber', 'IGNORED');
+    expect(state.selectedFamily()!.mappings[0].accountA.accountNumber).toBe('A-SIGHT');
+    state.beginEdit(importFamily.familyKey);
+    state.updateField(importMappings[0].mappingKey, 'accountA', 'accountNumber', 'TEMPORARY');
+    state.backToIndex();
+    expect(state.selectedFamily()).toBeNull();
+
+    const empty = new BalanceAccountMaintenanceComponent(api({ list: jest.fn(() => of({ ...response, items: [], categories: [] })) }));
+    const emptyState = exposed(empty);
+    empty.ngOnInit();
+    expect(emptyState.activeCategoryKey()).toBeNull();
   });
 
-  it('edits one nested account field and clears the row message', () => {
-    const component = new BalanceAccountMaintenanceComponent(makeApi());
+  it('uses server messages and the generic fallback for failed atomic saves', () => {
+    const updateFamily = jest
+      .fn()
+      .mockReturnValueOnce(throwError(() => ({ status: 500, error: { message: 'Configured account rejected.' } })))
+      .mockReturnValueOnce(throwError(() => ({ status: 500 })));
+    const component = new BalanceAccountMaintenanceComponent(api({ updateFamily }));
     const state = exposed(component);
     component.ngOnInit();
-    state.viewMapping(mapping.mappingKey);
-    state.beginEdit(mapping.mappingKey);
-    state.rowMessages.set({ [mapping.mappingKey]: { kind: 'success', text: 'old' } });
-
-    state.updateField(mapping.mappingKey, 'accountB', 'accountDescription', 'New description');
-
-    expect(state.mappings()[0].accountB.accountDescription).toBe('New description');
-    expect(state.isDirty(state.mappings()[0])).toBe(true);
-    expect(state.rowMessages()[mapping.mappingKey]).toBeUndefined();
-
-    state.updateField(mapping.mappingKey, 'accountB', 'accountDescription', mapping.accountB.accountDescription);
-    expect(state.isDirty(state.mappings()[0])).toBe(false);
+    state.viewFamily(importFamily.familyKey);
+    state.beginEdit(importFamily.familyKey);
+    state.updateField(importMappings[0].mappingKey, 'accountA', 'accountDescription', 'Changed once');
+    state.save(state.selectedFamily()!);
+    expect(state.familyMessages()[importFamily.familyKey]?.text).toBe('Configured account rejected.');
+    state.updateField(importMappings[0].mappingKey, 'accountA', 'accountDescription', 'Changed twice');
+    state.save(state.selectedFamily()!);
+    expect(state.familyMessages()[importFamily.familyKey]?.text).toBe('Unable to save this GL family.');
   });
 
-  it('requires an actor before saving', () => {
-    const update = jest.fn();
-    const component = new BalanceAccountMaintenanceComponent(makeApi({ update }));
-    const state = exposed(component);
-    state.updatedBy.set('  ');
-    state.mappings.set([mapping]);
-    state.viewMapping(mapping.mappingKey);
-    state.beginEdit(mapping.mappingKey);
-    state.mappings.set([{ ...mapping, accountA: { ...mapping.accountA, accountNumber: 'changed' } }]);
-
-    state.save(state.mappings()[0]);
-
-    expect(update).not.toHaveBeenCalled();
-    expect(state.rowMessages()[mapping.mappingKey]).toEqual({ kind: 'error', text: 'Updated By is required.' });
-  });
-
-  it('saves the complete pair, replaces its version and clears the busy state', () => {
-    const saved = { ...mapping, version: 2, updatedBy: 'demo-user' };
-    const update = jest.fn(() => of(saved));
-    const component = new BalanceAccountMaintenanceComponent(makeApi({ update }));
+  it('derives GL from the first configured Tenor when Sight is absent and supports empty editor parts', () => {
+    const noSightMapping = {
+      ...mapping('IPLC_ACCEPTANCE:BUYERS_USANCE', 'BUYERS_USANCE', "Buyer's Usance"),
+      familyKey: 'IMPORT_ACCEPTANCE_BALANCE',
+      familyLabel: 'Import Acceptance Balance',
+      accountA: { accountNumber: "Acceptance Buyer's Usance — Customer", accountDescription: "Acceptance Buyer's Usance — Customer" },
+    };
+    const noSightFamily: BalanceAccountFamilyDto = {
+      familyKey: 'IMPORT_ACCEPTANCE_BALANCE', categoryKey: 'IMPORT', label: 'Import Acceptance Balance', instrumentType: 'IPLC_ACCEPTANCE',
+      tenorKeys: ['BUYERS_USANCE'], mappings: [noSightMapping],
+    };
+    const component = new BalanceAccountMaintenanceComponent(api());
     const state = exposed(component);
     component.ngOnInit();
-    state.viewMapping(mapping.mappingKey);
-    state.beginEdit(mapping.mappingKey);
-    state.updateField(mapping.mappingKey, 'accountA', 'accountNumber', '110002');
+    state.categories.set([{ categoryKey: 'IMPORT', label: 'Import LC', tenorTypes: [], families: [noSightFamily] }]);
+    state.viewFamily(noSightFamily.familyKey);
+    expect(state.glValue('accountA', 'accountDescription')).toBe('Acceptance — Customer');
+    state.beginEdit(noSightFamily.familyKey);
+    state.updateGlField('accountA', 'accountNumber', ' ');
+    expect(state.selectedFamily()!.mappings[0].accountA.accountNumber).toBe('BUYERS_USANCE');
+    state.updateSlField(state.selectedFamily()!.mappings[0], 'accountA', 'accountNumber', ' ');
+    expect(state.selectedFamily()!.mappings[0].accountA.accountNumber).toBe('');
 
-    state.save(state.mappings()[0]);
-
-    expect(update).toHaveBeenCalledWith(expect.objectContaining({ accountA: expect.objectContaining({ accountNumber: '110002' }) }), 'demo-user');
-    expect(state.mappings()[0]).toEqual(saved);
-    expect(state.isEditing(mapping.mappingKey)).toBe(false);
-    expect(state.isDirty(state.mappings()[0])).toBe(false);
-    expect(state.savingKeys().has(mapping.mappingKey)).toBe(false);
-    expect(state.rowMessages()[mapping.mappingKey]).toEqual({ kind: 'success', text: 'Account set saved.' });
+    const extra = { ...noSightMapping, mappingKey: 'UNSAVED', tenorKey: 'UNSAVED' };
+    expect(state.isFamilyDirty({ ...noSightFamily, mappings: [extra] })).toBe(true);
+    state.categories.set([{ categoryKey: 'IMPORT', label: 'Import LC', tenorTypes: [], families: [{ ...noSightFamily, mappings: [extra] }] }]);
+    state.selectedFamilyKey.set(noSightFamily.familyKey);
+    state.cancelEdit(noSightFamily.familyKey);
+    expect(state.selectedFamily()!.mappings[0].mappingKey).toBe('UNSAVED');
   });
 
-  it.each([
-    [409, undefined, 'This account set was changed by another user. Reload before saving again.'],
-    [500, undefined, 'Unable to save this account set.'],
-    [400, 'Account Number is invalid.', 'Account Number is invalid.'],
-  ])('maps save error %p to an actionable row message', (status, message, expected) => {
-    const subject = new Subject<BalanceAccountMappingDto>();
-    const component = new BalanceAccountMaintenanceComponent(makeApi({ update: jest.fn(() => subject) }));
+  it('keeps GL editor commands safe outside an active edit and skips unchanged saves', () => {
+    const updateFamily = jest.fn(() => of(importFamily));
+    const component = new BalanceAccountMaintenanceComponent(api({ updateFamily }));
     const state = exposed(component);
+    expect(state.glValue('accountA', 'accountNumber')).toBe('');
+    state.updateGlField('accountA', 'accountNumber', 'IGNORED');
     component.ngOnInit();
-    state.viewMapping(mapping.mappingKey);
-    state.beginEdit(mapping.mappingKey);
-    state.updateField(mapping.mappingKey, 'accountA', 'accountNumber', 'changed');
-    state.save(state.mappings()[0]);
-    expect(state.savingKeys().has(mapping.mappingKey)).toBe(true);
+    state.viewFamily(importFamily.familyKey);
+    state.updateGlField('accountA', 'accountNumber', 'IGNORED');
+    state.editingFamilyKey.set(importFamily.familyKey);
+    state.glEditorValues.set(null);
+    state.updateGlField('accountA', 'accountNumber', 'IGNORED');
+    state.save(state.selectedFamily()!);
+    expect(updateFamily).not.toHaveBeenCalled();
 
-    subject.error({ status, error: message ? { message } : undefined });
-
-    expect(state.savingKeys().has(mapping.mappingKey)).toBe(false);
-    expect(state.rowMessages()[mapping.mappingKey]).toEqual({ kind: 'error', text: expected });
+    state.editingFamilyKey.set(null);
+    state.selectedFamilyKey.set(importFamily.familyKey);
+    state.categories.set([]);
+    state.beginEdit(importFamily.familyKey);
+    expect(state.editingFamilyKey()).toBeNull();
   });
 });

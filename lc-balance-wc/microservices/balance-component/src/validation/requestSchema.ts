@@ -16,6 +16,7 @@
  * cross-field rules to enforce).
  */
 import { z } from 'zod';
+import { BALANCE_ACCOUNT_TAXONOMY } from '../config/balanceAccountTaxonomy';
 import { MONETARY_AMOUNT_PATTERN, describeAmountScaleViolation } from '../money';
 
 export const createMovementRequestSchema = z
@@ -94,7 +95,9 @@ export const editMovementRequestSchema = z
     tolerancePct: z.string().nullable().optional(),
     toleranceChangePct: z.string().nullable().optional(),
     toleranceChangeDirection: z.enum(['INCREASE', 'DECREASE']).nullable().optional(),
-    tenorType: z.enum(['SIGHT', 'SELLERS_USANCE', 'BUYERS_USANCE']).nullable().optional(),
+    tenorType: z.string().refine((value) => BALANCE_ACCOUNT_TAXONOMY.isTenorApiValue(value), {
+      message: 'tenorType is not enabled by the Balance Account taxonomy configuration.',
+    }).nullable().optional(),
     tenorDays: z.number().nullable().optional(),
     expiryDate: z.string().nullable().optional(),
     mailFloatGraceDays: z.number().nullable().optional(),

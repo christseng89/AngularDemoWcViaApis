@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 const repo = resolve(import.meta.dirname, '..');
 const vault = resolve(repo, 'docs', 'obsidian-balance-kb-v3.2');
 const write = process.argv.includes('--write');
-const today = '2026-09-03';
+const today = '2026-09-04';
 
 if (!existsSync(vault) || relative(repo, vault).split(sep).join('/') !== 'docs/obsidian-balance-kb-v3.2') {
   throw new Error(`Refusing to operate on unexpected vault path: ${vault}`);
@@ -83,6 +83,57 @@ const instrumentTypes = union('InstrumentType');
 const movementStatuses = union('MovementStatus');
 const exposureNatures = union('ExposureNature');
 const tenorTypes = union('TenorType');
+const balanceAccountTaxonomy = JSON.parse(read('microservices/balance-component/config/balance-account-mappings.json'));
+const balanceAccountCategoryRows = balanceAccountTaxonomy.categories.map((category) =>
+  `| ${category.label} | ${category.tenorTypes.map((tenor) => `\`${tenor.tenorKey}\``).join('、')} |`,
+).join('\n');
+const balanceAccountFamilyRows = balanceAccountTaxonomy.families.map((family) =>
+  `| \`${family.familyKey}\` | ${family.label} | ${family.categoryKey} | \`${family.instrumentType}\` | ${family.tenorKeys.map((tenor) => `\`${tenor}\``).join('、')} |`,
+).join('\n');
+const balanceAccountDefaultRows = balanceAccountTaxonomy.mappings.map((mapping) =>
+  `| \`${mapping.mappingKey}\` | ${mapping.accountA.accountNumber} | ${mapping.accountA.accountDescription} | ${mapping.accountB.accountNumber} | ${mapping.accountB.accountDescription} |`,
+).join('\n');
+const envValues = Object.fromEntries(read('.env').split(/\r?\n/)
+  .map((line) => line.trim())
+  .filter((line) => line && !line.startsWith('#') && line.includes('='))
+  .map((line) => [line.slice(0, line.indexOf('=')).trim(), line.slice(line.indexOf('=') + 1).trim()]));
+const envConfiguration = {
+  BALANCE_HTTP_RETRY_COUNT: ['Angular generated HTTP retry', 'integer 0–10', '3'],
+  BALANCE_HTTP_RETRY_INITIAL_DELAY_MS: ['Angular generated initial backoff', 'integer 0–60000 ms', '250'],
+  BALANCE_HTTP_RETRY_MAX_DELAY_MS: ['Angular generated maximum backoff', 'integer >= initial delay and <=60000 ms', '2000'],
+  BUSINESS_CASE_RECOVERY_RETRY_COUNT: ['Business Case service recovery polling', 'integer 0–60', '15'],
+  BUSINESS_CASE_RECOVERY_INTERVAL_MS: ['Business Case recovery polling interval', 'integer 100–60000 ms', '2000'],
+  BALANCE_ACCOUNT_NUMBER_REGEX: ['Maintained Account Number syntax', 'valid JavaScript regular expression', '^.+$'],
+  BALANCE_ACCOUNT_NUMBER_MIN_LEN: ['Maintained Account Number minimum length', 'non-negative integer; <= maximum', '1'],
+  BALANCE_ACCOUNT_NUMBER_MAX_LEN: ['Maintained Account Number maximum length', 'non-negative integer; >= minimum', '128'],
+};
+const sensitiveEnvName = (name) => /(SECRET|TOKEN|PASSWORD|CREDENTIAL|PRIVATE_KEY)/i.test(name);
+const safeEnvValue = (name, value) => sensitiveEnvName(name) ? `\`${name}=...\`` : `\`${value}\``;
+if (safeEnvValue('AAA_SECRET', 'must-not-appear') !== '`AAA_SECRET=...`') throw new Error('Sensitive environment masking is not active');
+const envConfigurationRows = Object.entries(envValues).map(([name, value]) => {
+  const [consumer = 'Review required', constraint = 'Not inferred', fallback = 'Not inferred'] = envConfiguration[name] ?? [];
+  return `| \`${name}\` | ${safeEnvValue(name, value)} | \`${fallback}\` | ${constraint} | ${consumer} |`;
+}).join('\n');
+
+const configurationSources = [
+  '.env',
+  'scripts/generate-runtime-config.mjs',
+  'src/app/core/http-retry/http-retry.config.generated.ts',
+  'src/app/core/balance-account-taxonomy.generated.ts',
+  'microservices/balance-component/src/config.ts',
+  'microservices/balance-component/src/server.ts',
+  'backend/server.js',
+  'microservices/balance-component/config/balance-account-mappings.json',
+  'scripts/generate-domestic-calendar.mjs',
+  'microservices/business-days-mock/data/calendar.json',
+  'analysis/standing-microservice-reference/calendars.json',
+  'proxy.conf.json',
+  'e2e/live/proxy.conf.json',
+  'src/app/web-component/balance-component-element.contract.ts',
+  'angular.json',
+  'playwright.config.ts',
+  'playwright.live.config.ts',
+];
 
 const schemaSource = read('microservices/balance-component/src/db/schema.ts');
 const schemaTables = [...schemaSource.matchAll(/CREATE TABLE IF NOT EXISTS\s+(\w+)\s*\(([\s\S]*?)\n\);/g)].map((match) => {
@@ -141,7 +192,7 @@ const add = (path, content) => docs.set(path.split('/').join(sep), content);
 add('00-Home/Home.md', note({
   title: 'Balance Component Knowledge Base', type: 'moc', domain: 'balance', aliases: ['Home', 'Balance KB'], tags: ['moc'],
   sources: ['src/app/transaction-builder/balance-component.model.ts', 'microservices/balance-component/src/app.ts'],
-  body: `## 導航\n\n- [[System Overview]]\n- [[Domain Model]]\n- [[Business Rules MOC]]\n- [[Import Functions MOC]]\n- [[Export Functions MOC]]\n- [[Accounting and Exposure]]\n- [[Tolerance and Money]]\n- [[Maker Checker Lifecycle]]\n- [[API Reference]]\n- [[Data Model]]\n- [[Architecture]]\n- [[OOP OOD SOLID]]\n- [[ADR-001 Generic Balance Action Model]]\n- [[Test Coverage and Business Cases]]\n- [[Decision Tables]]\n- [[Traceability Matrix]]\n- [[Documentation Coverage]]\n- [[Knowledge Gaps]]\n- [[Source Map]]\n\n## 維護原則\n\n1. Source Code、測試及 OAS 是唯一內容來源；已接受但尚未完成的 target architecture 以 ADR 明確標示。\n2. 每個概念只有一篇 canonical note；其他頁面以 Wiki link 引用。\n3. tags 用於狀態與橫切分類，folder 用於穩定領域。\n4. 不把歷史 implementation log 當成目前行為。`,
+  body: `## 導航\n\n- [[System Overview]]\n- [[Domain Model]]\n- [[Business Rules MOC]]\n- [[Import Functions MOC]]\n- [[Export Functions MOC]]\n- [[Accounting and Exposure]]\n- [[Tolerance and Money]]\n- [[Maker Checker Lifecycle]]\n- [[API Reference]]\n- [[Data Model]]\n- [[Architecture]]\n- [[Configuration Reference]]\n- [[OOP OOD SOLID]]\n- [[ADR-001 Generic Balance Action Model]]\n- [[Test Coverage and Business Cases]]\n- [[Decision Tables]]\n- [[Traceability Matrix]]\n- [[Documentation Coverage]]\n- [[Knowledge Gaps]]\n- [[Source Map]]\n\n## 維護原則\n\n1. Source Code、測試及 OAS 是唯一內容來源；已接受但尚未完成的 target architecture 以 ADR 明確標示。\n2. 每個概念只有一篇 canonical note；其他頁面以 Wiki link 引用。\n3. tags 用於狀態與橫切分類，folder 用於穩定領域。\n4. 不把歷史 implementation log 當成目前行為。`,
 }));
 
 add('00-Home/System Overview.md', note({
@@ -285,6 +336,44 @@ add('04-Exposure-Accounting/Accounting and Exposure.md', note({
   body: `## 兩種 entry 不可混用\n\n- \`contingentAccountEntry\`：Balance Component 在 movement 建立時推導並持久化的單組 internal voucher，供 UI 與稽核。\n- \`accountEntries\`：外部／下游 Accounting payload。\n\n當 \`exposureNature=MEMO\`，service 強制 \`accountEntries=null\`。這不代表 internal \`contingentAccountEntry\` 必須為 null。逐交易的 Dr／Cr、compound legs 與 posting boundary 見 [[Transaction Accounting Matrix]]。\n\n## Earmarked entries\n\nEARMARKED 是虛帳／容量占用；後續真實交易不需沖銷這些虛帳，除非該 movement 自身的 domain rule 明確產生 reversal。`,
 }));
 
+add('04-Exposure-Accounting/Balance Account Configuration.md', note({
+  title: 'Balance Account Configuration', type: 'reference', domain: 'accounting', aliases: ['Balance Account Number Maintenance'], tags: ['accounting', 'configuration', 'solid'],
+  sources: ['microservices/balance-component/config/balance-account-mappings.json', 'microservices/balance-component/src/config/balanceAccountTaxonomy.ts', 'microservices/balance-component/src/service/balanceAccountMappingService.ts', 'microservices/balance-component/src/store/balanceAccountMappingStore.ts', 'microservices/balance-component/src/db/migrations.ts', 'src/app/balance-account-maintenance/balance-account-maintenance.component.ts', 'scripts/generate-runtime-config.mjs', 'analysis/balance-component-api.yaml'],
+  body: `## Canonical hierarchy
+
+\`config/balance-account-mappings.json\` 是 \`Category → Business Type / GL Family → Tenor SL\` 的唯一配置來源。Account Number Maintenance 第一層沿用交易頁名稱：
+
+| Category | Category-scoped Tenor SL |
+|---|---|
+${balanceAccountCategoryRows}
+
+Import Sight 與 Export Sight 是不同 category 的配置身分，所以是 Import 3 + Export 2，共五種，不是全域四值 enum。
+
+| Family key | GL family | Category | Current instrument | Tenor SL routes |
+|---|---|---|---|---|
+${balanceAccountFamilyRows}
+
+## Runtime rules
+
+- Taxonomy provider 在啟動時驗證 duplicate category、family、Tenor、mapping 與錯誤引用。
+- Store 啟動時只補配置新增的 mapping，不覆蓋已維護值；配置移除的舊 row 不再列出，但歷史 voucher snapshot 不變。
+- DB mapping table 不以固定 \`instrument_type\`／\`risk_class\` CHECK 寫死配置域。
+- Family PUT 必須包含全部 configured SL 且 version 全部正確；任一衝突會 rollback，不能部分成功。
+- Maintenance \`Reload\` 呼叫專用 POST，立即以 configuration defaults 原子覆寫全部 11 筆 configured mappings；成功後 version 為 1、actor 為 \`SYSTEM_CONFIG_RELOAD\`，任一失敗全部 rollback。Cleanup Database 保留 mappings。
+- Angular 導覽依 API hierarchy generic render；family 明細只在 presentation layer 改為先列 Contingent Liability／Liability GL（含 GL Number／Description 輸入），再於各 GL 下列出配置式 Tenor SL（含 SL Number／Description 輸入）。GL 預設取 Sight mapping 並移除 Sight；SL Number／Description 預設取 configured Tenor key／label。儲存前由 Angular 組合 GL + SL。DB、API mapping row、movement posting 與 voucher 結構均不因這個畫面編輯模型改變。
+- 交易 Tenor options 也由同一 JSON 在 build preparation 產生，沒有第二份清單。
+
+## Configuration defaults exported from DB
+
+| Mapping key | Account A Number | Account A Description | Account B Number | Account B Description |
+|---|---|---|---|---|
+${balanceAccountDefaultRows}
+
+未來新增 Account Maintenance category 或 business family 只改配置。全新交易 lifecycle／會計 behavior 仍屬產品功能開發，不可假裝由帳號配置自動產生。SBLC/LG 文件目前只作參考，不是已實作規格。
+
+此分層符合 SRP/OCP/DIP：provider 負責配置、store 負責 persistence、service 負責 use case、Angular 負責 presentation；新增配置不修改 consumer source。`,
+}));
+
 add('04-Exposure-Accounting/Transaction Accounting Matrix.md', note({
   title: 'Transaction Accounting Matrix', type: 'reference', domain: 'accounting', tags: ['accounting', 'transaction-matrix'],
   sources: ['microservices/balance-component/src/domain/contingentAccountEntry.ts', 'microservices/balance-component/src/domain/balanceDerivation.ts', 'microservices/balance-component/src/service/balanceService.ts', 'src/app/transaction-builder/maker-submit.service.ts'],
@@ -333,7 +422,13 @@ add('08-Data-Model/Data Tables Layout.md', note({
 add('09-Architecture/Architecture.md', note({
   title: 'Architecture', type: 'architecture', domain: 'architecture', tags: ['architecture', 'solid'],
   sources: ['microservices/balance-component/src/service/balanceService.ts', 'microservices/balance-component/src/service/unitOfWork.ts', 'src/app/transaction-builder/function-strategy.ts', 'src/app/transaction-builder/transaction-builder.component.ts'],
-  body: `## Boundaries\n\n- Angular strategies／policies：畫面組態、輸入與 orchestration。\n- Route layer：HTTP parsing 與 response mapping。\n- Service layer：use-case orchestration、transaction boundary。\n- Domain layer：純計算與 eligibility policies。\n- Store layer：SQLite persistence ports。\n\n本頁只定義分層與依賴方向。物件設計原則的 canonical 說明見 [[OOP OOD SOLID]]；產品擴充與 generic Balance action 的已接受 target architecture 見 [[ADR-001 Generic Balance Action Model]]；個別業務規則一律連結其 canonical rule note，避免複製。`,
+  body: `## Boundaries\n\n- Angular strategies／policies：畫面組態、輸入與 orchestration。\n- Route layer：HTTP parsing 與 response mapping。\n- Service layer：use-case orchestration、transaction boundary。\n- Domain layer：純計算與 eligibility policies。\n- Store layer：SQLite persistence ports。\n\nRuntime、build、taxonomy、proxy、calendar 與 Web Component 設定的 canonical 說明見 [[Configuration Reference]]。本頁只定義分層與依賴方向。物件設計原則的 canonical 說明見 [[OOP OOD SOLID]]；產品擴充與 generic Balance action 的已接受 target architecture 見 [[ADR-001 Generic Balance Action Model]]；個別業務規則一律連結其 canonical rule note，避免複製。`,
+}));
+
+add('09-Architecture/Configuration Reference.md', note({
+  title: 'Configuration Reference', type: 'reference', domain: 'configuration', tags: ['configuration', 'environment', 'operations'],
+  sources: configurationSources,
+  body: `## Configuration authority\n\n| Configuration area | Authoritative source | Runtime consumer | Apply change |\n|---|---|---|---|\n| Angular retry／Business Case recovery | \`.env\` + \`scripts/generate-runtime-config.mjs\` | generated Angular constants | rerun \`npm run prepare:app\`; restart the dev process when running |\n| Account Number validation | process environment, normally populated from root \`.env\` | Balance microservice \`config.ts\` | restart Balance microservice |\n| Service ports／URLs／CORS | process environment | Balance microservice／Business Case backend | restart affected process |\n| Account mapping taxonomy | \`balance-account-mappings.json\` | generator, Angular Account Number Maintenance | rerun \`npm run prepare:app\`; rebuild／restart Angular |\n| Lifecycle policy constants | Balance microservice \`config.ts\` | expiry／close jobs and business-day policies | source change, test, rebuild, restart |\n| Domestic calendar fixture | generator and JSON files | local business-day mock／reference | regenerate and validate fixture |\n| Development proxy | proxy JSON | Angular dev server | restart dev server |\n| Web Component host options | \`balance-component-element.contract.ts\` | embedding host／custom element | host supplies options at runtime |\n\n## Root .env snapshot\n\nThe table is generated from the currently tracked root \`.env\`. Generation precedence for the Angular values is **\`process.env\` > \`.env\` > code fallback**. Unknown variables remain visible for review. Names containing \`SECRET\`, \`TOKEN\`, \`PASSWORD\`, \`CREDENTIAL\` or \`PRIVATE_KEY\` are always rendered as \`AAA=...\`; their values are never copied into this vault.\n\n| Name | Documented value | Code fallback | Validation | Consumer |\n|---|---|---|---|---|\n${envConfigurationRows}\n\n## Service runtime environment\n\n| Process | Variable | Source fallback | Meaning |\n|---|---|---|---|\n| Balance microservice | \`PORT\` | \`4100\` | HTTP listen port |\n| Balance microservice | \`DB_PATH\` | \`balance-component.sqlite\` | SQLite file path |\n| Business Case backend | \`PORT\` | \`4300\` | HTTP listen port |\n| Business Case backend | \`BALANCE_SERVICE_URL\` | \`http://localhost:4100\` | Balance API upstream |\n| Business Case backend | \`ALLOWED_ORIGINS\` | \`http://localhost:4200\` | comma-separated CORS allowlist |\n\nThe Balance microservice start scripts load the repository \`.env\`; the backend reads its inherited process environment. A change is not live until the relevant process is restarted.\n\n## Source-controlled policy configuration\n\n### Account mapping taxonomy\n\n\`microservices/balance-component/config/balance-account-mappings.json\` defines configured business categories, balance families, display order and allowed tenor keys. \`generate-runtime-config.mjs\` validates referential integrity and creates the Angular taxonomy module. The database continues to store the composed Account Number／Description mapping; the taxonomy controls maintenance UI grouping rather than adding GL／SL columns. See [[Balance Account Configuration]].\n\n### Lifecycle and business-day rules\n\n\`config.ts\` currently defines a 30-second expiry sweep, Import／Export mail-float grace of 5 days, automated Maker／Checker actors, auto-expiry and auto-close enablement, an auto-close reason, and a 2-business-day auto-close grace period. These are source constants, not \`.env\` overrides. The domestic-calendar generator copies the standing reference into the local business-day mock; this is test／development data and is not proof of a production holiday calendar. See [[Auto Expiry and Auto Close]].\n\n### Proxy routing\n\nThe normal Angular proxy sends \`/api\` to port 4300 and Balance routes to port 4100. The live-E2E proxy uses backend port 4301 while retaining Balance port 4100. Proxy failure therefore appears as Vite \`ECONNREFUSED\` when the target process is unavailable; retry configuration does not replace service readiness.\n\n### Web Component configuration\n\nThe public runtime contract has configuration version \`1\`, view selection, \`system\`／\`light\`／\`dark\` themes and CSS design tokens. Unknown keys or incompatible versions are rejected by the contract parser.\n\n## Change procedure\n\n1. Change the authoritative source only; do not edit generated TypeScript files manually.\n2. Run \`npm run prepare:app\` for \`.env\` generation or taxonomy changes.\n3. Run the relevant type checks／tests and \`npm run docs:verify\`.\n4. Restart the process whose startup configuration changed.\n5. Regenerate this vault with \`node scripts/rebuild-obsidian-kb.mjs --write\`.\n\nThe external documentation counterpart is \`docs/configuration.md\`; OAS remains the authority for HTTP payloads and does not duplicate deployment settings.`,
 }));
 
 add('09-Architecture/ADR-001 Generic Balance Action Model.md', note({
@@ -342,6 +437,39 @@ add('09-Architecture/ADR-001 Generic Balance Action Model.md', note({
   sources: ['microservices/balance-component/src/types.ts', 'microservices/balance-component/src/service/balanceService.ts', 'microservices/balance-component/src/domain/balanceDerivation.ts', 'microservices/balance-component/src/domain/contingentAccountEntry.ts', 'src/app/transaction-builder/balance-component.model.ts'],
   body: `## Context\n\nLC、SBLC 與 LG 的合約欄位、法律事件、選擇條件及 SWIFT 流程不同，但對 Balance Control 的核心影響可正規化為少數動作：增額、減額及額度保留。若 Balance Engine 直接認識每一種產品與 Function，新增產品會迫使 type union、DB constraint、UI catalog、eligibility 與 accounting switch 同步修改。\n\n## Decision\n\nBalance Engine 的 target architecture 只處理以下 normalized actions：\n\n- \`TAKE_DOWN\`：建立或增加 balance。\n- \`REPAYMENT\`：減少或清償 balance。\n- \`EARMARK\`：保留 capacity，但未完成最終 balance／accounting event。\n- \`RELEASE_EARMARK\`：取消尚未被消耗的保留。\n- \`CONSUME_EARMARK\`：把既有保留轉入其後真正的 TAKE_DOWN／REPAYMENT 流程。\n\nAmount 一律為正值，方向由 action 表達，不以正負號暗示。LC、SBLC、LG Product Policy 負責把 ISSUE、AMENDMENT、CLAIM、DRAWING、EXPIRE、CLOSE 等 business event 映射成一個或多個 normalized actions。\n\n| Business event | Normalized Balance action |\n|---|---|\n| Issue | TAKE_DOWN |\n| Amendment Increase | TAKE_DOWN |\n| Amendment Decrease | REPAYMENT |\n| Claim／Drawing received | EARMARK |\n| Claim approved／paid | CONSUME_EARMARK + REPAYMENT（依產品 liability direction） |\n| Claim cancelled／rejected | RELEASE_EARMARK |\n| Expire／Close | REPAYMENT remaining balance |\n| Reopen | TAKE_DOWN restoration |\n\n## Responsibility boundary\n\nBalance Core 共用 balance math、Maker／Checker、Pending／Rejected、audit、idempotency、snapshot、decimal money 與 posting gate。Product Policy 擁有合約欄位、selection／eligibility、parent-child relationship、business-event mapping、Account Mapping key、SWIFT strategy 與產品專屬 lifecycle。\n\n\`Business Event → Product Policy → BalanceAction[] → Generic Balance Engine → Account Mapping\`\n\n## Options considered\n\n1. 繼續以產品／Function 硬編碼：短期直接，但每個新產品都擴大 switch、enum、migration 與 regression surface。\n2. 將所有規則做成無型別自由設定：擴充快，但會犧牲編譯期檢查、DB integrity 與可稽核性。\n3. 採 typed Product Policy + normalized Balance Action：保留型別與 audit，同時隔離產品差異。採用此方案。\n\n## Consequences\n\n- 新增 SBLC／LG 的 Balance 計算應是小改；主要工作集中在 selection eligibility、合約內容、event mapping 與 Account Mapping。\n- 現有 LC Function 必須逐步改成 business-event adapter，不進行一次性重寫。\n- DB／API 仍需辨識 product identity，但 Balance direction 不再由產品 switch 決定。\n- Accounting 科目可以不同，TAKE_DOWN／REPAYMENT 的方向語意保持一致。\n\n## Implementation guardrails\n\n- 先以 characterization tests 固定現有 A／B Function 行為，再抽取 \`BalanceAction\` 與 \`BalanceProductPolicy\` contracts。\n- Import LC／Export Confirmation 先接回新 contract 並維持 coverage gate，再增加 SBLC，最後增加 LG。\n- Product Policy 不得繞過 Maker／Checker、audit、decimal money、posting gate 或 idempotency。\n- 本 ADR 不代表 SBLC／LG 已實作，也不改變目前 source-backed lifecycle。`,
 }));
+
+const productExtensionDecision = `## Configuration-first product extension
+
+新增 SBLC、LG 或其他業務品種採用 **configuration-driven metadata + typed Product Policy plug-in + Generic Balance Engine**。目標是把標準行為配置化，大幅縮小新增產品的 source-code change surface，但不把複雜法律、帳務或 SWIFT 規則變成無型別自由 expression。
+
+| Product extension concern | Target mechanism | Expected change for a new product |
+|---|---|---|
+| Product／instrument identity | Typed product-definition configuration | Configuration only |
+| Contract fields／natural key | Validated field schema | Mostly configuration; custom cross-field validation stays in policy |
+| Transaction Function／lifecycle | Configured catalog and state transitions | Standard transitions by configuration; exceptional side effects in policy |
+| Selection／eligibility | Reusable predicate registry referenced by configuration | Common predicates by configuration; product-specific eligibility in policy |
+| Business Event → \`BalanceAction[]\` | Strongly typed action mapping | Standard TAKE_DOWN／REPAYMENT／EARMARK flows by configuration |
+| Accounting／posting and Account Mapping key | Posting templates plus Account Mapping taxonomy | Normally configuration only |
+| UI／API／DB／SWIFT／tests | Schema-driven UI and generic API; extensible persistence identity; strategy plug-ins | Shared framework remains unchanged; SWIFT and exceptional behavior may add a plug-in and explicit tests |
+
+The configuration authority should cover category, product code, instrument identity, labels, display order, Tenor Type, natural-key composition, required／optional／protected field metadata, simple lifecycle transitions, reusable eligibility predicates, normalized action mappings, GL family, Tenor SL, Account Number／Description defaults and standard debit／credit posting templates. Angular should render the same validated schema rather than maintain a second product list.
+
+The following controls remain typed code or immutable Balance Core behavior: complex exposure calculations, parent／child interactions, compound atomic release, exceptional earmark side effects, product-specific legal rules, SWIFT construction and cross-field validation, Maker／Checker, idempotency, audit, decimal rounding, posting gate and transaction integrity. Configuration selects a policy or strategy; it must not bypass these controls.
+
+### One-time framework enablement
+
+Before a future product can be added mostly by configuration, the platform must introduce a versioned Product Definition schema, generic contract-field and natural-key schema, configured function catalog and lifecycle state machine, reusable eligibility predicate registry, typed \`BalanceAction[]\` engine, posting templates, schema-driven Angular rendering, generic product／function API contracts, extensible persistence identity and configuration validation. Generated tests may cover schema invariants and standard actions, but product business acceptance tests remain mandatory.
+
+After that enablement, a normal new product should require one Product Definition, Account Mapping configuration, an optional small Product Policy／SWIFT Strategy for genuine differences, and product acceptance tests. This is an architectural target, not a statement that current SBLC／LG support is configuration-only today.`;
+
+const genericBalanceActionAdrPath = join('09-Architecture', 'ADR-001 Generic Balance Action Model.md');
+docs.set(
+  genericBalanceActionAdrPath,
+  docs.get(genericBalanceActionAdrPath).replace(
+    '\n## Responsibility boundary',
+    `\n${productExtensionDecision}\n\n## Responsibility boundary`,
+  ),
+);
 
 add('09-Architecture/OOP OOD SOLID.md', note({
   title: 'OOP OOD SOLID', type: 'architecture', domain: 'architecture', tags: ['architecture', 'oop', 'ood', 'solid'],
@@ -377,6 +505,8 @@ const documentationInventory = [
   ['Movement status values', movementStatuses.length],
   ['Exposure nature values', exposureNatures.length],
   ['Tenor type values', tenorTypes.length],
+  ['Configuration sources', configurationSources.length],
+  ['Root environment variables', Object.keys(envValues).length],
   ['Canonical cross-cutting topics', 14],
 ];
 const documentationInventoryTotal = documentationInventory.reduce((sum, [, count]) => sum + count, 0);
@@ -408,6 +538,12 @@ const sourceGroups = [
   ['Business cases', 'backend/data/businessCases.js'],
   ['Microservice OAS', 'analysis/balance-component-api.yaml'],
   ['Channel OAS', 'analysis/balance-component-channel-api.yaml'],
+  ['Runtime and deployment configuration', '.env'],
+  ['Generated runtime configuration', 'scripts/generate-runtime-config.mjs'],
+  ['Account mapping taxonomy', 'microservices/balance-component/config/balance-account-mappings.json'],
+  ['Domestic calendar fixture', 'microservices/business-days-mock/data/calendar.json'],
+  ['Development proxy', 'proxy.conf.json'],
+  ['Web Component runtime contract', 'src/app/web-component/balance-component-element.contract.ts'],
 ];
 add('99-Source-Map/Production Source Inventory.md', note({
   title: 'Production Source Inventory', type: 'source-map', domain: 'documentation', tags: ['source-map', 'coverage'],
@@ -430,6 +566,25 @@ for (const f of functions) {
   }
 }
 if (!docs.has(join('02-Business-Rules', 'Auto Expiry and Auto Close.md'))) throw new Error('Auto lifecycle documentation is missing');
+const configurationDoc = docs.get(join('09-Architecture', 'Configuration Reference.md')) ?? '';
+for (const source of configurationSources) {
+  if (!existsSync(resolve(repo, source))) throw new Error(`Configuration source is missing: ${source}`);
+}
+for (const name of Object.keys(envValues)) {
+  if (!configurationDoc.includes(name)) throw new Error(`Environment configuration is undocumented: ${name}`);
+  if (sensitiveEnvName(name) && !configurationDoc.includes(`${name}=...`)) throw new Error(`Sensitive environment configuration is not masked: ${name}`);
+}
+const balanceAccountConfigurationDoc = docs.get(join('04-Exposure-Accounting', 'Balance Account Configuration.md')) ?? '';
+for (const mapping of balanceAccountTaxonomy.mappings) {
+  if (!balanceAccountConfigurationDoc.includes(mapping.mappingKey)
+    || !balanceAccountConfigurationDoc.includes(mapping.accountA.accountNumber)
+    || !balanceAccountConfigurationDoc.includes(mapping.accountB.accountNumber)) {
+    throw new Error(`Account Number configuration default is undocumented: ${mapping.mappingKey}`);
+  }
+}
+if (!balanceAccountConfigurationDoc.includes('SYSTEM_CONFIG_RELOAD') || !balanceAccountConfigurationDoc.includes('Cleanup Database 保留 mappings')) {
+  throw new Error('Account Number configuration reload behavior is undocumented');
+}
 const earmarkDoc = docs.get(join('02-Business-Rules', 'Earmark Rules.md')) ?? '';
 for (const code of ['A3', 'A3S', 'A4', 'A6', 'B3', 'B4']) {
   if (!earmarkDoc.includes(code)) throw new Error(`Earmark lifecycle documentation is incomplete: ${code}`);

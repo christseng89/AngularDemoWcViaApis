@@ -703,6 +703,41 @@ export const MIGRATIONS: Migration[] = [
       if (!columns.includes('tolerance_change_direction')) db.exec("ALTER TABLE balance_movements ADD COLUMN tolerance_change_direction TEXT CHECK (tolerance_change_direction IS NULL OR tolerance_change_direction IN ('INCREASE','DECREASE'))");
     },
   },
+  {
+    id: 26,
+    description: 'Replace fixed Balance Account business-type and risk-class CHECKs with configuration-authoritative category/Tenor validation while preserving every maintained mapping row.',
+    up: (db) => {
+      db.exec('BEGIN IMMEDIATE');
+      try {
+        db.exec(`CREATE TABLE balance_account_mappings_new (
+          mapping_key TEXT PRIMARY KEY,
+          instrument_type TEXT NOT NULL,
+          risk_class TEXT NOT NULL,
+          account_a_number TEXT NOT NULL,
+          account_a_description TEXT NOT NULL,
+          account_b_number TEXT NOT NULL,
+          account_b_description TEXT NOT NULL,
+          version INTEGER NOT NULL CHECK (version > 0),
+          updated_by TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          UNIQUE (instrument_type, risk_class)
+        )`);
+        db.exec(`INSERT INTO balance_account_mappings_new (
+          mapping_key, instrument_type, risk_class, account_a_number, account_a_description,
+          account_b_number, account_b_description, version, updated_by, updated_at
+        ) SELECT
+          mapping_key, instrument_type, risk_class, account_a_number, account_a_description,
+          account_b_number, account_b_description, version, updated_by, updated_at
+        FROM balance_account_mappings`);
+        db.exec('DROP TABLE balance_account_mappings');
+        db.exec('ALTER TABLE balance_account_mappings_new RENAME TO balance_account_mappings');
+        db.exec('COMMIT');
+      } catch (error) {
+        db.exec('ROLLBACK');
+        throw error;
+      }
+    },
+  },
 ];
 
 export function runMigrations(db: DatabaseSync): void {

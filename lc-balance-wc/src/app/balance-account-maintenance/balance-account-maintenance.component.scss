@@ -11,6 +11,10 @@ input:focus { outline: 2px solid var(--blue, #1d4ed8); outline-offset: 1px; }
 input[readonly] { cursor: default; color: var(--gray-muted, #6b7280); background: var(--gray-readonly-bg, #f3f4f6); }
 .validation-rule { display: grid; gap: .2rem; color: var(--gray-muted, #6b7280); font-size: .8rem; }
 code { overflow-wrap: anywhere; }
+.category-tabs { display: flex; gap: 1.5rem; margin: 0 0 1rem; border-bottom: 1px solid var(--gray-border, #e5e7eb); }
+.category-tabs button { padding: .8rem .25rem; color: var(--gray-muted, #6b7280); background: transparent; border: 0; border-bottom: 3px solid transparent; border-radius: 0; }
+.category-tabs button:hover, .category-tabs button:focus-visible { color: var(--blue, #1d4ed8); }
+.category-tabs .category-tabs__tab--active { color: var(--blue, #1d4ed8); border-bottom-color: var(--blue, #1d4ed8); }
 .mapping-index { overflow: hidden; border-top: 3px solid var(--blue, #1d4ed8); }
 .mapping-index__header { display: flex; align-items: end; justify-content: space-between; gap: 1.5rem; padding: 1rem; }
 .mapping-index h2 { margin: 0 0 .25rem; color: var(--navy, #1e3a5f); font-size: 1.1rem; }
@@ -27,10 +31,24 @@ code { overflow-wrap: anywhere; }
 .mapping-detail { display: grid; gap: .75rem; }
 .back-button { justify-self: start; }
 .mapping-card { padding: 1rem; border-top: 3px solid var(--blue, #1d4ed8); }
-.mapping-card > header, .mapping-card > footer { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.mapping-card > header, .mapping-card > footer, .subledger-card > header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.mapping-card > header > div { display: grid; gap: .2rem; }
+.mapping-card > header strong { color: var(--navy, #1e3a5f); font-size: 1.15rem; }
+.family-code { color: var(--gray-muted, #6b7280); font-size: .8rem; }
 .mapping-actions { display: flex; align-items: center; gap: .65rem; }
-.mapping-card > header span { margin-left: .65rem; padding: .15rem .5rem; color: var(--blue-dark, #1e40af); background: var(--blue-bg, #eff6ff); border-radius: 999px; font-size: .75rem; }
 .mapping-card small { color: var(--gray-muted, #6b7280); }
+.account-grid--gl-first { align-items: start; }
+.gl-card { display: grid; gap: 1rem; min-width: 0; }
+.gl-card__title { color: var(--navy, #1e3a5f); font-size: 1.2rem; font-weight: 800; }
+.gl-card__fields { grid-template-columns: 1fr; }
+.gl-card__fields label { font-size: .95rem; font-weight: 800; }
+.gl-card__fields input { font-size: 1rem; font-weight: 700; }
+.gl-card__subledgers { display: grid; gap: 1rem; }
+.subledger-card { display: grid; gap: .75rem; padding: 1rem; background: var(--bg-surface, #fff); border: 1px solid var(--gray-border, #e5e7eb); border-radius: .5rem; }
+.subledger-card > header > div { display: flex; align-items: center; gap: .5rem; }
+.subledger-label { color: var(--navy, #1e3a5f); font-weight: 750; }
+.composition-note { justify-self: end; font-style: italic; }
+.tenor-badges { display: flex; flex-wrap: wrap; gap: .35rem; }
 .account-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin: 1rem 0; }
 fieldset { display: grid; gap: .75rem; min-width: 0; padding: 1rem; border: 1px solid var(--gray-border, #e5e7eb); border-radius: .4rem; }
 legend { padding: 0 .35rem; color: var(--navy, #1e3a5f); font-weight: 700; }
@@ -40,7 +58,7 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .secondary-button { color: var(--blue, #1d4ed8); background: transparent; border: 1px solid var(--blue, #1d4ed8); }
 .state-message { padding: 1rem; border: 1px solid var(--gray-border, #e5e7eb); border-radius: .4rem; }
 .state-message--error, .error-message { color: var(--red-dark, #b91c1c); }
-.success-message { color: var(--green-dark, #15803d); }
+.state-message--success, .success-message { color: var(--green-dark, #15803d); }
 @media (max-width: 720px) {
   .account-grid { grid-template-columns: 1fr; }
   .maintenance-toolbar, .account-maintenance__header, .mapping-index__header { align-items: stretch; flex-direction: column; }

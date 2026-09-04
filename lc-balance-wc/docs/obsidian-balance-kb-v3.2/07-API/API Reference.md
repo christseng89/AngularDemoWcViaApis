@@ -4,8 +4,8 @@ type: reference
 domain: api
 status: verified
 source_of_truth: source-code
-source_revision: "c7e9884"
-verified_date: 2026-09-03
+source_revision: "1865d80"
+verified_date: 2026-09-04
 generated: true
 aliases: []
 tags: ["api"]
@@ -48,6 +48,8 @@ OAS 是 consumer contract；Express route 與 service 是 runtime implementation
 | `POST` | `/balance-movements/:movementId/maker-submit` | `microservices/balance-component/src/routes/balanceMovements.ts` |
 | `POST` | `/balance-movements/:movementId/withdraw-maker-submit` | `microservices/balance-component/src/routes/balanceMovements.ts` |
 | `GET` | `/balance-account-mappings` | `microservices/balance-component/src/routes/balanceAccountMappings.ts` |
+| `POST` | `/balance-account-mappings/reload-configuration` | `microservices/balance-component/src/routes/balanceAccountMappings.ts` |
+| `PUT` | `/balance-account-mappings/families/:familyKey` | `microservices/balance-component/src/routes/balanceAccountMappings.ts` |
 | `PUT` | `/balance-account-mappings/:mappingKey` | `microservices/balance-component/src/routes/balanceAccountMappings.ts` |
 | `GET` | `/delete-pending-audit/lc-catalog` | `microservices/balance-component/src/routes/deletePendingAudit.ts` |
 | `GET` | `/delete-pending-audit` | `microservices/balance-component/src/routes/deletePendingAudit.ts` |
