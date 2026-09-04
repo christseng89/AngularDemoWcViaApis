@@ -22,8 +22,9 @@
 1. Reviewer／BA 最新明确确认的业务决策。
 2. `analysis/` 中当前批准的规格和映射。
 3. `analysis/balance-component-api.yaml` 与 `analysis/balance-component-channel-api.yaml`。
-4. 自动化测试所表达的当前合约。
-5. 现有实现。
+4. `openspec/specs/` 中已经验证并归档的当前行为合约。
+5. 自动化测试所表达的当前合约。
+6. 现有实现。
 
 新确认的长期决策写入 `docs/decisions/`；不要向本文件追加实施日记。历史过程在 `docs/history/implementation-log.md`。
 
@@ -52,6 +53,18 @@
 - Decrease 后的 Resulting Tolerance 可等于 0，但不得小于 0；Angular 与 API 必须使用相同规则直接拒绝。
 - Amendment Release 不接受也不重传最终 `tolerancePct`；服务端必须从已保存的 change 与当前核准 Contract 自行重算、检查 stale basis，并仅在 Release 成功后激活最终值。
 - 每项 SWIFT 相关变更必须有正向、边界及拒绝案例，并纳入相关单元／整合测试与 Business Case Runner。
+
+## OpenSpec Professional Verification Gate（项目级）
+
+本节是本项目自定义的专业验证门槛，不代表 OpenSpec 官方颁发的个人或产品认证。正式 OpenSpec artifacts 位于 repository 根目录 `openspec/`；不得在 `docs/` 建立第二份 OpenSpec truth。
+
+- `openspec/specs/` 只描述已经由 Source Code、自动化测试及 OAS 证实的可观察 AS-IS 行为；尚未实现的目标架构、SBLC／LG 或其他未来行为必须留在 `openspec/changes/`。
+- 任何新增、修改或删除行为必须先建立 change proposal 与 delta spec；复杂跨层变更还必须包含 design 和可验证 tasks，未经同意不得直接实施。
+- 每项规范性 Requirement 必须使用 SHALL／MUST，并至少包含一个可测试的 WHEN／THEN scenario；金额、状态、权限或边界规则还必须包含适用的拒绝／边界 scenario。
+- 验证必须覆盖受影响的 Angular、API、Domain、DB、Maker／Checker、accounting、Business Case Runner、OAS、Obsidian 与 OpenSpec。不得只验证 UI，也不得以改写 spec 或 expected result 掩盖缺陷。
+- OpenSpec 与较高权威来源冲突时，依本文件的“权威来源顺序”处理，记录冲突并同步修正；不得让未经验证的 spec 静默覆盖业务决策或 OAS。
+- Archive 前必须逐项对照 implementation、测试结果与 delta scenarios；只有全部完成、验证通过且 current specs 已同步，才可归档。
+- OpenSpec CLI 严格验证命令为 `openspec validate --all --strict --no-interactive`。Claude Code 使用 `/opsx:*` workflows；Codex 使用 `$openspec-*` skills。
 
 ## 目录级规则
 

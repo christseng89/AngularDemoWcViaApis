@@ -1,0 +1,37 @@
+schema: spec-driven
+
+context: |
+  專案：Balance Component Web Component 與 Balance 微服務。
+  技術棧：Angular 20、TypeScript、Express、SQLite、Jest、Playwright、OpenAPI 3。
+  業務領域：進口信用證、出口保兌信用證、承兌及提貨擔保的額度控制。
+  權威順序：BA／Reviewer 最新明確決策；已批准 analysis；OAS；目前 OpenSpec specs；自動化測試；現有實作。
+  現況證據位於 analysis/、測試、Source Code 與 docs/obsidian-balance-kb-v3.2/。
+  金額採精確十進位運算，依幣別小數位 ROUND_HALF_UP；JavaScript 浮點數不是權威計算方式。
+  Maker／Checker 分離、審計、冪等、原子性及服務端驗證均為強制控制。
+  OpenSpec specs 只描述可觀察的 AS-IS 行為。未來或尚未實作的行為必須留在 openspec/changes/，直到完成實作、驗證與歸檔。
+
+rules:
+  proposal:
+    - 必須說明原因、範圍、非目標、受影響能力、遷移影響與回復考量。
+    - 沒有 Source Code 與測試證據時，不得把 SBLC、LG 或其他目標架構寫成已實作行為。
+  specs:
+    - 每項規範性要求必須使用 SHALL 或 MUST。
+    - 每項 Requirement 至少要有一個可測試的 WHEN／THEN Scenario；適用時必須加入拒絕或邊界情境。
+    - 受影響時必須明確說明 Maker／Checker、金額、帳務、審計、冪等與交易邊界效果。
+    - 實作細節放在 design；specs 只定義可觀察契約。
+  design:
+    - 必須識別服務邊界、資料流、交易邊界、失敗行為、安全控制及 OOP／OOD／SOLID 取捨。
+    - 優先採用配置驅動 metadata 加 typed policy，不採用無型別規則 expression。
+  tasks:
+    - 採測試先行及可獨立驗證的步驟，並列出準確檔案與驗證命令。
+    - 行為變更時必須包含 OAS、Business Case Runner、Obsidian 與 OpenSpec 同步。
+
+operations:
+  apply:
+    guidance:
+      - proposal、delta specs、design 與 tasks 尚未達到可審查狀態前，不得實作。
+      - 保留工作樹內無關修改，不得直接修改 generated files。
+  archive:
+    guidance:
+      - delta specs 合併至 current specs 前，必須逐項用 Scenario 驗證實作。
+      - 未解決缺口必須記錄，不得降低 Requirement 來迎合缺陷。
