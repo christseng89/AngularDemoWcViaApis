@@ -5,7 +5,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const root = process.cwd();
-const portalUrl = process.env.PORTAL_URL ?? "http://localhost:4400/";
+const portalUrl = process.env.PORTAL_URL ?? "http://localhost:4600/";
 const uatApiBase = process.env.UAT_API_BASE ?? "http://localhost:3100/api";
 const dataVersion = process.env.UAT_DATA_VERSION ?? "v15.2";
 const v153 = dataVersion === "v15.3";

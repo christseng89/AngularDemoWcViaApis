@@ -1,13 +1,13 @@
 {
   "schemaVersion": "1.0",
   "artifact": "memory/lc-ssi-wc-operating-model-zh-v2.md",
-  "version": "v2.8.18",
-  "effectiveDate": "2026-09-15",
-  "sha256": "5D3B1730409BB974137CCCEC59E7E2635F2E2C75FFCB452AD0C5983EBFC80318",
-  "changeReason": "Add an independent DBA/Database Performance Engineer as a mandatory data-volume and latency gate; require database-side filtering/join/sort evidence and exact seed, fixture, eligibility, and logical-snapshot parity across Operational API, QA automation, and Browser UI.",
+  "version": "v2.8.19",
+  "effectiveDate": "2026-09-16",
+  "sha256": "78A6DFF2E7DF49979072824830B36357392A6EA74478096B346D09B559A63D88",
+  "changeReason": "Revoke authorization for all D: workspaces and make C:/Users/samfi/Downloads/outputs/lc-ssi-wc the sole project root; keep local controlled deliverables off Git remotes; add mandatory MT1/pacs.008 Customer Payment Instructions versus Bank SSI domain boundaries and fail-closed BA evidence gates.",
   "scope": "All current and future SSI Resolution Message Families and their Generic UI consumers.",
   "maker": "/root",
-  "independentChecker": "/root/ba_independent_nvr_review; /root/qa_payment_all_scenarios",
+  "independentChecker": "/root/ba_mt1_pacs008_boundary; /root/qa_payment_all_scenarios",
   "checkerStatus": "PENDING_REVIEW",
   "checkedAt": null,
   "referencedArtifacts": [
@@ -19,9 +19,9 @@
   ],
   "reviewEvidence": {
     "ba": {
-      "checker": "/root/ba_independent_nvr_review",
+      "checker": "/root/ba_mt1_pacs008_boundary",
       "status": "PENDING_REVIEW",
-      "scope": "RMA versus SSI route, MT/MX display format, FIN/FINPLUS execution transport, Core/COV profile, actual Receiver, and contingency governance"
+      "scope": "MT1/pacs.008 CPI versus Bank SSI boundary, Customer UI semantics, Serial/Cover and INDA/INGA/COVE axes, scenario ownership, current-rule evidence, and D: authorization revocation"
     },
     "qa": {
       "checker": "/root/qa_payment_all_scenarios",

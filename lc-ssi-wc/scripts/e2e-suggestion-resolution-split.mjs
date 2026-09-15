@@ -1,7 +1,7 @@
 import { chromium } from "@playwright/test";
 
 const api = process.env.BFF_URL ?? "http://localhost:3100/api";
-const portal = process.env.PORTAL_URL ?? "http://localhost:4400/";
+const portal = process.env.PORTAL_URL ?? "http://localhost:4600/";
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 const post = async (path, body) => {
   const response = await fetch(`${api}/${path}`, {

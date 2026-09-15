@@ -25,7 +25,7 @@ const browser = await chromium.launch({
 });
 try {
   const page = await browser.newPage({ viewport: { width: 760, height: 900 } });
-  await page.goto(process.env.PORTAL_URL ?? "http://localhost:4400/", {
+  await page.goto(process.env.PORTAL_URL ?? "http://localhost:4600/", {
     waitUntil: "networkidle",
   });
   const activeEntities = await fetch(
@@ -334,7 +334,7 @@ try {
   await noticePage.route("**/api/reference/currencies", (route) =>
     route.abort(),
   );
-  await noticePage.goto(process.env.PORTAL_URL ?? "http://localhost:4400/", {
+  await noticePage.goto(process.env.PORTAL_URL ?? "http://localhost:4600/", {
     waitUntil: "networkidle",
   });
   const notice = noticePage.locator(".notice.warning").first();

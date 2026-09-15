@@ -16,7 +16,7 @@ import {
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const workspace = path.resolve(here, "../..");
-const portalUrl = process.env.PORTAL_URL ?? "http://localhost:4400/";
+const portalUrl = process.env.PORTAL_URL ?? "http://localhost:4600/";
 const apiUrl = process.env.MT2_QA_API_URL ?? "http://localhost:3100/api";
 const workbook = path.resolve(
   workspace,

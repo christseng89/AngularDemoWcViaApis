@@ -5,7 +5,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const root = process.cwd();
-const portalUrl = process.env.PORTAL_URL ?? "http://localhost:4400/";
+const portalUrl = process.env.PORTAL_URL ?? "http://localhost:4600/";
 const chrome =
   process.env.PLAYWRIGHT_BROWSER_PATH ??
   "C:/Program Files/Google/Chrome/Application/chrome.exe";

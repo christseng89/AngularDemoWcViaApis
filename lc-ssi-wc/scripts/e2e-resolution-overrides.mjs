@@ -2,7 +2,7 @@ import { chromium } from '@playwright/test';
 const assert=(condition,message)=>{if(!condition)throw new Error(message);};
 const browser=await chromium.launch({headless:true,executablePath:process.env.PLAYWRIGHT_BROWSER_PATH??'C:/Program Files/Google/Chrome/Application/chrome.exe'});
 try{
-  const page=await browser.newPage();await page.goto(process.env.PORTAL_URL??'http://localhost:4400/',{waitUntil:'networkidle'});await page.getByRole('button',{name:'SSI Resolution',exact:true}).click();
+  const page=await browser.newPage();await page.goto(process.env.PORTAL_URL??'http://localhost:4600/',{waitUntil:'networkidle'});await page.getByRole('button',{name:'SSI Resolution',exact:true}).click();
   const country=page.getByLabel('Settlement Country（advanced optional override）');const clearing=page.getByLabel('Clearing System（advanced optional override）');const currency=page.getByLabel('Currency (ISO 4217)');
   assert(await country.inputValue()===''&&await clearing.inputValue()==='','Overrides must default to Derive from eligible route');
   const countryOptions=await country.locator('option').allTextContents();assert(countryOptions[0]?.includes('Derive from eligible route')&&countryOptions.some((value)=>value.includes('US · United States')),'Country dropdown must use Country Standing Data');

@@ -10,7 +10,7 @@ const artifactRoot = process.env.SSI_UI_ARTIFACT_ROOT ?? "C:/Users/samfi/OneDriv
 const browser = await chromium.launch({ headless: true, executablePath: process.env.PLAYWRIGHT_BROWSER_PATH ?? "C:/Program Files/Google/Chrome/Application/chrome.exe" });
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
-  await page.goto(process.env.PORTAL_URL ?? "http://localhost:4400/", { waitUntil: "networkidle" });
+  await page.goto(process.env.PORTAL_URL ?? "http://localhost:4600/", { waitUntil: "networkidle" });
   await page.getByRole("button", { name: "SWIFT Data Service", exact: true }).click();
   await page.locator(".resource-tabs").waitFor();
   const resources = (await page.locator(".resource-tabs button").allTextContents()).map((item) => item.trim());

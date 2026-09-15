@@ -1,5 +1,5 @@
 {
-  "portalUrl": "http://localhost:4400/",
+  "portalUrl": "http://localhost:4600/",
   "entryButton": "Payment SSI Resolution",
   "messageIndexHeading": "Payment Message Index",
   "bankServiceResponsePattern": "/api/reference/banks",

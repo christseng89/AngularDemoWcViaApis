@@ -1,6 +1,6 @@
 import { chromium } from "@playwright/test";
 
-const portal = process.env.PORTAL_URL ?? "http://localhost:4400/";
+const portal = process.env.PORTAL_URL ?? "http://localhost:4600/";
 const screenshotPath =
   process.env.SUGGESTION_SCREENSHOT_PATH ??
   "C:/Users/samfi/OneDrive/Documents/ChatGPT/Baseline-SSI/artifacts/outward-mt400-gbp-result-side.png";

@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { chromium } from "@playwright/test";
 
-const portalUrl = process.env.PORTAL_URL ?? "http://localhost:4400/";
+const portalUrl = process.env.PORTAL_URL ?? "http://localhost:4600/";
 const browserPath =
   process.env.PLAYWRIGHT_BROWSER_PATH ??
   "C:/Program Files/Google/Chrome/Application/chrome.exe";

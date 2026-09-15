@@ -10,7 +10,7 @@ import { chromium } from "@playwright/test";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "../..");
-const portalUrl = process.env.PORTAL_URL ?? "http://localhost:4400/";
+const portalUrl = process.env.PORTAL_URL ?? "http://localhost:4600/";
 const apiUrl = process.env.MT2_QA_API_URL ?? "http://localhost:3100/api";
 const seed = process.env.MT2_QA_RANDOM_SEED ?? "MT2-RESOLVER-20260911";
 const reportPath = path.resolve(

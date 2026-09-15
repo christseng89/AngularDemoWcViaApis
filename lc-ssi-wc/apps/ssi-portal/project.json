@@ -23,7 +23,7 @@
       "continuous": true,
       "options": {
         "buildTarget": "ssi-portal:build",
-        "port": 4400,
+        "port": 4600,
         "proxyConfig": "apps/ssi-portal/proxy.conf.json"
       }
     },

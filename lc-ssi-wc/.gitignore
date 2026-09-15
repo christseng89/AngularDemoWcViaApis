@@ -10,6 +10,8 @@ playwright-report/
 test-results/
 tmp/
 
+qa-archived/
+
 # Rebuildable QA run artifacts (keep reviewed MD/JSON/DOCX summaries tracked)
 qa/mt2/migration-backups/
 qa/mt2/reports/mt2-139-ui-evidence/

@@ -9,7 +9,7 @@ const assert=(condition,message)=>{if(!condition)throw new Error(message);};
 const browser=await chromium.launch({headless:true,executablePath:process.env.PLAYWRIGHT_BROWSER_PATH??'C:/Program Files/Google/Chrome/Application/chrome.exe'});
 try{
   const page=await browser.newPage({acceptDownloads:true});
-  await page.goto(process.env.PORTAL_URL??'http://localhost:4400/',{waitUntil:'networkidle'});
+  await page.goto(process.env.PORTAL_URL??'http://localhost:4600/',{waitUntil:'networkidle'});
   const resources=[
     {tab:'RMA Authorisation',id:'rma',endpoint:'rma-authorisations'},
     {tab:'SSI',id:'ssi',endpoint:'ssis'},

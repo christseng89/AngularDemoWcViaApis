@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 
-const ports = [3100, 3101, 3102, 4400, 4401];
+const ports = [3100, 3101, 3102, 4600, 4401];
 if (process.platform !== 'win32') {
   console.log('[dev:stop] Automatic port cleanup is currently supported on Windows only.');
   process.exit(0);

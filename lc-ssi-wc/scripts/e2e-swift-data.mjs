@@ -14,7 +14,7 @@ assert(nostro.decision==='RESOLVED'&&nostro.maskedAccountRef.endsWith('PRIMARY')
 const browser=await chromium.launch({headless:true,executablePath:process.env.PLAYWRIGHT_BROWSER_PATH??'C:/Program Files/Google/Chrome/Application/chrome.exe'});
 try{
   const page=await browser.newPage({viewport:{width:1500,height:1000}});
-  await page.goto('http://localhost:4400/',{waitUntil:'networkidle'});
+  await page.goto('http://localhost:4600/',{waitUntil:'networkidle'});
   const navigation=await page.locator('aside nav button').allTextContents();
   assert(navigation[0]?.trim()==='SWIFT Data Service','SWIFT Data Service should be the first navigation item');
   assert(navigation.map((item)=>item.replace(/\s+\d+$/,'').trim()).join('|')==='SWIFT Data Service|Checker 審批|SSI Resolution|MT／MX Tag Lab|稽核與事件','Unexpected primary navigation order');

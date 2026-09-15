@@ -1,7 +1,7 @@
 # lc-ssi-wc 全專案作業模式與交付治理 — 中文版 v2
 
 **狀態：CONTROLLED**  
-**文件版本：v2.8.18**
+**文件版本：v2.8.19**
 **生效日期：2026-09-15**
 **適用範圍：MT1／pacs.008、MT2／pacs.009 plain/COV/ADV、MT3＋MT4＋MT7（MT347）及未來所有 Message Family**
 
@@ -29,6 +29,7 @@
 18. 本規範對所有參與者具強制力，包括主代理、子代理、BA Maker／Checker、QA、API／Backend、UI、Data／DB、Security、Reviewer、臨時專家及後續新增組員。每位成員開始任何分析、修改、測試、掃描或簽核前，必須讀取本規範與 Manifest，核對當前版本及 SHA-256，並在交付中聲明所依據的版本／SHA。未核對、使用舊 SHA、只依聊天摘要或與本規範衝突的成果，一律不得合併、不得標示 PASS，也不得作為 4-EYES 證據。
 19. RMA 是針對 chosen route 的實際 Receiver、service/channel、direction、exact message profile 與有效日所作的授權 Gate，不是 SSI route、MT↔MX mapping、顯示格式或預設 transport 的選擇器。受控 Message Profile／Delivery Policy 先決定正常 transport；SSI／Nostro 再決定 executable route 與 `actualReceiverBic`；RMA 最後逐 route 驗證。對 MT2／pacs.009，正常 default 為 FINPLUS／MX `pacs.009.001.08`（Core `swift.cbprplus.04`、COV `swift.cbprplus.cov.04`）；FIN／MT 僅能在正式 contingency policy、明確 intent／reason、權限與 4-EYES 下使用。FIN 與 FINPLUS 同時授權時仍不得由 RMA 任意選擇或自動偏好 FIN；只有 FIN 授權時不得靜默降級，正常 MX resolution 必須 fail closed。`displayFormat`（MX 或 MT compatibility view）必須與 `executionTransport`（FINPLUS 或 FIN）分離；切換 compatibility view 不得重跑 SSI、改 route／RMA／Nostro 或 snapshot hash。
 20. 工作組必須配置獨立 DBA／Database Performance Engineer，且資料量增加時 DBA review 為強制 Gate。Operational、QA API 與 Browser UI 必須使用同一版本化 seed、fixture binding、logical snapshot 與 eligibility projection；QA-only／negative／boundary 資料必須隔離，不得滲入 Operational Picker。每個啟用幣別至少提供三條完整、RMA-authorised、可 Resolve 的 SSI route，API 依受控排序回傳唯一最佳預設。高頻 eligibility／route discovery／Resolve 查詢必須由 DB 先完成 filter／join／sort，只把候選結果交給中台；禁止每次請求全表讀取 JSON 後在 application memory 篩選。DBA 必須保存 row count、index／query plan、冷熱延遲、p50／p95／max、payload、WAL／lock 與 reload 前後 snapshot 證據；QA 必須以相同 snapshot 驗證 API 候選、default、UI 顯示與 Resolve 結果完全一致。資料、索引、SQL、seed 或 snapshot 任一變更，都使既有 DBA／QA 簽認失效並要求同 SHA／snapshot 重測。
+21. MT1／pacs.008 Customer Payment domain 必須明確區分 Customer Party Master、Payment Instruction Profile、transaction-scoped Customer Payment Instructions（CPI）、Bank SSI、Clearing／Network Reference、Routing／Settlement Policy 與 Executable Payment Instruction。Customer 提供付款意圖、party/account、amount/currency、purpose/remittance 及受控 routing constraint；Customer data 不得標為 Bank SSI，Customer UI 不得顯示 `SSI Count` 或 `governed SSI record`。Own／Counterparty SSI、Nostro／Vostro、reimbursement agents/accounts、RMA 與 settlement method 均由銀行受控來源／政策解析。原始 customer intent 必須 immutable 並保留 provenance；bank enrichment 不得靜默覆寫。MT103／pacs.008 先限 Phase 1，其他 MT1xx 必須逐 Message 另做 MRG／NVR ruling。Serial／Cover、chain topology 與 INDA／INGA／COVE／CLRG 是不同維度；未有 current SR2026／CBPR+／PMPG 精確證據及 BA OPEN 裁決前，不得推定 populate／omit、correlation、UETR copying 或合法組合，必須 fail closed。
 
 ## 2. 角色與任務分派
 
@@ -289,7 +290,7 @@ MT347 已實作且可供所有 Message Family 重用的完整 normative pattern�
 
 - 正式結構使用 `qa/<message-family>/`，例如 `qa/mt1/`、`qa/mt2/`、`qa/mt347/`。
 - `tdd/`、`reports/`、`test_cases/`、`uat/`、`fixtures/` 均置於各自 family 下，避免不同系列互相封存或覆蓋。
-- Git repo 內只保留最新版與正式 FINAL；DRAFT、被取代版本及舊 evidence 移至 repo 外的 `D:\Baseline_V6_20251231\qa-archived\<message-family>\...`。
+- 本機 workspace 內只保留最新版與正式 FINAL；DRAFT、被取代版本及舊 evidence 移至 `C:\Users\samfi\Downloads\outputs\lc-ssi-wc\docs\archive\<message-family>\...`。除非 Product Owner 另行明確授權，本機 governance、Proposal、Checker report 與 SHA evidence 不 commit、不 push 到 Git remote。
 - 「最新版」由狀態、語意版本、受控 SHA 與 supersession 記錄共同判斷，不得只依檔案日期；尚未被新版取代且為現行 runner/config 的檔案不因名稱較舊而自動封存。
 - `qa` 保留各 family 最新受控 TDD、FINAL 報告、現行 fixture/config、runner 及必要 evidence；DRAFT、superseded、舊 run 與 migration backup 送封存。
 - 封存前後產生 archive manifest，記錄原路徑、新路徑、SHA-256、狀態、原因與日期；不得刪除稽核軌跡。
@@ -353,7 +354,7 @@ Block 一經發現立即回報，格式固定如下：
 
 以下要求是目前工作的受控執行基準；細部 SWIFT 語意仍以各 Message Family 的最新受控 Memory／TDD 與 Source Register 為準，不在本章複製第二份規則。
 
-- **工作環境**：所有專案修改、測試、掃描與產物都在 `D:\Baseline_V6_20251231\lc-ssi-wc`；不得使用 OneDrive。暫存檔、scanner intermediate、cache 與 transient report 一律放在 repo-local `tmp/`，且 `tmp/` 必須由 Git ignore。
+- **工作環境**：自 2026-09-16 起，所有專案修改、測試、掃描與產物都以 `C:\Users\samfi\Downloads\outputs\lc-ssi-wc` 為唯一主目錄；不得再使用 `D:\Baseline_V6_20251231` 或 OneDrive workspace。暫存檔、scanner intermediate、cache 與 transient report 一律放在 repo-local `tmp/`，且 `tmp/` 必須由 Git ignore。
 - **工作編制**：每個 Message Family 至少配置兩位獨立 BA（Maker、Checker）及獨立 QA；所有受控結論適用 4-EYES，不得由作者自行核准。
 - **MT2／pacs.009 範圍**：Payment Index 只包含四個可執行 Message：`MT202`、`MT202COV`、`MT205`、`MT205COV`；每個 Message 依 SWIFT MRG、CBPR+ pacs.009 UG 與 NVR 建立 Operational 及 QA Scenarios。四個 Message 不等於只有四個 Scenario；Scenario 只在輸入契約、處理路徑、validation 或 oracle 有可驗證差異時保留。
 - **Scenario 分類與排序**：Operational 供 UAT 正向流程；QA 包含正向、負向與邊界驗證。排序鍵固定為 Operational／Valid=`0`、Invalid=`1`、Boundary=`2`，同類再依 Description 排序。
@@ -452,3 +453,4 @@ Block 一經發現立即回報，格式固定如下：
 | v2.8.16 | 2026-09-15 | 依 BA 裁定明訂 RMA 僅為 actual Receiver／channel／direction／exact profile 的授權 Gate，不是 MT／MX 格式或 route 選擇器；MT2 正常預設為 FINPLUS／MX，FIN 僅限受控 contingency，並分離 display format 與 execution transport | Maker `/root`；BA Maker 已完成裁定，待 Independent BA／QA 對本版本 SHA 重驗 |
 | v2.8.17 | 2026-09-15 | 依 Product Owner 指示，將 repo-local QA／Sonar 工具連線 loopback SonarQube 的 `http://localhost:9000` 設為窄範圍受控例外；產品 API、非 loopback、共享環境及 production 仍須遵守 TLS，且例外 issue 必須保留 reviewed／accepted trace | Maker `/root`；待 Independent Sonar／QA Checker 對本版本 SHA 重驗 |
 | v2.8.18 | 2026-09-15 | 依 Product Owner 指示，工作組新增獨立 DBA／Database Performance Engineer；資料量增加時強制 DB-side filter／join／sort、query plan 與冷熱延遲證據，並要求 Operational、QA API、Browser UI 共用同一 seed／fixture／logical snapshot，隔離 QA-only 資料 | Maker `/root`；任何既有 DBA／QA／BA 簽認因新版本與 SHA 失效，待 Independent Checker 對 v2.8.18 同 SHA 重驗 |
+| v2.8.19 | 2026-09-16 | 依 Product Owner 指示將唯一主目錄改為 `C:\Users\samfi\Downloads\outputs\lc-ssi-wc`，本機交付物不推送 remote；新增 MT1／pacs.008 CPI 與 Bank SSI 強制分域、Customer UI 禁止 SSI 語意、intent provenance、三軸拆分及 current-rule/OPEN fail-closed Gate | Maker `/root`；待 Independent BA／QA Checker 對 v2.8.19 同 SHA 重驗，簽認前為 NOT_ACCEPTED |
