@@ -1,0 +1,42 @@
+import 'reflect-metadata';
+import { NestFactory } from '@nestjs/core';
+import { Module, Controller, Get, Post, Body, Param, All, Req, Res, BadGatewayException } from '@nestjs/common';
+import type { Request, Response } from 'express';
+
+const serviceUrl = () => process.env['SSI_SERVICE_URL'] ?? 'http://localhost:3101';
+
+async function forward(path: string, init?: RequestInit): Promise<unknown> {
+  try {
+    const response = await fetch(`${serviceUrl()}/api/${path}`, { ...init, headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) } });
+    const value = await response.json() as unknown;
+    if (!response.ok) throw new BadGatewayException(value);
+    return value;
+  } catch (error) {
+    if (error instanceof BadGatewayException) throw error;
+    throw new BadGatewayException('SSI service is unavailable');
+  }
+}
+
+@Controller('api')
+class BffController {
+  @Get('dashboard') async dashboard(): Promise<unknown> {
+    const ssis = await forward('ssis') as Array<{ status: string }>;
+    return { counts: { total: ssis.length, active: ssis.filter((ssi) => ssi.status === 'ACTIVE').length, pending: ssis.filter((ssi) => ssi.status === 'PENDING_APPROVAL').length }, recent: ssis.slice(0, 8) };
+  }
+  @Get('ssis') list(): Promise<unknown> { return forward('ssis'); }
+  @Post('ssis') create(@Body() body: unknown): Promise<unknown> { return forward('ssis', { method: 'POST', body: JSON.stringify(body) }); }
+  @Post('ssis/:id/:action') transition(@Param('id') id: string, @Param('action') action: string, @Body() body: unknown): Promise<unknown> { return forward(`ssis/${encodeURIComponent(id)}/${encodeURIComponent(action)}`, { method: 'POST', body: JSON.stringify(body) }); }
+  @Post('resolve') resolve(@Body() body: unknown): Promise<unknown> { return forward('ssis/resolve', { method: 'POST', body: JSON.stringify(body) }); }
+  @Post('messages/extract') extract(@Body() body: unknown): Promise<unknown> { return forward('messages/extract', { method: 'POST', body: JSON.stringify(body) }); }
+  @Post('messages/generate') generate(@Body() body: unknown): Promise<unknown> { return forward('messages/generate', { method: 'POST', body: JSON.stringify(body) }); }
+  @Get('audit') audit(): Promise<unknown> { return forward('ssis/audit/events'); }
+}
+
+@Module({ controllers: [BffController] })
+class BffModule {}
+
+async function bootstrap(): Promise<void> {
+  const app = await NestFactory.create(BffModule); app.enableCors();
+  await app.listen(Number(process.env['SSI_BFF_PORT'] ?? 3100));
+}
+void bootstrap();

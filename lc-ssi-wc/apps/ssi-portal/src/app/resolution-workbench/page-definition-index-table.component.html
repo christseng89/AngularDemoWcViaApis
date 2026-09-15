@@ -1,0 +1,503 @@
+<section class="definition-index-workspace">
+  @if (selected(); as selection) {
+    <button class="back-button" type="button" (click)="close()">
+      <span aria-hidden="true">←</span> Back to transaction index
+    </button>
+    <ssi-resolution-workbench
+      [selection]="selection"
+      [pageSize]="pageSize()"
+      (cancelled)="backToScenarios()"
+    />
+  } @else {
+    @if (failure(); as currentFailure) {
+      <ssi-resolution-failure [failure]="currentFailure" (retry)="load()" />
+    } @else if (loading() && !index()) {
+      <output class="loading-state" aria-live="polite">
+        <span class="loading-pulse" aria-hidden="true"></span>
+        Loading SSI transaction index…
+      </output>
+    } @else if (index(); as currentIndex) {
+      <h2 class="index-title">Search {{ domainLabel() }} Message Index</h2>
+      <label class="index-search">
+        <span class="sr-only">Search {{ domainLabel() }} message index</span>
+        <input
+          type="search"
+          [value]="search()"
+          placeholder="MT code or message description"
+          (input)="searchIndex($any($event.target).value)"
+        />
+      </label>
+
+      <section class="transaction-index" aria-label="SWIFT transaction catalog">
+        <div class="index-summary">
+          <span>{{ visibleMessageGroups().length }} SWIFT messages</span>
+          <span>Click selectable rows</span>
+        </div>
+
+        <div class="index-table-scroll">
+          <table class="transaction-table">
+            <caption class="sr-only">
+              {{
+                domainLabel()
+              }}
+              SSI-supported SWIFT messages
+            </caption>
+            <thead>
+              <tr>
+                <th [attr.aria-sort]="ariaSort('messageCode')">
+                  <button
+                    type="button"
+                    class="sort-heading"
+                    (click)="sortBy('messageCode')"
+                  >
+                    MT TYPE
+                    @if (sortKey() === "messageCode") {
+                      <span aria-hidden="true">{{
+                        sortDirection() === "asc" ? "↑" : "↓"
+                      }}</span>
+                    }
+                  </button>
+                </th>
+                <th [attr.aria-sort]="ariaSort('description')">
+                  <button
+                    type="button"
+                    class="sort-heading"
+                    (click)="sortBy('description')"
+                  >
+                    SWIFT DESCRIPTION
+                    @if (sortKey() === "description") {
+                      <span aria-hidden="true">{{
+                        sortDirection() === "asc" ? "↑" : "↓"
+                      }}</span>
+                    }
+                  </button>
+                </th>
+                <th [attr.aria-sort]="ariaSort('profileSlots')">
+                  <button
+                    type="button"
+                    class="sort-heading"
+                    (click)="sortBy('profileSlots')"
+                  >
+                    SSI GENERATED TAGS
+                    @if (sortKey() === "profileSlots") {
+                      <span aria-hidden="true">{{
+                        sortDirection() === "asc" ? "↑" : "↓"
+                      }}</span>
+                    }
+                  </button>
+                </th>
+                <th [attr.aria-sort]="ariaSort('inputFields')">
+                  <button
+                    type="button"
+                    class="sort-heading"
+                    (click)="sortBy('inputFields')"
+                  >
+                    INPUT FIELDS
+                    @if (sortKey() === "inputFields") {
+                      <span aria-hidden="true">{{
+                        sortDirection() === "asc" ? "↑" : "↓"
+                      }}</span>
+                    }
+                  </button>
+                </th>
+                <th [attr.aria-sort]="ariaSort('scenarioCount')">
+                  <button
+                    type="button"
+                    class="sort-heading"
+                    (click)="sortBy('scenarioCount')"
+                  >
+                    SCENARIOS
+                    @if (sortKey() === "scenarioCount") {
+                      <span aria-hidden="true">{{
+                        sortDirection() === "asc" ? "↑" : "↓"
+                      }}</span>
+                    }
+                  </button>
+                </th>
+                <th [attr.aria-sort]="ariaSort('mappingStatus')">
+                  <button
+                    type="button"
+                    class="sort-heading"
+                    (click)="sortBy('mappingStatus')"
+                  >
+                    MAPPING STATUS
+                    @if (sortKey() === "mappingStatus") {
+                      <span aria-hidden="true">{{
+                        sortDirection() === "asc" ? "↑" : "↓"
+                      }}</span>
+                    }
+                  </button>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (group of pagedMessageGroups(); track group.id) {
+                <tr
+                  tabindex="0"
+                  [class.is-selected]="selectedGroupId() === group.id"
+                  [attr.aria-label]="'Open ' + group.messageCode + ' scenarios'"
+                  (click)="activateGroup(group, $event)"
+                  (keydown.enter)="activateGroup(group, $event)"
+                  (keydown.space)="
+                    $event.preventDefault(); activateGroup(group, $event)
+                  "
+                >
+                  <td data-label="MT TYPE">
+                    <strong>{{ group.messageCode }}</strong>
+                  </td>
+                  <td data-label="SWIFT DESCRIPTION">
+                    {{ group.description }}
+                  </td>
+                  <td data-label="SSI GENERATED TAGS" class="profile-slots">
+                    {{ group.profileSlots.join(" · ") || "—" }}
+                  </td>
+                  <td data-label="INPUT FIELDS" class="profile-slots">
+                    {{ group.inputFields.join(" · ") || "—" }}
+                  </td>
+                  <td data-label="SCENARIO COUNT">
+                    <button
+                      type="button"
+                      class="scenario-count"
+                      (click)="
+                        $event.stopPropagation(); activateGroup(group, $event)
+                      "
+                    >
+                      {{ group.operationalScenarioCount }} operational ·
+                      {{ group.qaScenarioCount }} QA
+                      <span class="sr-only">
+                        {{
+                          group.scenarioCount === 1
+                            ? "Open scenario"
+                            : "View scenarios"
+                        }}
+                      </span>
+                    </button>
+                  </td>
+                  <td data-label="MAPPING STATUS">
+                    <span
+                      class="mapping-status"
+                      [class.is-oos]="group.mappingStatus === 'OUT_OF_SCOPE'"
+                    >
+                      {{
+                        group.mappingStatus === "PROFILE_VERIFIED"
+                          ? "VERIFIED REFERENCE"
+                          : "OUT OF SCOPE"
+                      }}
+                    </span>
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="5" class="empty-state">
+                    No SSI-supported message matches this search.
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+
+        <div class="index-pager">
+          <span>Page {{ page() }} / {{ totalPages() }}</span>
+          <div>
+            <button
+              type="button"
+              [disabled]="page() === 1"
+              (click)="movePage(-1)"
+            >
+              上一頁
+            </button>
+            <button
+              type="button"
+              [disabled]="page() === totalPages()"
+              (click)="movePage(1)"
+            >
+              下一頁
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <details class="audit-details index-audit">
+        <summary>Audit details</summary>
+        <dl class="context-list">
+          <div>
+            <dt>Schema</dt>
+            <dd>{{ currentIndex.schemaVersion }}</dd>
+          </div>
+          <div>
+            <dt>Index version</dt>
+            <dd>{{ currentIndex.indexVersion }}</dd>
+          </div>
+          <div>
+            <dt>Definitions</dt>
+            <dd>{{ currentIndex.items.length }}</dd>
+          </div>
+          <div>
+            <dt>Configuration diagnostics</dt>
+            <dd>
+              {{
+                currentIndex.diagnostics?.signOffBlocked
+                  ? "Review required"
+                  : "Clear"
+              }}
+            </dd>
+          </div>
+        </dl>
+      </details>
+    }
+  }
+</section>
+
+@if (drawerGroup(); as group) {
+  <div
+    class="scenario-drawer-backdrop"
+    (click)="closeDrawer()"
+    (keydown.escape)="closeDrawer()"
+  >
+    <dialog
+      #drawerPanel
+      class="scenario-drawer"
+      open
+      aria-modal="true"
+      [attr.aria-labelledby]="'scenario-drawer-title-' + group.id"
+      tabindex="-1"
+      (click)="$event.stopPropagation()"
+      (keydown.escape)="closeDrawer()"
+    >
+      <header class="scenario-drawer-header">
+        <div>
+          <span class="eyebrow"
+            >{{ group.messageCode }} · {{ group.scenarioCount }} scenarios</span
+          >
+          <h2 [id]="'scenario-drawer-title-' + group.id">Select a scenario</h2>
+          <p>{{ group.description }}</p>
+        </div>
+        <button
+          type="button"
+          class="drawer-close"
+          aria-label="Close scenario index"
+          (click)="closeDrawer()"
+        >
+          ×
+        </button>
+      </header>
+      <div
+        class="scenario-audience-tabs"
+        role="tablist"
+        aria-label="Scenario audience"
+      >
+        <button
+          type="button"
+          role="tab"
+          [attr.aria-selected]="drawerAudience() === 'OPERATIONAL'"
+          [class.is-active]="drawerAudience() === 'OPERATIONAL'"
+          (click)="showScenarioAudience('OPERATIONAL')"
+        >
+          Operational ({{ group.operationalScenarioCount }})
+        </button>
+        <button
+          type="button"
+          role="tab"
+          [attr.aria-selected]="drawerAudience() === 'QA_TEST_ONLY'"
+          [class.is-active]="drawerAudience() === 'QA_TEST_ONLY'"
+          (click)="showScenarioAudience('QA_TEST_ONLY')"
+        >
+          QA / test only ({{ group.qaScenarioCount }})
+        </button>
+      </div>
+      <label class="drawer-search">
+        <span class="sr-only">Search scenarios</span>
+        <input
+          type="search"
+          [value]="drawerSearch()"
+          placeholder="Scenario or description"
+          (input)="searchDrawer($any($event.target).value)"
+        />
+      </label>
+      <div class="scenario-table-scroll">
+        <table class="scenario-table">
+          <caption class="sr-only">
+            Available scenarios for
+            {{
+              group.messageCode
+            }}
+          </caption>
+          <thead>
+            <tr>
+              <th [attr.aria-sort]="scenarioAriaSort('label')">
+                <button
+                  type="button"
+                  class="sort-heading"
+                  (click)="sortScenarioBy('label')"
+                >
+                  SCENARIO
+                  @if (scenarioSortKey() === "label") {
+                    <span aria-hidden="true">{{
+                      scenarioSortDirection() === "asc" ? "↑" : "↓"
+                    }}</span>
+                  }
+                </button>
+              </th>
+              <th [attr.aria-sort]="scenarioAriaSort('description')">
+                <button
+                  type="button"
+                  class="sort-heading"
+                  (click)="sortScenarioBy('description')"
+                >
+                  DESCRIPTION
+                  @if (scenarioSortKey() === "description") {
+                    <span aria-hidden="true">{{
+                      scenarioSortDirection() === "asc" ? "↑" : "↓"
+                    }}</span>
+                  }
+                </button>
+              </th>
+              <th [attr.aria-sort]="scenarioAriaSort('sequence')">
+                <button
+                  type="button"
+                  class="sort-heading"
+                  (click)="sortScenarioBy('sequence')"
+                >
+                  SEQUENCE
+                  @if (scenarioSortKey() === "sequence") {
+                    <span aria-hidden="true">{{
+                      scenarioSortDirection() === "asc" ? "↑" : "↓"
+                    }}</span>
+                  }
+                </button>
+              </th>
+              <th [attr.aria-sort]="scenarioAriaSort('flowKind')">
+                <button
+                  type="button"
+                  class="sort-heading"
+                  (click)="sortScenarioBy('flowKind')"
+                >
+                  FLOW
+                  @if (scenarioSortKey() === "flowKind") {
+                    <span aria-hidden="true">{{
+                      scenarioSortDirection() === "asc" ? "↑" : "↓"
+                    }}</span>
+                  }
+                </button>
+              </th>
+              <th [attr.aria-sort]="scenarioAriaSort('ssiScope')">
+                <button
+                  type="button"
+                  class="sort-heading"
+                  (click)="sortScenarioBy('ssiScope')"
+                >
+                  SSI SCOPE
+                  @if (scenarioSortKey() === "ssiScope") {
+                    <span aria-hidden="true">{{
+                      scenarioSortDirection() === "asc" ? "↑" : "↓"
+                    }}</span>
+                  }
+                </button>
+              </th>
+              <th [attr.aria-sort]="scenarioAriaSort('validationOwner')">
+                <button
+                  type="button"
+                  class="sort-heading"
+                  (click)="sortScenarioBy('validationOwner')"
+                >
+                  VALIDATION OWNER
+                  @if (scenarioSortKey() === "validationOwner") {
+                    <span aria-hidden="true">{{
+                      scenarioSortDirection() === "asc" ? "↑" : "↓"
+                    }}</span>
+                  }
+                </button>
+              </th>
+              <th [attr.aria-sort]="scenarioAriaSort('status')">
+                <button
+                  type="button"
+                  class="sort-heading"
+                  (click)="sortScenarioBy('status')"
+                >
+                  STATUS
+                  @if (scenarioSortKey() === "status") {
+                    <span aria-hidden="true">{{
+                      scenarioSortDirection() === "asc" ? "↑" : "↓"
+                    }}</span>
+                  }
+                </button>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of pagedDrawerRows(); track row.scenarioId) {
+              <tr
+                [class.is-read-only]="!row.executable"
+                [attr.tabindex]="row.executable ? 0 : null"
+                [attr.role]="row.executable ? 'link' : null"
+                [attr.aria-label]="
+                  row.executable
+                    ? 'Open ' + row.label
+                    : row.label + ', read only'
+                "
+                (click)="openScenario(row)"
+                (keydown.enter)="openScenario(row)"
+                (keydown.space)="$event.preventDefault(); openScenario(row)"
+              >
+                <td data-label="SCENARIO">
+                  <strong>{{ row.label }}</strong>
+                </td>
+                <td data-label="DESCRIPTION">{{ row.description }}</td>
+                <td data-label="SEQUENCE">{{ row.sequence }}</td>
+                <td data-label="FLOW">
+                  {{ row.flowKind.replaceAll("_", " ") }}
+                </td>
+                <td data-label="SSI SCOPE">
+                  {{
+                    row.ssiScope === "IN_SCOPE" ? "In scope" : "Out of scope"
+                  }}
+                </td>
+                <td data-label="VALIDATION OWNER">
+                  {{
+                    row.validationOwner === "SSI_FIELD_RESOLUTION_API"
+                      ? "SSI Resolution API"
+                      : "Upstream"
+                  }}
+                </td>
+                <td data-label="STATUS">
+                  {{
+                    row.status === "AVAILABLE"
+                      ? "Available"
+                      : "Read-only scope decision"
+                  }}
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="7" class="empty-state">
+                  No scenario matches this search.
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <footer class="scenario-drawer-footer">
+        <span>Page {{ drawerPage() }} / {{ drawerTotalPages() }} · Click or press Enter to open.</span>
+        <div>
+          <button
+            type="button"
+            [disabled]="drawerPage() === 1"
+            (click)="moveDrawerPage(-1)"
+          >
+            上一頁
+          </button>
+          <button
+            type="button"
+            [disabled]="drawerPage() === drawerTotalPages()"
+            (click)="moveDrawerPage(1)"
+          >
+            下一頁
+          </button>
+          <button type="button" (click)="closeDrawer()">Close</button>
+        </div>
+      </footer>
+    </dialog>
+  </div>
+}

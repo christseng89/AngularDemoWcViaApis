@@ -1,0 +1,44 @@
+import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import { DatabaseSync } from 'node:sqlite';
+import { mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
+
+export interface SsiRecord {
+  id: string; counterpartyId: string; scope: string; maker: string; checker?: string;
+  status: string; version: number; route: Record<string, string>; createdAt: string; updatedAt: string;
+}
+
+@Injectable()
+export class SqliteSsiRepository implements OnModuleDestroy {
+  private readonly db: DatabaseSync;
+  constructor() {
+    const path = process.env['SSI_DATABASE_PATH'] ?? './data/ssi-demo.sqlite';
+    mkdirSync(dirname(path), { recursive: true });
+    this.db = new DatabaseSync(path);
+    this.db.exec(`
+      PRAGMA journal_mode=WAL;
+      CREATE TABLE IF NOT EXISTS ssi (id TEXT PRIMARY KEY, payload TEXT NOT NULL, updated_at TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS audit_event (id INTEGER PRIMARY KEY AUTOINCREMENT, ssi_id TEXT NOT NULL, action TEXT NOT NULL, actor TEXT NOT NULL, payload TEXT NOT NULL, occurred_at TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS outbox (id INTEGER PRIMARY KEY AUTOINCREMENT, event_id TEXT UNIQUE NOT NULL, event_type TEXT NOT NULL, payload TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'PENDING', created_at TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS inbox (event_id TEXT PRIMARY KEY, event_type TEXT NOT NULL, processed_at TEXT NOT NULL);
+    `);
+  }
+  list(): SsiRecord[] {
+    return this.db.prepare('SELECT payload FROM ssi ORDER BY updated_at DESC').all().map((row) => JSON.parse(String((row as { payload: unknown }).payload)) as SsiRecord);
+  }
+  find(id: string): SsiRecord | undefined {
+    const row = this.db.prepare('SELECT payload FROM ssi WHERE id=?').get(id) as { payload: unknown } | undefined;
+    return row ? JSON.parse(String(row.payload)) as SsiRecord : undefined;
+  }
+  save(record: SsiRecord, action: string, actor: string): void {
+    const now = new Date().toISOString();
+    const transaction = this.db.transaction(() => {
+      this.db.prepare('INSERT INTO ssi(id,payload,updated_at) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload,updated_at=excluded.updated_at').run(record.id, JSON.stringify(record), now);
+      this.db.prepare('INSERT INTO audit_event(ssi_id,action,actor,payload,occurred_at) VALUES(?,?,?,?,?)').run(record.id, action, actor, JSON.stringify(record), now);
+      this.db.prepare('INSERT INTO outbox(event_id,event_type,payload,created_at) VALUES(?,?,?,?)').run(crypto.randomUUID(), `SSI_${action}`, JSON.stringify(record), now);
+    });
+    transaction();
+  }
+  audit(): unknown[] { return this.db.prepare('SELECT * FROM audit_event ORDER BY id DESC').all(); }
+  onModuleDestroy(): void { this.db.close(); }
+}

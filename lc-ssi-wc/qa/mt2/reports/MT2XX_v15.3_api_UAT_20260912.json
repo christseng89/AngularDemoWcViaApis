@@ -1,0 +1,2886 @@
+{
+  "schemaVersion": "1.0",
+  "reportType": "V15.3_API_UAT",
+  "generatedAt": "2026-09-12T09:05:02.088Z",
+  "apiBase": "http://localhost:3100/api",
+  "expectationPath": "qa/mt2/reports/MT2XX_v15.3_migration_expected_20260912.json",
+  "expectationSha256": "3F7973EA0DFD3F34C16518A5B41562BAAAA0BDC3E0CF61B5EB014967DA9EC57E",
+  "logicalSnapshotSha256": "FD6A4C064FE81F42AAB1D3E30C293F45FD3908FA6BF2C92FBBF3381FCAD378A6",
+  "totals": {
+    "formalPlanned": 48,
+    "formalPassed": 48,
+    "ambiguityPlanned": 4,
+    "ambiguityPassed": 4
+  },
+  "passed": true,
+  "formalCases": [
+    {
+      "caseKey": "PAIR-01-MT202",
+      "request": {
+        "sourceMessageType": "MT202",
+        "messageType": "pacs.009.001.08",
+        "currency": "USD",
+        "counterpartyBankServiceId": "BANK-SVC-CITIUS33",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-01-MT202",
+        "paymentBeneficiaryInstitutionInput": "CITIUS33"
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "b0c18c9a-2ff7-59d4-96d0-f600853b8408",
+        "ssiCode": "SSI-UAT-GEN-01",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-USD-CITIUS33",
+        "currency": "USD",
+        "accountId": "DEMO-NOSTRO-001-PRIMARY",
+        "nostroId": "fe5d672f-311e-4eb9-88bf-f8538d45793c",
+        "nostroVersion": 4,
+        "matchedApplicabilityId": "b0c18c9a-2ff7-59d4-96d0-f600853b8408:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "829c732b-2a90-4933-8a9b-c0c1a33cc4cd",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-01-MT205",
+      "request": {
+        "sourceMessageType": "MT205",
+        "messageType": "pacs.009.001.08",
+        "currency": "USD",
+        "counterpartyBankServiceId": "BANK-SVC-CITIUS33",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-01-MT205",
+        "paymentBeneficiaryInstitutionInput": "CITIUS33"
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "b0c18c9a-2ff7-59d4-96d0-f600853b8408",
+        "ssiCode": "SSI-UAT-GEN-01",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-USD-CITIUS33",
+        "currency": "USD",
+        "accountId": "DEMO-NOSTRO-001-PRIMARY",
+        "nostroId": "fe5d672f-311e-4eb9-88bf-f8538d45793c",
+        "nostroVersion": 4,
+        "matchedApplicabilityId": "b0c18c9a-2ff7-59d4-96d0-f600853b8408:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "954b13b0-be71-4cfd-bbb7-05eedcd56db4",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-01-MT202COV",
+      "request": {
+        "sourceMessageType": "MT202COV",
+        "messageType": "pacs.009.001.08",
+        "currency": "USD",
+        "counterpartyBankServiceId": "BANK-SVC-CITIUS33",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-01-MT202COV",
+        "paymentBeneficiaryInstitutionInput": "CITIUS33",
+        "block3": {
+          "119": "COV"
+        },
+        "sequenceB": {
+          "59": "BENEFICIARY",
+          "50A": "DEMOHKHH"
+        }
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "b0c18c9a-2ff7-59d4-96d0-f600853b8408",
+        "ssiCode": "SSI-UAT-GEN-01",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-USD-CITIUS33",
+        "currency": "USD",
+        "accountId": "DEMO-NOSTRO-001-PRIMARY",
+        "nostroId": "fe5d672f-311e-4eb9-88bf-f8538d45793c",
+        "nostroVersion": 4,
+        "matchedApplicabilityId": "b0c18c9a-2ff7-59d4-96d0-f600853b8408:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "7619cd8a-59e7-4903-944e-f33d1e001bcb",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-01-MT205COV",
+      "request": {
+        "sourceMessageType": "MT205COV",
+        "messageType": "pacs.009.001.08",
+        "currency": "USD",
+        "counterpartyBankServiceId": "BANK-SVC-CITIUS33",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-01-MT205COV",
+        "paymentBeneficiaryInstitutionInput": "CITIUS33",
+        "block3": {
+          "119": "COV"
+        },
+        "sequenceB": {
+          "59": "BENEFICIARY",
+          "50A": "DEMOHKHH"
+        }
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "b0c18c9a-2ff7-59d4-96d0-f600853b8408",
+        "ssiCode": "SSI-UAT-GEN-01",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-USD-CITIUS33",
+        "currency": "USD",
+        "accountId": "DEMO-NOSTRO-001-PRIMARY",
+        "nostroId": "fe5d672f-311e-4eb9-88bf-f8538d45793c",
+        "nostroVersion": 4,
+        "matchedApplicabilityId": "b0c18c9a-2ff7-59d4-96d0-f600853b8408:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "d4a30af1-9300-48a0-8dbb-139284a397f1",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-02-MT202",
+      "request": {
+        "sourceMessageType": "MT202",
+        "messageType": "pacs.009.001.08",
+        "currency": "GBP",
+        "counterpartyBankServiceId": "BANK-SVC-BARCGB22",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-02-MT202",
+        "paymentBeneficiaryInstitutionInput": "BARCGB22"
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "1a9bbd1f-b884-5fbf-87d4-1e8c79a13800",
+        "ssiCode": "SSI-UAT-GEN-02",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-GBP-BARCGB22",
+        "currency": "GBP",
+        "accountId": "DEMO-NOSTRO-002-PRIMARY",
+        "nostroId": "8df71888-7903-4f17-82a3-da90e6309ce5",
+        "nostroVersion": 4,
+        "matchedApplicabilityId": "1a9bbd1f-b884-5fbf-87d4-1e8c79a13800:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "096e512b-f079-44ce-95d9-056be9bcc2fa",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-02-MT205",
+      "request": {
+        "sourceMessageType": "MT205",
+        "messageType": "pacs.009.001.08",
+        "currency": "GBP",
+        "counterpartyBankServiceId": "BANK-SVC-BARCGB22",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-02-MT205",
+        "paymentBeneficiaryInstitutionInput": "BARCGB22"
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "1a9bbd1f-b884-5fbf-87d4-1e8c79a13800",
+        "ssiCode": "SSI-UAT-GEN-02",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-GBP-BARCGB22",
+        "currency": "GBP",
+        "accountId": "DEMO-NOSTRO-002-PRIMARY",
+        "nostroId": "8df71888-7903-4f17-82a3-da90e6309ce5",
+        "nostroVersion": 4,
+        "matchedApplicabilityId": "1a9bbd1f-b884-5fbf-87d4-1e8c79a13800:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "7909f717-7684-4f2d-814c-3c29098c3d45",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-02-MT202COV",
+      "request": {
+        "sourceMessageType": "MT202COV",
+        "messageType": "pacs.009.001.08",
+        "currency": "GBP",
+        "counterpartyBankServiceId": "BANK-SVC-BARCGB22",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-02-MT202COV",
+        "paymentBeneficiaryInstitutionInput": "BARCGB22",
+        "block3": {
+          "119": "COV"
+        },
+        "sequenceB": {
+          "59": "BENEFICIARY",
+          "50A": "DEMOHKHH"
+        }
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "1a9bbd1f-b884-5fbf-87d4-1e8c79a13800",
+        "ssiCode": "SSI-UAT-GEN-02",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-GBP-BARCGB22",
+        "currency": "GBP",
+        "accountId": "DEMO-NOSTRO-002-PRIMARY",
+        "nostroId": "8df71888-7903-4f17-82a3-da90e6309ce5",
+        "nostroVersion": 4,
+        "matchedApplicabilityId": "1a9bbd1f-b884-5fbf-87d4-1e8c79a13800:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "f66e3ac1-743f-469d-b502-68929e194331",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-02-MT205COV",
+      "request": {
+        "sourceMessageType": "MT205COV",
+        "messageType": "pacs.009.001.08",
+        "currency": "GBP",
+        "counterpartyBankServiceId": "BANK-SVC-BARCGB22",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-02-MT205COV",
+        "paymentBeneficiaryInstitutionInput": "BARCGB22",
+        "block3": {
+          "119": "COV"
+        },
+        "sequenceB": {
+          "59": "BENEFICIARY",
+          "50A": "DEMOHKHH"
+        }
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "1a9bbd1f-b884-5fbf-87d4-1e8c79a13800",
+        "ssiCode": "SSI-UAT-GEN-02",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-GBP-BARCGB22",
+        "currency": "GBP",
+        "accountId": "DEMO-NOSTRO-002-PRIMARY",
+        "nostroId": "8df71888-7903-4f17-82a3-da90e6309ce5",
+        "nostroVersion": 4,
+        "matchedApplicabilityId": "1a9bbd1f-b884-5fbf-87d4-1e8c79a13800:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "571cb610-c2ae-4209-9f09-743409c1f656",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-03-MT202",
+      "request": {
+        "sourceMessageType": "MT202",
+        "messageType": "pacs.009.001.08",
+        "currency": "USD",
+        "counterpartyBankServiceId": "BANK-SVC-BARCGB22",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-03-MT202",
+        "paymentBeneficiaryInstitutionInput": "BARCGB22"
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "e5f71960-aff2-5f27-b01f-58194e54e736",
+        "ssiCode": "SSI-UAT-GEN-03",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-USD-CITIUS33-BARC",
+        "currency": "USD",
+        "accountId": "DEMO-NOSTRO-001-PRIMARY",
+        "nostroId": "fe5d672f-311e-4eb9-88bf-f8538d45793c",
+        "nostroVersion": 4,
+        "matchedApplicabilityId": "e5f71960-aff2-5f27-b01f-58194e54e736:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "f04bc693-0ac4-4463-b42b-131f302046d6",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-03-MT205",
+      "request": {
+        "sourceMessageType": "MT205",
+        "messageType": "pacs.009.001.08",
+        "currency": "USD",
+        "counterpartyBankServiceId": "BANK-SVC-BARCGB22",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-03-MT205",
+        "paymentBeneficiaryInstitutionInput": "BARCGB22"
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "e5f71960-aff2-5f27-b01f-58194e54e736",
+        "ssiCode": "SSI-UAT-GEN-03",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-USD-CITIUS33-BARC",
+        "currency": "USD",
+        "accountId": "DEMO-NOSTRO-001-PRIMARY",
+        "nostroId": "fe5d672f-311e-4eb9-88bf-f8538d45793c",
+        "nostroVersion": 4,
+        "matchedApplicabilityId": "e5f71960-aff2-5f27-b01f-58194e54e736:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "a27c3092-a829-4329-bc9b-faa2b5a5f307",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-03-MT202COV",
+      "request": {
+        "sourceMessageType": "MT202COV",
+        "messageType": "pacs.009.001.08",
+        "currency": "USD",
+        "counterpartyBankServiceId": "BANK-SVC-BARCGB22",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-03-MT202COV",
+        "paymentBeneficiaryInstitutionInput": "BARCGB22",
+        "block3": {
+          "119": "COV"
+        },
+        "sequenceB": {
+          "59": "BENEFICIARY",
+          "50A": "DEMOHKHH"
+        }
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "e5f71960-aff2-5f27-b01f-58194e54e736",
+        "ssiCode": "SSI-UAT-GEN-03",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-USD-CITIUS33-BARC",
+        "currency": "USD",
+        "accountId": "DEMO-NOSTRO-001-PRIMARY",
+        "nostroId": "fe5d672f-311e-4eb9-88bf-f8538d45793c",
+        "nostroVersion": 4,
+        "matchedApplicabilityId": "e5f71960-aff2-5f27-b01f-58194e54e736:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "02ab3d01-dfd0-4cfc-bf58-45d6ff018f51",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-03-MT205COV",
+      "request": {
+        "sourceMessageType": "MT205COV",
+        "messageType": "pacs.009.001.08",
+        "currency": "USD",
+        "counterpartyBankServiceId": "BANK-SVC-BARCGB22",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-03-MT205COV",
+        "paymentBeneficiaryInstitutionInput": "BARCGB22",
+        "block3": {
+          "119": "COV"
+        },
+        "sequenceB": {
+          "59": "BENEFICIARY",
+          "50A": "DEMOHKHH"
+        }
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "e5f71960-aff2-5f27-b01f-58194e54e736",
+        "ssiCode": "SSI-UAT-GEN-03",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-USD-CITIUS33-BARC",
+        "currency": "USD",
+        "accountId": "DEMO-NOSTRO-001-PRIMARY",
+        "nostroId": "fe5d672f-311e-4eb9-88bf-f8538d45793c",
+        "nostroVersion": 4,
+        "matchedApplicabilityId": "e5f71960-aff2-5f27-b01f-58194e54e736:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "063ade42-42ff-4bfa-9516-7f30a0da7136",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-04-MT202",
+      "request": {
+        "sourceMessageType": "MT202",
+        "messageType": "pacs.009.001.08",
+        "currency": "EUR",
+        "counterpartyBankServiceId": "BANK-SVC-DEUTDEFF",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-04-MT202",
+        "paymentBeneficiaryInstitutionInput": "DEUTDEFF"
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "163482f1-a692-5908-ad22-7e94c8634890",
+        "ssiCode": "SSI-UAT-GEN-04",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-EUR-DEUTDEFF",
+        "currency": "EUR",
+        "accountId": "DEMO-NOSTRO-003-PRIMARY",
+        "nostroId": "00d12012-2900-4b2d-8443-8f67fb5b9e79",
+        "nostroVersion": 9,
+        "matchedApplicabilityId": "163482f1-a692-5908-ad22-7e94c8634890:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "ada7d312-c7fa-40a6-8599-a15ab044f0e7",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-04-MT205",
+      "request": {
+        "sourceMessageType": "MT205",
+        "messageType": "pacs.009.001.08",
+        "currency": "EUR",
+        "counterpartyBankServiceId": "BANK-SVC-DEUTDEFF",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-04-MT205",
+        "paymentBeneficiaryInstitutionInput": "DEUTDEFF"
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "163482f1-a692-5908-ad22-7e94c8634890",
+        "ssiCode": "SSI-UAT-GEN-04",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-EUR-DEUTDEFF",
+        "currency": "EUR",
+        "accountId": "DEMO-NOSTRO-003-PRIMARY",
+        "nostroId": "00d12012-2900-4b2d-8443-8f67fb5b9e79",
+        "nostroVersion": 9,
+        "matchedApplicabilityId": "163482f1-a692-5908-ad22-7e94c8634890:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "ea98d407-e60c-499e-bdc8-386c08e8c98d",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-04-MT202COV",
+      "request": {
+        "sourceMessageType": "MT202COV",
+        "messageType": "pacs.009.001.08",
+        "currency": "EUR",
+        "counterpartyBankServiceId": "BANK-SVC-DEUTDEFF",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-04-MT202COV",
+        "paymentBeneficiaryInstitutionInput": "DEUTDEFF",
+        "block3": {
+          "119": "COV"
+        },
+        "sequenceB": {
+          "59": "BENEFICIARY",
+          "50A": "DEMOHKHH"
+        }
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "163482f1-a692-5908-ad22-7e94c8634890",
+        "ssiCode": "SSI-UAT-GEN-04",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-EUR-DEUTDEFF",
+        "currency": "EUR",
+        "accountId": "DEMO-NOSTRO-003-PRIMARY",
+        "nostroId": "00d12012-2900-4b2d-8443-8f67fb5b9e79",
+        "nostroVersion": 9,
+        "matchedApplicabilityId": "163482f1-a692-5908-ad22-7e94c8634890:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "f4dfc19b-bea5-4d20-a1b3-f8b79dfe5428",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-04-MT205COV",
+      "request": {
+        "sourceMessageType": "MT205COV",
+        "messageType": "pacs.009.001.08",
+        "currency": "EUR",
+        "counterpartyBankServiceId": "BANK-SVC-DEUTDEFF",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-04-MT205COV",
+        "paymentBeneficiaryInstitutionInput": "DEUTDEFF",
+        "block3": {
+          "119": "COV"
+        },
+        "sequenceB": {
+          "59": "BENEFICIARY",
+          "50A": "DEMOHKHH"
+        }
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "163482f1-a692-5908-ad22-7e94c8634890",
+        "ssiCode": "SSI-UAT-GEN-04",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-EUR-DEUTDEFF",
+        "currency": "EUR",
+        "accountId": "DEMO-NOSTRO-003-PRIMARY",
+        "nostroId": "00d12012-2900-4b2d-8443-8f67fb5b9e79",
+        "nostroVersion": 9,
+        "matchedApplicabilityId": "163482f1-a692-5908-ad22-7e94c8634890:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "1da47b7b-4411-494d-8e1e-579ef0e312d0",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-05-MT202",
+      "request": {
+        "sourceMessageType": "MT202",
+        "messageType": "pacs.009.001.08",
+        "currency": "SGD",
+        "counterpartyBankServiceId": "BANK-SVC-DBSSSGSG",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-05-MT202",
+        "paymentBeneficiaryInstitutionInput": "DBSSSGSG"
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "6d14da92-faf4-5611-854a-ef2c42350913",
+        "ssiCode": "SSI-UAT-GEN-05",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-SGD-DBSSSGSG",
+        "currency": "SGD",
+        "accountId": "DEMO-NOSTRO-004-PRIMARY",
+        "nostroId": "0b8b501b-3087-4828-93b9-99e9e8ec89d1",
+        "nostroVersion": 9,
+        "matchedApplicabilityId": "6d14da92-faf4-5611-854a-ef2c42350913:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "eb3ff0dc-9615-4e4e-8fa2-f55d5f3ec0d8",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-05-MT205",
+      "request": {
+        "sourceMessageType": "MT205",
+        "messageType": "pacs.009.001.08",
+        "currency": "SGD",
+        "counterpartyBankServiceId": "BANK-SVC-DBSSSGSG",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-05-MT205",
+        "paymentBeneficiaryInstitutionInput": "DBSSSGSG"
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "6d14da92-faf4-5611-854a-ef2c42350913",
+        "ssiCode": "SSI-UAT-GEN-05",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-SGD-DBSSSGSG",
+        "currency": "SGD",
+        "accountId": "DEMO-NOSTRO-004-PRIMARY",
+        "nostroId": "0b8b501b-3087-4828-93b9-99e9e8ec89d1",
+        "nostroVersion": 9,
+        "matchedApplicabilityId": "6d14da92-faf4-5611-854a-ef2c42350913:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "63540a51-c881-4906-a2dd-ed427d64b710",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-05-MT202COV",
+      "request": {
+        "sourceMessageType": "MT202COV",
+        "messageType": "pacs.009.001.08",
+        "currency": "SGD",
+        "counterpartyBankServiceId": "BANK-SVC-DBSSSGSG",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-05-MT202COV",
+        "paymentBeneficiaryInstitutionInput": "DBSSSGSG",
+        "block3": {
+          "119": "COV"
+        },
+        "sequenceB": {
+          "59": "BENEFICIARY",
+          "50A": "DEMOHKHH"
+        }
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "6d14da92-faf4-5611-854a-ef2c42350913",
+        "ssiCode": "SSI-UAT-GEN-05",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-SGD-DBSSSGSG",
+        "currency": "SGD",
+        "accountId": "DEMO-NOSTRO-004-PRIMARY",
+        "nostroId": "0b8b501b-3087-4828-93b9-99e9e8ec89d1",
+        "nostroVersion": 9,
+        "matchedApplicabilityId": "6d14da92-faf4-5611-854a-ef2c42350913:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "594be906-d0fd-4a80-80e1-8f3da3462b31",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-05-MT205COV",
+      "request": {
+        "sourceMessageType": "MT205COV",
+        "messageType": "pacs.009.001.08",
+        "currency": "SGD",
+        "counterpartyBankServiceId": "BANK-SVC-DBSSSGSG",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-05-MT205COV",
+        "paymentBeneficiaryInstitutionInput": "DBSSSGSG",
+        "block3": {
+          "119": "COV"
+        },
+        "sequenceB": {
+          "59": "BENEFICIARY",
+          "50A": "DEMOHKHH"
+        }
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "6d14da92-faf4-5611-854a-ef2c42350913",
+        "ssiCode": "SSI-UAT-GEN-05",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-SGD-DBSSSGSG",
+        "currency": "SGD",
+        "accountId": "DEMO-NOSTRO-004-PRIMARY",
+        "nostroId": "0b8b501b-3087-4828-93b9-99e9e8ec89d1",
+        "nostroVersion": 9,
+        "matchedApplicabilityId": "6d14da92-faf4-5611-854a-ef2c42350913:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "f32ca062-64c1-434c-9198-1883ffbff742",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-06-MT202",
+      "request": {
+        "sourceMessageType": "MT202",
+        "messageType": "pacs.009.001.08",
+        "currency": "JPY",
+        "counterpartyBankServiceId": "BANK-SVC-BOTKJPJT",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-06-MT202",
+        "paymentBeneficiaryInstitutionInput": "BOTKJPJT"
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "4a32aa4b-5f8a-5b43-bf52-7b00ad2f8673",
+        "ssiCode": "SSI-UAT-GEN-06",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-JPY-BOTKJPJT",
+        "currency": "JPY",
+        "accountId": "DEMO-NOSTRO-005-PRIMARY",
+        "nostroId": "29d4f0b1-6905-42d3-9be0-b73367af038c",
+        "nostroVersion": 9,
+        "matchedApplicabilityId": "4a32aa4b-5f8a-5b43-bf52-7b00ad2f8673:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "48c3cefe-e973-41c2-ae7a-679f9ed62dbc",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-06-MT205",
+      "request": {
+        "sourceMessageType": "MT205",
+        "messageType": "pacs.009.001.08",
+        "currency": "JPY",
+        "counterpartyBankServiceId": "BANK-SVC-BOTKJPJT",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-06-MT205",
+        "paymentBeneficiaryInstitutionInput": "BOTKJPJT"
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "4a32aa4b-5f8a-5b43-bf52-7b00ad2f8673",
+        "ssiCode": "SSI-UAT-GEN-06",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-JPY-BOTKJPJT",
+        "currency": "JPY",
+        "accountId": "DEMO-NOSTRO-005-PRIMARY",
+        "nostroId": "29d4f0b1-6905-42d3-9be0-b73367af038c",
+        "nostroVersion": 9,
+        "matchedApplicabilityId": "4a32aa4b-5f8a-5b43-bf52-7b00ad2f8673:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "1258adcb-4f35-4558-b225-d73bb1172051",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-06-MT202COV",
+      "request": {
+        "sourceMessageType": "MT202COV",
+        "messageType": "pacs.009.001.08",
+        "currency": "JPY",
+        "counterpartyBankServiceId": "BANK-SVC-BOTKJPJT",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-06-MT202COV",
+        "paymentBeneficiaryInstitutionInput": "BOTKJPJT",
+        "block3": {
+          "119": "COV"
+        },
+        "sequenceB": {
+          "59": "BENEFICIARY",
+          "50A": "DEMOHKHH"
+        }
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "4a32aa4b-5f8a-5b43-bf52-7b00ad2f8673",
+        "ssiCode": "SSI-UAT-GEN-06",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-JPY-BOTKJPJT",
+        "currency": "JPY",
+        "accountId": "DEMO-NOSTRO-005-PRIMARY",
+        "nostroId": "29d4f0b1-6905-42d3-9be0-b73367af038c",
+        "nostroVersion": 9,
+        "matchedApplicabilityId": "4a32aa4b-5f8a-5b43-bf52-7b00ad2f8673:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "560dbdd5-f9ee-491e-8734-7c5b193793b3",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-06-MT205COV",
+      "request": {
+        "sourceMessageType": "MT205COV",
+        "messageType": "pacs.009.001.08",
+        "currency": "JPY",
+        "counterpartyBankServiceId": "BANK-SVC-BOTKJPJT",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-06-MT205COV",
+        "paymentBeneficiaryInstitutionInput": "BOTKJPJT",
+        "block3": {
+          "119": "COV"
+        },
+        "sequenceB": {
+          "59": "BENEFICIARY",
+          "50A": "DEMOHKHH"
+        }
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "4a32aa4b-5f8a-5b43-bf52-7b00ad2f8673",
+        "ssiCode": "SSI-UAT-GEN-06",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-JPY-BOTKJPJT",
+        "currency": "JPY",
+        "accountId": "DEMO-NOSTRO-005-PRIMARY",
+        "nostroId": "29d4f0b1-6905-42d3-9be0-b73367af038c",
+        "nostroVersion": 9,
+        "matchedApplicabilityId": "4a32aa4b-5f8a-5b43-bf52-7b00ad2f8673:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "99ef9684-8d5b-40ff-aade-7645a1f5c900",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-07-MT202",
+      "request": {
+        "sourceMessageType": "MT202",
+        "messageType": "pacs.009.001.08",
+        "currency": "HKD",
+        "counterpartyBankServiceId": "BANK-SVC-HSBCHKHH",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-07-MT202",
+        "paymentBeneficiaryInstitutionInput": "HSBCHKHH"
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "c07bb708-f81e-5976-b6de-62171bdcab57",
+        "ssiCode": "SSI-UAT-GEN-07",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-HKD-HSBCHKHH",
+        "currency": "HKD",
+        "accountId": "DEMO-NOSTRO-006-PRIMARY",
+        "nostroId": "f976e74f-4f58-4efd-86b9-48921a3db5a0",
+        "nostroVersion": 9,
+        "matchedApplicabilityId": "c07bb708-f81e-5976-b6de-62171bdcab57:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "42d3a44e-cdb0-4be8-a32c-be6610086c57",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-07-MT205",
+      "request": {
+        "sourceMessageType": "MT205",
+        "messageType": "pacs.009.001.08",
+        "currency": "HKD",
+        "counterpartyBankServiceId": "BANK-SVC-HSBCHKHH",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-07-MT205",
+        "paymentBeneficiaryInstitutionInput": "HSBCHKHH"
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "c07bb708-f81e-5976-b6de-62171bdcab57",
+        "ssiCode": "SSI-UAT-GEN-07",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-HKD-HSBCHKHH",
+        "currency": "HKD",
+        "accountId": "DEMO-NOSTRO-006-PRIMARY",
+        "nostroId": "f976e74f-4f58-4efd-86b9-48921a3db5a0",
+        "nostroVersion": 9,
+        "matchedApplicabilityId": "c07bb708-f81e-5976-b6de-62171bdcab57:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "a795e9ef-6d99-4adf-aa1d-58f74f52a2e9",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-07-MT202COV",
+      "request": {
+        "sourceMessageType": "MT202COV",
+        "messageType": "pacs.009.001.08",
+        "currency": "HKD",
+        "counterpartyBankServiceId": "BANK-SVC-HSBCHKHH",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-07-MT202COV",
+        "paymentBeneficiaryInstitutionInput": "HSBCHKHH",
+        "block3": {
+          "119": "COV"
+        },
+        "sequenceB": {
+          "59": "BENEFICIARY",
+          "50A": "DEMOHKHH"
+        }
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "c07bb708-f81e-5976-b6de-62171bdcab57",
+        "ssiCode": "SSI-UAT-GEN-07",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-HKD-HSBCHKHH",
+        "currency": "HKD",
+        "accountId": "DEMO-NOSTRO-006-PRIMARY",
+        "nostroId": "f976e74f-4f58-4efd-86b9-48921a3db5a0",
+        "nostroVersion": 9,
+        "matchedApplicabilityId": "c07bb708-f81e-5976-b6de-62171bdcab57:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "fa206cca-638f-468d-aaa8-d9634b5c3016",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-07-MT205COV",
+      "request": {
+        "sourceMessageType": "MT205COV",
+        "messageType": "pacs.009.001.08",
+        "currency": "HKD",
+        "counterpartyBankServiceId": "BANK-SVC-HSBCHKHH",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-07-MT205COV",
+        "paymentBeneficiaryInstitutionInput": "HSBCHKHH",
+        "block3": {
+          "119": "COV"
+        },
+        "sequenceB": {
+          "59": "BENEFICIARY",
+          "50A": "DEMOHKHH"
+        }
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "c07bb708-f81e-5976-b6de-62171bdcab57",
+        "ssiCode": "SSI-UAT-GEN-07",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-HKD-HSBCHKHH",
+        "currency": "HKD",
+        "accountId": "DEMO-NOSTRO-006-PRIMARY",
+        "nostroId": "f976e74f-4f58-4efd-86b9-48921a3db5a0",
+        "nostroVersion": 9,
+        "matchedApplicabilityId": "c07bb708-f81e-5976-b6de-62171bdcab57:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "21359653-0c13-4627-a4ab-5ddaaf0cbd23",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-08-MT202",
+      "request": {
+        "sourceMessageType": "MT202",
+        "messageType": "pacs.009.001.08",
+        "currency": "AUD",
+        "counterpartyBankServiceId": "BANK-SVC-BOFAUS3N",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-08-MT202",
+        "paymentBeneficiaryInstitutionInput": "BOFAUS3N"
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "7e285998-4c3c-5d63-b05a-b613cd39c7b1",
+        "ssiCode": "SSI-UAT-GEN-08",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-AUD-CTBAAU2S",
+        "currency": "AUD",
+        "accountId": "DEMO-NOSTRO-007-PRIMARY",
+        "nostroId": "e6a9ae97-823c-4a66-86e7-b76aa5dc0c1a",
+        "nostroVersion": 9,
+        "matchedApplicabilityId": "7e285998-4c3c-5d63-b05a-b613cd39c7b1:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "619ded40-11d8-42c3-ae3c-e91e6c3f804e",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-08-MT205",
+      "request": {
+        "sourceMessageType": "MT205",
+        "messageType": "pacs.009.001.08",
+        "currency": "AUD",
+        "counterpartyBankServiceId": "BANK-SVC-BOFAUS3N",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-08-MT205",
+        "paymentBeneficiaryInstitutionInput": "BOFAUS3N"
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "7e285998-4c3c-5d63-b05a-b613cd39c7b1",
+        "ssiCode": "SSI-UAT-GEN-08",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-AUD-CTBAAU2S",
+        "currency": "AUD",
+        "accountId": "DEMO-NOSTRO-007-PRIMARY",
+        "nostroId": "e6a9ae97-823c-4a66-86e7-b76aa5dc0c1a",
+        "nostroVersion": 9,
+        "matchedApplicabilityId": "7e285998-4c3c-5d63-b05a-b613cd39c7b1:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "b3f38b46-4f7a-47e5-88a1-86c3a576c703",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-08-MT202COV",
+      "request": {
+        "sourceMessageType": "MT202COV",
+        "messageType": "pacs.009.001.08",
+        "currency": "AUD",
+        "counterpartyBankServiceId": "BANK-SVC-BOFAUS3N",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-08-MT202COV",
+        "paymentBeneficiaryInstitutionInput": "BOFAUS3N",
+        "block3": {
+          "119": "COV"
+        },
+        "sequenceB": {
+          "59": "BENEFICIARY",
+          "50A": "DEMOHKHH"
+        }
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "7e285998-4c3c-5d63-b05a-b613cd39c7b1",
+        "ssiCode": "SSI-UAT-GEN-08",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-AUD-CTBAAU2S",
+        "currency": "AUD",
+        "accountId": "DEMO-NOSTRO-007-PRIMARY",
+        "nostroId": "e6a9ae97-823c-4a66-86e7-b76aa5dc0c1a",
+        "nostroVersion": 9,
+        "matchedApplicabilityId": "7e285998-4c3c-5d63-b05a-b613cd39c7b1:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "9c738128-32dd-4f60-9dd4-20b5651b6ad4",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-08-MT205COV",
+      "request": {
+        "sourceMessageType": "MT205COV",
+        "messageType": "pacs.009.001.08",
+        "currency": "AUD",
+        "counterpartyBankServiceId": "BANK-SVC-BOFAUS3N",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-08-MT205COV",
+        "paymentBeneficiaryInstitutionInput": "BOFAUS3N",
+        "block3": {
+          "119": "COV"
+        },
+        "sequenceB": {
+          "59": "BENEFICIARY",
+          "50A": "DEMOHKHH"
+        }
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "7e285998-4c3c-5d63-b05a-b613cd39c7b1",
+        "ssiCode": "SSI-UAT-GEN-08",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-AUD-CTBAAU2S",
+        "currency": "AUD",
+        "accountId": "DEMO-NOSTRO-007-PRIMARY",
+        "nostroId": "e6a9ae97-823c-4a66-86e7-b76aa5dc0c1a",
+        "nostroVersion": 9,
+        "matchedApplicabilityId": "7e285998-4c3c-5d63-b05a-b613cd39c7b1:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "878300a1-af08-4d58-9fbc-2974aa9ab075",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-09-MT202",
+      "request": {
+        "sourceMessageType": "MT202",
+        "messageType": "pacs.009.001.08",
+        "currency": "CAD",
+        "counterpartyBankServiceId": "BANK-SVC-CHASUS33",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-09-MT202",
+        "paymentBeneficiaryInstitutionInput": "CHASUS33"
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "91765d67-8e0c-52f4-92a1-501ef37bba23",
+        "ssiCode": "SSI-UAT-GEN-09",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-CAD-ROYCCAT2",
+        "currency": "CAD",
+        "accountId": "DEMO-NOSTRO-008-PRIMARY",
+        "nostroId": "82a0b5a0-d1ba-45ef-8fa2-4425d4cb0a6b",
+        "nostroVersion": 9,
+        "matchedApplicabilityId": "91765d67-8e0c-52f4-92a1-501ef37bba23:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "ea45d073-9e4d-46ae-af2c-ac480865b033",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-09-MT205",
+      "request": {
+        "sourceMessageType": "MT205",
+        "messageType": "pacs.009.001.08",
+        "currency": "CAD",
+        "counterpartyBankServiceId": "BANK-SVC-CHASUS33",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-09-MT205",
+        "paymentBeneficiaryInstitutionInput": "CHASUS33"
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "91765d67-8e0c-52f4-92a1-501ef37bba23",
+        "ssiCode": "SSI-UAT-GEN-09",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-CAD-ROYCCAT2",
+        "currency": "CAD",
+        "accountId": "DEMO-NOSTRO-008-PRIMARY",
+        "nostroId": "82a0b5a0-d1ba-45ef-8fa2-4425d4cb0a6b",
+        "nostroVersion": 9,
+        "matchedApplicabilityId": "91765d67-8e0c-52f4-92a1-501ef37bba23:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "667a9c9e-ce1b-4dcd-9519-cfedc8ac1332",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-09-MT202COV",
+      "request": {
+        "sourceMessageType": "MT202COV",
+        "messageType": "pacs.009.001.08",
+        "currency": "CAD",
+        "counterpartyBankServiceId": "BANK-SVC-CHASUS33",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-09-MT202COV",
+        "paymentBeneficiaryInstitutionInput": "CHASUS33",
+        "block3": {
+          "119": "COV"
+        },
+        "sequenceB": {
+          "59": "BENEFICIARY",
+          "50A": "DEMOHKHH"
+        }
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "91765d67-8e0c-52f4-92a1-501ef37bba23",
+        "ssiCode": "SSI-UAT-GEN-09",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-CAD-ROYCCAT2",
+        "currency": "CAD",
+        "accountId": "DEMO-NOSTRO-008-PRIMARY",
+        "nostroId": "82a0b5a0-d1ba-45ef-8fa2-4425d4cb0a6b",
+        "nostroVersion": 9,
+        "matchedApplicabilityId": "91765d67-8e0c-52f4-92a1-501ef37bba23:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "d653fc8e-2b6f-47f9-aabd-41d05f607a7c",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-09-MT205COV",
+      "request": {
+        "sourceMessageType": "MT205COV",
+        "messageType": "pacs.009.001.08",
+        "currency": "CAD",
+        "counterpartyBankServiceId": "BANK-SVC-CHASUS33",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-09-MT205COV",
+        "paymentBeneficiaryInstitutionInput": "CHASUS33",
+        "block3": {
+          "119": "COV"
+        },
+        "sequenceB": {
+          "59": "BENEFICIARY",
+          "50A": "DEMOHKHH"
+        }
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "91765d67-8e0c-52f4-92a1-501ef37bba23",
+        "ssiCode": "SSI-UAT-GEN-09",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-CAD-ROYCCAT2",
+        "currency": "CAD",
+        "accountId": "DEMO-NOSTRO-008-PRIMARY",
+        "nostroId": "82a0b5a0-d1ba-45ef-8fa2-4425d4cb0a6b",
+        "nostroVersion": 9,
+        "matchedApplicabilityId": "91765d67-8e0c-52f4-92a1-501ef37bba23:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "89d889fd-6ccd-4ff4-adfd-f2c6ba3c041f",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-10-MT202",
+      "request": {
+        "sourceMessageType": "MT202",
+        "messageType": "pacs.009.001.08",
+        "currency": "USD",
+        "counterpartyBankServiceId": "BANK-SVC-CHASUS33",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-10-MT202",
+        "paymentBeneficiaryInstitutionInput": "CHASUS33"
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "a6486f75-a0a8-5207-9c28-cedf30f4f990",
+        "ssiCode": "SSI-UAT-GEN-10",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-USD-CITIUS33",
+        "currency": "USD",
+        "accountId": "DEMO-NOSTRO-001-PRIMARY",
+        "nostroId": "fe5d672f-311e-4eb9-88bf-f8538d45793c",
+        "nostroVersion": 4,
+        "matchedApplicabilityId": "a6486f75-a0a8-5207-9c28-cedf30f4f990:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "e63fc9a3-362a-4587-955e-6c3091f6ba89",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-10-MT205",
+      "request": {
+        "sourceMessageType": "MT205",
+        "messageType": "pacs.009.001.08",
+        "currency": "USD",
+        "counterpartyBankServiceId": "BANK-SVC-CHASUS33",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-10-MT205",
+        "paymentBeneficiaryInstitutionInput": "CHASUS33"
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "a6486f75-a0a8-5207-9c28-cedf30f4f990",
+        "ssiCode": "SSI-UAT-GEN-10",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-USD-CITIUS33",
+        "currency": "USD",
+        "accountId": "DEMO-NOSTRO-001-PRIMARY",
+        "nostroId": "fe5d672f-311e-4eb9-88bf-f8538d45793c",
+        "nostroVersion": 4,
+        "matchedApplicabilityId": "a6486f75-a0a8-5207-9c28-cedf30f4f990:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "101b8d65-a8fe-4ddd-97a2-e6ae64b18a83",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-10-MT202COV",
+      "request": {
+        "sourceMessageType": "MT202COV",
+        "messageType": "pacs.009.001.08",
+        "currency": "USD",
+        "counterpartyBankServiceId": "BANK-SVC-CHASUS33",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-10-MT202COV",
+        "paymentBeneficiaryInstitutionInput": "CHASUS33",
+        "block3": {
+          "119": "COV"
+        },
+        "sequenceB": {
+          "59": "BENEFICIARY",
+          "50A": "DEMOHKHH"
+        }
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "a6486f75-a0a8-5207-9c28-cedf30f4f990",
+        "ssiCode": "SSI-UAT-GEN-10",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-USD-CITIUS33",
+        "currency": "USD",
+        "accountId": "DEMO-NOSTRO-001-PRIMARY",
+        "nostroId": "fe5d672f-311e-4eb9-88bf-f8538d45793c",
+        "nostroVersion": 4,
+        "matchedApplicabilityId": "a6486f75-a0a8-5207-9c28-cedf30f4f990:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "3bedc9df-c6cc-4c1d-8b1d-2af0538c7bb5",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-10-MT205COV",
+      "request": {
+        "sourceMessageType": "MT205COV",
+        "messageType": "pacs.009.001.08",
+        "currency": "USD",
+        "counterpartyBankServiceId": "BANK-SVC-CHASUS33",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-10-MT205COV",
+        "paymentBeneficiaryInstitutionInput": "CHASUS33",
+        "block3": {
+          "119": "COV"
+        },
+        "sequenceB": {
+          "59": "BENEFICIARY",
+          "50A": "DEMOHKHH"
+        }
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "a6486f75-a0a8-5207-9c28-cedf30f4f990",
+        "ssiCode": "SSI-UAT-GEN-10",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-USD-CITIUS33",
+        "currency": "USD",
+        "accountId": "DEMO-NOSTRO-001-PRIMARY",
+        "nostroId": "fe5d672f-311e-4eb9-88bf-f8538d45793c",
+        "nostroVersion": 4,
+        "matchedApplicabilityId": "a6486f75-a0a8-5207-9c28-cedf30f4f990:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "e725b31f-00ee-4362-96d5-0e0213668041",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-11-MT202",
+      "request": {
+        "sourceMessageType": "MT202",
+        "messageType": "pacs.009.001.08",
+        "currency": "CHF",
+        "counterpartyBankServiceId": "BANK-SVC-SCBLGB2L",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-11-MT202",
+        "paymentBeneficiaryInstitutionInput": "SCBLGB2L"
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "123b04ec-75bc-5d16-8232-d2eaebea7907",
+        "ssiCode": "SSI-UAT-GEN-11",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-CHF-UBSWCHZH80A",
+        "currency": "CHF",
+        "accountId": "DEMO-NOSTRO-009-PRIMARY",
+        "nostroId": "1acdcac1-b267-41c8-a38c-47a385c4b995",
+        "nostroVersion": 9,
+        "matchedApplicabilityId": "123b04ec-75bc-5d16-8232-d2eaebea7907:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "8044cc7c-3faf-4e9b-80c8-882276e251dc",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-11-MT205",
+      "request": {
+        "sourceMessageType": "MT205",
+        "messageType": "pacs.009.001.08",
+        "currency": "CHF",
+        "counterpartyBankServiceId": "BANK-SVC-SCBLGB2L",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-11-MT205",
+        "paymentBeneficiaryInstitutionInput": "SCBLGB2L"
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "123b04ec-75bc-5d16-8232-d2eaebea7907",
+        "ssiCode": "SSI-UAT-GEN-11",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-CHF-UBSWCHZH80A",
+        "currency": "CHF",
+        "accountId": "DEMO-NOSTRO-009-PRIMARY",
+        "nostroId": "1acdcac1-b267-41c8-a38c-47a385c4b995",
+        "nostroVersion": 9,
+        "matchedApplicabilityId": "123b04ec-75bc-5d16-8232-d2eaebea7907:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "c769f426-177e-4600-9af2-ec0806543b36",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-11-MT202COV",
+      "request": {
+        "sourceMessageType": "MT202COV",
+        "messageType": "pacs.009.001.08",
+        "currency": "CHF",
+        "counterpartyBankServiceId": "BANK-SVC-SCBLGB2L",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-11-MT202COV",
+        "paymentBeneficiaryInstitutionInput": "SCBLGB2L",
+        "block3": {
+          "119": "COV"
+        },
+        "sequenceB": {
+          "59": "BENEFICIARY",
+          "50A": "DEMOHKHH"
+        }
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "123b04ec-75bc-5d16-8232-d2eaebea7907",
+        "ssiCode": "SSI-UAT-GEN-11",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-CHF-UBSWCHZH80A",
+        "currency": "CHF",
+        "accountId": "DEMO-NOSTRO-009-PRIMARY",
+        "nostroId": "1acdcac1-b267-41c8-a38c-47a385c4b995",
+        "nostroVersion": 9,
+        "matchedApplicabilityId": "123b04ec-75bc-5d16-8232-d2eaebea7907:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "a2007b7f-bb90-4995-a00f-36b42c390bf5",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-11-MT205COV",
+      "request": {
+        "sourceMessageType": "MT205COV",
+        "messageType": "pacs.009.001.08",
+        "currency": "CHF",
+        "counterpartyBankServiceId": "BANK-SVC-SCBLGB2L",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-11-MT205COV",
+        "paymentBeneficiaryInstitutionInput": "SCBLGB2L",
+        "block3": {
+          "119": "COV"
+        },
+        "sequenceB": {
+          "59": "BENEFICIARY",
+          "50A": "DEMOHKHH"
+        }
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "123b04ec-75bc-5d16-8232-d2eaebea7907",
+        "ssiCode": "SSI-UAT-GEN-11",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-CHF-UBSWCHZH80A",
+        "currency": "CHF",
+        "accountId": "DEMO-NOSTRO-009-PRIMARY",
+        "nostroId": "1acdcac1-b267-41c8-a38c-47a385c4b995",
+        "nostroVersion": 9,
+        "matchedApplicabilityId": "123b04ec-75bc-5d16-8232-d2eaebea7907:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "ab718513-e6bf-44ca-88b3-677fc5205c9a",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-12-MT202",
+      "request": {
+        "sourceMessageType": "MT202",
+        "messageType": "pacs.009.001.08",
+        "currency": "CNY",
+        "counterpartyBankServiceId": "BANK-SVC-BNPAFRPP",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-12-MT202",
+        "paymentBeneficiaryInstitutionInput": "BNPAFRPP"
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "dadfc78e-619e-5fca-ba19-69a5732fd246",
+        "ssiCode": "SSI-UAT-GEN-12",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-CNY-BKCHCNBJ",
+        "currency": "CNY",
+        "accountId": "DEMO-NOSTRO-010-PRIMARY",
+        "nostroId": "26405901-8b16-4372-b6fd-65e695bf2056",
+        "nostroVersion": 9,
+        "matchedApplicabilityId": "dadfc78e-619e-5fca-ba19-69a5732fd246:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "ddddd517-eff5-40f5-80f6-50fefe6978fd",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-12-MT205",
+      "request": {
+        "sourceMessageType": "MT205",
+        "messageType": "pacs.009.001.08",
+        "currency": "CNY",
+        "counterpartyBankServiceId": "BANK-SVC-BNPAFRPP",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-12-MT205",
+        "paymentBeneficiaryInstitutionInput": "BNPAFRPP"
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "dadfc78e-619e-5fca-ba19-69a5732fd246",
+        "ssiCode": "SSI-UAT-GEN-12",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-CNY-BKCHCNBJ",
+        "currency": "CNY",
+        "accountId": "DEMO-NOSTRO-010-PRIMARY",
+        "nostroId": "26405901-8b16-4372-b6fd-65e695bf2056",
+        "nostroVersion": 9,
+        "matchedApplicabilityId": "dadfc78e-619e-5fca-ba19-69a5732fd246:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "d8789992-9171-4a5a-bf3a-5493846f786f",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-12-MT202COV",
+      "request": {
+        "sourceMessageType": "MT202COV",
+        "messageType": "pacs.009.001.08",
+        "currency": "CNY",
+        "counterpartyBankServiceId": "BANK-SVC-BNPAFRPP",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-12-MT202COV",
+        "paymentBeneficiaryInstitutionInput": "BNPAFRPP",
+        "block3": {
+          "119": "COV"
+        },
+        "sequenceB": {
+          "59": "BENEFICIARY",
+          "50A": "DEMOHKHH"
+        }
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "dadfc78e-619e-5fca-ba19-69a5732fd246",
+        "ssiCode": "SSI-UAT-GEN-12",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-CNY-BKCHCNBJ",
+        "currency": "CNY",
+        "accountId": "DEMO-NOSTRO-010-PRIMARY",
+        "nostroId": "26405901-8b16-4372-b6fd-65e695bf2056",
+        "nostroVersion": 9,
+        "matchedApplicabilityId": "dadfc78e-619e-5fca-ba19-69a5732fd246:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "028ea6d1-463a-454f-aace-6c295a966d7c",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "PAIR-12-MT205COV",
+      "request": {
+        "sourceMessageType": "MT205COV",
+        "messageType": "pacs.009.001.08",
+        "currency": "CNY",
+        "counterpartyBankServiceId": "BANK-SVC-BNPAFRPP",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-PAIR-12-MT205COV",
+        "paymentBeneficiaryInstitutionInput": "BNPAFRPP",
+        "block3": {
+          "119": "COV"
+        },
+        "sequenceB": {
+          "59": "BENEFICIARY",
+          "50A": "DEMOHKHH"
+        }
+      },
+      "actualStatus": 200,
+      "actualDecision": "SSI_RESOLVED",
+      "actualChosenRoute": {
+        "ssiId": "dadfc78e-619e-5fca-ba19-69a5732fd246",
+        "ssiCode": "SSI-UAT-GEN-12",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-CNY-BKCHCNBJ",
+        "currency": "CNY",
+        "accountId": "DEMO-NOSTRO-010-PRIMARY",
+        "nostroId": "26405901-8b16-4372-b6fd-65e695bf2056",
+        "nostroVersion": 9,
+        "matchedApplicabilityId": "dadfc78e-619e-5fca-ba19-69a5732fd246:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "resolutionToken": "2308d76c-18e6-4cc9-ba44-6cb83ce8addf",
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "chosenSsiCode": true,
+        "chosenSsiVersion": true,
+        "accountReference": true,
+        "currency": true,
+        "routePurpose": true,
+        "selectedBy": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    }
+  ],
+  "ambiguityCases": [
+    {
+      "caseKey": "QA-TIE-MT202",
+      "request": {
+        "sourceMessageType": "MT202",
+        "messageType": "pacs.009.001.08",
+        "currency": "GBP",
+        "counterpartyBankServiceId": "BANK-SVC-QATIGB2L",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-QA-TIE-MT202",
+        "paymentBeneficiaryInstitutionInput": "QATIGB2L"
+      },
+      "actualStatus": 422,
+      "actualDecision": "SSI_AMBIGUOUS",
+      "candidates": [
+        {
+          "ssiId": "6a7b0357-3036-5f6d-a1db-55711c60a908",
+          "ssiCode": "SSI-QA-TIE-1",
+          "ssiVersion": 1,
+          "settlementRouteId": "ROUTE-QA-TIE-GBP-BARCGB22",
+          "currency": "GBP",
+          "accountId": "QA-TIE-GBP-1",
+          "nostroId": "9c854d0c-3cfb-5092-a103-273fe8a14c5c",
+          "nostroVersion": 1,
+          "maskedAccountRef": "QA-TIE-GBP-1-MASKED",
+          "matchedApplicabilityId": "6a7b0357-3036-5f6d-a1db-55711c60a908:APPL:1",
+          "businessRank": {
+            "priority": 10,
+            "routePreference": "PRIMARY",
+            "specificity": 0
+          },
+          "selectionStatus": "TOP_RANK_TIE",
+          "ambiguityReason": "TIED_ON_CONTROLLED_RANK_KEYS",
+          "tiedOn": [
+            "priority",
+            "routePreference",
+            "specificity"
+          ],
+          "tieMember": true
+        },
+        {
+          "ssiId": "c3490516-6311-547c-855b-2c5847e74e36",
+          "ssiCode": "SSI-QA-TIE-2",
+          "ssiVersion": 1,
+          "settlementRouteId": "ROUTE-QA-TIE-GBP-BARCGB22",
+          "currency": "GBP",
+          "accountId": "QA-TIE-GBP-2",
+          "nostroId": "48b0d256-8502-5d4b-bb14-4b06a7889dee",
+          "nostroVersion": 1,
+          "maskedAccountRef": "QA-TIE-GBP-2-MASKED",
+          "matchedApplicabilityId": "c3490516-6311-547c-855b-2c5847e74e36:APPL:1",
+          "businessRank": {
+            "priority": 10,
+            "routePreference": "PRIMARY",
+            "specificity": 0
+          },
+          "selectionStatus": "TOP_RANK_TIE",
+          "ambiguityReason": "TIED_ON_CONTROLLED_RANK_KEYS",
+          "tiedOn": [
+            "priority",
+            "routePreference",
+            "specificity"
+          ],
+          "tieMember": true
+        }
+      ],
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "failClosed": true,
+        "candidates": true,
+        "ambiguityReason": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "QA-TIE-MT202COV",
+      "request": {
+        "sourceMessageType": "MT202COV",
+        "messageType": "pacs.009.001.08",
+        "currency": "GBP",
+        "counterpartyBankServiceId": "BANK-SVC-QATIGB2L",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-QA-TIE-MT202COV",
+        "paymentBeneficiaryInstitutionInput": "QATIGB2L",
+        "block3": {
+          "119": "COV"
+        },
+        "sequenceB": {
+          "59": "BENEFICIARY",
+          "50A": "DEMOHKHH"
+        }
+      },
+      "actualStatus": 422,
+      "actualDecision": "SSI_AMBIGUOUS",
+      "candidates": [
+        {
+          "ssiId": "6a7b0357-3036-5f6d-a1db-55711c60a908",
+          "ssiCode": "SSI-QA-TIE-1",
+          "ssiVersion": 1,
+          "settlementRouteId": "ROUTE-QA-TIE-GBP-BARCGB22",
+          "currency": "GBP",
+          "accountId": "QA-TIE-GBP-1",
+          "nostroId": "9c854d0c-3cfb-5092-a103-273fe8a14c5c",
+          "nostroVersion": 1,
+          "maskedAccountRef": "QA-TIE-GBP-1-MASKED",
+          "matchedApplicabilityId": "6a7b0357-3036-5f6d-a1db-55711c60a908:APPL:1",
+          "businessRank": {
+            "priority": 10,
+            "routePreference": "PRIMARY",
+            "specificity": 0
+          },
+          "selectionStatus": "TOP_RANK_TIE",
+          "ambiguityReason": "TIED_ON_CONTROLLED_RANK_KEYS",
+          "tiedOn": [
+            "priority",
+            "routePreference",
+            "specificity"
+          ],
+          "tieMember": true
+        },
+        {
+          "ssiId": "c3490516-6311-547c-855b-2c5847e74e36",
+          "ssiCode": "SSI-QA-TIE-2",
+          "ssiVersion": 1,
+          "settlementRouteId": "ROUTE-QA-TIE-GBP-BARCGB22",
+          "currency": "GBP",
+          "accountId": "QA-TIE-GBP-2",
+          "nostroId": "48b0d256-8502-5d4b-bb14-4b06a7889dee",
+          "nostroVersion": 1,
+          "maskedAccountRef": "QA-TIE-GBP-2-MASKED",
+          "matchedApplicabilityId": "c3490516-6311-547c-855b-2c5847e74e36:APPL:1",
+          "businessRank": {
+            "priority": 10,
+            "routePreference": "PRIMARY",
+            "specificity": 0
+          },
+          "selectionStatus": "TOP_RANK_TIE",
+          "ambiguityReason": "TIED_ON_CONTROLLED_RANK_KEYS",
+          "tiedOn": [
+            "priority",
+            "routePreference",
+            "specificity"
+          ],
+          "tieMember": true
+        }
+      ],
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "failClosed": true,
+        "candidates": true,
+        "ambiguityReason": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "QA-TIE-MT205",
+      "request": {
+        "sourceMessageType": "MT205",
+        "messageType": "pacs.009.001.08",
+        "currency": "GBP",
+        "counterpartyBankServiceId": "BANK-SVC-QATIGB2L",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-QA-TIE-MT205",
+        "paymentBeneficiaryInstitutionInput": "QATIGB2L"
+      },
+      "actualStatus": 422,
+      "actualDecision": "SSI_AMBIGUOUS",
+      "candidates": [
+        {
+          "ssiId": "6a7b0357-3036-5f6d-a1db-55711c60a908",
+          "ssiCode": "SSI-QA-TIE-1",
+          "ssiVersion": 1,
+          "settlementRouteId": "ROUTE-QA-TIE-GBP-BARCGB22",
+          "currency": "GBP",
+          "accountId": "QA-TIE-GBP-1",
+          "nostroId": "9c854d0c-3cfb-5092-a103-273fe8a14c5c",
+          "nostroVersion": 1,
+          "maskedAccountRef": "QA-TIE-GBP-1-MASKED",
+          "matchedApplicabilityId": "6a7b0357-3036-5f6d-a1db-55711c60a908:APPL:1",
+          "businessRank": {
+            "priority": 10,
+            "routePreference": "PRIMARY",
+            "specificity": 0
+          },
+          "selectionStatus": "TOP_RANK_TIE",
+          "ambiguityReason": "TIED_ON_CONTROLLED_RANK_KEYS",
+          "tiedOn": [
+            "priority",
+            "routePreference",
+            "specificity"
+          ],
+          "tieMember": true
+        },
+        {
+          "ssiId": "c3490516-6311-547c-855b-2c5847e74e36",
+          "ssiCode": "SSI-QA-TIE-2",
+          "ssiVersion": 1,
+          "settlementRouteId": "ROUTE-QA-TIE-GBP-BARCGB22",
+          "currency": "GBP",
+          "accountId": "QA-TIE-GBP-2",
+          "nostroId": "48b0d256-8502-5d4b-bb14-4b06a7889dee",
+          "nostroVersion": 1,
+          "maskedAccountRef": "QA-TIE-GBP-2-MASKED",
+          "matchedApplicabilityId": "c3490516-6311-547c-855b-2c5847e74e36:APPL:1",
+          "businessRank": {
+            "priority": 10,
+            "routePreference": "PRIMARY",
+            "specificity": 0
+          },
+          "selectionStatus": "TOP_RANK_TIE",
+          "ambiguityReason": "TIED_ON_CONTROLLED_RANK_KEYS",
+          "tiedOn": [
+            "priority",
+            "routePreference",
+            "specificity"
+          ],
+          "tieMember": true
+        }
+      ],
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "failClosed": true,
+        "candidates": true,
+        "ambiguityReason": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    },
+    {
+      "caseKey": "QA-TIE-MT205COV",
+      "request": {
+        "sourceMessageType": "MT205COV",
+        "messageType": "pacs.009.001.08",
+        "currency": "GBP",
+        "counterpartyBankServiceId": "BANK-SVC-QATIGB2L",
+        "consumer": "CENTRAL_PAYMENT",
+        "product": "CENTRAL_PAYMENT",
+        "businessFunction": "INTERBANK_TRANSFER",
+        "paymentLeg": "INTERBANK_SETTLEMENT",
+        "direction": "OUTBOUND",
+        "bookingEntity": "HK01",
+        "valueDate": "2026-09-12",
+        "amount": "1000000",
+        "messagingService": "FINPLUS",
+        "transactionReference": "V153-QA-TIE-MT205COV",
+        "paymentBeneficiaryInstitutionInput": "QATIGB2L",
+        "block3": {
+          "119": "COV"
+        },
+        "sequenceB": {
+          "59": "BENEFICIARY",
+          "50A": "DEMOHKHH"
+        }
+      },
+      "actualStatus": 422,
+      "actualDecision": "SSI_AMBIGUOUS",
+      "candidates": [
+        {
+          "ssiId": "6a7b0357-3036-5f6d-a1db-55711c60a908",
+          "ssiCode": "SSI-QA-TIE-1",
+          "ssiVersion": 1,
+          "settlementRouteId": "ROUTE-QA-TIE-GBP-BARCGB22",
+          "currency": "GBP",
+          "accountId": "QA-TIE-GBP-1",
+          "nostroId": "9c854d0c-3cfb-5092-a103-273fe8a14c5c",
+          "nostroVersion": 1,
+          "maskedAccountRef": "QA-TIE-GBP-1-MASKED",
+          "matchedApplicabilityId": "6a7b0357-3036-5f6d-a1db-55711c60a908:APPL:1",
+          "businessRank": {
+            "priority": 10,
+            "routePreference": "PRIMARY",
+            "specificity": 0
+          },
+          "selectionStatus": "TOP_RANK_TIE",
+          "ambiguityReason": "TIED_ON_CONTROLLED_RANK_KEYS",
+          "tiedOn": [
+            "priority",
+            "routePreference",
+            "specificity"
+          ],
+          "tieMember": true
+        },
+        {
+          "ssiId": "c3490516-6311-547c-855b-2c5847e74e36",
+          "ssiCode": "SSI-QA-TIE-2",
+          "ssiVersion": 1,
+          "settlementRouteId": "ROUTE-QA-TIE-GBP-BARCGB22",
+          "currency": "GBP",
+          "accountId": "QA-TIE-GBP-2",
+          "nostroId": "48b0d256-8502-5d4b-bb14-4b06a7889dee",
+          "nostroVersion": 1,
+          "maskedAccountRef": "QA-TIE-GBP-2-MASKED",
+          "matchedApplicabilityId": "c3490516-6311-547c-855b-2c5847e74e36:APPL:1",
+          "businessRank": {
+            "priority": 10,
+            "routePreference": "PRIMARY",
+            "specificity": 0
+          },
+          "selectionStatus": "TOP_RANK_TIE",
+          "ambiguityReason": "TIED_ON_CONTROLLED_RANK_KEYS",
+          "tiedOn": [
+            "priority",
+            "routePreference",
+            "specificity"
+          ],
+          "tieMember": true
+        }
+      ],
+      "assertions": {
+        "httpStatus": true,
+        "decision": true,
+        "failClosed": true,
+        "candidates": true,
+        "ambiguityReason": true,
+        "snapshotIdentity": true
+      },
+      "passed": true
+    }
+  ]
+}

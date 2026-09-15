@@ -1,0 +1,56 @@
+{
+  "name": "mock-reference-services",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/mock-reference-services/src",
+  "projectType": "application",
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "options": {
+        "outputPath": "dist/apps/mock-reference-services",
+        "main": "apps/mock-reference-services/src/main.ts",
+        "tsConfig": "apps/mock-reference-services/tsconfig.app.json",
+        "rootDir": ".",
+        "outputFileName": "apps/mock-reference-services/src/main.js",
+        "assets": [
+          {
+            "input": "parameters",
+            "glob": "bank*.json",
+            "output": "parameters"
+          }
+        ]
+      }
+    },
+    "serve": {
+      "executor": "@nx/js:node",
+      "continuous": true,
+      "dependsOn": ["build"],
+      "options": {
+        "buildTarget": "mock-reference-services:build",
+        "runBuildTargetDependencies": false,
+        "port": 0
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc -p apps/mock-reference-services/tsconfig.app.json --noEmit"
+      }
+    },
+    "test": {
+      "executor": "@nx/jest:jest",
+      "outputs": ["{workspaceRoot}/coverage/apps/mock-reference-services"],
+      "options": {
+        "jestConfig": "apps/mock-reference-services/jest.config.ts"
+      },
+      "configurations": {
+        "ci": {
+          "ci": true,
+          "codeCoverage": true,
+          "coverageReporters": ["json-summary", "lcov", "text-summary"]
+        }
+      }
+    }
+  },
+  "tags": ["type:app", "scope:mock"]
+}

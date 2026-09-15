@@ -1,0 +1,194 @@
+{
+  "schemaVersion": "1.0",
+  "catalogueVersion": "2026.09.15-task4-ssi-scope",
+  "standardsRelease": "SR2026",
+  "messageFamily": "MT2_PACS009",
+  "definitions": [
+    {
+      "messageType": "MT202",
+      "businessFunction": "General Financial Institution Transfer",
+      "businessService": "swift.cbprplus.04",
+      "scenarios": [
+        {
+          "scenarioId": "MT202-OP-DIRECT",
+          "servicerRelationship": "DIFFERENT",
+          "label": "Direct institutional transfer",
+          "polarity": "POSITIVE",
+          "audience": "OPERATIONAL"
+        },
+        {
+          "scenarioId": "MT202-OP-BOOK",
+          "servicerRelationship": "SAME",
+          "label": "Book transfer — same receiver",
+          "polarity": "POSITIVE",
+          "audience": "OPERATIONAL"
+        },
+        {
+          "scenarioId": "MT202-OP-CREDIT-57A",
+          "servicerRelationship": "DIFFERENT",
+          "label": "Credit one of several accounts at 57A",
+          "polarity": "POSITIVE",
+          "audience": "OPERATIONAL"
+        },
+        {
+          "scenarioId": "MT202-QA-C81",
+          "servicerRelationship": "NOT_APPLICABLE",
+          "label": "C81 — 56A present without 57A",
+          "polarity": "NEGATIVE",
+          "audience": "QA_TEST_ONLY",
+          "resolverInputValues": {
+            "fixture.intermediaryBankServiceId": "BANK-SVC-CITIUS33",
+            "fixture.accountWithBankMissing": true
+          }
+        },
+        {
+          "scenarioId": "MT202-QA-CONTINUITY",
+          "servicerRelationship": "NOT_APPLICABLE",
+          "label": "SSI option and omission continuity",
+          "polarity": "BOUNDARY",
+          "audience": "QA_TEST_ONLY"
+        }
+      ]
+    },
+    {
+      "messageType": "MT202COV",
+      "businessFunction": "General Financial Institution Transfer — Cover",
+      "businessService": "swift.cbprplus.cov.04",
+      "governedInputValues": {
+        "context.swift21NONE": "MT202COV-RELATED-REFERENCE",
+        "context.swift119NONE": "COV",
+        "context.swift121NONE": "123e4567-e89b-42d3-a456-426614174000",
+        "context.sequenceB50A": "ORDERING CUSTOMER",
+        "context.sequenceB59": "BENEFICIARY CUSTOMER"
+      },
+      "scenarios": [
+        {
+          "scenarioId": "MT202COV-OP-BOOK",
+          "servicerRelationship": "SAME",
+          "label": "Cover book transfer — same receiver",
+          "polarity": "POSITIVE",
+          "audience": "OPERATIONAL"
+        },
+        {
+          "scenarioId": "MT202COV-OP-CREDIT-57A",
+          "servicerRelationship": "DIFFERENT",
+          "label": "Cover credit one of several accounts at 57A",
+          "polarity": "POSITIVE",
+          "audience": "OPERATIONAL"
+        },
+        {
+          "scenarioId": "MT202COV-OP-STANDARD",
+          "servicerRelationship": "DIFFERENT",
+          "label": "Standard cover transfer",
+          "polarity": "POSITIVE",
+          "audience": "OPERATIONAL"
+        },
+        {
+          "scenarioId": "MT202COV-QA-INCOMPLETE",
+          "servicerRelationship": "NOT_APPLICABLE",
+          "label": "Incomplete cover context",
+          "polarity": "NEGATIVE",
+          "audience": "QA_TEST_ONLY",
+          "resolverInputValues": {
+            "fixture.coverSequenceBMissing": true
+          }
+        },
+        {
+          "scenarioId": "MT202COV-QA-CONTINUITY",
+          "servicerRelationship": "NOT_APPLICABLE",
+          "label": "Cover profile and SSI option continuity",
+          "polarity": "BOUNDARY",
+          "audience": "QA_TEST_ONLY"
+        }
+      ]
+    },
+    {
+      "messageType": "MT205",
+      "businessFunction": "Financial Institution Transfer Execution",
+      "businessService": "swift.cbprplus.04",
+      "scenarios": [
+        {
+          "scenarioId": "MT205-OP-INITIAL-MT200-201-EQUIVALENCE",
+          "servicerRelationship": "NOT_APPLICABLE",
+          "label": "Initial MT200/MT201 equivalence",
+          "polarity": "POSITIVE",
+          "audience": "OPERATIONAL"
+        },
+        {
+          "scenarioId": "MT205-OP-STANDARD-DOMESTIC-ONWARD",
+          "servicerRelationship": "DIFFERENT",
+          "label": "Standard domestic onward transfer",
+          "polarity": "POSITIVE",
+          "audience": "OPERATIONAL"
+        },
+        {
+          "scenarioId": "MT205-QA-CROSS-BORDER",
+          "servicerRelationship": "NOT_APPLICABLE",
+          "label": "Cross-border further transmission",
+          "polarity": "NEGATIVE",
+          "audience": "QA_TEST_ONLY",
+          "resolverInputValues": {
+            "fixture.senderCountry": "HK",
+            "fixture.receiverCountry": "US"
+          }
+        },
+        {
+          "scenarioId": "MT205-QA-PROVENANCE",
+          "servicerRelationship": "NOT_APPLICABLE",
+          "label": "Source-type governed 52/58 semantics",
+          "polarity": "BOUNDARY",
+          "audience": "QA_TEST_ONLY"
+        }
+      ]
+    },
+    {
+      "messageType": "MT205COV",
+      "businessFunction": "Financial Institution Transfer Execution — Cover",
+      "businessService": "swift.cbprplus.cov.04",
+      "governedInputValues": {
+        "context.swift21NONE": "MT205COV-RELATED-REFERENCE",
+        "context.swift119NONE": "COV",
+        "context.swift121NONE": "8ec66d20-3450-4f31-9f68-d16e911c515c",
+        "context.sequenceB50A": "CURRENT ORDERING CUSTOMER",
+        "context.sequenceB59": "CURRENT BENEFICIARY CUSTOMER",
+        "context.previousMessageType": "MT202COV",
+        "context.previousMessage20": "PREVIOUS-TX-001",
+        "context.previousMessage21": "PREVIOUS-RELATED-001",
+        "context.previousMessage121": "a6d08f4c-94af-4f48-a44b-5b958af61a32",
+        "context.previousMessageA52": "CITIUS33",
+        "context.previousMessageA58": "DEUTDEFF",
+        "context.previousMessageSequenceB50A": "PREVIOUS ORDERING CUSTOMER",
+        "context.previousMessageSequenceB59": "PREVIOUS BENEFICIARY CUSTOMER",
+        "context.previousMessageArtifactSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "context.previousMessageArtifactVersion": "SR2026-MT202COV-V1"
+      },
+      "scenarios": [
+        {
+          "scenarioId": "MT205COV-OP-CONTINUATION",
+          "servicerRelationship": "DIFFERENT",
+          "label": "Same-country cover continuation",
+          "polarity": "POSITIVE",
+          "audience": "OPERATIONAL"
+        },
+        {
+          "scenarioId": "MT205COV-QA-CROSS-BORDER",
+          "servicerRelationship": "NOT_APPLICABLE",
+          "label": "Cross-border cover continuation",
+          "polarity": "NEGATIVE",
+          "audience": "QA_TEST_ONLY",
+          "resolverInputValues": {
+            "fixture.senderCountry": "HK",
+            "fixture.receiverCountry": "US"
+          }
+        },
+        {
+          "scenarioId": "MT205COV-QA-CONTINUITY",
+          "servicerRelationship": "NOT_APPLICABLE",
+          "label": "Cover profile and no-equivalence SSI semantics",
+          "polarity": "BOUNDARY",
+          "audience": "QA_TEST_ONLY"
+        }
+      ]
+    }
+  ]
+}

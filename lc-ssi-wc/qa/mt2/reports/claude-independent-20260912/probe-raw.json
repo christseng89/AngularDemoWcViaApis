@@ -1,0 +1,4721 @@
+{
+ "apiBase": "http://localhost:3101/api",
+ "generatedAt": "2026-09-12T06:03:08.886Z",
+ "results": [
+  {
+   "name": "A1_GEN_CITIUS33",
+   "status": 200,
+   "error": null,
+   "request": {
+    "consumer": "TRADE_FINANCE",
+    "product": "IMPORT_LC",
+    "businessFunction": "IMPORT_LC_BANK_REIMBURSEMENT",
+    "paymentLeg": "BANK_REIMBURSEMENT",
+    "direction": "OUTBOUND",
+    "currency": "USD",
+    "bookingEntity": "HK01",
+    "valueDate": "2026-09-12",
+    "amount": "1000000",
+    "messageType": "pacs.009.001.08",
+    "sourceMessageType": "MT202",
+    "correlationId": "c8af6153-d269-4752-8357-d8f232208779",
+    "transactionReference": "A1",
+    "counterpartyBankServiceId": "BANK-SVC-CITIUS33"
+   },
+   "response": {
+    "mx": {
+     "httpStatus": 200,
+     "decision": "RESOLVED",
+     "messageDefinitionId": "pacs.009.001.08",
+     "businessService": "swift.cbprplus.04",
+     "redirectDomain": null,
+     "canonicalScenario": "FI_TO_FI_TRANSFER",
+     "validationScope": "canonical route + MRG; full serialized XML requires controlled Translation Portal golden fixture",
+     "canonicalRoles": {
+      "instructedAgent": "CITIUS33",
+      "beneficiaryInstitution": "CITIUS33",
+      "directAccount": true,
+      "selectedSsi": "SSI-DEMO-001",
+      "creditorAgent": "CITIUS33",
+      "creditor": "CITIUS33",
+      "creditorSource": "REQUEST_PASS_THROUGH"
+     },
+     "code": "SSI_RESOLVED",
+     "chosenRoute": {
+      "ssiId": "a1e1ac1a-a16f-414c-ac70-85731ed84d3f",
+      "ssiCode": "SSI-DEMO-001",
+      "ssiVersion": 44,
+      "settlementRouteId": "ROUTE-USD-CITIUS33",
+      "currency": "USD",
+      "accountId": "DEMO-NOSTRO-001-PRIMARY",
+      "nostroId": "fe5d672f-311e-4eb9-88bf-f8538d45793c",
+      "nostroVersion": 4,
+      "matchedApplicabilityId": "a1e1ac1a-a16f-414c-ac70-85731ed84d3f:APPL:1",
+      "routePurpose": "",
+      "selectedBy": "CONTROLLED_RANK_KEYS",
+      "specificity": "NAMED_COUNTERPARTY"
+     },
+     "alternatives": [
+      {
+       "ssiId": "e029ad81-7715-4c2a-9452-75876508cacb",
+       "ssiCode": "SSI-DEMO-002",
+       "ssiVersion": 39,
+       "settlementRouteId": "ROUTE-USD-HSBCHKHH",
+       "currency": "USD",
+       "accountId": "DEMO-NOSTRO-001-SECONDARY",
+       "nostroId": "d4ee3d85-7ad4-4767-9046-33a050705a78",
+       "nostroVersion": 4,
+       "maskedAccountRef": "DEMO-NOSTRO-001-SECONDARY-PRIMARY",
+       "matchedApplicabilityId": "e029ad81-7715-4c2a-9452-75876508cacb:APPL:1"
+      }
+     ],
+     "roleProvenance": {
+      "instructedAgent": {
+       "value": "CITIUS33",
+       "source": "COUNTERPARTY_SSI",
+       "ssiCode": "SSI-DEMO-001",
+       "ssiVersion": 44,
+       "sourceField": "actualReceiverBic"
+      },
+      "creditorAgent": {
+       "value": "CITIUS33",
+       "source": "COUNTERPARTY_SSI",
+       "ssiCode": "SSI-DEMO-001",
+       "ssiVersion": 44,
+       "sourceField": "accountWithBic"
+      }
+     },
+     "messageComposerContext": {
+      "SttlmMtd": {
+       "value": "INDA",
+       "source": "SETTLEMENT_POLICY"
+      },
+      "Dbtr": {
+       "value": "DEMOHKHH",
+       "source": "OWN_ENTITY"
+      },
+      "SttlmAcct": {
+       "value": "DEMO-NOSTRO-001-PRIMARY-PRIMARY",
+       "source": "OWN_SSI_NOSTRO",
+       "nostroId": "fe5d672f-311e-4eb9-88bf-f8538d45793c",
+       "nostroVersion": 4
+      },
+      "Cdtr": {
+       "value": "CITIUS33",
+       "source": "REQUEST_PASS_THROUGH"
+      }
+     }
+    },
+    "mt": {
+     "renderer": "MT compatibility view from the same confirmed canonical snapshot",
+     "tags": {
+      "58A": "CITIUS33"
+     },
+     "omitted": [
+      "53a",
+      "54a",
+      "56a",
+      "57a"
+     ],
+     "assertions": [
+      "57a omitted means Receiver is AWI"
+     ]
+    },
+    "chosenRoute": {
+     "ssiId": "a1e1ac1a-a16f-414c-ac70-85731ed84d3f",
+     "ssiCode": "SSI-DEMO-001",
+     "ssiVersion": 44,
+     "settlementRouteId": "ROUTE-USD-CITIUS33",
+     "currency": "USD",
+     "accountId": "DEMO-NOSTRO-001-PRIMARY",
+     "nostroId": "fe5d672f-311e-4eb9-88bf-f8538d45793c",
+     "nostroVersion": 4,
+     "matchedApplicabilityId": "a1e1ac1a-a16f-414c-ac70-85731ed84d3f:APPL:1",
+     "routePurpose": "",
+     "selectedBy": "CONTROLLED_RANK_KEYS",
+     "specificity": "NAMED_COUNTERPARTY"
+    },
+    "resolutionDecision": "RESOLVED",
+    "code": "SSI_RESOLVED",
+    "alternatives": [
+     {
+      "ssiId": "e029ad81-7715-4c2a-9452-75876508cacb",
+      "ssiCode": "SSI-DEMO-002",
+      "ssiVersion": 39,
+      "settlementRouteId": "ROUTE-USD-HSBCHKHH",
+      "currency": "USD",
+      "accountId": "DEMO-NOSTRO-001-SECONDARY",
+      "nostroId": "d4ee3d85-7ad4-4767-9046-33a050705a78",
+      "nostroVersion": 4,
+      "maskedAccountRef": "DEMO-NOSTRO-001-SECONDARY-PRIMARY",
+      "matchedApplicabilityId": "e029ad81-7715-4c2a-9452-75876508cacb:APPL:1"
+     }
+    ],
+    "excludedCandidates": [
+     {
+      "ssiId": "22a11830-f848-4281-805f-8e693c98b364",
+      "ssiCode": "SSI-DEMO-041",
+      "reason": "COUNTERPARTY_SCOPE_MISMATCH",
+      "evidence": [
+       {
+        "criterion": "STATUS",
+        "outcome": "PASS",
+        "expected": "ACTIVE",
+        "actual": "ACTIVE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CURRENCY",
+        "outcome": "PASS",
+        "expected": "USD",
+        "actual": "USD",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "APPLICABILITY",
+        "outcome": "PASS",
+        "expected": "active/effective SSI_APPLICABILITY",
+        "actual": "22a11830-f848-4281-805f-8e693c98b364:APPL:1",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CONSUMER",
+        "outcome": "PASS",
+        "expected": "TRADE_FINANCE",
+        "actual": "ANY",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "PRODUCT",
+        "outcome": "PASS",
+        "expected": "IMPORT_LC",
+        "actual": "ANY",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "BUSINESS_FUNCTION",
+        "outcome": "PASS",
+        "expected": "IMPORT_LC_BANK_REIMBURSEMENT",
+        "actual": "ANY",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "PAYMENT_LEG",
+        "outcome": "PASS",
+        "expected": "BANK_REIMBURSEMENT",
+        "actual": "BANK_REIMBURSEMENT",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "COUNTERPARTY_SCOPE",
+        "outcome": "FAIL",
+        "expected": "CITIUS33 or approved US/ANY matcher",
+        "actual": "NSSIUSN1",
+        "reasonCode": "COUNTERPARTY_SCOPE_MISMATCH"
+       },
+       {
+        "criterion": "COUNTERPARTY_TYPE",
+        "outcome": "PASS",
+        "expected": "BANK",
+        "actual": "BANK",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "GLOBAL_FALLBACK_APPROVAL",
+        "outcome": "PASS",
+        "expected": "approvedGlobal=true",
+        "actual": "false",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "SETTLEMENT_COUNTRY",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "US",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "SETTLEMENT_MARKET",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "US_DOLLAR",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_SYSTEM",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "FEDWIRE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_STANDING_DATA",
+        "outcome": "PASS",
+        "expected": "USD active governed clearing system",
+        "actual": "FEDWIRE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_SCHEME_TYPE",
+        "outcome": "PASS",
+        "expected": "RTGS",
+        "actual": "RTGS",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "NOSTRO_CURRENCY",
+        "outcome": "PASS",
+        "expected": "USD",
+        "actual": "USD",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "BOOKING_ENTITY",
+        "outcome": "PASS",
+        "expected": "HK01",
+        "actual": "HK01",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "DIRECTION",
+        "outcome": "PASS",
+        "expected": "OUTBOUND",
+        "actual": "OUTBOUND",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "MESSAGING_SERVICE",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "FINPLUS",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "MESSAGE_TYPE",
+        "outcome": "PASS",
+        "expected": "pacs.009.001.08",
+        "actual": "pacs.008.001.12,pacs.009.001.12,pacs.009.001.08",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "COV_PROFILE",
+        "outcome": "PASS",
+        "expected": "NOT_APPLICABLE",
+        "actual": "NOT_APPLICABLE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "VALUE_DATE",
+        "outcome": "PASS",
+        "expected": "2026-09-12",
+        "actual": "2026-01-01..2027-12-31",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "AMOUNT_LIMIT",
+        "outcome": "PASS",
+        "expected": "1000000",
+        "actual": "OPEN..OPEN",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "LIVE_CLEARING_PARTICIPATION",
+        "outcome": "NOT_EVALUATED",
+        "expected": "FEDWIRE",
+        "actual": "STANDING_DATA_VALIDATED_LIVE_DIRECTORY_REQUIRED",
+        "reasonCode": "LIVE_REACHABILITY_NOT_EVALUATED"
+       }
+      ]
+     },
+     {
+      "ssiId": "b96e8d9a-327b-4fb0-9777-a9ad9d86ac43",
+      "ssiCode": "SSI-DEMO-021",
+      "reason": "COUNTERPARTY_SCOPE_MISMATCH",
+      "evidence": [
+       {
+        "criterion": "STATUS",
+        "outcome": "PASS",
+        "expected": "ACTIVE",
+        "actual": "ACTIVE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CURRENCY",
+        "outcome": "PASS",
+        "expected": "USD",
+        "actual": "USD",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "APPLICABILITY",
+        "outcome": "PASS",
+        "expected": "active/effective SSI_APPLICABILITY",
+        "actual": "b96e8d9a-327b-4fb0-9777-a9ad9d86ac43:APPL:2",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CONSUMER",
+        "outcome": "PASS",
+        "expected": "TRADE_FINANCE",
+        "actual": "TRADE_FINANCE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "PRODUCT",
+        "outcome": "PASS",
+        "expected": "IMPORT_LC",
+        "actual": "IMPORT_LC",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "BUSINESS_FUNCTION",
+        "outcome": "PASS",
+        "expected": "IMPORT_LC_BANK_REIMBURSEMENT",
+        "actual": "IMPORT_LC_BANK_REIMBURSEMENT",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "PAYMENT_LEG",
+        "outcome": "PASS",
+        "expected": "BANK_REIMBURSEMENT",
+        "actual": "BANK_REIMBURSEMENT",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "COUNTERPARTY_SCOPE",
+        "outcome": "FAIL",
+        "expected": "CITIUS33 or approved US/ANY matcher",
+        "actual": "CHASUS33",
+        "reasonCode": "COUNTERPARTY_SCOPE_MISMATCH"
+       },
+       {
+        "criterion": "COUNTERPARTY_TYPE",
+        "outcome": "PASS",
+        "expected": "BANK",
+        "actual": "BANK",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "GLOBAL_FALLBACK_APPROVAL",
+        "outcome": "PASS",
+        "expected": "approvedGlobal=true",
+        "actual": "false",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "SETTLEMENT_COUNTRY",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "US",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "SETTLEMENT_MARKET",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "US_DOLLAR",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_SYSTEM",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "FEDWIRE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_STANDING_DATA",
+        "outcome": "PASS",
+        "expected": "USD active governed clearing system",
+        "actual": "FEDWIRE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_SCHEME_TYPE",
+        "outcome": "PASS",
+        "expected": "RTGS",
+        "actual": "RTGS",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "NOSTRO_CURRENCY",
+        "outcome": "PASS",
+        "expected": "USD",
+        "actual": "USD",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "BOOKING_ENTITY",
+        "outcome": "PASS",
+        "expected": "HK01",
+        "actual": "HK01",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "DIRECTION",
+        "outcome": "PASS",
+        "expected": "OUTBOUND",
+        "actual": "OUTBOUND",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "MESSAGING_SERVICE",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "FINPLUS",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "MESSAGE_TYPE",
+        "outcome": "PASS",
+        "expected": "pacs.009.001.08",
+        "actual": "pacs.008.001.12,pacs.009.001.12,pacs.009.001.08",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "COV_PROFILE",
+        "outcome": "PASS",
+        "expected": "NOT_APPLICABLE",
+        "actual": "NOT_APPLICABLE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "VALUE_DATE",
+        "outcome": "PASS",
+        "expected": "2026-09-12",
+        "actual": "2026-01-01..2027-12-31",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "AMOUNT_LIMIT",
+        "outcome": "PASS",
+        "expected": "1000000",
+        "actual": "OPEN..OPEN",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "LIVE_CLEARING_PARTICIPATION",
+        "outcome": "NOT_EVALUATED",
+        "expected": "FEDWIRE",
+        "actual": "STANDING_DATA_VALIDATED_LIVE_DIRECTORY_REQUIRED",
+        "reasonCode": "LIVE_REACHABILITY_NOT_EVALUATED"
+       }
+      ]
+     },
+     {
+      "ssiId": "5547df35-b8e3-4375-a54a-e569fc4e69fa",
+      "ssiCode": "SSI-DEMO-025",
+      "reason": "PROFILE_VERSION_MISMATCH",
+      "evidence": [
+       {
+        "criterion": "STATUS",
+        "outcome": "PASS",
+        "expected": "ACTIVE",
+        "actual": "ACTIVE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CURRENCY",
+        "outcome": "PASS",
+        "expected": "USD",
+        "actual": "USD",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "APPLICABILITY",
+        "outcome": "PASS",
+        "expected": "active/effective SSI_APPLICABILITY",
+        "actual": "5547df35-b8e3-4375-a54a-e569fc4e69fa:APPL:1",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CONSUMER",
+        "outcome": "PASS",
+        "expected": "TRADE_FINANCE",
+        "actual": "ANY",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "PRODUCT",
+        "outcome": "PASS",
+        "expected": "IMPORT_LC",
+        "actual": "ANY",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "BUSINESS_FUNCTION",
+        "outcome": "PASS",
+        "expected": "IMPORT_LC_BANK_REIMBURSEMENT",
+        "actual": "ANY",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "PAYMENT_LEG",
+        "outcome": "PASS",
+        "expected": "BANK_REIMBURSEMENT",
+        "actual": "BANK_REIMBURSEMENT",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "COUNTERPARTY_SCOPE",
+        "outcome": "PASS",
+        "expected": "CITIUS33 or approved US/ANY matcher",
+        "actual": "ANY",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "COUNTERPARTY_TYPE",
+        "outcome": "PASS",
+        "expected": "BANK",
+        "actual": "BANK",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "GLOBAL_FALLBACK_APPROVAL",
+        "outcome": "PASS",
+        "expected": "approvedGlobal=true",
+        "actual": "true",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "SETTLEMENT_COUNTRY",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "US",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "SETTLEMENT_MARKET",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "US_DOLLAR",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_SYSTEM",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "FEDWIRE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_STANDING_DATA",
+        "outcome": "PASS",
+        "expected": "USD active governed clearing system",
+        "actual": "FEDWIRE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_SCHEME_TYPE",
+        "outcome": "PASS",
+        "expected": "RTGS",
+        "actual": "RTGS",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "NOSTRO_CURRENCY",
+        "outcome": "PASS",
+        "expected": "USD",
+        "actual": "USD",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "BOOKING_ENTITY",
+        "outcome": "PASS",
+        "expected": "HK01",
+        "actual": "HK01",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "DIRECTION",
+        "outcome": "PASS",
+        "expected": "OUTBOUND",
+        "actual": "OUTBOUND",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "MESSAGING_SERVICE",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "FINPLUS",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "MESSAGE_TYPE",
+        "outcome": "FAIL",
+        "expected": "pacs.009.001.08",
+        "actual": "pacs.008.001.12,pacs.009.001.12",
+        "reasonCode": "MESSAGE_TYPE_NOT_SUPPORTED"
+       },
+       {
+        "criterion": "COV_PROFILE",
+        "outcome": "PASS",
+        "expected": "NOT_APPLICABLE",
+        "actual": "NOT_APPLICABLE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "VALUE_DATE",
+        "outcome": "PASS",
+        "expected": "2026-09-12",
+        "actual": "2026-01-01..2027-12-31",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "AMOUNT_LIMIT",
+        "outcome": "PASS",
+        "expected": "1000000",
+        "actual": "OPEN..OPEN",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "LIVE_CLEARING_PARTICIPATION",
+        "outcome": "NOT_EVALUATED",
+        "expected": "FEDWIRE",
+        "actual": "STANDING_DATA_VALIDATED_LIVE_DIRECTORY_REQUIRED",
+        "reasonCode": "LIVE_REACHABILITY_NOT_EVALUATED"
+       }
+      ]
+     },
+     {
+      "ssiId": "867b9600-5a93-45a3-a4c8-ec5b008fe8cf",
+      "ssiCode": "SSI-DEMO-023",
+      "reason": "PROFILE_VERSION_MISMATCH",
+      "evidence": [
+       {
+        "criterion": "STATUS",
+        "outcome": "PASS",
+        "expected": "ACTIVE",
+        "actual": "ACTIVE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CURRENCY",
+        "outcome": "PASS",
+        "expected": "USD",
+        "actual": "USD",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "APPLICABILITY",
+        "outcome": "PASS",
+        "expected": "active/effective SSI_APPLICABILITY",
+        "actual": "867b9600-5a93-45a3-a4c8-ec5b008fe8cf:APPL:2",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CONSUMER",
+        "outcome": "PASS",
+        "expected": "TRADE_FINANCE",
+        "actual": "TRADE_FINANCE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "PRODUCT",
+        "outcome": "PASS",
+        "expected": "IMPORT_LC",
+        "actual": "IMPORT_LC",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "BUSINESS_FUNCTION",
+        "outcome": "PASS",
+        "expected": "IMPORT_LC_BANK_REIMBURSEMENT",
+        "actual": "IMPORT_LC_BANK_REIMBURSEMENT",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "PAYMENT_LEG",
+        "outcome": "PASS",
+        "expected": "BANK_REIMBURSEMENT",
+        "actual": "BANK_REIMBURSEMENT",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "COUNTERPARTY_SCOPE",
+        "outcome": "PASS",
+        "expected": "CITIUS33 or approved US/ANY matcher",
+        "actual": "ANY",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "COUNTERPARTY_TYPE",
+        "outcome": "PASS",
+        "expected": "BANK",
+        "actual": "BANK",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "GLOBAL_FALLBACK_APPROVAL",
+        "outcome": "PASS",
+        "expected": "approvedGlobal=true",
+        "actual": "true",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "SETTLEMENT_COUNTRY",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "US",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "SETTLEMENT_MARKET",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "US_DOLLAR",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_SYSTEM",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "FEDWIRE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_STANDING_DATA",
+        "outcome": "PASS",
+        "expected": "USD active governed clearing system",
+        "actual": "FEDWIRE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_SCHEME_TYPE",
+        "outcome": "PASS",
+        "expected": "RTGS",
+        "actual": "RTGS",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "NOSTRO_CURRENCY",
+        "outcome": "PASS",
+        "expected": "USD",
+        "actual": "USD",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "BOOKING_ENTITY",
+        "outcome": "PASS",
+        "expected": "HK01",
+        "actual": "HK01",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "DIRECTION",
+        "outcome": "PASS",
+        "expected": "OUTBOUND",
+        "actual": "OUTBOUND",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "MESSAGING_SERVICE",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "FINPLUS",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "MESSAGE_TYPE",
+        "outcome": "FAIL",
+        "expected": "pacs.009.001.08",
+        "actual": "pacs.009.001.12",
+        "reasonCode": "MESSAGE_TYPE_NOT_SUPPORTED"
+       },
+       {
+        "criterion": "COV_PROFILE",
+        "outcome": "PASS",
+        "expected": "NOT_APPLICABLE",
+        "actual": "NOT_APPLICABLE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "VALUE_DATE",
+        "outcome": "PASS",
+        "expected": "2026-09-12",
+        "actual": "2026-01-01..2027-12-31",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "AMOUNT_LIMIT",
+        "outcome": "PASS",
+        "expected": "1000000",
+        "actual": "OPEN..OPEN",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "LIVE_CLEARING_PARTICIPATION",
+        "outcome": "NOT_EVALUATED",
+        "expected": "FEDWIRE",
+        "actual": "STANDING_DATA_VALIDATED_LIVE_DIRECTORY_REQUIRED",
+        "reasonCode": "LIVE_REACHABILITY_NOT_EVALUATED"
+       }
+      ]
+     }
+    ],
+    "fieldProvenance": {
+     "58A": {
+      "source": "TRANSACTION_CONTEXT",
+      "evidenceId": "CITIUS33"
+     }
+    },
+    "roleProvenance": {
+     "instructedAgent": {
+      "value": "CITIUS33",
+      "source": "COUNTERPARTY_SSI",
+      "ssiCode": "SSI-DEMO-001",
+      "ssiVersion": 44,
+      "sourceField": "actualReceiverBic"
+     },
+     "creditorAgent": {
+      "value": "CITIUS33",
+      "source": "COUNTERPARTY_SSI",
+      "ssiCode": "SSI-DEMO-001",
+      "ssiVersion": 44,
+      "sourceField": "accountWithBic"
+     }
+    },
+    "snapshotHash": "fd6a4c064fe81f42aab1d3e30c293f45fd3908fa6bf2c92fbbf3381fcad378a6",
+    "snapshotIdentityMethod": "SQLITE_WAL_AWARE_LOGICAL_SNAPSHOT_V1",
+    "resolutionToken": "a113ff1d-3a2f-4ff1-a787-ff2d5325ec17",
+    "correlationId": "c8af6153-d269-4752-8357-d8f232208779",
+    "evidenceGates": [
+     {
+      "criterion": "STATUS",
+      "outcome": "PASS",
+      "expected": "ACTIVE",
+      "actual": "ACTIVE",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "CURRENCY",
+      "outcome": "PASS",
+      "expected": "USD",
+      "actual": "USD",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "APPLICABILITY",
+      "outcome": "PASS",
+      "expected": "active/effective SSI_APPLICABILITY",
+      "actual": "a1e1ac1a-a16f-414c-ac70-85731ed84d3f:APPL:1",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "CONSUMER",
+      "outcome": "PASS",
+      "expected": "TRADE_FINANCE",
+      "actual": "TRADE_FINANCE",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "PRODUCT",
+      "outcome": "PASS",
+      "expected": "IMPORT_LC",
+      "actual": "IMPORT_LC",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "BUSINESS_FUNCTION",
+      "outcome": "PASS",
+      "expected": "IMPORT_LC_BANK_REIMBURSEMENT",
+      "actual": "IMPORT_LC_BANK_REIMBURSEMENT",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "PAYMENT_LEG",
+      "outcome": "PASS",
+      "expected": "BANK_REIMBURSEMENT",
+      "actual": "BANK_REIMBURSEMENT",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "COUNTERPARTY_SCOPE",
+      "outcome": "PASS",
+      "expected": "CITIUS33 or approved US/ANY matcher",
+      "actual": "CITIUS33",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "COUNTERPARTY_TYPE",
+      "outcome": "PASS",
+      "expected": "BANK",
+      "actual": "BANK",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "GLOBAL_FALLBACK_APPROVAL",
+      "outcome": "PASS",
+      "expected": "approvedGlobal=true",
+      "actual": "false",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "SETTLEMENT_COUNTRY",
+      "outcome": "PASS",
+      "expected": "DERIVE_FROM_ROUTE",
+      "actual": "US",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "SETTLEMENT_MARKET",
+      "outcome": "PASS",
+      "expected": "DERIVE_FROM_ROUTE",
+      "actual": "US_DOLLAR",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "CLEARING_SYSTEM",
+      "outcome": "PASS",
+      "expected": "DERIVE_FROM_ROUTE",
+      "actual": "FEDWIRE",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "CLEARING_STANDING_DATA",
+      "outcome": "PASS",
+      "expected": "USD active governed clearing system",
+      "actual": "FEDWIRE",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "CLEARING_SCHEME_TYPE",
+      "outcome": "PASS",
+      "expected": "RTGS",
+      "actual": "RTGS",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "NOSTRO_CURRENCY",
+      "outcome": "PASS",
+      "expected": "USD",
+      "actual": "USD",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "BOOKING_ENTITY",
+      "outcome": "PASS",
+      "expected": "HK01",
+      "actual": "HK01",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "DIRECTION",
+      "outcome": "PASS",
+      "expected": "OUTBOUND",
+      "actual": "OUTBOUND",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "MESSAGING_SERVICE",
+      "outcome": "PASS",
+      "expected": "DERIVE_FROM_ROUTE",
+      "actual": "FINPLUS",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "MESSAGE_TYPE",
+      "outcome": "PASS",
+      "expected": "pacs.009.001.08",
+      "actual": "pacs.009.001.12,pacs.009.001.08",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "COV_PROFILE",
+      "outcome": "PASS",
+      "expected": "NOT_APPLICABLE",
+      "actual": "NOT_APPLICABLE",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "VALUE_DATE",
+      "outcome": "PASS",
+      "expected": "2026-09-12",
+      "actual": "2026-01-01..2027-12-31",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "AMOUNT_LIMIT",
+      "outcome": "PASS",
+      "expected": "1000000",
+      "actual": "OPEN..OPEN",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "LIVE_CLEARING_PARTICIPATION",
+      "outcome": "NOT_EVALUATED",
+      "expected": "FEDWIRE",
+      "actual": "STANDING_DATA_VALIDATED_LIVE_DIRECTORY_REQUIRED",
+      "reasonCode": "LIVE_REACHABILITY_NOT_EVALUATED"
+     }
+    ],
+    "renderingDecisions": {
+     "MT202.57a": {
+      "outcome": "OMITTED_BY_RULE",
+      "rule": "MRG_MT202_57A_RECEIVER_IS_AWI"
+     },
+     "pacs.009.CdtrAgt": {
+      "outcome": "INCLUDE",
+      "reason": "OPTIONAL_ROLE_RETAINED_NO_EQUIVALENT_OMISSION_RULE"
+     }
+    }
+   }
+  },
+  {
+   "name": "A2_GEN_CHASUS33",
+   "status": 200,
+   "error": null,
+   "request": {
+    "consumer": "TRADE_FINANCE",
+    "product": "IMPORT_LC",
+    "businessFunction": "IMPORT_LC_BANK_REIMBURSEMENT",
+    "paymentLeg": "BANK_REIMBURSEMENT",
+    "direction": "OUTBOUND",
+    "currency": "USD",
+    "bookingEntity": "HK01",
+    "valueDate": "2026-09-12",
+    "amount": "1000000",
+    "messageType": "pacs.009.001.08",
+    "sourceMessageType": "MT202",
+    "correlationId": "a1872f90-5f82-450c-8d47-e256ed1fd19b",
+    "transactionReference": "A2",
+    "counterpartyBankServiceId": "BANK-SVC-CHASUS33"
+   },
+   "response": {
+    "mx": {
+     "httpStatus": 200,
+     "decision": "RESOLVED",
+     "messageDefinitionId": "pacs.009.001.08",
+     "businessService": "swift.cbprplus.04",
+     "redirectDomain": null,
+     "canonicalScenario": "FI_TO_FI_TRANSFER",
+     "validationScope": "canonical route + MRG; full serialized XML requires controlled Translation Portal golden fixture",
+     "canonicalRoles": {
+      "instructedAgent": "CITIUS33",
+      "beneficiaryInstitution": "CHASUS33",
+      "directAccount": true,
+      "selectedSsi": "SSI-DEMO-021",
+      "creditorAgent": "CITIUS33",
+      "creditor": "CHASUS33",
+      "creditorSource": "REQUEST_PASS_THROUGH"
+     },
+     "code": "SSI_RESOLVED",
+     "chosenRoute": {
+      "ssiId": "b96e8d9a-327b-4fb0-9777-a9ad9d86ac43",
+      "ssiCode": "SSI-DEMO-021",
+      "ssiVersion": 39,
+      "settlementRouteId": "ROUTE-USD-CITIUS33",
+      "currency": "USD",
+      "accountId": "DEMO-NOSTRO-001-EXPCOLL",
+      "nostroId": "d28b0fc3-a0d8-4e16-a5e4-64325760b331",
+      "nostroVersion": 4,
+      "matchedApplicabilityId": "b96e8d9a-327b-4fb0-9777-a9ad9d86ac43:APPL:2",
+      "routePurpose": "",
+      "selectedBy": "CONTROLLED_RANK_KEYS",
+      "specificity": "NAMED_COUNTERPARTY"
+     },
+     "alternatives": [],
+     "roleProvenance": {
+      "instructedAgent": {
+       "value": "CITIUS33",
+       "source": "COUNTERPARTY_SSI",
+       "ssiCode": "SSI-DEMO-021",
+       "ssiVersion": 39,
+       "sourceField": "actualReceiverBic"
+      },
+      "creditorAgent": {
+       "value": "CITIUS33",
+       "source": "COUNTERPARTY_SSI",
+       "ssiCode": "SSI-DEMO-021",
+       "ssiVersion": 39,
+       "sourceField": "accountWithBic"
+      }
+     },
+     "messageComposerContext": {
+      "SttlmMtd": {
+       "value": "INDA",
+       "source": "SETTLEMENT_POLICY"
+      },
+      "Dbtr": {
+       "value": "DEMOHKHH",
+       "source": "OWN_ENTITY"
+      },
+      "SttlmAcct": {
+       "value": "DEMO-NOSTRO-001-EXPCOLL-PRIMARY",
+       "source": "OWN_SSI_NOSTRO",
+       "nostroId": "d28b0fc3-a0d8-4e16-a5e4-64325760b331",
+       "nostroVersion": 4
+      },
+      "Cdtr": {
+       "value": "CHASUS33",
+       "source": "REQUEST_PASS_THROUGH"
+      }
+     }
+    },
+    "mt": {
+     "renderer": "MT compatibility view from the same confirmed canonical snapshot",
+     "tags": {
+      "58A": "CHASUS33"
+     },
+     "omitted": [
+      "53a",
+      "54a",
+      "56a",
+      "57a"
+     ],
+     "assertions": [
+      "57a omitted means Receiver is AWI"
+     ]
+    },
+    "chosenRoute": {
+     "ssiId": "b96e8d9a-327b-4fb0-9777-a9ad9d86ac43",
+     "ssiCode": "SSI-DEMO-021",
+     "ssiVersion": 39,
+     "settlementRouteId": "ROUTE-USD-CITIUS33",
+     "currency": "USD",
+     "accountId": "DEMO-NOSTRO-001-EXPCOLL",
+     "nostroId": "d28b0fc3-a0d8-4e16-a5e4-64325760b331",
+     "nostroVersion": 4,
+     "matchedApplicabilityId": "b96e8d9a-327b-4fb0-9777-a9ad9d86ac43:APPL:2",
+     "routePurpose": "",
+     "selectedBy": "CONTROLLED_RANK_KEYS",
+     "specificity": "NAMED_COUNTERPARTY"
+    },
+    "resolutionDecision": "RESOLVED",
+    "code": "SSI_RESOLVED",
+    "alternatives": [],
+    "excludedCandidates": [
+     {
+      "ssiId": "22a11830-f848-4281-805f-8e693c98b364",
+      "ssiCode": "SSI-DEMO-041",
+      "reason": "COUNTERPARTY_SCOPE_MISMATCH",
+      "evidence": [
+       {
+        "criterion": "STATUS",
+        "outcome": "PASS",
+        "expected": "ACTIVE",
+        "actual": "ACTIVE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CURRENCY",
+        "outcome": "PASS",
+        "expected": "USD",
+        "actual": "USD",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "APPLICABILITY",
+        "outcome": "PASS",
+        "expected": "active/effective SSI_APPLICABILITY",
+        "actual": "22a11830-f848-4281-805f-8e693c98b364:APPL:1",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CONSUMER",
+        "outcome": "PASS",
+        "expected": "TRADE_FINANCE",
+        "actual": "ANY",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "PRODUCT",
+        "outcome": "PASS",
+        "expected": "IMPORT_LC",
+        "actual": "ANY",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "BUSINESS_FUNCTION",
+        "outcome": "PASS",
+        "expected": "IMPORT_LC_BANK_REIMBURSEMENT",
+        "actual": "ANY",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "PAYMENT_LEG",
+        "outcome": "PASS",
+        "expected": "BANK_REIMBURSEMENT",
+        "actual": "BANK_REIMBURSEMENT",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "COUNTERPARTY_SCOPE",
+        "outcome": "FAIL",
+        "expected": "CHASUS33 or approved US/ANY matcher",
+        "actual": "NSSIUSN1",
+        "reasonCode": "COUNTERPARTY_SCOPE_MISMATCH"
+       },
+       {
+        "criterion": "COUNTERPARTY_TYPE",
+        "outcome": "PASS",
+        "expected": "BANK",
+        "actual": "BANK",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "GLOBAL_FALLBACK_APPROVAL",
+        "outcome": "PASS",
+        "expected": "approvedGlobal=true",
+        "actual": "false",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "SETTLEMENT_COUNTRY",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "US",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "SETTLEMENT_MARKET",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "US_DOLLAR",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_SYSTEM",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "FEDWIRE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_STANDING_DATA",
+        "outcome": "PASS",
+        "expected": "USD active governed clearing system",
+        "actual": "FEDWIRE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_SCHEME_TYPE",
+        "outcome": "PASS",
+        "expected": "RTGS",
+        "actual": "RTGS",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "NOSTRO_CURRENCY",
+        "outcome": "PASS",
+        "expected": "USD",
+        "actual": "USD",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "BOOKING_ENTITY",
+        "outcome": "PASS",
+        "expected": "HK01",
+        "actual": "HK01",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "DIRECTION",
+        "outcome": "PASS",
+        "expected": "OUTBOUND",
+        "actual": "OUTBOUND",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "MESSAGING_SERVICE",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "FINPLUS",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "MESSAGE_TYPE",
+        "outcome": "PASS",
+        "expected": "pacs.009.001.08",
+        "actual": "pacs.008.001.12,pacs.009.001.12,pacs.009.001.08",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "COV_PROFILE",
+        "outcome": "PASS",
+        "expected": "NOT_APPLICABLE",
+        "actual": "NOT_APPLICABLE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "VALUE_DATE",
+        "outcome": "PASS",
+        "expected": "2026-09-12",
+        "actual": "2026-01-01..2027-12-31",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "AMOUNT_LIMIT",
+        "outcome": "PASS",
+        "expected": "1000000",
+        "actual": "OPEN..OPEN",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "LIVE_CLEARING_PARTICIPATION",
+        "outcome": "NOT_EVALUATED",
+        "expected": "FEDWIRE",
+        "actual": "STANDING_DATA_VALIDATED_LIVE_DIRECTORY_REQUIRED",
+        "reasonCode": "LIVE_REACHABILITY_NOT_EVALUATED"
+       }
+      ]
+     },
+     {
+      "ssiId": "e029ad81-7715-4c2a-9452-75876508cacb",
+      "ssiCode": "SSI-DEMO-002",
+      "reason": "COUNTERPARTY_SCOPE_MISMATCH",
+      "evidence": [
+       {
+        "criterion": "STATUS",
+        "outcome": "PASS",
+        "expected": "ACTIVE",
+        "actual": "ACTIVE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CURRENCY",
+        "outcome": "PASS",
+        "expected": "USD",
+        "actual": "USD",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "APPLICABILITY",
+        "outcome": "PASS",
+        "expected": "active/effective SSI_APPLICABILITY",
+        "actual": "e029ad81-7715-4c2a-9452-75876508cacb:APPL:1",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CONSUMER",
+        "outcome": "PASS",
+        "expected": "TRADE_FINANCE",
+        "actual": "TRADE_FINANCE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "PRODUCT",
+        "outcome": "PASS",
+        "expected": "IMPORT_LC",
+        "actual": "IMPORT_LC",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "BUSINESS_FUNCTION",
+        "outcome": "PASS",
+        "expected": "IMPORT_LC_BANK_REIMBURSEMENT",
+        "actual": "IMPORT_LC_BANK_REIMBURSEMENT",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "PAYMENT_LEG",
+        "outcome": "PASS",
+        "expected": "BANK_REIMBURSEMENT",
+        "actual": "BANK_REIMBURSEMENT",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "COUNTERPARTY_SCOPE",
+        "outcome": "FAIL",
+        "expected": "CHASUS33 or approved US/ANY matcher",
+        "actual": "CITIUS33",
+        "reasonCode": "COUNTERPARTY_SCOPE_MISMATCH"
+       },
+       {
+        "criterion": "COUNTERPARTY_TYPE",
+        "outcome": "PASS",
+        "expected": "BANK",
+        "actual": "BANK",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "GLOBAL_FALLBACK_APPROVAL",
+        "outcome": "PASS",
+        "expected": "approvedGlobal=true",
+        "actual": "false",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "SETTLEMENT_COUNTRY",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "HK",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "SETTLEMENT_MARKET",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "HK_USD",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_SYSTEM",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "USD_CHATS",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_STANDING_DATA",
+        "outcome": "PASS",
+        "expected": "USD active governed clearing system",
+        "actual": "USD_CHATS",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_SCHEME_TYPE",
+        "outcome": "PASS",
+        "expected": "RTGS",
+        "actual": "RTGS",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "NOSTRO_CURRENCY",
+        "outcome": "PASS",
+        "expected": "USD",
+        "actual": "USD",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "BOOKING_ENTITY",
+        "outcome": "PASS",
+        "expected": "HK01",
+        "actual": "HK01",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "DIRECTION",
+        "outcome": "PASS",
+        "expected": "OUTBOUND",
+        "actual": "OUTBOUND",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "MESSAGING_SERVICE",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "FINPLUS",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "MESSAGE_TYPE",
+        "outcome": "PASS",
+        "expected": "pacs.009.001.08",
+        "actual": "pacs.009.001.12,pacs.009.001.08",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "COV_PROFILE",
+        "outcome": "PASS",
+        "expected": "NOT_APPLICABLE",
+        "actual": "NOT_APPLICABLE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "VALUE_DATE",
+        "outcome": "PASS",
+        "expected": "2026-09-12",
+        "actual": "2026-01-01..2027-12-31",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "AMOUNT_LIMIT",
+        "outcome": "PASS",
+        "expected": "1000000",
+        "actual": "OPEN..OPEN",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "LIVE_CLEARING_PARTICIPATION",
+        "outcome": "NOT_EVALUATED",
+        "expected": "USD_CHATS",
+        "actual": "STANDING_DATA_VALIDATED_LIVE_DIRECTORY_REQUIRED",
+        "reasonCode": "LIVE_REACHABILITY_NOT_EVALUATED"
+       }
+      ]
+     },
+     {
+      "ssiId": "a1e1ac1a-a16f-414c-ac70-85731ed84d3f",
+      "ssiCode": "SSI-DEMO-001",
+      "reason": "COUNTERPARTY_SCOPE_MISMATCH",
+      "evidence": [
+       {
+        "criterion": "STATUS",
+        "outcome": "PASS",
+        "expected": "ACTIVE",
+        "actual": "ACTIVE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CURRENCY",
+        "outcome": "PASS",
+        "expected": "USD",
+        "actual": "USD",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "APPLICABILITY",
+        "outcome": "PASS",
+        "expected": "active/effective SSI_APPLICABILITY",
+        "actual": "a1e1ac1a-a16f-414c-ac70-85731ed84d3f:APPL:1",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CONSUMER",
+        "outcome": "PASS",
+        "expected": "TRADE_FINANCE",
+        "actual": "TRADE_FINANCE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "PRODUCT",
+        "outcome": "PASS",
+        "expected": "IMPORT_LC",
+        "actual": "IMPORT_LC",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "BUSINESS_FUNCTION",
+        "outcome": "PASS",
+        "expected": "IMPORT_LC_BANK_REIMBURSEMENT",
+        "actual": "IMPORT_LC_BANK_REIMBURSEMENT",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "PAYMENT_LEG",
+        "outcome": "PASS",
+        "expected": "BANK_REIMBURSEMENT",
+        "actual": "BANK_REIMBURSEMENT",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "COUNTERPARTY_SCOPE",
+        "outcome": "FAIL",
+        "expected": "CHASUS33 or approved US/ANY matcher",
+        "actual": "CITIUS33",
+        "reasonCode": "COUNTERPARTY_SCOPE_MISMATCH"
+       },
+       {
+        "criterion": "COUNTERPARTY_TYPE",
+        "outcome": "PASS",
+        "expected": "BANK",
+        "actual": "BANK",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "GLOBAL_FALLBACK_APPROVAL",
+        "outcome": "PASS",
+        "expected": "approvedGlobal=true",
+        "actual": "false",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "SETTLEMENT_COUNTRY",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "US",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "SETTLEMENT_MARKET",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "US_DOLLAR",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_SYSTEM",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "FEDWIRE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_STANDING_DATA",
+        "outcome": "PASS",
+        "expected": "USD active governed clearing system",
+        "actual": "FEDWIRE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_SCHEME_TYPE",
+        "outcome": "PASS",
+        "expected": "RTGS",
+        "actual": "RTGS",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "NOSTRO_CURRENCY",
+        "outcome": "PASS",
+        "expected": "USD",
+        "actual": "USD",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "BOOKING_ENTITY",
+        "outcome": "PASS",
+        "expected": "HK01",
+        "actual": "HK01",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "DIRECTION",
+        "outcome": "PASS",
+        "expected": "OUTBOUND",
+        "actual": "OUTBOUND",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "MESSAGING_SERVICE",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "FINPLUS",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "MESSAGE_TYPE",
+        "outcome": "PASS",
+        "expected": "pacs.009.001.08",
+        "actual": "pacs.009.001.12,pacs.009.001.08",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "COV_PROFILE",
+        "outcome": "PASS",
+        "expected": "NOT_APPLICABLE",
+        "actual": "NOT_APPLICABLE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "VALUE_DATE",
+        "outcome": "PASS",
+        "expected": "2026-09-12",
+        "actual": "2026-01-01..2027-12-31",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "AMOUNT_LIMIT",
+        "outcome": "PASS",
+        "expected": "1000000",
+        "actual": "OPEN..OPEN",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "LIVE_CLEARING_PARTICIPATION",
+        "outcome": "NOT_EVALUATED",
+        "expected": "FEDWIRE",
+        "actual": "STANDING_DATA_VALIDATED_LIVE_DIRECTORY_REQUIRED",
+        "reasonCode": "LIVE_REACHABILITY_NOT_EVALUATED"
+       }
+      ]
+     },
+     {
+      "ssiId": "5547df35-b8e3-4375-a54a-e569fc4e69fa",
+      "ssiCode": "SSI-DEMO-025",
+      "reason": "PROFILE_VERSION_MISMATCH",
+      "evidence": [
+       {
+        "criterion": "STATUS",
+        "outcome": "PASS",
+        "expected": "ACTIVE",
+        "actual": "ACTIVE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CURRENCY",
+        "outcome": "PASS",
+        "expected": "USD",
+        "actual": "USD",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "APPLICABILITY",
+        "outcome": "PASS",
+        "expected": "active/effective SSI_APPLICABILITY",
+        "actual": "5547df35-b8e3-4375-a54a-e569fc4e69fa:APPL:1",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CONSUMER",
+        "outcome": "PASS",
+        "expected": "TRADE_FINANCE",
+        "actual": "ANY",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "PRODUCT",
+        "outcome": "PASS",
+        "expected": "IMPORT_LC",
+        "actual": "ANY",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "BUSINESS_FUNCTION",
+        "outcome": "PASS",
+        "expected": "IMPORT_LC_BANK_REIMBURSEMENT",
+        "actual": "ANY",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "PAYMENT_LEG",
+        "outcome": "PASS",
+        "expected": "BANK_REIMBURSEMENT",
+        "actual": "BANK_REIMBURSEMENT",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "COUNTERPARTY_SCOPE",
+        "outcome": "PASS",
+        "expected": "CHASUS33 or approved US/ANY matcher",
+        "actual": "ANY",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "COUNTERPARTY_TYPE",
+        "outcome": "PASS",
+        "expected": "BANK",
+        "actual": "BANK",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "GLOBAL_FALLBACK_APPROVAL",
+        "outcome": "PASS",
+        "expected": "approvedGlobal=true",
+        "actual": "true",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "SETTLEMENT_COUNTRY",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "US",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "SETTLEMENT_MARKET",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "US_DOLLAR",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_SYSTEM",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "FEDWIRE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_STANDING_DATA",
+        "outcome": "PASS",
+        "expected": "USD active governed clearing system",
+        "actual": "FEDWIRE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_SCHEME_TYPE",
+        "outcome": "PASS",
+        "expected": "RTGS",
+        "actual": "RTGS",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "NOSTRO_CURRENCY",
+        "outcome": "PASS",
+        "expected": "USD",
+        "actual": "USD",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "BOOKING_ENTITY",
+        "outcome": "PASS",
+        "expected": "HK01",
+        "actual": "HK01",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "DIRECTION",
+        "outcome": "PASS",
+        "expected": "OUTBOUND",
+        "actual": "OUTBOUND",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "MESSAGING_SERVICE",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "FINPLUS",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "MESSAGE_TYPE",
+        "outcome": "FAIL",
+        "expected": "pacs.009.001.08",
+        "actual": "pacs.008.001.12,pacs.009.001.12",
+        "reasonCode": "MESSAGE_TYPE_NOT_SUPPORTED"
+       },
+       {
+        "criterion": "COV_PROFILE",
+        "outcome": "PASS",
+        "expected": "NOT_APPLICABLE",
+        "actual": "NOT_APPLICABLE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "VALUE_DATE",
+        "outcome": "PASS",
+        "expected": "2026-09-12",
+        "actual": "2026-01-01..2027-12-31",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "AMOUNT_LIMIT",
+        "outcome": "PASS",
+        "expected": "1000000",
+        "actual": "OPEN..OPEN",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "LIVE_CLEARING_PARTICIPATION",
+        "outcome": "NOT_EVALUATED",
+        "expected": "FEDWIRE",
+        "actual": "STANDING_DATA_VALIDATED_LIVE_DIRECTORY_REQUIRED",
+        "reasonCode": "LIVE_REACHABILITY_NOT_EVALUATED"
+       }
+      ]
+     },
+     {
+      "ssiId": "867b9600-5a93-45a3-a4c8-ec5b008fe8cf",
+      "ssiCode": "SSI-DEMO-023",
+      "reason": "PROFILE_VERSION_MISMATCH",
+      "evidence": [
+       {
+        "criterion": "STATUS",
+        "outcome": "PASS",
+        "expected": "ACTIVE",
+        "actual": "ACTIVE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CURRENCY",
+        "outcome": "PASS",
+        "expected": "USD",
+        "actual": "USD",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "APPLICABILITY",
+        "outcome": "PASS",
+        "expected": "active/effective SSI_APPLICABILITY",
+        "actual": "867b9600-5a93-45a3-a4c8-ec5b008fe8cf:APPL:2",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CONSUMER",
+        "outcome": "PASS",
+        "expected": "TRADE_FINANCE",
+        "actual": "TRADE_FINANCE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "PRODUCT",
+        "outcome": "PASS",
+        "expected": "IMPORT_LC",
+        "actual": "IMPORT_LC",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "BUSINESS_FUNCTION",
+        "outcome": "PASS",
+        "expected": "IMPORT_LC_BANK_REIMBURSEMENT",
+        "actual": "IMPORT_LC_BANK_REIMBURSEMENT",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "PAYMENT_LEG",
+        "outcome": "PASS",
+        "expected": "BANK_REIMBURSEMENT",
+        "actual": "BANK_REIMBURSEMENT",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "COUNTERPARTY_SCOPE",
+        "outcome": "PASS",
+        "expected": "CHASUS33 or approved US/ANY matcher",
+        "actual": "ANY",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "COUNTERPARTY_TYPE",
+        "outcome": "PASS",
+        "expected": "BANK",
+        "actual": "BANK",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "GLOBAL_FALLBACK_APPROVAL",
+        "outcome": "PASS",
+        "expected": "approvedGlobal=true",
+        "actual": "true",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "SETTLEMENT_COUNTRY",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "US",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "SETTLEMENT_MARKET",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "US_DOLLAR",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_SYSTEM",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "FEDWIRE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_STANDING_DATA",
+        "outcome": "PASS",
+        "expected": "USD active governed clearing system",
+        "actual": "FEDWIRE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_SCHEME_TYPE",
+        "outcome": "PASS",
+        "expected": "RTGS",
+        "actual": "RTGS",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "NOSTRO_CURRENCY",
+        "outcome": "PASS",
+        "expected": "USD",
+        "actual": "USD",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "BOOKING_ENTITY",
+        "outcome": "PASS",
+        "expected": "HK01",
+        "actual": "HK01",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "DIRECTION",
+        "outcome": "PASS",
+        "expected": "OUTBOUND",
+        "actual": "OUTBOUND",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "MESSAGING_SERVICE",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "FINPLUS",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "MESSAGE_TYPE",
+        "outcome": "FAIL",
+        "expected": "pacs.009.001.08",
+        "actual": "pacs.009.001.12",
+        "reasonCode": "MESSAGE_TYPE_NOT_SUPPORTED"
+       },
+       {
+        "criterion": "COV_PROFILE",
+        "outcome": "PASS",
+        "expected": "NOT_APPLICABLE",
+        "actual": "NOT_APPLICABLE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "VALUE_DATE",
+        "outcome": "PASS",
+        "expected": "2026-09-12",
+        "actual": "2026-01-01..2027-12-31",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "AMOUNT_LIMIT",
+        "outcome": "PASS",
+        "expected": "1000000",
+        "actual": "OPEN..OPEN",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "LIVE_CLEARING_PARTICIPATION",
+        "outcome": "NOT_EVALUATED",
+        "expected": "FEDWIRE",
+        "actual": "STANDING_DATA_VALIDATED_LIVE_DIRECTORY_REQUIRED",
+        "reasonCode": "LIVE_REACHABILITY_NOT_EVALUATED"
+       }
+      ]
+     }
+    ],
+    "fieldProvenance": {
+     "53A": {
+      "source": "OWN_NOSTRO",
+      "evidenceId": "d28b0fc3-a0d8-4e16-a5e4-64325760b331"
+     },
+     "57A": {
+      "source": "COUNTERPARTY_SSI",
+      "evidenceId": "b96e8d9a-327b-4fb0-9777-a9ad9d86ac43"
+     },
+     "58A": {
+      "source": "TRANSACTION_CONTEXT",
+      "evidenceId": "CHASUS33"
+     }
+    },
+    "roleProvenance": {
+     "instructedAgent": {
+      "value": "CITIUS33",
+      "source": "COUNTERPARTY_SSI",
+      "ssiCode": "SSI-DEMO-021",
+      "ssiVersion": 39,
+      "sourceField": "actualReceiverBic"
+     },
+     "creditorAgent": {
+      "value": "CITIUS33",
+      "source": "COUNTERPARTY_SSI",
+      "ssiCode": "SSI-DEMO-021",
+      "ssiVersion": 39,
+      "sourceField": "accountWithBic"
+     }
+    },
+    "snapshotHash": "fd6a4c064fe81f42aab1d3e30c293f45fd3908fa6bf2c92fbbf3381fcad378a6",
+    "snapshotIdentityMethod": "SQLITE_WAL_AWARE_LOGICAL_SNAPSHOT_V1",
+    "resolutionToken": "1f0e3c32-546e-4573-adb8-654cda159be7",
+    "correlationId": "a1872f90-5f82-450c-8d47-e256ed1fd19b",
+    "evidenceGates": [
+     {
+      "criterion": "STATUS",
+      "outcome": "PASS",
+      "expected": "ACTIVE",
+      "actual": "ACTIVE",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "CURRENCY",
+      "outcome": "PASS",
+      "expected": "USD",
+      "actual": "USD",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "APPLICABILITY",
+      "outcome": "PASS",
+      "expected": "active/effective SSI_APPLICABILITY",
+      "actual": "b96e8d9a-327b-4fb0-9777-a9ad9d86ac43:APPL:2",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "CONSUMER",
+      "outcome": "PASS",
+      "expected": "TRADE_FINANCE",
+      "actual": "TRADE_FINANCE",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "PRODUCT",
+      "outcome": "PASS",
+      "expected": "IMPORT_LC",
+      "actual": "IMPORT_LC",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "BUSINESS_FUNCTION",
+      "outcome": "PASS",
+      "expected": "IMPORT_LC_BANK_REIMBURSEMENT",
+      "actual": "IMPORT_LC_BANK_REIMBURSEMENT",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "PAYMENT_LEG",
+      "outcome": "PASS",
+      "expected": "BANK_REIMBURSEMENT",
+      "actual": "BANK_REIMBURSEMENT",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "COUNTERPARTY_SCOPE",
+      "outcome": "PASS",
+      "expected": "CHASUS33 or approved US/ANY matcher",
+      "actual": "CHASUS33",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "COUNTERPARTY_TYPE",
+      "outcome": "PASS",
+      "expected": "BANK",
+      "actual": "BANK",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "GLOBAL_FALLBACK_APPROVAL",
+      "outcome": "PASS",
+      "expected": "approvedGlobal=true",
+      "actual": "false",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "SETTLEMENT_COUNTRY",
+      "outcome": "PASS",
+      "expected": "DERIVE_FROM_ROUTE",
+      "actual": "US",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "SETTLEMENT_MARKET",
+      "outcome": "PASS",
+      "expected": "DERIVE_FROM_ROUTE",
+      "actual": "US_DOLLAR",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "CLEARING_SYSTEM",
+      "outcome": "PASS",
+      "expected": "DERIVE_FROM_ROUTE",
+      "actual": "FEDWIRE",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "CLEARING_STANDING_DATA",
+      "outcome": "PASS",
+      "expected": "USD active governed clearing system",
+      "actual": "FEDWIRE",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "CLEARING_SCHEME_TYPE",
+      "outcome": "PASS",
+      "expected": "RTGS",
+      "actual": "RTGS",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "NOSTRO_CURRENCY",
+      "outcome": "PASS",
+      "expected": "USD",
+      "actual": "USD",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "BOOKING_ENTITY",
+      "outcome": "PASS",
+      "expected": "HK01",
+      "actual": "HK01",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "DIRECTION",
+      "outcome": "PASS",
+      "expected": "OUTBOUND",
+      "actual": "OUTBOUND",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "MESSAGING_SERVICE",
+      "outcome": "PASS",
+      "expected": "DERIVE_FROM_ROUTE",
+      "actual": "FINPLUS",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "MESSAGE_TYPE",
+      "outcome": "PASS",
+      "expected": "pacs.009.001.08",
+      "actual": "pacs.008.001.12,pacs.009.001.12,pacs.009.001.08",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "COV_PROFILE",
+      "outcome": "PASS",
+      "expected": "NOT_APPLICABLE",
+      "actual": "NOT_APPLICABLE",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "VALUE_DATE",
+      "outcome": "PASS",
+      "expected": "2026-09-12",
+      "actual": "2026-01-01..2027-12-31",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "AMOUNT_LIMIT",
+      "outcome": "PASS",
+      "expected": "1000000",
+      "actual": "OPEN..OPEN",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "LIVE_CLEARING_PARTICIPATION",
+      "outcome": "NOT_EVALUATED",
+      "expected": "FEDWIRE",
+      "actual": "STANDING_DATA_VALIDATED_LIVE_DIRECTORY_REQUIRED",
+      "reasonCode": "LIVE_REACHABILITY_NOT_EVALUATED"
+     }
+    ],
+    "renderingDecisions": {
+     "MT202.57a": {
+      "outcome": "OMITTED_BY_RULE",
+      "rule": "MRG_MT202_57A_RECEIVER_IS_AWI"
+     },
+     "pacs.009.CdtrAgt": {
+      "outcome": "INCLUDE",
+      "reason": "OPTIONAL_ROLE_RETAINED_NO_EQUIVALENT_OMISSION_RULE"
+     }
+    }
+   }
+  },
+  {
+   "name": "B1_OVERLAY_CITIUS33",
+   "status": 200,
+   "error": null,
+   "request": {
+    "consumer": "CENTRAL_PAYMENT",
+    "product": "CENTRAL_PAYMENT",
+    "businessFunction": "INTERBANK_TRANSFER",
+    "paymentLeg": "INTERBANK_SETTLEMENT",
+    "direction": "OUTBOUND",
+    "currency": "USD",
+    "bookingEntity": "HK01",
+    "valueDate": "2026-09-12",
+    "amount": "1000000",
+    "messageType": "pacs.009.001.08",
+    "sourceMessageType": "MT202",
+    "correlationId": "93c81954-a5c4-47f1-84e9-90951805bc3d",
+    "transactionReference": "B1",
+    "counterpartyBankServiceId": "BANK-SVC-CITIUS33"
+   },
+   "response": {
+    "mx": {
+     "httpStatus": 200,
+     "decision": "RESOLVED",
+     "messageDefinitionId": "pacs.009.001.08",
+     "businessService": "swift.cbprplus.04",
+     "redirectDomain": null,
+     "canonicalScenario": "FI_TO_FI_TRANSFER",
+     "validationScope": "canonical route + MRG; full serialized XML requires controlled Translation Portal golden fixture",
+     "canonicalRoles": {
+      "instructedAgent": "CITIUS33",
+      "beneficiaryInstitution": "CITIUS33",
+      "directAccount": true,
+      "selectedSsi": "SSI-UAT-GEN-01",
+      "creditorAgent": "CITIUS33",
+      "creditor": "CITIUS33",
+      "creditorSource": "REQUEST_PASS_THROUGH"
+     },
+     "code": "SSI_RESOLVED",
+     "chosenRoute": {
+      "ssiId": "b0c18c9a-2ff7-59d4-96d0-f600853b8408",
+      "ssiCode": "SSI-UAT-GEN-01",
+      "ssiVersion": 1,
+      "settlementRouteId": "ROUTE-USD-CITIUS33",
+      "currency": "USD",
+      "accountId": "DEMO-NOSTRO-001-PRIMARY",
+      "nostroId": "fe5d672f-311e-4eb9-88bf-f8538d45793c",
+      "nostroVersion": 4,
+      "matchedApplicabilityId": "b0c18c9a-2ff7-59d4-96d0-f600853b8408:APPL:1",
+      "routePurpose": "INTERBANK_TRANSFER",
+      "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+      "specificity": "NAMED_COUNTERPARTY"
+     },
+     "alternatives": [],
+     "roleProvenance": {
+      "instructedAgent": {
+       "value": "CITIUS33",
+       "source": "COUNTERPARTY_SSI",
+       "ssiCode": "SSI-UAT-GEN-01",
+       "ssiVersion": 1,
+       "sourceField": "actualReceiverBic"
+      },
+      "creditorAgent": {
+       "value": "CITIUS33",
+       "source": "COUNTERPARTY_SSI",
+       "ssiCode": "SSI-UAT-GEN-01",
+       "ssiVersion": 1,
+       "sourceField": "accountWithBic"
+      }
+     },
+     "messageComposerContext": {
+      "SttlmMtd": {
+       "value": "INDA",
+       "source": "SETTLEMENT_POLICY"
+      },
+      "Dbtr": {
+       "value": "DEMOHKHH",
+       "source": "OWN_ENTITY"
+      },
+      "SttlmAcct": {
+       "value": "DEMO-NOSTRO-001-PRIMARY-PRIMARY",
+       "source": "OWN_SSI_NOSTRO",
+       "nostroId": "fe5d672f-311e-4eb9-88bf-f8538d45793c",
+       "nostroVersion": 4
+      },
+      "Cdtr": {
+       "value": "CITIUS33",
+       "source": "REQUEST_PASS_THROUGH"
+      }
+     }
+    },
+    "mt": {
+     "renderer": "MT compatibility view from the same confirmed canonical snapshot",
+     "tags": {
+      "58A": "CITIUS33"
+     },
+     "omitted": [
+      "53a",
+      "54a",
+      "56a",
+      "57a"
+     ],
+     "assertions": [
+      "57a omitted means Receiver is AWI"
+     ]
+    },
+    "chosenRoute": {
+     "ssiId": "b0c18c9a-2ff7-59d4-96d0-f600853b8408",
+     "ssiCode": "SSI-UAT-GEN-01",
+     "ssiVersion": 1,
+     "settlementRouteId": "ROUTE-USD-CITIUS33",
+     "currency": "USD",
+     "accountId": "DEMO-NOSTRO-001-PRIMARY",
+     "nostroId": "fe5d672f-311e-4eb9-88bf-f8538d45793c",
+     "nostroVersion": 4,
+     "matchedApplicabilityId": "b0c18c9a-2ff7-59d4-96d0-f600853b8408:APPL:1",
+     "routePurpose": "INTERBANK_TRANSFER",
+     "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+     "specificity": "NAMED_COUNTERPARTY"
+    },
+    "resolutionDecision": "RESOLVED",
+    "code": "SSI_RESOLVED",
+    "alternatives": [],
+    "excludedCandidates": [
+     {
+      "ssiId": "a6486f75-a0a8-5207-9c28-cedf30f4f990",
+      "ssiCode": "SSI-UAT-GEN-10",
+      "reason": "COUNTERPARTY_SCOPE_MISMATCH",
+      "evidence": [
+       {
+        "criterion": "STATUS",
+        "outcome": "PASS",
+        "expected": "ACTIVE",
+        "actual": "ACTIVE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CURRENCY",
+        "outcome": "PASS",
+        "expected": "USD",
+        "actual": "USD",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "APPLICABILITY",
+        "outcome": "PASS",
+        "expected": "active/effective SSI_APPLICABILITY",
+        "actual": "a6486f75-a0a8-5207-9c28-cedf30f4f990:APPL:1",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CONSUMER",
+        "outcome": "PASS",
+        "expected": "CENTRAL_PAYMENT",
+        "actual": "CENTRAL_PAYMENT",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "PRODUCT",
+        "outcome": "PASS",
+        "expected": "CENTRAL_PAYMENT",
+        "actual": "CENTRAL_PAYMENT",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "BUSINESS_FUNCTION",
+        "outcome": "PASS",
+        "expected": "INTERBANK_TRANSFER",
+        "actual": "INTERBANK_TRANSFER",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "PAYMENT_LEG",
+        "outcome": "PASS",
+        "expected": "INTERBANK_SETTLEMENT",
+        "actual": "INTERBANK_SETTLEMENT",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "COUNTERPARTY_SCOPE",
+        "outcome": "FAIL",
+        "expected": "CITIUS33 or approved US/ANY matcher",
+        "actual": "CHASUS33",
+        "reasonCode": "COUNTERPARTY_SCOPE_MISMATCH"
+       },
+       {
+        "criterion": "COUNTERPARTY_TYPE",
+        "outcome": "PASS",
+        "expected": "BANK",
+        "actual": "BANK",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "GLOBAL_FALLBACK_APPROVAL",
+        "outcome": "PASS",
+        "expected": "approvedGlobal=true",
+        "actual": "false",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "SETTLEMENT_COUNTRY",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "US",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "SETTLEMENT_MARKET",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "US_DOLLAR",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_SYSTEM",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "FEDWIRE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_STANDING_DATA",
+        "outcome": "PASS",
+        "expected": "USD active governed clearing system",
+        "actual": "FEDWIRE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_SCHEME_TYPE",
+        "outcome": "PASS",
+        "expected": "RTGS",
+        "actual": "RTGS",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "NOSTRO_CURRENCY",
+        "outcome": "PASS",
+        "expected": "USD",
+        "actual": "USD",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "BOOKING_ENTITY",
+        "outcome": "PASS",
+        "expected": "HK01",
+        "actual": "HK01",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "DIRECTION",
+        "outcome": "PASS",
+        "expected": "OUTBOUND",
+        "actual": "OUTBOUND",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "MESSAGING_SERVICE",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "FINPLUS",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "MESSAGE_TYPE",
+        "outcome": "PASS",
+        "expected": "pacs.009.001.08",
+        "actual": "pacs.009.001.12,pacs.009.001.08",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "COV_PROFILE",
+        "outcome": "PASS",
+        "expected": "NOT_APPLICABLE",
+        "actual": "NOT_APPLICABLE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "VALUE_DATE",
+        "outcome": "PASS",
+        "expected": "2026-09-12",
+        "actual": "2026-01-01..2027-12-31",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "AMOUNT_LIMIT",
+        "outcome": "PASS",
+        "expected": "1000000",
+        "actual": "OPEN..OPEN",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "LIVE_CLEARING_PARTICIPATION",
+        "outcome": "NOT_EVALUATED",
+        "expected": "FEDWIRE",
+        "actual": "STANDING_DATA_VALIDATED_LIVE_DIRECTORY_REQUIRED",
+        "reasonCode": "LIVE_REACHABILITY_NOT_EVALUATED"
+       }
+      ]
+     },
+     {
+      "ssiId": "e5f71960-aff2-5f27-b01f-58194e54e736",
+      "ssiCode": "SSI-UAT-GEN-03",
+      "reason": "COUNTERPARTY_SCOPE_MISMATCH",
+      "evidence": [
+       {
+        "criterion": "STATUS",
+        "outcome": "PASS",
+        "expected": "ACTIVE",
+        "actual": "ACTIVE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CURRENCY",
+        "outcome": "PASS",
+        "expected": "USD",
+        "actual": "USD",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "APPLICABILITY",
+        "outcome": "PASS",
+        "expected": "active/effective SSI_APPLICABILITY",
+        "actual": "e5f71960-aff2-5f27-b01f-58194e54e736:APPL:1",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CONSUMER",
+        "outcome": "PASS",
+        "expected": "CENTRAL_PAYMENT",
+        "actual": "CENTRAL_PAYMENT",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "PRODUCT",
+        "outcome": "PASS",
+        "expected": "CENTRAL_PAYMENT",
+        "actual": "CENTRAL_PAYMENT",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "BUSINESS_FUNCTION",
+        "outcome": "PASS",
+        "expected": "INTERBANK_TRANSFER",
+        "actual": "INTERBANK_TRANSFER",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "PAYMENT_LEG",
+        "outcome": "PASS",
+        "expected": "INTERBANK_SETTLEMENT",
+        "actual": "INTERBANK_SETTLEMENT",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "COUNTERPARTY_SCOPE",
+        "outcome": "FAIL",
+        "expected": "CITIUS33 or approved US/ANY matcher",
+        "actual": "BARCGB22",
+        "reasonCode": "COUNTERPARTY_SCOPE_MISMATCH"
+       },
+       {
+        "criterion": "COUNTERPARTY_TYPE",
+        "outcome": "PASS",
+        "expected": "BANK",
+        "actual": "BANK",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "GLOBAL_FALLBACK_APPROVAL",
+        "outcome": "PASS",
+        "expected": "approvedGlobal=true",
+        "actual": "false",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "SETTLEMENT_COUNTRY",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "US",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "SETTLEMENT_MARKET",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "US_DOLLAR",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_SYSTEM",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "FEDWIRE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_STANDING_DATA",
+        "outcome": "PASS",
+        "expected": "USD active governed clearing system",
+        "actual": "FEDWIRE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_SCHEME_TYPE",
+        "outcome": "PASS",
+        "expected": "RTGS",
+        "actual": "RTGS",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "NOSTRO_CURRENCY",
+        "outcome": "PASS",
+        "expected": "USD",
+        "actual": "USD",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "BOOKING_ENTITY",
+        "outcome": "PASS",
+        "expected": "HK01",
+        "actual": "HK01",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "DIRECTION",
+        "outcome": "PASS",
+        "expected": "OUTBOUND",
+        "actual": "OUTBOUND",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "MESSAGING_SERVICE",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "FINPLUS",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "MESSAGE_TYPE",
+        "outcome": "PASS",
+        "expected": "pacs.009.001.08",
+        "actual": "pacs.009.001.12,pacs.009.001.08",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "COV_PROFILE",
+        "outcome": "PASS",
+        "expected": "NOT_APPLICABLE",
+        "actual": "NOT_APPLICABLE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "VALUE_DATE",
+        "outcome": "PASS",
+        "expected": "2026-09-12",
+        "actual": "2026-01-01..2027-12-31",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "AMOUNT_LIMIT",
+        "outcome": "PASS",
+        "expected": "1000000",
+        "actual": "OPEN..OPEN",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "LIVE_CLEARING_PARTICIPATION",
+        "outcome": "NOT_EVALUATED",
+        "expected": "FEDWIRE",
+        "actual": "STANDING_DATA_VALIDATED_LIVE_DIRECTORY_REQUIRED",
+        "reasonCode": "LIVE_REACHABILITY_NOT_EVALUATED"
+       }
+      ]
+     },
+     {
+      "ssiId": "22a11830-f848-4281-805f-8e693c98b364",
+      "ssiCode": "SSI-DEMO-041",
+      "reason": "COUNTERPARTY_SCOPE_MISMATCH",
+      "evidence": [
+       {
+        "criterion": "STATUS",
+        "outcome": "PASS",
+        "expected": "ACTIVE",
+        "actual": "ACTIVE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CURRENCY",
+        "outcome": "PASS",
+        "expected": "USD",
+        "actual": "USD",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "APPLICABILITY",
+        "outcome": "PASS",
+        "expected": "active/effective SSI_APPLICABILITY",
+        "actual": "22a11830-f848-4281-805f-8e693c98b364:APPL:5",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CONSUMER",
+        "outcome": "PASS",
+        "expected": "CENTRAL_PAYMENT",
+        "actual": "ANY",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "PRODUCT",
+        "outcome": "PASS",
+        "expected": "CENTRAL_PAYMENT",
+        "actual": "ANY",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "BUSINESS_FUNCTION",
+        "outcome": "PASS",
+        "expected": "INTERBANK_TRANSFER",
+        "actual": "ANY",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "PAYMENT_LEG",
+        "outcome": "PASS",
+        "expected": "INTERBANK_SETTLEMENT",
+        "actual": "INTERBANK_SETTLEMENT",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "COUNTERPARTY_SCOPE",
+        "outcome": "FAIL",
+        "expected": "CITIUS33 or approved US/ANY matcher",
+        "actual": "NSSIUSN1",
+        "reasonCode": "COUNTERPARTY_SCOPE_MISMATCH"
+       },
+       {
+        "criterion": "COUNTERPARTY_TYPE",
+        "outcome": "PASS",
+        "expected": "BANK",
+        "actual": "BANK",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "GLOBAL_FALLBACK_APPROVAL",
+        "outcome": "PASS",
+        "expected": "approvedGlobal=true",
+        "actual": "false",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "SETTLEMENT_COUNTRY",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "US",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "SETTLEMENT_MARKET",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "US_DOLLAR",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_SYSTEM",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "FEDWIRE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_STANDING_DATA",
+        "outcome": "PASS",
+        "expected": "USD active governed clearing system",
+        "actual": "FEDWIRE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_SCHEME_TYPE",
+        "outcome": "PASS",
+        "expected": "RTGS",
+        "actual": "RTGS",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "NOSTRO_CURRENCY",
+        "outcome": "PASS",
+        "expected": "USD",
+        "actual": "USD",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "BOOKING_ENTITY",
+        "outcome": "PASS",
+        "expected": "HK01",
+        "actual": "HK01",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "DIRECTION",
+        "outcome": "PASS",
+        "expected": "OUTBOUND",
+        "actual": "OUTBOUND",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "MESSAGING_SERVICE",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "FINPLUS",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "MESSAGE_TYPE",
+        "outcome": "PASS",
+        "expected": "pacs.009.001.08",
+        "actual": "pacs.008.001.12,pacs.009.001.12,pacs.009.001.08",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "COV_PROFILE",
+        "outcome": "PASS",
+        "expected": "NOT_APPLICABLE",
+        "actual": "NOT_APPLICABLE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "VALUE_DATE",
+        "outcome": "PASS",
+        "expected": "2026-09-12",
+        "actual": "2026-01-01..2027-12-31",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "AMOUNT_LIMIT",
+        "outcome": "PASS",
+        "expected": "1000000",
+        "actual": "OPEN..OPEN",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "LIVE_CLEARING_PARTICIPATION",
+        "outcome": "NOT_EVALUATED",
+        "expected": "FEDWIRE",
+        "actual": "STANDING_DATA_VALIDATED_LIVE_DIRECTORY_REQUIRED",
+        "reasonCode": "LIVE_REACHABILITY_NOT_EVALUATED"
+       }
+      ]
+     },
+     {
+      "ssiId": "5547df35-b8e3-4375-a54a-e569fc4e69fa",
+      "ssiCode": "SSI-DEMO-025",
+      "reason": "PROFILE_VERSION_MISMATCH",
+      "evidence": [
+       {
+        "criterion": "STATUS",
+        "outcome": "PASS",
+        "expected": "ACTIVE",
+        "actual": "ACTIVE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CURRENCY",
+        "outcome": "PASS",
+        "expected": "USD",
+        "actual": "USD",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "APPLICABILITY",
+        "outcome": "PASS",
+        "expected": "active/effective SSI_APPLICABILITY",
+        "actual": "5547df35-b8e3-4375-a54a-e569fc4e69fa:APPL:5",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CONSUMER",
+        "outcome": "PASS",
+        "expected": "CENTRAL_PAYMENT",
+        "actual": "ANY",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "PRODUCT",
+        "outcome": "PASS",
+        "expected": "CENTRAL_PAYMENT",
+        "actual": "ANY",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "BUSINESS_FUNCTION",
+        "outcome": "PASS",
+        "expected": "INTERBANK_TRANSFER",
+        "actual": "ANY",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "PAYMENT_LEG",
+        "outcome": "PASS",
+        "expected": "INTERBANK_SETTLEMENT",
+        "actual": "INTERBANK_SETTLEMENT",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "COUNTERPARTY_SCOPE",
+        "outcome": "PASS",
+        "expected": "CITIUS33 or approved US/ANY matcher",
+        "actual": "ANY",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "COUNTERPARTY_TYPE",
+        "outcome": "PASS",
+        "expected": "BANK",
+        "actual": "BANK",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "GLOBAL_FALLBACK_APPROVAL",
+        "outcome": "PASS",
+        "expected": "approvedGlobal=true",
+        "actual": "true",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "SETTLEMENT_COUNTRY",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "US",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "SETTLEMENT_MARKET",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "US_DOLLAR",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_SYSTEM",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "FEDWIRE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_STANDING_DATA",
+        "outcome": "PASS",
+        "expected": "USD active governed clearing system",
+        "actual": "FEDWIRE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_SCHEME_TYPE",
+        "outcome": "PASS",
+        "expected": "RTGS",
+        "actual": "RTGS",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "NOSTRO_CURRENCY",
+        "outcome": "PASS",
+        "expected": "USD",
+        "actual": "USD",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "BOOKING_ENTITY",
+        "outcome": "PASS",
+        "expected": "HK01",
+        "actual": "HK01",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "DIRECTION",
+        "outcome": "PASS",
+        "expected": "OUTBOUND",
+        "actual": "OUTBOUND",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "MESSAGING_SERVICE",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "FINPLUS",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "MESSAGE_TYPE",
+        "outcome": "FAIL",
+        "expected": "pacs.009.001.08",
+        "actual": "pacs.008.001.12,pacs.009.001.12",
+        "reasonCode": "MESSAGE_TYPE_NOT_SUPPORTED"
+       },
+       {
+        "criterion": "COV_PROFILE",
+        "outcome": "PASS",
+        "expected": "NOT_APPLICABLE",
+        "actual": "NOT_APPLICABLE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "VALUE_DATE",
+        "outcome": "PASS",
+        "expected": "2026-09-12",
+        "actual": "2026-01-01..2027-12-31",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "AMOUNT_LIMIT",
+        "outcome": "PASS",
+        "expected": "1000000",
+        "actual": "OPEN..OPEN",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "LIVE_CLEARING_PARTICIPATION",
+        "outcome": "NOT_EVALUATED",
+        "expected": "FEDWIRE",
+        "actual": "STANDING_DATA_VALIDATED_LIVE_DIRECTORY_REQUIRED",
+        "reasonCode": "LIVE_REACHABILITY_NOT_EVALUATED"
+       }
+      ]
+     }
+    ],
+    "fieldProvenance": {
+     "58A": {
+      "source": "TRANSACTION_CONTEXT",
+      "evidenceId": "CITIUS33"
+     }
+    },
+    "roleProvenance": {
+     "instructedAgent": {
+      "value": "CITIUS33",
+      "source": "COUNTERPARTY_SSI",
+      "ssiCode": "SSI-UAT-GEN-01",
+      "ssiVersion": 1,
+      "sourceField": "actualReceiverBic"
+     },
+     "creditorAgent": {
+      "value": "CITIUS33",
+      "source": "COUNTERPARTY_SSI",
+      "ssiCode": "SSI-UAT-GEN-01",
+      "ssiVersion": 1,
+      "sourceField": "accountWithBic"
+     }
+    },
+    "snapshotHash": "fd6a4c064fe81f42aab1d3e30c293f45fd3908fa6bf2c92fbbf3381fcad378a6",
+    "snapshotIdentityMethod": "SQLITE_WAL_AWARE_LOGICAL_SNAPSHOT_V1",
+    "resolutionToken": "340ef5a6-355f-4eb0-89e5-dcf7014c77de",
+    "correlationId": "93c81954-a5c4-47f1-84e9-90951805bc3d",
+    "evidenceGates": [
+     {
+      "criterion": "STATUS",
+      "outcome": "PASS",
+      "expected": "ACTIVE",
+      "actual": "ACTIVE",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "CURRENCY",
+      "outcome": "PASS",
+      "expected": "USD",
+      "actual": "USD",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "APPLICABILITY",
+      "outcome": "PASS",
+      "expected": "active/effective SSI_APPLICABILITY",
+      "actual": "b0c18c9a-2ff7-59d4-96d0-f600853b8408:APPL:1",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "CONSUMER",
+      "outcome": "PASS",
+      "expected": "CENTRAL_PAYMENT",
+      "actual": "CENTRAL_PAYMENT",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "PRODUCT",
+      "outcome": "PASS",
+      "expected": "CENTRAL_PAYMENT",
+      "actual": "CENTRAL_PAYMENT",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "BUSINESS_FUNCTION",
+      "outcome": "PASS",
+      "expected": "INTERBANK_TRANSFER",
+      "actual": "INTERBANK_TRANSFER",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "PAYMENT_LEG",
+      "outcome": "PASS",
+      "expected": "INTERBANK_SETTLEMENT",
+      "actual": "INTERBANK_SETTLEMENT",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "COUNTERPARTY_SCOPE",
+      "outcome": "PASS",
+      "expected": "CITIUS33 or approved US/ANY matcher",
+      "actual": "CITIUS33",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "COUNTERPARTY_TYPE",
+      "outcome": "PASS",
+      "expected": "BANK",
+      "actual": "BANK",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "GLOBAL_FALLBACK_APPROVAL",
+      "outcome": "PASS",
+      "expected": "approvedGlobal=true",
+      "actual": "false",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "SETTLEMENT_COUNTRY",
+      "outcome": "PASS",
+      "expected": "DERIVE_FROM_ROUTE",
+      "actual": "US",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "SETTLEMENT_MARKET",
+      "outcome": "PASS",
+      "expected": "DERIVE_FROM_ROUTE",
+      "actual": "US_DOLLAR",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "CLEARING_SYSTEM",
+      "outcome": "PASS",
+      "expected": "DERIVE_FROM_ROUTE",
+      "actual": "FEDWIRE",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "CLEARING_STANDING_DATA",
+      "outcome": "PASS",
+      "expected": "USD active governed clearing system",
+      "actual": "FEDWIRE",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "CLEARING_SCHEME_TYPE",
+      "outcome": "PASS",
+      "expected": "RTGS",
+      "actual": "RTGS",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "NOSTRO_CURRENCY",
+      "outcome": "PASS",
+      "expected": "USD",
+      "actual": "USD",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "BOOKING_ENTITY",
+      "outcome": "PASS",
+      "expected": "HK01",
+      "actual": "HK01",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "DIRECTION",
+      "outcome": "PASS",
+      "expected": "OUTBOUND",
+      "actual": "OUTBOUND",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "MESSAGING_SERVICE",
+      "outcome": "PASS",
+      "expected": "DERIVE_FROM_ROUTE",
+      "actual": "FINPLUS",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "MESSAGE_TYPE",
+      "outcome": "PASS",
+      "expected": "pacs.009.001.08",
+      "actual": "pacs.009.001.12,pacs.009.001.08",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "COV_PROFILE",
+      "outcome": "PASS",
+      "expected": "NOT_APPLICABLE",
+      "actual": "NOT_APPLICABLE",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "VALUE_DATE",
+      "outcome": "PASS",
+      "expected": "2026-09-12",
+      "actual": "2026-01-01..2027-12-31",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "AMOUNT_LIMIT",
+      "outcome": "PASS",
+      "expected": "1000000",
+      "actual": "OPEN..OPEN",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "LIVE_CLEARING_PARTICIPATION",
+      "outcome": "NOT_EVALUATED",
+      "expected": "FEDWIRE",
+      "actual": "STANDING_DATA_VALIDATED_LIVE_DIRECTORY_REQUIRED",
+      "reasonCode": "LIVE_REACHABILITY_NOT_EVALUATED"
+     }
+    ],
+    "renderingDecisions": {
+     "MT202.57a": {
+      "outcome": "OMITTED_BY_RULE",
+      "rule": "MRG_MT202_57A_RECEIVER_IS_AWI"
+     },
+     "pacs.009.CdtrAgt": {
+      "outcome": "INCLUDE",
+      "reason": "OPTIONAL_ROLE_RETAINED_NO_EQUIVALENT_OMISSION_RULE"
+     }
+    }
+   }
+  },
+  {
+   "name": "B2_OVERLAY_BARCGB22",
+   "status": 200,
+   "error": null,
+   "request": {
+    "consumer": "CENTRAL_PAYMENT",
+    "product": "CENTRAL_PAYMENT",
+    "businessFunction": "INTERBANK_TRANSFER",
+    "paymentLeg": "INTERBANK_SETTLEMENT",
+    "direction": "OUTBOUND",
+    "currency": "USD",
+    "bookingEntity": "HK01",
+    "valueDate": "2026-09-12",
+    "amount": "1000000",
+    "messageType": "pacs.009.001.08",
+    "sourceMessageType": "MT202",
+    "correlationId": "59381e2c-f071-4580-8082-00eba0c53c77",
+    "transactionReference": "B2",
+    "counterpartyBankServiceId": "BANK-SVC-BARCGB22"
+   },
+   "response": {
+    "mx": {
+     "httpStatus": 200,
+     "decision": "RESOLVED",
+     "messageDefinitionId": "pacs.009.001.08",
+     "businessService": "swift.cbprplus.04",
+     "redirectDomain": null,
+     "canonicalScenario": "FI_TO_FI_TRANSFER",
+     "validationScope": "canonical route + MRG; full serialized XML requires controlled Translation Portal golden fixture",
+     "canonicalRoles": {
+      "instructedAgent": "CITIUS33",
+      "creditorAgent": "CITIUS33",
+      "beneficiaryInstitution": "BARCGB22",
+      "selectedSsi": "SSI-UAT-GEN-03",
+      "creditor": "BARCGB22",
+      "creditorSource": "REQUEST_PASS_THROUGH"
+     },
+     "code": "SSI_RESOLVED",
+     "chosenRoute": {
+      "ssiId": "e5f71960-aff2-5f27-b01f-58194e54e736",
+      "ssiCode": "SSI-UAT-GEN-03",
+      "ssiVersion": 1,
+      "settlementRouteId": "ROUTE-USD-CITIUS33-BARC",
+      "currency": "USD",
+      "accountId": "DEMO-NOSTRO-001-PRIMARY",
+      "nostroId": "fe5d672f-311e-4eb9-88bf-f8538d45793c",
+      "nostroVersion": 4,
+      "matchedApplicabilityId": "e5f71960-aff2-5f27-b01f-58194e54e736:APPL:1",
+      "routePurpose": "INTERBANK_TRANSFER",
+      "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+      "specificity": "NAMED_COUNTERPARTY"
+     },
+     "alternatives": [],
+     "roleProvenance": {
+      "instructedAgent": {
+       "value": "CITIUS33",
+       "source": "COUNTERPARTY_SSI",
+       "ssiCode": "SSI-UAT-GEN-03",
+       "ssiVersion": 1,
+       "sourceField": "actualReceiverBic"
+      },
+      "creditorAgent": {
+       "value": "CITIUS33",
+       "source": "COUNTERPARTY_SSI",
+       "ssiCode": "SSI-UAT-GEN-03",
+       "ssiVersion": 1,
+       "sourceField": "accountWithBic"
+      }
+     },
+     "messageComposerContext": {
+      "SttlmMtd": {
+       "value": "INDA",
+       "source": "SETTLEMENT_POLICY"
+      },
+      "Dbtr": {
+       "value": "DEMOHKHH",
+       "source": "OWN_ENTITY"
+      },
+      "SttlmAcct": {
+       "value": "DEMO-NOSTRO-001-PRIMARY-PRIMARY",
+       "source": "OWN_SSI_NOSTRO",
+       "nostroId": "fe5d672f-311e-4eb9-88bf-f8538d45793c",
+       "nostroVersion": 4
+      },
+      "Cdtr": {
+       "value": "BARCGB22",
+       "source": "REQUEST_PASS_THROUGH"
+      }
+     }
+    },
+    "mt": {
+     "renderer": "MT compatibility view from the same confirmed canonical snapshot",
+     "tags": {
+      "58A": "BARCGB22"
+     },
+     "omitted": [
+      "53a",
+      "54a",
+      "56a",
+      "57a"
+     ],
+     "assertions": [
+      "Receiver itself is AWI; do not duplicate Receiver into 53A/57A"
+     ]
+    },
+    "chosenRoute": {
+     "ssiId": "e5f71960-aff2-5f27-b01f-58194e54e736",
+     "ssiCode": "SSI-UAT-GEN-03",
+     "ssiVersion": 1,
+     "settlementRouteId": "ROUTE-USD-CITIUS33-BARC",
+     "currency": "USD",
+     "accountId": "DEMO-NOSTRO-001-PRIMARY",
+     "nostroId": "fe5d672f-311e-4eb9-88bf-f8538d45793c",
+     "nostroVersion": 4,
+     "matchedApplicabilityId": "e5f71960-aff2-5f27-b01f-58194e54e736:APPL:1",
+     "routePurpose": "INTERBANK_TRANSFER",
+     "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+     "specificity": "NAMED_COUNTERPARTY"
+    },
+    "resolutionDecision": "RESOLVED",
+    "code": "SSI_RESOLVED",
+    "alternatives": [],
+    "excludedCandidates": [
+     {
+      "ssiId": "a6486f75-a0a8-5207-9c28-cedf30f4f990",
+      "ssiCode": "SSI-UAT-GEN-10",
+      "reason": "COUNTERPARTY_SCOPE_MISMATCH",
+      "evidence": [
+       {
+        "criterion": "STATUS",
+        "outcome": "PASS",
+        "expected": "ACTIVE",
+        "actual": "ACTIVE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CURRENCY",
+        "outcome": "PASS",
+        "expected": "USD",
+        "actual": "USD",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "APPLICABILITY",
+        "outcome": "PASS",
+        "expected": "active/effective SSI_APPLICABILITY",
+        "actual": "a6486f75-a0a8-5207-9c28-cedf30f4f990:APPL:1",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CONSUMER",
+        "outcome": "PASS",
+        "expected": "CENTRAL_PAYMENT",
+        "actual": "CENTRAL_PAYMENT",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "PRODUCT",
+        "outcome": "PASS",
+        "expected": "CENTRAL_PAYMENT",
+        "actual": "CENTRAL_PAYMENT",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "BUSINESS_FUNCTION",
+        "outcome": "PASS",
+        "expected": "INTERBANK_TRANSFER",
+        "actual": "INTERBANK_TRANSFER",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "PAYMENT_LEG",
+        "outcome": "PASS",
+        "expected": "INTERBANK_SETTLEMENT",
+        "actual": "INTERBANK_SETTLEMENT",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "COUNTERPARTY_SCOPE",
+        "outcome": "FAIL",
+        "expected": "BARCGB22 or approved GB/ANY matcher",
+        "actual": "CHASUS33",
+        "reasonCode": "COUNTERPARTY_SCOPE_MISMATCH"
+       },
+       {
+        "criterion": "COUNTERPARTY_TYPE",
+        "outcome": "PASS",
+        "expected": "BANK",
+        "actual": "BANK",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "GLOBAL_FALLBACK_APPROVAL",
+        "outcome": "PASS",
+        "expected": "approvedGlobal=true",
+        "actual": "false",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "SETTLEMENT_COUNTRY",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "US",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "SETTLEMENT_MARKET",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "US_DOLLAR",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_SYSTEM",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "FEDWIRE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_STANDING_DATA",
+        "outcome": "PASS",
+        "expected": "USD active governed clearing system",
+        "actual": "FEDWIRE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_SCHEME_TYPE",
+        "outcome": "PASS",
+        "expected": "RTGS",
+        "actual": "RTGS",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "NOSTRO_CURRENCY",
+        "outcome": "PASS",
+        "expected": "USD",
+        "actual": "USD",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "BOOKING_ENTITY",
+        "outcome": "PASS",
+        "expected": "HK01",
+        "actual": "HK01",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "DIRECTION",
+        "outcome": "PASS",
+        "expected": "OUTBOUND",
+        "actual": "OUTBOUND",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "MESSAGING_SERVICE",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "FINPLUS",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "MESSAGE_TYPE",
+        "outcome": "PASS",
+        "expected": "pacs.009.001.08",
+        "actual": "pacs.009.001.12,pacs.009.001.08",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "COV_PROFILE",
+        "outcome": "PASS",
+        "expected": "NOT_APPLICABLE",
+        "actual": "NOT_APPLICABLE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "VALUE_DATE",
+        "outcome": "PASS",
+        "expected": "2026-09-12",
+        "actual": "2026-01-01..2027-12-31",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "AMOUNT_LIMIT",
+        "outcome": "PASS",
+        "expected": "1000000",
+        "actual": "OPEN..OPEN",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "LIVE_CLEARING_PARTICIPATION",
+        "outcome": "NOT_EVALUATED",
+        "expected": "FEDWIRE",
+        "actual": "STANDING_DATA_VALIDATED_LIVE_DIRECTORY_REQUIRED",
+        "reasonCode": "LIVE_REACHABILITY_NOT_EVALUATED"
+       }
+      ]
+     },
+     {
+      "ssiId": "b0c18c9a-2ff7-59d4-96d0-f600853b8408",
+      "ssiCode": "SSI-UAT-GEN-01",
+      "reason": "COUNTERPARTY_SCOPE_MISMATCH",
+      "evidence": [
+       {
+        "criterion": "STATUS",
+        "outcome": "PASS",
+        "expected": "ACTIVE",
+        "actual": "ACTIVE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CURRENCY",
+        "outcome": "PASS",
+        "expected": "USD",
+        "actual": "USD",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "APPLICABILITY",
+        "outcome": "PASS",
+        "expected": "active/effective SSI_APPLICABILITY",
+        "actual": "b0c18c9a-2ff7-59d4-96d0-f600853b8408:APPL:1",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CONSUMER",
+        "outcome": "PASS",
+        "expected": "CENTRAL_PAYMENT",
+        "actual": "CENTRAL_PAYMENT",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "PRODUCT",
+        "outcome": "PASS",
+        "expected": "CENTRAL_PAYMENT",
+        "actual": "CENTRAL_PAYMENT",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "BUSINESS_FUNCTION",
+        "outcome": "PASS",
+        "expected": "INTERBANK_TRANSFER",
+        "actual": "INTERBANK_TRANSFER",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "PAYMENT_LEG",
+        "outcome": "PASS",
+        "expected": "INTERBANK_SETTLEMENT",
+        "actual": "INTERBANK_SETTLEMENT",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "COUNTERPARTY_SCOPE",
+        "outcome": "FAIL",
+        "expected": "BARCGB22 or approved GB/ANY matcher",
+        "actual": "CITIUS33",
+        "reasonCode": "COUNTERPARTY_SCOPE_MISMATCH"
+       },
+       {
+        "criterion": "COUNTERPARTY_TYPE",
+        "outcome": "PASS",
+        "expected": "BANK",
+        "actual": "BANK",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "GLOBAL_FALLBACK_APPROVAL",
+        "outcome": "PASS",
+        "expected": "approvedGlobal=true",
+        "actual": "false",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "SETTLEMENT_COUNTRY",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "US",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "SETTLEMENT_MARKET",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "US_DOLLAR",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_SYSTEM",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "FEDWIRE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_STANDING_DATA",
+        "outcome": "PASS",
+        "expected": "USD active governed clearing system",
+        "actual": "FEDWIRE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_SCHEME_TYPE",
+        "outcome": "PASS",
+        "expected": "RTGS",
+        "actual": "RTGS",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "NOSTRO_CURRENCY",
+        "outcome": "PASS",
+        "expected": "USD",
+        "actual": "USD",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "BOOKING_ENTITY",
+        "outcome": "PASS",
+        "expected": "HK01",
+        "actual": "HK01",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "DIRECTION",
+        "outcome": "PASS",
+        "expected": "OUTBOUND",
+        "actual": "OUTBOUND",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "MESSAGING_SERVICE",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "FINPLUS",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "MESSAGE_TYPE",
+        "outcome": "PASS",
+        "expected": "pacs.009.001.08",
+        "actual": "pacs.009.001.12,pacs.009.001.08",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "COV_PROFILE",
+        "outcome": "PASS",
+        "expected": "NOT_APPLICABLE",
+        "actual": "NOT_APPLICABLE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "VALUE_DATE",
+        "outcome": "PASS",
+        "expected": "2026-09-12",
+        "actual": "2026-01-01..2027-12-31",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "AMOUNT_LIMIT",
+        "outcome": "PASS",
+        "expected": "1000000",
+        "actual": "OPEN..OPEN",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "LIVE_CLEARING_PARTICIPATION",
+        "outcome": "NOT_EVALUATED",
+        "expected": "FEDWIRE",
+        "actual": "STANDING_DATA_VALIDATED_LIVE_DIRECTORY_REQUIRED",
+        "reasonCode": "LIVE_REACHABILITY_NOT_EVALUATED"
+       }
+      ]
+     },
+     {
+      "ssiId": "22a11830-f848-4281-805f-8e693c98b364",
+      "ssiCode": "SSI-DEMO-041",
+      "reason": "COUNTERPARTY_SCOPE_MISMATCH",
+      "evidence": [
+       {
+        "criterion": "STATUS",
+        "outcome": "PASS",
+        "expected": "ACTIVE",
+        "actual": "ACTIVE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CURRENCY",
+        "outcome": "PASS",
+        "expected": "USD",
+        "actual": "USD",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "APPLICABILITY",
+        "outcome": "PASS",
+        "expected": "active/effective SSI_APPLICABILITY",
+        "actual": "22a11830-f848-4281-805f-8e693c98b364:APPL:5",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CONSUMER",
+        "outcome": "PASS",
+        "expected": "CENTRAL_PAYMENT",
+        "actual": "ANY",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "PRODUCT",
+        "outcome": "PASS",
+        "expected": "CENTRAL_PAYMENT",
+        "actual": "ANY",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "BUSINESS_FUNCTION",
+        "outcome": "PASS",
+        "expected": "INTERBANK_TRANSFER",
+        "actual": "ANY",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "PAYMENT_LEG",
+        "outcome": "PASS",
+        "expected": "INTERBANK_SETTLEMENT",
+        "actual": "INTERBANK_SETTLEMENT",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "COUNTERPARTY_SCOPE",
+        "outcome": "FAIL",
+        "expected": "BARCGB22 or approved GB/ANY matcher",
+        "actual": "NSSIUSN1",
+        "reasonCode": "COUNTERPARTY_SCOPE_MISMATCH"
+       },
+       {
+        "criterion": "COUNTERPARTY_TYPE",
+        "outcome": "PASS",
+        "expected": "BANK",
+        "actual": "BANK",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "GLOBAL_FALLBACK_APPROVAL",
+        "outcome": "PASS",
+        "expected": "approvedGlobal=true",
+        "actual": "false",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "SETTLEMENT_COUNTRY",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "US",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "SETTLEMENT_MARKET",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "US_DOLLAR",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_SYSTEM",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "FEDWIRE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_STANDING_DATA",
+        "outcome": "PASS",
+        "expected": "USD active governed clearing system",
+        "actual": "FEDWIRE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_SCHEME_TYPE",
+        "outcome": "PASS",
+        "expected": "RTGS",
+        "actual": "RTGS",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "NOSTRO_CURRENCY",
+        "outcome": "PASS",
+        "expected": "USD",
+        "actual": "USD",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "BOOKING_ENTITY",
+        "outcome": "PASS",
+        "expected": "HK01",
+        "actual": "HK01",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "DIRECTION",
+        "outcome": "PASS",
+        "expected": "OUTBOUND",
+        "actual": "OUTBOUND",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "MESSAGING_SERVICE",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "FINPLUS",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "MESSAGE_TYPE",
+        "outcome": "PASS",
+        "expected": "pacs.009.001.08",
+        "actual": "pacs.008.001.12,pacs.009.001.12,pacs.009.001.08",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "COV_PROFILE",
+        "outcome": "PASS",
+        "expected": "NOT_APPLICABLE",
+        "actual": "NOT_APPLICABLE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "VALUE_DATE",
+        "outcome": "PASS",
+        "expected": "2026-09-12",
+        "actual": "2026-01-01..2027-12-31",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "AMOUNT_LIMIT",
+        "outcome": "PASS",
+        "expected": "1000000",
+        "actual": "OPEN..OPEN",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "LIVE_CLEARING_PARTICIPATION",
+        "outcome": "NOT_EVALUATED",
+        "expected": "FEDWIRE",
+        "actual": "STANDING_DATA_VALIDATED_LIVE_DIRECTORY_REQUIRED",
+        "reasonCode": "LIVE_REACHABILITY_NOT_EVALUATED"
+       }
+      ]
+     },
+     {
+      "ssiId": "5547df35-b8e3-4375-a54a-e569fc4e69fa",
+      "ssiCode": "SSI-DEMO-025",
+      "reason": "PROFILE_VERSION_MISMATCH",
+      "evidence": [
+       {
+        "criterion": "STATUS",
+        "outcome": "PASS",
+        "expected": "ACTIVE",
+        "actual": "ACTIVE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CURRENCY",
+        "outcome": "PASS",
+        "expected": "USD",
+        "actual": "USD",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "APPLICABILITY",
+        "outcome": "PASS",
+        "expected": "active/effective SSI_APPLICABILITY",
+        "actual": "5547df35-b8e3-4375-a54a-e569fc4e69fa:APPL:5",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CONSUMER",
+        "outcome": "PASS",
+        "expected": "CENTRAL_PAYMENT",
+        "actual": "ANY",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "PRODUCT",
+        "outcome": "PASS",
+        "expected": "CENTRAL_PAYMENT",
+        "actual": "ANY",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "BUSINESS_FUNCTION",
+        "outcome": "PASS",
+        "expected": "INTERBANK_TRANSFER",
+        "actual": "ANY",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "PAYMENT_LEG",
+        "outcome": "PASS",
+        "expected": "INTERBANK_SETTLEMENT",
+        "actual": "INTERBANK_SETTLEMENT",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "COUNTERPARTY_SCOPE",
+        "outcome": "PASS",
+        "expected": "BARCGB22 or approved GB/ANY matcher",
+        "actual": "ANY",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "COUNTERPARTY_TYPE",
+        "outcome": "PASS",
+        "expected": "BANK",
+        "actual": "BANK",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "GLOBAL_FALLBACK_APPROVAL",
+        "outcome": "PASS",
+        "expected": "approvedGlobal=true",
+        "actual": "true",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "SETTLEMENT_COUNTRY",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "US",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "SETTLEMENT_MARKET",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "US_DOLLAR",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_SYSTEM",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "FEDWIRE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_STANDING_DATA",
+        "outcome": "PASS",
+        "expected": "USD active governed clearing system",
+        "actual": "FEDWIRE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "CLEARING_SCHEME_TYPE",
+        "outcome": "PASS",
+        "expected": "RTGS",
+        "actual": "RTGS",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "NOSTRO_CURRENCY",
+        "outcome": "PASS",
+        "expected": "USD",
+        "actual": "USD",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "BOOKING_ENTITY",
+        "outcome": "PASS",
+        "expected": "HK01",
+        "actual": "HK01",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "DIRECTION",
+        "outcome": "PASS",
+        "expected": "OUTBOUND",
+        "actual": "OUTBOUND",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "MESSAGING_SERVICE",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "FINPLUS",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "MESSAGE_TYPE",
+        "outcome": "FAIL",
+        "expected": "pacs.009.001.08",
+        "actual": "pacs.008.001.12,pacs.009.001.12",
+        "reasonCode": "MESSAGE_TYPE_NOT_SUPPORTED"
+       },
+       {
+        "criterion": "COV_PROFILE",
+        "outcome": "PASS",
+        "expected": "NOT_APPLICABLE",
+        "actual": "NOT_APPLICABLE",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "VALUE_DATE",
+        "outcome": "PASS",
+        "expected": "2026-09-12",
+        "actual": "2026-01-01..2027-12-31",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "AMOUNT_LIMIT",
+        "outcome": "PASS",
+        "expected": "1000000",
+        "actual": "OPEN..OPEN",
+        "reasonCode": "MATCHED"
+       },
+       {
+        "criterion": "LIVE_CLEARING_PARTICIPATION",
+        "outcome": "NOT_EVALUATED",
+        "expected": "FEDWIRE",
+        "actual": "STANDING_DATA_VALIDATED_LIVE_DIRECTORY_REQUIRED",
+        "reasonCode": "LIVE_REACHABILITY_NOT_EVALUATED"
+       }
+      ]
+     }
+    ],
+    "fieldProvenance": {
+     "53A": {
+      "source": "OWN_NOSTRO",
+      "evidenceId": "fe5d672f-311e-4eb9-88bf-f8538d45793c"
+     },
+     "57A": {
+      "source": "COUNTERPARTY_SSI",
+      "evidenceId": "e5f71960-aff2-5f27-b01f-58194e54e736"
+     },
+     "58A": {
+      "source": "TRANSACTION_CONTEXT",
+      "evidenceId": "BARCGB22"
+     }
+    },
+    "roleProvenance": {
+     "instructedAgent": {
+      "value": "CITIUS33",
+      "source": "COUNTERPARTY_SSI",
+      "ssiCode": "SSI-UAT-GEN-03",
+      "ssiVersion": 1,
+      "sourceField": "actualReceiverBic"
+     },
+     "creditorAgent": {
+      "value": "CITIUS33",
+      "source": "COUNTERPARTY_SSI",
+      "ssiCode": "SSI-UAT-GEN-03",
+      "ssiVersion": 1,
+      "sourceField": "accountWithBic"
+     }
+    },
+    "snapshotHash": "fd6a4c064fe81f42aab1d3e30c293f45fd3908fa6bf2c92fbbf3381fcad378a6",
+    "snapshotIdentityMethod": "SQLITE_WAL_AWARE_LOGICAL_SNAPSHOT_V1",
+    "resolutionToken": "49275938-93a1-419f-9c65-a151bf0d163d",
+    "correlationId": "59381e2c-f071-4580-8082-00eba0c53c77",
+    "evidenceGates": [
+     {
+      "criterion": "STATUS",
+      "outcome": "PASS",
+      "expected": "ACTIVE",
+      "actual": "ACTIVE",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "CURRENCY",
+      "outcome": "PASS",
+      "expected": "USD",
+      "actual": "USD",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "APPLICABILITY",
+      "outcome": "PASS",
+      "expected": "active/effective SSI_APPLICABILITY",
+      "actual": "e5f71960-aff2-5f27-b01f-58194e54e736:APPL:1",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "CONSUMER",
+      "outcome": "PASS",
+      "expected": "CENTRAL_PAYMENT",
+      "actual": "CENTRAL_PAYMENT",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "PRODUCT",
+      "outcome": "PASS",
+      "expected": "CENTRAL_PAYMENT",
+      "actual": "CENTRAL_PAYMENT",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "BUSINESS_FUNCTION",
+      "outcome": "PASS",
+      "expected": "INTERBANK_TRANSFER",
+      "actual": "INTERBANK_TRANSFER",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "PAYMENT_LEG",
+      "outcome": "PASS",
+      "expected": "INTERBANK_SETTLEMENT",
+      "actual": "INTERBANK_SETTLEMENT",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "COUNTERPARTY_SCOPE",
+      "outcome": "PASS",
+      "expected": "BARCGB22 or approved GB/ANY matcher",
+      "actual": "BARCGB22",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "COUNTERPARTY_TYPE",
+      "outcome": "PASS",
+      "expected": "BANK",
+      "actual": "BANK",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "GLOBAL_FALLBACK_APPROVAL",
+      "outcome": "PASS",
+      "expected": "approvedGlobal=true",
+      "actual": "false",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "SETTLEMENT_COUNTRY",
+      "outcome": "PASS",
+      "expected": "DERIVE_FROM_ROUTE",
+      "actual": "US",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "SETTLEMENT_MARKET",
+      "outcome": "PASS",
+      "expected": "DERIVE_FROM_ROUTE",
+      "actual": "US_DOLLAR",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "CLEARING_SYSTEM",
+      "outcome": "PASS",
+      "expected": "DERIVE_FROM_ROUTE",
+      "actual": "FEDWIRE",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "CLEARING_STANDING_DATA",
+      "outcome": "PASS",
+      "expected": "USD active governed clearing system",
+      "actual": "FEDWIRE",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "CLEARING_SCHEME_TYPE",
+      "outcome": "PASS",
+      "expected": "RTGS",
+      "actual": "RTGS",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "NOSTRO_CURRENCY",
+      "outcome": "PASS",
+      "expected": "USD",
+      "actual": "USD",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "BOOKING_ENTITY",
+      "outcome": "PASS",
+      "expected": "HK01",
+      "actual": "HK01",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "DIRECTION",
+      "outcome": "PASS",
+      "expected": "OUTBOUND",
+      "actual": "OUTBOUND",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "MESSAGING_SERVICE",
+      "outcome": "PASS",
+      "expected": "DERIVE_FROM_ROUTE",
+      "actual": "FINPLUS",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "MESSAGE_TYPE",
+      "outcome": "PASS",
+      "expected": "pacs.009.001.08",
+      "actual": "pacs.009.001.12,pacs.009.001.08",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "COV_PROFILE",
+      "outcome": "PASS",
+      "expected": "NOT_APPLICABLE",
+      "actual": "NOT_APPLICABLE",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "VALUE_DATE",
+      "outcome": "PASS",
+      "expected": "2026-09-12",
+      "actual": "2026-01-01..2027-12-31",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "AMOUNT_LIMIT",
+      "outcome": "PASS",
+      "expected": "1000000",
+      "actual": "OPEN..OPEN",
+      "reasonCode": "MATCHED"
+     },
+     {
+      "criterion": "LIVE_CLEARING_PARTICIPATION",
+      "outcome": "NOT_EVALUATED",
+      "expected": "FEDWIRE",
+      "actual": "STANDING_DATA_VALIDATED_LIVE_DIRECTORY_REQUIRED",
+      "reasonCode": "LIVE_REACHABILITY_NOT_EVALUATED"
+     }
+    ],
+    "renderingDecisions": {
+     "MT202.57a": {
+      "outcome": "OMITTED_BY_RULE",
+      "rule": "MRG_MT202_57A_RECEIVER_IS_AWI"
+     },
+     "pacs.009.CdtrAgt": {
+      "outcome": "INCLUDE",
+      "reason": "OPTIONAL_ROLE_RETAINED_NO_EQUIVALENT_OMISSION_RULE"
+     }
+    }
+   }
+  },
+  {
+   "name": "C1_BOOK_ok",
+   "status": 200,
+   "error": null,
+   "request": {
+    "consumer": "TRADE_FINANCE",
+    "product": "IMPORT_LC",
+    "businessFunction": "IMPORT_LC_BANK_REIMBURSEMENT",
+    "paymentLeg": "BANK_REIMBURSEMENT",
+    "direction": "OUTBOUND",
+    "currency": "USD",
+    "bookingEntity": "HK01",
+    "valueDate": "2026-09-12",
+    "amount": "1000000",
+    "messageType": "pacs.009.001.08",
+    "sourceMessageType": "MT202",
+    "correlationId": "f0218266-0b46-4d6c-b806-87371eeb2a9c",
+    "transactionReference": "C1_BOOK_ok",
+    "scenarioCode": "BOOK_TRANSFER_SAME_RECEIVER",
+    "receiverBankServiceId": "BANK-SVC-CITIUS33",
+    "ownDebitAccountId": "fe5d672f-311e-4eb9-88bf-f8538d45793c",
+    "ownDebitAccountVersion": 4,
+    "ownCreditAccountId": "d28b0fc3-a0d8-4e16-a5e4-64325760b331",
+    "ownCreditAccountVersion": 4
+   },
+   "response": {
+    "mx": {
+     "httpStatus": 200,
+     "redirectDomain": null,
+     "decision": "RESOLVED",
+     "code": "RESOLVED",
+     "resolutionDomain": "OWN_SSI_NOSTRO",
+     "counterpartySsiResolution": "SKIPPED",
+     "chosenRoute": null,
+     "candidates": [],
+     "messageDefinitionId": "pacs.009.001.08",
+     "businessService": "swift.cbprplus.04",
+     "canonicalScenario": "BOOK_TRANSFER_SAME_RECEIVER",
+     "canonicalRoles": {
+      "sender": "DEMOHKHH",
+      "debtor": "DEMOHKHH",
+      "receiver": "CITIUS33",
+      "beneficiary": "DEMOHKHH"
+     },
+     "roleProvenance": {
+      "sender": {
+       "source": "OWN_ENTITY",
+       "bankServiceId": "BANK-SVC-DEMOHKHH"
+      },
+      "debtor": {
+       "value": "DEMOHKHH",
+       "source": "OWN_ENTITY",
+       "bankServiceId": "BANK-SVC-DEMOHKHH"
+      },
+      "beneficiary": {
+       "value": "DEMOHKHH",
+       "source": "OWN_ENTITY",
+       "bankServiceId": "BANK-SVC-DEMOHKHH"
+      },
+      "receiver": {
+       "source": "RECEIVER_BANK_SERVICE",
+       "bankServiceId": "BANK-SVC-CITIUS33"
+      },
+      "debitAccount": {
+       "source": "OWN_SSI_NOSTRO",
+       "nostroId": "fe5d672f-311e-4eb9-88bf-f8538d45793c",
+       "nostroVersion": 4
+      },
+      "creditAccount": {
+       "source": "OWN_SSI_NOSTRO",
+       "nostroId": "d28b0fc3-a0d8-4e16-a5e4-64325760b331",
+       "nostroVersion": 4
+      }
+     },
+     "messageComposerContext": {
+      "SttlmMtd": {
+       "value": "INDA",
+       "source": "SETTLEMENT_POLICY"
+      },
+      "Dbtr": {
+       "value": "DEMOHKHH",
+       "source": "OWN_ENTITY"
+      },
+      "DbtrAcct": {
+       "value": "DEMO-NOSTRO-001-PRIMARY",
+       "source": "OWN_SSI_NOSTRO",
+       "nostroId": "fe5d672f-311e-4eb9-88bf-f8538d45793c",
+       "nostroVersion": 4
+      },
+      "SttlmAcct": {
+       "value": "DEMO-NOSTRO-001-PRIMARY",
+       "source": "OWN_SSI_NOSTRO",
+       "nostroId": "fe5d672f-311e-4eb9-88bf-f8538d45793c",
+       "nostroVersion": 4,
+       "semanticRole": "SETTLEMENT_DEBIT_ACCOUNT"
+      },
+      "CdtrAcct": {
+       "value": "DEMO-NOSTRO-001-EXPCOLL",
+       "source": "OWN_SSI_NOSTRO",
+       "nostroId": "d28b0fc3-a0d8-4e16-a5e4-64325760b331",
+       "nostroVersion": 4
+      },
+      "Cdtr": {
+       "value": "DEMOHKHH",
+       "source": "OWN_ENTITY"
+      }
+     },
+     "payloadGenerated": true,
+     "snapshotHash": "fd6a4c064fe81f42aab1d3e30c293f45fd3908fa6bf2c92fbbf3381fcad378a6",
+     "snapshotIdentityMethod": "SQLITE_WAL_AWARE_LOGICAL_SNAPSHOT_V1",
+     "resolutionToken": "9dd015d9-8e3e-489f-8b9e-30457b1fe9c0",
+     "correlationId": "f0218266-0b46-4d6c-b806-87371eeb2a9c",
+     "resolutionTrace": {
+      "counterpartySsiQueried": false
+     }
+    },
+    "mt": {
+     "redirectDomain": null,
+     "renderer": "MT compatibility view from the same confirmed own-account snapshot",
+     "tags": {
+      "58A": "/DEMO-NOSTRO-001-EXPCOLL\nDEMOHKHH",
+      "53B": "/DEMO-NOSTRO-001-PRIMARY"
+     },
+     "omitted": [
+      "57A"
+     ],
+     "renderingDecisions": {
+      "53B": {
+       "outcome": "INCLUDE",
+       "option": "B",
+       "rule": "MRG_MT202_DEBIT_ACCOUNT"
+      },
+      "57A": {
+       "outcome": "OMITTED_BY_RULE",
+       "rule": "MRG_MT202_BOOK_TRANSFER_RECEIVER_IS_AWI"
+      }
+     },
+     "assertions": [
+      "Counterparty SSI resolution is skipped",
+      "53B option B identifies the debit account",
+      "58A identifies the Sender"
+     ]
+    }
+   }
+  },
+  {
+   "name": "C2_BOOK_same_reference",
+   "status": 422,
+   "error": null,
+   "request": {
+    "consumer": "TRADE_FINANCE",
+    "product": "IMPORT_LC",
+    "businessFunction": "IMPORT_LC_BANK_REIMBURSEMENT",
+    "paymentLeg": "BANK_REIMBURSEMENT",
+    "direction": "OUTBOUND",
+    "currency": "USD",
+    "bookingEntity": "HK01",
+    "valueDate": "2026-09-12",
+    "amount": "1000000",
+    "messageType": "pacs.009.001.08",
+    "sourceMessageType": "MT202",
+    "correlationId": "5b0bfbee-92c8-496a-a3de-659f17a6c40b",
+    "transactionReference": "C2_BOOK_same_reference",
+    "scenarioCode": "BOOK_TRANSFER_SAME_RECEIVER",
+    "receiverBankServiceId": "BANK-SVC-CITIUS33",
+    "ownDebitAccountId": "0f56135e-b198-42d1-a1b7-b1b34bb1266f",
+    "ownDebitAccountVersion": 4,
+    "ownCreditAccountId": "d633da6c-034e-47a6-8d73-24e0dbf5ee7e",
+    "ownCreditAccountVersion": 4
+   },
+   "response": {
+    "mx": {
+     "httpStatus": 422,
+     "redirectDomain": null,
+     "decision": "REJECTED",
+     "code": "OPTION_CONSTRAINT_VIOLATION",
+     "reasonCode": "OWN_ACCOUNT_DEBIT_CREDIT_COLLISION",
+     "resolutionDomain": "OWN_SSI_NOSTRO",
+     "counterpartySsiResolution": "SKIPPED",
+     "chosenRoute": null,
+     "candidates": [],
+     "canonicalRoute": null,
+     "roleProvenance": null,
+     "messageComposerContext": null,
+     "payloadGenerated": false,
+     "correlationId": "5b0bfbee-92c8-496a-a3de-659f17a6c40b",
+     "snapshotHash": "fd6a4c064fe81f42aab1d3e30c293f45fd3908fa6bf2c92fbbf3381fcad378a6",
+     "snapshotIdentityMethod": "SQLITE_WAL_AWARE_LOGICAL_SNAPSHOT_V1",
+     "resolutionTrace": {
+      "counterpartySsiQueried": false
+     }
+    },
+    "mt": {
+     "redirectDomain": null,
+     "validation": "FAIL",
+     "code": "OPTION_CONSTRAINT_VIOLATION",
+     "reasonCode": "OWN_ACCOUNT_DEBIT_CREDIT_COLLISION",
+     "payloadGenerated": false
+    }
+   }
+  },
+  {
+   "name": "C3_BOOK_currency_mismatch",
+   "status": 422,
+   "error": null,
+   "request": {
+    "consumer": "TRADE_FINANCE",
+    "product": "IMPORT_LC",
+    "businessFunction": "IMPORT_LC_BANK_REIMBURSEMENT",
+    "paymentLeg": "BANK_REIMBURSEMENT",
+    "direction": "OUTBOUND",
+    "currency": "USD",
+    "bookingEntity": "HK01",
+    "valueDate": "2026-09-12",
+    "amount": "1000000",
+    "messageType": "pacs.009.001.08",
+    "sourceMessageType": "MT202",
+    "correlationId": "72fa5d8a-0b49-407c-ba73-293eab73b760",
+    "transactionReference": "C3_BOOK_currency_mismatch",
+    "scenarioCode": "BOOK_TRANSFER_SAME_RECEIVER",
+    "receiverBankServiceId": "BANK-SVC-HSBCHKHH",
+    "ownDebitAccountId": "f976e74f-4f58-4efd-86b9-48921a3db5a0",
+    "ownDebitAccountVersion": 9,
+    "ownCreditAccountId": "d4ee3d85-7ad4-4767-9046-33a050705a78",
+    "ownCreditAccountVersion": 4
+   },
+   "response": {
+    "mx": {
+     "httpStatus": 422,
+     "redirectDomain": null,
+     "decision": "REJECTED",
+     "code": "OPTION_CONSTRAINT_VIOLATION",
+     "reasonCode": "OWN_ACCOUNT_CURRENCY_MISMATCH",
+     "resolutionDomain": "OWN_SSI_NOSTRO",
+     "counterpartySsiResolution": "SKIPPED",
+     "chosenRoute": null,
+     "candidates": [],
+     "canonicalRoute": null,
+     "roleProvenance": null,
+     "messageComposerContext": null,
+     "payloadGenerated": false,
+     "correlationId": "72fa5d8a-0b49-407c-ba73-293eab73b760",
+     "snapshotHash": "fd6a4c064fe81f42aab1d3e30c293f45fd3908fa6bf2c92fbbf3381fcad378a6",
+     "snapshotIdentityMethod": "SQLITE_WAL_AWARE_LOGICAL_SNAPSHOT_V1",
+     "resolutionTrace": {
+      "counterpartySsiQueried": false
+     }
+    },
+    "mt": {
+     "redirectDomain": null,
+     "validation": "FAIL",
+     "code": "OPTION_CONSTRAINT_VIOLATION",
+     "reasonCode": "OWN_ACCOUNT_CURRENCY_MISMATCH",
+     "payloadGenerated": false
+    }
+   }
+  },
+  {
+   "name": "C4_BOOK_receiver_mismatch",
+   "status": 422,
+   "error": null,
+   "request": {
+    "consumer": "TRADE_FINANCE",
+    "product": "IMPORT_LC",
+    "businessFunction": "IMPORT_LC_BANK_REIMBURSEMENT",
+    "paymentLeg": "BANK_REIMBURSEMENT",
+    "direction": "OUTBOUND",
+    "currency": "USD",
+    "bookingEntity": "HK01",
+    "valueDate": "2026-09-12",
+    "amount": "1000000",
+    "messageType": "pacs.009.001.08",
+    "sourceMessageType": "MT202",
+    "correlationId": "6cd170ef-3904-48ce-a48f-ce43a5d1d04f",
+    "transactionReference": "C4_BOOK_receiver_mismatch",
+    "scenarioCode": "BOOK_TRANSFER_SAME_RECEIVER",
+    "receiverBankServiceId": "BANK-SVC-CITIUS33",
+    "ownDebitAccountId": "fe5d672f-311e-4eb9-88bf-f8538d45793c",
+    "ownDebitAccountVersion": 4,
+    "ownCreditAccountId": "d4ee3d85-7ad4-4767-9046-33a050705a78",
+    "ownCreditAccountVersion": 4
+   },
+   "response": {
+    "mx": {
+     "httpStatus": 422,
+     "redirectDomain": null,
+     "decision": "REJECTED",
+     "code": "OPTION_CONSTRAINT_VIOLATION",
+     "reasonCode": "OWN_ACCOUNT_RECEIVER_MISMATCH",
+     "resolutionDomain": "OWN_SSI_NOSTRO",
+     "counterpartySsiResolution": "SKIPPED",
+     "chosenRoute": null,
+     "candidates": [],
+     "canonicalRoute": null,
+     "roleProvenance": null,
+     "messageComposerContext": null,
+     "payloadGenerated": false,
+     "correlationId": "6cd170ef-3904-48ce-a48f-ce43a5d1d04f",
+     "snapshotHash": "fd6a4c064fe81f42aab1d3e30c293f45fd3908fa6bf2c92fbbf3381fcad378a6",
+     "snapshotIdentityMethod": "SQLITE_WAL_AWARE_LOGICAL_SNAPSHOT_V1",
+     "resolutionTrace": {
+      "counterpartySsiQueried": false
+     }
+    },
+    "mt": {
+     "redirectDomain": null,
+     "validation": "FAIL",
+     "code": "OPTION_CONSTRAINT_VIOLATION",
+     "reasonCode": "OWN_ACCOUNT_RECEIVER_MISMATCH",
+     "payloadGenerated": false
+    }
+   }
+  },
+  {
+   "name": "C5_SCN_57A",
+   "status": 422,
+   "error": null,
+   "request": {
+    "consumer": "TRADE_FINANCE",
+    "product": "IMPORT_LC",
+    "businessFunction": "IMPORT_LC_BANK_REIMBURSEMENT",
+    "paymentLeg": "BANK_REIMBURSEMENT",
+    "direction": "OUTBOUND",
+    "currency": "USD",
+    "bookingEntity": "HK01",
+    "valueDate": "2026-09-12",
+    "amount": "1000000",
+    "messageType": "pacs.009.001.08",
+    "sourceMessageType": "MT202",
+    "correlationId": "d92f6837-5f15-44c7-bbd3-740e58c85935",
+    "transactionReference": "C5",
+    "scenarioCode": "CREDIT_ONE_OF_SEVERAL_AT_57A",
+    "receiverBankServiceId": "BANK-SVC-CITIUS33",
+    "ownCreditAccountId": "d28b0fc3-a0d8-4e16-a5e4-64325760b331",
+    "ownCreditAccountVersion": 4
+   },
+   "response": {
+    "mx": {
+     "httpStatus": 422,
+     "redirectDomain": null,
+     "decision": "REJECTED",
+     "code": "OPTION_CONSTRAINT_VIOLATION",
+     "reasonCode": "OWN_ACCOUNT_PIN_REQUIRED",
+     "resolutionDomain": "OWN_SSI_NOSTRO",
+     "counterpartySsiResolution": "SKIPPED",
+     "chosenRoute": null,
+     "candidates": [],
+     "canonicalRoute": null,
+     "roleProvenance": null,
+     "messageComposerContext": null,
+     "payloadGenerated": false,
+     "correlationId": "d92f6837-5f15-44c7-bbd3-740e58c85935",
+     "snapshotHash": "fd6a4c064fe81f42aab1d3e30c293f45fd3908fa6bf2c92fbbf3381fcad378a6",
+     "snapshotIdentityMethod": "SQLITE_WAL_AWARE_LOGICAL_SNAPSHOT_V1",
+     "resolutionTrace": {
+      "counterpartySsiQueried": false
+     }
+    },
+    "mt": {
+     "redirectDomain": null,
+     "validation": "FAIL",
+     "code": "OPTION_CONSTRAINT_VIOLATION",
+     "reasonCode": "OWN_ACCOUNT_PIN_REQUIRED",
+     "payloadGenerated": false
+    }
+   }
+  }
+ ]
+}

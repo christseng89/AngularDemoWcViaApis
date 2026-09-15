@@ -1,0 +1,159 @@
+{
+  "standardsRelease": "SR2026",
+  "maxBatchItems": 100,
+  "items": [
+    {
+      "order": 1,
+      "messageType": "MT200",
+      "description": "Financial Institution Transfer for its Own Account",
+      "processingMode": "SINGLE",
+      "profileStatus": "OWN_SSI_NOSTRO_DOMAIN",
+      "targetMessage": "pacs.009.001.08",
+      "businessService": "swift.cbprplus.04",
+      "selectable": false,
+      "mtCompatibility": {
+        "status": "NOT_SUPPORTED",
+        "ssiFields": ["53B", "56a", "57a"],
+        "mandatorySsiFields": ["57a"],
+        "requiredUpstreamFields": ["OWN_SSI_PROFILE"],
+        "mrgPages": [13, 14, 15, 18, 20]
+      }
+    },
+    {
+      "order": 2,
+      "messageType": "MT201",
+      "description": "Multiple Financial Institution Transfer for its Own Account",
+      "processingMode": "SPLIT",
+      "profileStatus": "FIN_FI_TO_FI_MESSAGE_TYPE_NOT_SUPPORTED",
+      "targetMessage": "pacs.009.001.08",
+      "businessService": "swift.cbprplus.04",
+      "selectable": false,
+      "mtCompatibility": {
+        "status": "NOT_SUPPORTED",
+        "ssiFields": ["53B", "56a", "57a"],
+        "mandatorySsiFields": ["57a"],
+        "requiredUpstreamFields": ["FIN_FI_TO_FI_NOT_AVAILABLE"],
+        "mrgPages": [25, 26, 30, 32, 34]
+      }
+    },
+    {
+      "order": 3,
+      "messageType": "MT202",
+      "description": "General Financial Institution Transfer",
+      "processingMode": "SINGLE",
+      "profileStatus": "PROFILE_VERIFIED",
+      "targetMessage": "pacs.009.001.08",
+      "businessService": "swift.cbprplus.04",
+      "selectable": true,
+      "mtCompatibility": {
+        "status": "SUPPORTED_SINGLE",
+        "ssiFields": ["53a", "54a", "56a", "57a"],
+        "mandatorySsiFields": [],
+        "requiredUpstreamFields": ["58a"],
+        "mrgPages": [39, 40, 46, 49, 52, 55]
+      }
+    },
+    {
+      "order": 4,
+      "messageType": "MT202COV",
+      "description": "General Financial Institution Transfer — Cover",
+      "processingMode": "SINGLE",
+      "profileStatus": "PROFILE_VERIFIED",
+      "targetMessage": "pacs.009.001.08",
+      "businessService": "swift.cbprplus.cov.04",
+      "selectable": true,
+      "mtCompatibility": {
+        "status": "SUPPORTED_SINGLE",
+        "ssiFields": ["A.53a", "A.54a", "A.56a", "A.57a"],
+        "mandatorySsiFields": [],
+        "requiredUpstreamFields": ["A.58a", "B.50a", "B.59a"],
+        "mrgPages": [59, 60, 61]
+      }
+    },
+    {
+      "order": 5,
+      "messageType": "MT203",
+      "description": "Multiple General Financial Institution Transfer",
+      "processingMode": "SPLIT",
+      "profileStatus": "FIN_FI_TO_FI_MESSAGE_TYPE_NOT_SUPPORTED",
+      "targetMessage": "pacs.009.001.08",
+      "businessService": "swift.cbprplus.04",
+      "selectable": false,
+      "mtCompatibility": {
+        "status": "NOT_SUPPORTED",
+        "ssiFields": ["53a", "54a", "56a", "57a"],
+        "mandatorySsiFields": [],
+        "requiredUpstreamFields": ["58a", "FIN_FI_TO_FI_NOT_AVAILABLE"],
+        "mrgPages": [94, 95, 102, 105, 108, 111]
+      }
+    },
+    {
+      "order": 6,
+      "messageType": "MT204",
+      "description": "Financial Markets Direct Debit",
+      "processingMode": "SINGLE",
+      "profileStatus": "SEPARATE_DIRECT_DEBIT_PROFILE",
+      "targetMessage": "pacs.010.001.03",
+      "businessService": "swift.cbprplus.04",
+      "selectable": false,
+      "mtCompatibility": {
+        "status": "NOT_SUPPORTED",
+        "ssiFields": ["A.57a", "A.58a", "B.53a"],
+        "mandatorySsiFields": ["B.53a"],
+        "requiredUpstreamFields": ["DIRECT_DEBIT_MUG_PROFILE"],
+        "mrgPages": [116, 117]
+      }
+    },
+    {
+      "order": 7,
+      "messageType": "MT205",
+      "description": "Financial Institution Transfer Execution",
+      "processingMode": "SINGLE",
+      "profileStatus": "PROFILE_VERIFIED_WITH_REQUIRED_INPUT",
+      "targetMessage": "pacs.009.001.08",
+      "businessService": "swift.cbprplus.04",
+      "selectable": true,
+      "mtCompatibility": {
+        "status": "SUPPORTED_SINGLE",
+        "ssiFields": ["53a", "56a", "57a"],
+        "mandatorySsiFields": [],
+        "requiredUpstreamFields": ["52a", "58a"],
+        "mrgPages": [134, 135]
+      }
+    },
+    {
+      "order": 8,
+      "messageType": "MT205COV",
+      "description": "Financial Institution Transfer Execution — Cover",
+      "processingMode": "SINGLE",
+      "profileStatus": "PROFILE_VERIFIED_WITH_REQUIRED_INPUT",
+      "targetMessage": "pacs.009.001.08",
+      "businessService": "swift.cbprplus.cov.04",
+      "selectable": true,
+      "mtCompatibility": {
+        "status": "SUPPORTED_SINGLE",
+        "ssiFields": ["A.53a", "A.56a", "A.57a"],
+        "mandatorySsiFields": [],
+        "requiredUpstreamFields": ["A.52a", "A.58a", "B.50a", "B.59a"],
+        "mrgPages": [153, 154, 155]
+      }
+    },
+    {
+      "order": 9,
+      "messageType": "MT210",
+      "description": "Notice to Receive",
+      "processingMode": "NOTIFICATION",
+      "profileStatus": "NOT_AN_SSI_RESOLUTION_INSTRUCTION",
+      "targetMessage": "camt.057.001.06",
+      "businessService": "swift.cbprplus.04",
+      "selectable": false,
+      "mtCompatibility": {
+        "status": "NOT_SUPPORTED",
+        "ssiFields": ["50a", "52a", "56a"],
+        "mandatorySsiFields": [],
+        "requiredUpstreamFields": ["NOTICE_TO_RECEIVE_CONTEXT"],
+        "mrgPages": [189, 190]
+      }
+    }
+  ]
+}

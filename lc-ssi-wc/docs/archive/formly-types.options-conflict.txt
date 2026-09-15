@@ -1,0 +1,17 @@
+import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ReactiveFormsModule } from '@angular/forms';
+import { FieldType, FormlyAttributes, type FieldTypeConfig } from '@ngx-formly/core';
+
+@Component({
+  selector: 'ssi-native-input', standalone: true, imports: [ReactiveFormsModule, FormlyAttributes], changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `<label class="field"><span>{{ props.label }} @if (props.required) {<b>*</b>}</span><input [type]="props.type ?? 'text'" [formControl]="formControl" [formlyAttributes]="field" [placeholder]="props.placeholder ?? ''" />@if (showError) {<small>欄位內容不符合規則</small>}</label>`,
+})
+export class NativeInputType extends FieldType<FieldTypeConfig> {}
+
+@Component({
+  selector: 'ssi-native-select', standalone: true, imports: [ReactiveFormsModule, FormlyAttributes], changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `<label class="field"><span>{{ props.label }} @if (props.required) {<b>*</b>}</span><select [formControl]="formControl" [formlyAttributes]="field">@for (option of options; track option.value) {<option [value]="option.value">{{ option.label }}</option>}</select></label>`,
+})
+export class NativeSelectType extends FieldType<FieldTypeConfig> {
+  get options(): Array<{ label: string; value: unknown }> { return Array.isArray(this.props.options) ? this.props.options as Array<{label:string;value:unknown}> : []; }
+}

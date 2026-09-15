@@ -1,0 +1,38 @@
+<div
+  class="result-modal-backdrop"
+  role="presentation"
+  (click)="close()"
+  (keydown.escape)="close()"
+>
+  <dialog
+    #dialog
+    class="result-dialog"
+    open
+    aria-modal="true"
+    aria-labelledby="result-dialog-title"
+    (click)="$event.stopPropagation()"
+    (keydown.escape)="close()"
+  >
+    <header class="result-dialog__header">
+      <div>
+        <span class="eyebrow">SSI RESOLUTION</span>
+        <h2 id="result-dialog-title">Resolution result</h2>
+      </div>
+      <button
+        #closeButton
+        type="button"
+        class="result-dialog__close"
+        aria-label="Close resolution result"
+        (click)="close()"
+      >
+        ×
+      </button>
+    </header>
+
+    <ssi-resolution-evidence [result]="result()" [page]="page()" />
+
+    <footer class="result-dialog__footer">
+      <button type="button" (click)="close()">Close</button>
+    </footer>
+  </dialog>
+</div>

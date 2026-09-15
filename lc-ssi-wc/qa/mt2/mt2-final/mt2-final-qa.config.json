@@ -1,0 +1,142 @@
+{
+  "schemaVersion": 1,
+  "expectedCaseCount": 139,
+  "workbook": "fixtures/MT2XX_測試案例_SSI與NOSTRO_v6.2_FINAL.xlsx",
+  "workbookSha256": "DF3328998BA24B904B1E8944F1680699F75A916A77716BB0AD831D4A4CAA2BED",
+  "expectedRuntime": {
+    "fixtureId": "SSI-DEMO-V15.3-MT2-UI-PARITY-V1",
+    "seedSha256": "2F0C01577FD9E25788245052E5BD13F7C1E9C36EE7FA3D5B2910BD73772844B4",
+    "snapshotSha256": "ED93BAFB5FB86C9320EBEF004D716EBBBA2B5B15FC0764E9999564FD0733762A",
+    "snapshotMethod": "SQLITE_WAL_AWARE_LOGICAL_SNAPSHOT_V1"
+  },
+  "baselineArtifacts": [
+    {
+      "file": "../../../fixtures/ssi-demo.v15.3.canonical.seed.json",
+      "sha256": "2F0C01577FD9E25788245052E5BD13F7C1E9C36EE7FA3D5B2910BD73772844B4",
+      "role": "CANONICAL_POSITIVE_SEED"
+    },
+    {
+      "file": "fixtures/baselines/swift-data-service.v1.current.json",
+      "sha256": "C4855F1B917DA7588A526B704BC004CA1CB9E9E1006BF30783912E61F4AF5FD0",
+      "role": "CURRENT_OAS"
+    },
+    {
+      "file": "fixtures/baselines/ssi-demo.consistent-snapshot.sqlite",
+      "sha256": "7492CC264BCDBC7EE43DC7028CDCDC12385898BFD4BDCCA02798D2B5A3AB4EF3",
+      "role": "SQLITE_CONSISTENT_SNAPSHOT"
+    },
+    {
+      "file": "fixtures/baselines/nostro-active.current.json",
+      "sha256": "2A4B100379C791104C2CEFCD442D43F85C6B3B5308D77542BE700235A111863D",
+      "role": "OWN_NOSTRO"
+    },
+    {
+      "file": "fixtures/baselines/ssi-bank-counterparty-active.current.json",
+      "sha256": "F6859FF4F4D27F59217B019D00E443FC49BA457D2DB05A7A4FFB1B1AA77C3835",
+      "role": "BANK_COUNTERPARTY_SSI"
+    },
+    {
+      "file": "fixtures/baselines/ssi-customer-active-negative.current.json",
+      "sha256": "51434DFD94469136F06C5B8C3099EEE7D30838903D1DF93A60A09020951ABD6A",
+      "role": "CUSTOMER_SSI_NEGATIVE"
+    },
+    {
+      "file": "fixtures/baselines/rma-active-outbound.current.json",
+      "sha256": "7EFA38BE3FDBFA991D8DBAB7907000F136A66584BBE68F58E899FD0DC0202B75",
+      "role": "RMA_OUTBOUND"
+    },
+    {
+      "file": "fixtures/baselines/payment-message-scenario-index.v6.proposed.json",
+      "sha256": "5EC3B6E926C4E8DF74073680F73B2106B11A750CFFF8E05202259FAB2B12EDEB",
+      "role": "MESSAGE_SCENARIO_INDEX"
+    },
+    {
+      "file": "fixtures/baselines/proposed-qa-seed-data.json",
+      "sha256": "97118C5EA43BDEBB7790F00E359BE16C8811B66244207F44444D0D27E9506ABE",
+      "role": "QA_SEED_DATA"
+    },
+    {
+      "file": "fixtures/baselines/bank-service.current.json",
+      "sha256": "9270C2D26F7CDE62E2D297F1BF428D1B8245414A9F6BFD97696303E66F886DCB",
+      "role": "BANK_SERVICE"
+    }
+  ],
+  "resultFile": "evidence/executable-case-results.json",
+  "evidenceDirectory": "evidence/final",
+  "failFast": false,
+  "thresholds": { "coverage": 95, "duplication": 1 },
+  "coverageProjects": [
+    "apps/ssi-service",
+    "apps/ssi-portal",
+    "apps/ssi-bff",
+    "apps/mock-reference-services",
+    "apps/ssi-web-components",
+    "libs/domain",
+    "libs/parameter-engine",
+    "libs/swift-ssi-mapping"
+  ],
+  "metrics": {
+    "coverageFile": "qa/mt2/mt2-final/evidence/aggregate-coverage.json",
+    "coverageProperty": "total.lines.pct",
+    "sonarFile": "qa/mt2/mt2-final/evidence/sonar-measures.json",
+    "duplicationProperty": "duplicatedLinesDensity"
+  },
+  "gates": [
+    {
+      "id": "EXECUTE_139_CASES",
+      "command": ["node", "scripts/mt2-final-qa/execute-cases.mjs"]
+    },
+    {
+      "id": "LINT",
+      "command": ["node", "node_modules/eslint/bin/eslint.js", "apps", "libs"]
+    },
+    {
+      "id": "TYPECHECK",
+      "command": [
+        "node",
+        "node_modules/nx/dist/bin/nx.js",
+        "run-many",
+        "-t",
+        "typecheck"
+      ]
+    },
+    {
+      "id": "UNIT_INTEGRATION",
+      "command": [
+        "node",
+        "node_modules/nx/dist/bin/nx.js",
+        "run-many",
+        "-t",
+        "test",
+        "--configuration=ci",
+        "--coverage"
+      ]
+    },
+    {
+      "id": "AGGREGATE_COVERAGE",
+      "command": ["node", "scripts/mt2-final-qa/aggregate-coverage.mjs"]
+    },
+    {
+      "id": "BUILD",
+      "command": [
+        "node",
+        "node_modules/nx/dist/bin/nx.js",
+        "run-many",
+        "-t",
+        "build"
+      ]
+    },
+    {
+      "id": "API",
+      "command": ["node", "scripts/mt2-final-qa/verify-mt2-oas.mjs"]
+    },
+    {
+      "id": "MT2_UI",
+      "command": ["node", "scripts/e2e-mt2-final-ui.mjs"]
+    },
+    {
+      "id": "SONAR_CURRENT_ANALYSIS",
+      "command": ["node", "scripts/mt2-final-qa/sonar-current-analysis.mjs"]
+    }
+  ]
+}

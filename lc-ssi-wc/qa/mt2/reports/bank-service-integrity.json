@@ -1,0 +1,36 @@
+{
+  "status": "PASS",
+  "asOf": "2026-09-10",
+  "counts": {
+    "catalogue": 28,
+    "activeBankServices": 27,
+    "activeSsiRecords": 37,
+    "referencedBics": 22,
+    "qaNegativeFixtures": 2
+  },
+  "referencedBics": [
+    "ANZBAU3M",
+    "BARCGB22",
+    "BKCHCNBJ",
+    "BNPAFRPP",
+    "BOFAUS3N",
+    "BOFMCAM2",
+    "BOTKJPJT",
+    "CHASUS33",
+    "CITIUS33",
+    "CRESCHZZ80A",
+    "CTBAAU2S",
+    "DBSSSGSG",
+    "DEMOHKHH",
+    "DEUTDEFF",
+    "HSBCHKHH",
+    "NSSIUSN1",
+    "OCBCSGSG",
+    "ROYCCAT2",
+    "SCBLGB2L",
+    "SCBLHKHH",
+    "SMBCJPJT",
+    "UBSWCHZH80A"
+  ],
+  "failures": []
+}

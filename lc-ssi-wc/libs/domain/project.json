@@ -1,0 +1,7 @@
+{
+  "name": "domain", "$schema": "../../node_modules/nx/schemas/project-schema.json", "sourceRoot": "libs/domain/src", "projectType": "library",
+  "targets": {
+    "typecheck": { "executor": "nx:run-commands", "options": { "command": "tsc -p libs/domain/tsconfig.lib.json --noEmit" } },
+    "test": { "executor": "@nx/jest:jest", "outputs": ["{workspaceRoot}/coverage/libs/domain"], "options": { "jestConfig": "libs/domain/jest.config.ts" }, "configurations": { "ci": { "ci": true, "coverage": true, "coverageReporters": ["json-summary", "lcov", "text-summary"] } } }
+  }, "tags": ["type:domain", "scope:shared"]
+}

@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "status": "PLANNED_NOT_EXECUTED",
+  "scope": "MT202/MT202COV/MT205/MT205COV and pacs.009 plain/COV/ADV routing guard",
+  "controlledMemory": "memory/swift-mt2xx-pacs009-v2.md",
+  "commands": [
+    "npm run qa:mt2:final",
+    "npm run qa:mt2:ui",
+    "npm run qa:mt2:v153:data-quality"
+  ],
+  "oracles": [
+    "Profile is selected by governed scenario and BAH BizSvc, never MsgDefIdr or MT code alone",
+    "MT option, omission, source MT type, Sequence A/B, account identity and UETR remain semantically stable",
+    "Selected operational account uses accountReference and never maskedAccountRef fallback",
+    "DEVELOPMENT/DEMO data-quality failure is HTTP 409; non-development is HTTP 500; neither generates payload, confirmed resolution or Repair Queue",
+    "ADV is a non-settlement routing guard and must not create a settlement posting"
+  ],
+  "acceptanceRule": "Every command must have a current machine-readable report and every oracle must be asserted; this manifest alone is not execution evidence."
+}

@@ -1,0 +1,44 @@
+{
+  "name": "ssi-web-components",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/ssi-web-components/src",
+  "projectType": "application",
+  "targets": {
+    "build": {
+      "executor": "@angular-devkit/build-angular:application",
+      "options": {
+        "outputPath": "dist/apps/ssi-web-components",
+        "index": "apps/ssi-web-components/src/index.html",
+        "browser": "apps/ssi-web-components/src/main.ts",
+        "tsConfig": "apps/ssi-web-components/tsconfig.app.json",
+        "styles": []
+      }
+    },
+    "serve": {
+      "executor": "@angular-devkit/build-angular:dev-server",
+      "continuous": true,
+      "options": { "buildTarget": "ssi-web-components:build", "port": 4401 }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc -p apps/ssi-web-components/tsconfig.app.json --noEmit"
+      }
+    },
+    "test": {
+      "executor": "@nx/jest:jest",
+      "outputs": ["{workspaceRoot}/coverage/apps/ssi-web-components"],
+      "options": {
+        "jestConfig": "apps/ssi-web-components/jest.config.ts"
+      },
+      "configurations": {
+        "ci": {
+          "ci": true,
+          "codeCoverage": true,
+          "coverageReporters": ["json-summary", "lcov", "text-summary"]
+        }
+      }
+    }
+  },
+  "tags": ["type:app", "scope:wc"]
+}

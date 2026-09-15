@@ -1,0 +1,3057 @@
+{
+  "schemaVersion": "1.0",
+  "kind": "GENERIC_SSI_BROWSER_UAT_MATRIX",
+  "startedAt": "2026-09-15T18:03:08.964Z",
+  "portalUrl": "http://localhost:4400/",
+  "browserPath": "C:/Program Files/Google/Chrome/Application/chrome.exe",
+  "configuredCurrencies": null,
+  "shard": {
+    "index": 0,
+    "total": 1
+  },
+  "oracleAuthority": {
+    "tddMrgSemantics": {
+      "path": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "purpose": "TAG_OPTION_ROLE_BIC"
+    },
+    "negativeTddMrgSemantics": {
+      "path": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "purpose": "EXPECTED_HTTP_FAIL_CLOSED_AND_NO_PAYLOAD"
+    },
+    "syntheticIdentity": {
+      "path": "qa/mt347/fixtures/mt347-executable-counterparties.v4.json",
+      "sha256": "9E2CF4035DB1185B7F8F685717883483731C2C21986FDF2513A69C220BFC3C63",
+      "purpose": "SELECTED_SSI_AND_APPLICABILITY_IDENTITY",
+      "rationale": "The canonical reload manifest governs v4 identities; the prior v2 artifact contains UUIDs derived from the superseded v3 variant namespace."
+    }
+  },
+  "results": [
+    {
+      "businessDomain": "TRADE_FINANCE",
+      "messageType": "MT400",
+      "scenarioId": "MT400-004",
+      "scenarioLabel": "MESSAGE - Message / option B provenance boundary",
+      "scenarioCount": 7,
+      "polarity": "NEGATIVE",
+      "audience": "QA_TEST_ONLY",
+      "sequence": "MESSAGE",
+      "definitionId": "PAGE-MT347:MT400:COLLECTION-PAYMENT-DIRECT:MESSAGE:MESSAGE",
+      "definitionVersion": "MT347-SR2026-RESOLUTION-PAGE-SCENARIOS",
+      "contractSha256": "af289172495d3e10c73a1d1cb14a4d82e409bfbe8ed6f913f7b0da7aab5d93da",
+      "query": {
+        "standardsRelease": "SR2026",
+        "messageFamily": "MT347",
+        "messageType": "MT400",
+        "direction": "OUTGOING",
+        "businessDomain": "TRADE_FINANCE",
+        "businessScenarioId": "MT400-001"
+      },
+      "startedAt": "2026-09-15T18:03:11.986Z",
+      "checks": [
+        {
+          "currency": "EUR",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT400",
+              "scenarioId": "MT400-004",
+              "sequence": "MESSAGE",
+              "currency": "EUR",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT400",
+              "scenarioId": "MT400-004",
+              "sequence": "MESSAGE",
+              "currency": "EUR",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT400",
+              "scenarioId": "MT400-004",
+              "sequence": "MESSAGE",
+              "currency": "EUR",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "GBP",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT400",
+              "scenarioId": "MT400-004",
+              "sequence": "MESSAGE",
+              "currency": "GBP",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT400",
+              "scenarioId": "MT400-004",
+              "sequence": "MESSAGE",
+              "currency": "GBP",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT400",
+              "scenarioId": "MT400-004",
+              "sequence": "MESSAGE",
+              "currency": "GBP",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "HKD",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT400",
+              "scenarioId": "MT400-004",
+              "sequence": "MESSAGE",
+              "currency": "HKD",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT400",
+              "scenarioId": "MT400-004",
+              "sequence": "MESSAGE",
+              "currency": "HKD",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT400",
+              "scenarioId": "MT400-004",
+              "sequence": "MESSAGE",
+              "currency": "HKD",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "JPY",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT400",
+              "scenarioId": "MT400-004",
+              "sequence": "MESSAGE",
+              "currency": "JPY",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT400",
+              "scenarioId": "MT400-004",
+              "sequence": "MESSAGE",
+              "currency": "JPY",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT400",
+              "scenarioId": "MT400-004",
+              "sequence": "MESSAGE",
+              "currency": "JPY",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "USD",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT400",
+              "scenarioId": "MT400-004",
+              "sequence": "MESSAGE",
+              "currency": "USD",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT400",
+              "scenarioId": "MT400-004",
+              "sequence": "MESSAGE",
+              "currency": "USD",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT400",
+              "scenarioId": "MT400-004",
+              "sequence": "MESSAGE",
+              "currency": "USD",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        }
+      ],
+      "passed": false,
+      "error": "15 counterparty executions failed",
+      "pageContract": {
+        "contractSha256": "af289172495d3e10c73a1d1cb14a4d82e409bfbe8ed6f913f7b0da7aab5d93da",
+        "polarity": "NEGATIVE",
+        "visibleFieldIds": [
+          "context.transactionReference",
+          "context.currency",
+          "context.bookingEntity",
+          "context.valueDate",
+          "context.counterpartyBankServiceId"
+        ],
+        "requiredFieldIds": [
+          "context.transactionReference",
+          "context.currency",
+          "context.bookingEntity",
+          "context.valueDate",
+          "context.counterpartyBankServiceId"
+        ]
+      },
+      "finishedAt": "2026-09-15T18:03:17.175Z"
+    },
+    {
+      "businessDomain": "TRADE_FINANCE",
+      "messageType": "MT730",
+      "scenarioId": "MT730-004",
+      "scenarioLabel": "MESSAGE - Message / option D provenance boundary",
+      "scenarioCount": 7,
+      "polarity": "NEGATIVE",
+      "audience": "QA_TEST_ONLY",
+      "sequence": "MESSAGE",
+      "definitionId": "PAGE-MT347:MT730:CHARGES-SETTLEMENT:MESSAGE:MESSAGE",
+      "definitionVersion": "MT347-SR2026-RESOLUTION-PAGE-SCENARIOS",
+      "contractSha256": "5e480ba480488e70e16b222a68ec7d0c436d726a7ca920a5babe7c2f8033f8e6",
+      "query": {
+        "standardsRelease": "SR2026",
+        "messageFamily": "MT347",
+        "messageType": "MT730",
+        "direction": "OUTGOING",
+        "businessDomain": "TRADE_FINANCE",
+        "businessScenarioId": "MT730-001"
+      },
+      "startedAt": "2026-09-15T18:03:17.250Z",
+      "checks": [
+        {
+          "currency": "EUR",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT730",
+              "scenarioId": "MT730-004",
+              "sequence": "MESSAGE",
+              "currency": "EUR",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"D\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT730",
+              "scenarioId": "MT730-004",
+              "sequence": "MESSAGE",
+              "currency": "EUR",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"D\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT730",
+              "scenarioId": "MT730-004",
+              "sequence": "MESSAGE",
+              "currency": "EUR",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"D\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "GBP",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT730",
+              "scenarioId": "MT730-004",
+              "sequence": "MESSAGE",
+              "currency": "GBP",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"D\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT730",
+              "scenarioId": "MT730-004",
+              "sequence": "MESSAGE",
+              "currency": "GBP",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"D\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT730",
+              "scenarioId": "MT730-004",
+              "sequence": "MESSAGE",
+              "currency": "GBP",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"D\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "HKD",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT730",
+              "scenarioId": "MT730-004",
+              "sequence": "MESSAGE",
+              "currency": "HKD",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"D\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT730",
+              "scenarioId": "MT730-004",
+              "sequence": "MESSAGE",
+              "currency": "HKD",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"D\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT730",
+              "scenarioId": "MT730-004",
+              "sequence": "MESSAGE",
+              "currency": "HKD",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"D\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "JPY",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT730",
+              "scenarioId": "MT730-004",
+              "sequence": "MESSAGE",
+              "currency": "JPY",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"D\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT730",
+              "scenarioId": "MT730-004",
+              "sequence": "MESSAGE",
+              "currency": "JPY",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"D\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT730",
+              "scenarioId": "MT730-004",
+              "sequence": "MESSAGE",
+              "currency": "JPY",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"D\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "USD",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT730",
+              "scenarioId": "MT730-004",
+              "sequence": "MESSAGE",
+              "currency": "USD",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"D\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT730",
+              "scenarioId": "MT730-004",
+              "sequence": "MESSAGE",
+              "currency": "USD",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"D\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT730",
+              "scenarioId": "MT730-004",
+              "sequence": "MESSAGE",
+              "currency": "USD",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"D\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        }
+      ],
+      "passed": false,
+      "error": "15 counterparty executions failed",
+      "pageContract": {
+        "contractSha256": "5e480ba480488e70e16b222a68ec7d0c436d726a7ca920a5babe7c2f8033f8e6",
+        "polarity": "NEGATIVE",
+        "visibleFieldIds": [
+          "context.transactionReference",
+          "context.currency",
+          "context.bookingEntity",
+          "context.valueDate",
+          "context.counterpartyBankServiceId"
+        ],
+        "requiredFieldIds": [
+          "context.transactionReference",
+          "context.currency",
+          "context.bookingEntity",
+          "context.valueDate",
+          "context.counterpartyBankServiceId"
+        ]
+      },
+      "finishedAt": "2026-09-15T18:03:21.733Z"
+    },
+    {
+      "businessDomain": "TRADE_FINANCE",
+      "messageType": "MT734",
+      "scenarioId": "MT734-004",
+      "scenarioLabel": "MESSAGE - Message / option B provenance boundary",
+      "scenarioCount": 5,
+      "polarity": "NEGATIVE",
+      "audience": "QA_TEST_ONLY",
+      "sequence": "MESSAGE",
+      "definitionId": "PAGE-MT347:MT734:REFUND-CLAIM-SETTLEMENT:MESSAGE:MESSAGE",
+      "definitionVersion": "MT347-SR2026-RESOLUTION-PAGE-SCENARIOS",
+      "contractSha256": "46f68a06f7e73a383b509b2e283c48e78c5120253c806949ea5d1fdf314cf632",
+      "query": {
+        "standardsRelease": "SR2026",
+        "messageFamily": "MT347",
+        "messageType": "MT734",
+        "direction": "OUTGOING",
+        "businessDomain": "TRADE_FINANCE",
+        "businessScenarioId": "MT734-001"
+      },
+      "startedAt": "2026-09-15T18:03:21.799Z",
+      "checks": [
+        {
+          "currency": "EUR",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT734",
+              "scenarioId": "MT734-004",
+              "sequence": "MESSAGE",
+              "currency": "EUR",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT734",
+              "scenarioId": "MT734-004",
+              "sequence": "MESSAGE",
+              "currency": "EUR",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT734",
+              "scenarioId": "MT734-004",
+              "sequence": "MESSAGE",
+              "currency": "EUR",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "GBP",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT734",
+              "scenarioId": "MT734-004",
+              "sequence": "MESSAGE",
+              "currency": "GBP",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT734",
+              "scenarioId": "MT734-004",
+              "sequence": "MESSAGE",
+              "currency": "GBP",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT734",
+              "scenarioId": "MT734-004",
+              "sequence": "MESSAGE",
+              "currency": "GBP",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "HKD",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT734",
+              "scenarioId": "MT734-004",
+              "sequence": "MESSAGE",
+              "currency": "HKD",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT734",
+              "scenarioId": "MT734-004",
+              "sequence": "MESSAGE",
+              "currency": "HKD",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT734",
+              "scenarioId": "MT734-004",
+              "sequence": "MESSAGE",
+              "currency": "HKD",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "JPY",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT734",
+              "scenarioId": "MT734-004",
+              "sequence": "MESSAGE",
+              "currency": "JPY",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT734",
+              "scenarioId": "MT734-004",
+              "sequence": "MESSAGE",
+              "currency": "JPY",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT734",
+              "scenarioId": "MT734-004",
+              "sequence": "MESSAGE",
+              "currency": "JPY",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "USD",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT734",
+              "scenarioId": "MT734-004",
+              "sequence": "MESSAGE",
+              "currency": "USD",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT734",
+              "scenarioId": "MT734-004",
+              "sequence": "MESSAGE",
+              "currency": "USD",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT734",
+              "scenarioId": "MT734-004",
+              "sequence": "MESSAGE",
+              "currency": "USD",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        }
+      ],
+      "passed": false,
+      "error": "15 counterparty executions failed",
+      "pageContract": {
+        "contractSha256": "46f68a06f7e73a383b509b2e283c48e78c5120253c806949ea5d1fdf314cf632",
+        "polarity": "NEGATIVE",
+        "visibleFieldIds": [
+          "context.transactionReference",
+          "context.currency",
+          "context.bookingEntity",
+          "context.valueDate",
+          "context.counterpartyBankServiceId"
+        ],
+        "requiredFieldIds": [
+          "context.transactionReference",
+          "context.currency",
+          "context.bookingEntity",
+          "context.valueDate",
+          "context.counterpartyBankServiceId"
+        ]
+      },
+      "finishedAt": "2026-09-15T18:03:25.928Z"
+    },
+    {
+      "businessDomain": "TRADE_FINANCE",
+      "messageType": "MT742",
+      "scenarioId": "MT742-004",
+      "scenarioLabel": "MESSAGE - Message / option B provenance boundary",
+      "scenarioCount": 13,
+      "polarity": "NEGATIVE",
+      "audience": "QA_TEST_ONLY",
+      "sequence": "MESSAGE",
+      "definitionId": "PAGE-MT347:MT742:REIMBURSEMENT-CLAIM:MESSAGE:MESSAGE",
+      "definitionVersion": "MT347-SR2026-RESOLUTION-PAGE-SCENARIOS",
+      "contractSha256": "ad123fda735c8564e5e6337f5c7913affe8634c285e4c0328502b663d835ec74",
+      "query": {
+        "standardsRelease": "SR2026",
+        "messageFamily": "MT347",
+        "messageType": "MT742",
+        "direction": "OUTGOING",
+        "businessDomain": "TRADE_FINANCE",
+        "businessScenarioId": "MT742-001"
+      },
+      "startedAt": "2026-09-15T18:03:26.023Z",
+      "checks": [
+        {
+          "currency": "EUR",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT742",
+              "scenarioId": "MT742-004",
+              "sequence": "MESSAGE",
+              "currency": "EUR",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT742",
+              "scenarioId": "MT742-004",
+              "sequence": "MESSAGE",
+              "currency": "EUR",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT742",
+              "scenarioId": "MT742-004",
+              "sequence": "MESSAGE",
+              "currency": "EUR",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "GBP",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT742",
+              "scenarioId": "MT742-004",
+              "sequence": "MESSAGE",
+              "currency": "GBP",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT742",
+              "scenarioId": "MT742-004",
+              "sequence": "MESSAGE",
+              "currency": "GBP",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT742",
+              "scenarioId": "MT742-004",
+              "sequence": "MESSAGE",
+              "currency": "GBP",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "HKD",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT742",
+              "scenarioId": "MT742-004",
+              "sequence": "MESSAGE",
+              "currency": "HKD",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT742",
+              "scenarioId": "MT742-004",
+              "sequence": "MESSAGE",
+              "currency": "HKD",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT742",
+              "scenarioId": "MT742-004",
+              "sequence": "MESSAGE",
+              "currency": "HKD",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "JPY",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT742",
+              "scenarioId": "MT742-004",
+              "sequence": "MESSAGE",
+              "currency": "JPY",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT742",
+              "scenarioId": "MT742-004",
+              "sequence": "MESSAGE",
+              "currency": "JPY",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT742",
+              "scenarioId": "MT742-004",
+              "sequence": "MESSAGE",
+              "currency": "JPY",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "USD",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT742",
+              "scenarioId": "MT742-004",
+              "sequence": "MESSAGE",
+              "currency": "USD",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT742",
+              "scenarioId": "MT742-004",
+              "sequence": "MESSAGE",
+              "currency": "USD",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT742",
+              "scenarioId": "MT742-004",
+              "sequence": "MESSAGE",
+              "currency": "USD",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        }
+      ],
+      "passed": false,
+      "error": "15 counterparty executions failed",
+      "pageContract": {
+        "contractSha256": "ad123fda735c8564e5e6337f5c7913affe8634c285e4c0328502b663d835ec74",
+        "polarity": "NEGATIVE",
+        "visibleFieldIds": [
+          "context.transactionReference",
+          "context.currency",
+          "context.bookingEntity",
+          "context.valueDate",
+          "context.counterpartyBankServiceId"
+        ],
+        "requiredFieldIds": [
+          "context.transactionReference",
+          "context.currency",
+          "context.bookingEntity",
+          "context.valueDate",
+          "context.counterpartyBankServiceId"
+        ]
+      },
+      "finishedAt": "2026-09-15T18:03:30.133Z"
+    },
+    {
+      "businessDomain": "TRADE_FINANCE",
+      "messageType": "MT750",
+      "scenarioId": "MT750-004",
+      "scenarioLabel": "MESSAGE - Message / option B provenance boundary",
+      "scenarioCount": 5,
+      "polarity": "NEGATIVE",
+      "audience": "QA_TEST_ONLY",
+      "sequence": "MESSAGE",
+      "definitionId": "PAGE-MT347:MT750:AMOUNT-CLAIMED-SETTLEMENT:MESSAGE:MESSAGE",
+      "definitionVersion": "MT347-SR2026-RESOLUTION-PAGE-SCENARIOS",
+      "contractSha256": "8685126f13e8b8c5eaa1a7987e889cc4a27f739471927eae9fd7b31b8cf596ee",
+      "query": {
+        "standardsRelease": "SR2026",
+        "messageFamily": "MT347",
+        "messageType": "MT750",
+        "direction": "OUTGOING",
+        "businessDomain": "TRADE_FINANCE",
+        "businessScenarioId": "MT750-001"
+      },
+      "startedAt": "2026-09-15T18:03:30.209Z",
+      "checks": [
+        {
+          "currency": "EUR",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT750",
+              "scenarioId": "MT750-004",
+              "sequence": "MESSAGE",
+              "currency": "EUR",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT750",
+              "scenarioId": "MT750-004",
+              "sequence": "MESSAGE",
+              "currency": "EUR",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT750",
+              "scenarioId": "MT750-004",
+              "sequence": "MESSAGE",
+              "currency": "EUR",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "GBP",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT750",
+              "scenarioId": "MT750-004",
+              "sequence": "MESSAGE",
+              "currency": "GBP",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT750",
+              "scenarioId": "MT750-004",
+              "sequence": "MESSAGE",
+              "currency": "GBP",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT750",
+              "scenarioId": "MT750-004",
+              "sequence": "MESSAGE",
+              "currency": "GBP",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "HKD",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT750",
+              "scenarioId": "MT750-004",
+              "sequence": "MESSAGE",
+              "currency": "HKD",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT750",
+              "scenarioId": "MT750-004",
+              "sequence": "MESSAGE",
+              "currency": "HKD",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT750",
+              "scenarioId": "MT750-004",
+              "sequence": "MESSAGE",
+              "currency": "HKD",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "JPY",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT750",
+              "scenarioId": "MT750-004",
+              "sequence": "MESSAGE",
+              "currency": "JPY",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT750",
+              "scenarioId": "MT750-004",
+              "sequence": "MESSAGE",
+              "currency": "JPY",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT750",
+              "scenarioId": "MT750-004",
+              "sequence": "MESSAGE",
+              "currency": "JPY",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "USD",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT750",
+              "scenarioId": "MT750-004",
+              "sequence": "MESSAGE",
+              "currency": "USD",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT750",
+              "scenarioId": "MT750-004",
+              "sequence": "MESSAGE",
+              "currency": "USD",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT750",
+              "scenarioId": "MT750-004",
+              "sequence": "MESSAGE",
+              "currency": "USD",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        }
+      ],
+      "passed": false,
+      "error": "15 counterparty executions failed",
+      "pageContract": {
+        "contractSha256": "8685126f13e8b8c5eaa1a7987e889cc4a27f739471927eae9fd7b31b8cf596ee",
+        "polarity": "NEGATIVE",
+        "visibleFieldIds": [
+          "context.transactionReference",
+          "context.currency",
+          "context.bookingEntity",
+          "context.valueDate",
+          "context.counterpartyBankServiceId"
+        ],
+        "requiredFieldIds": [
+          "context.transactionReference",
+          "context.currency",
+          "context.bookingEntity",
+          "context.valueDate",
+          "context.counterpartyBankServiceId"
+        ]
+      },
+      "finishedAt": "2026-09-15T18:03:34.379Z"
+    },
+    {
+      "businessDomain": "TRADE_FINANCE",
+      "messageType": "MT752",
+      "scenarioId": "MT752-004",
+      "scenarioLabel": "MESSAGE - Message / option B provenance boundary",
+      "scenarioCount": 5,
+      "polarity": "NEGATIVE",
+      "audience": "QA_TEST_ONLY",
+      "sequence": "MESSAGE",
+      "definitionId": "PAGE-MT347:MT752:PAYMENT-AUTHORIZATION-SETTLEMENT:MESSAGE:MESSAGE",
+      "definitionVersion": "MT347-SR2026-RESOLUTION-PAGE-SCENARIOS",
+      "contractSha256": "16c0fd470cf6bc98bf370b222511375231157bdbc4a71ffdeac34c6fe597b113",
+      "query": {
+        "standardsRelease": "SR2026",
+        "messageFamily": "MT347",
+        "messageType": "MT752",
+        "direction": "OUTGOING",
+        "businessDomain": "TRADE_FINANCE",
+        "businessScenarioId": "MT752-001"
+      },
+      "startedAt": "2026-09-15T18:03:34.441Z",
+      "checks": [
+        {
+          "currency": "EUR",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT752",
+              "scenarioId": "MT752-004",
+              "sequence": "MESSAGE",
+              "currency": "EUR",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT752",
+              "scenarioId": "MT752-004",
+              "sequence": "MESSAGE",
+              "currency": "EUR",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT752",
+              "scenarioId": "MT752-004",
+              "sequence": "MESSAGE",
+              "currency": "EUR",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "GBP",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT752",
+              "scenarioId": "MT752-004",
+              "sequence": "MESSAGE",
+              "currency": "GBP",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT752",
+              "scenarioId": "MT752-004",
+              "sequence": "MESSAGE",
+              "currency": "GBP",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT752",
+              "scenarioId": "MT752-004",
+              "sequence": "MESSAGE",
+              "currency": "GBP",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "HKD",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT752",
+              "scenarioId": "MT752-004",
+              "sequence": "MESSAGE",
+              "currency": "HKD",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT752",
+              "scenarioId": "MT752-004",
+              "sequence": "MESSAGE",
+              "currency": "HKD",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT752",
+              "scenarioId": "MT752-004",
+              "sequence": "MESSAGE",
+              "currency": "HKD",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "JPY",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT752",
+              "scenarioId": "MT752-004",
+              "sequence": "MESSAGE",
+              "currency": "JPY",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT752",
+              "scenarioId": "MT752-004",
+              "sequence": "MESSAGE",
+              "currency": "JPY",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT752",
+              "scenarioId": "MT752-004",
+              "sequence": "MESSAGE",
+              "currency": "JPY",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "USD",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT752",
+              "scenarioId": "MT752-004",
+              "sequence": "MESSAGE",
+              "currency": "USD",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT752",
+              "scenarioId": "MT752-004",
+              "sequence": "MESSAGE",
+              "currency": "USD",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT752",
+              "scenarioId": "MT752-004",
+              "sequence": "MESSAGE",
+              "currency": "USD",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        }
+      ],
+      "passed": false,
+      "error": "15 counterparty executions failed",
+      "pageContract": {
+        "contractSha256": "16c0fd470cf6bc98bf370b222511375231157bdbc4a71ffdeac34c6fe597b113",
+        "polarity": "NEGATIVE",
+        "visibleFieldIds": [
+          "context.transactionReference",
+          "context.currency",
+          "context.bookingEntity",
+          "context.valueDate",
+          "context.counterpartyBankServiceId"
+        ],
+        "requiredFieldIds": [
+          "context.transactionReference",
+          "context.currency",
+          "context.bookingEntity",
+          "context.valueDate",
+          "context.counterpartyBankServiceId"
+        ]
+      },
+      "finishedAt": "2026-09-15T18:03:38.392Z"
+    },
+    {
+      "businessDomain": "TRADE_FINANCE",
+      "messageType": "MT754",
+      "scenarioId": "MT754-004",
+      "scenarioLabel": "MESSAGE - Message / option B provenance boundary",
+      "scenarioCount": 14,
+      "polarity": "NEGATIVE",
+      "audience": "QA_TEST_ONLY",
+      "sequence": "MESSAGE",
+      "definitionId": "PAGE-MT347:MT754:PAYMENT-ACCEPTANCE-NEGOTIATION:MESSAGE:MESSAGE",
+      "definitionVersion": "MT347-SR2026-RESOLUTION-PAGE-SCENARIOS",
+      "contractSha256": "8e2e3588eda35c5215f7030d668cf5fdc2fd44fb97dc485b00c15932df375483",
+      "query": {
+        "standardsRelease": "SR2026",
+        "messageFamily": "MT347",
+        "messageType": "MT754",
+        "direction": "OUTGOING",
+        "businessDomain": "TRADE_FINANCE",
+        "businessScenarioId": "MT754-001"
+      },
+      "startedAt": "2026-09-15T18:03:38.466Z",
+      "checks": [
+        {
+          "currency": "EUR",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT754",
+              "scenarioId": "MT754-004",
+              "sequence": "MESSAGE",
+              "currency": "EUR",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT754",
+              "scenarioId": "MT754-004",
+              "sequence": "MESSAGE",
+              "currency": "EUR",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT754",
+              "scenarioId": "MT754-004",
+              "sequence": "MESSAGE",
+              "currency": "EUR",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "GBP",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT754",
+              "scenarioId": "MT754-004",
+              "sequence": "MESSAGE",
+              "currency": "GBP",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT754",
+              "scenarioId": "MT754-004",
+              "sequence": "MESSAGE",
+              "currency": "GBP",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT754",
+              "scenarioId": "MT754-004",
+              "sequence": "MESSAGE",
+              "currency": "GBP",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "HKD",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT754",
+              "scenarioId": "MT754-004",
+              "sequence": "MESSAGE",
+              "currency": "HKD",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT754",
+              "scenarioId": "MT754-004",
+              "sequence": "MESSAGE",
+              "currency": "HKD",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT754",
+              "scenarioId": "MT754-004",
+              "sequence": "MESSAGE",
+              "currency": "HKD",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "JPY",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT754",
+              "scenarioId": "MT754-004",
+              "sequence": "MESSAGE",
+              "currency": "JPY",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT754",
+              "scenarioId": "MT754-004",
+              "sequence": "MESSAGE",
+              "currency": "JPY",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT754",
+              "scenarioId": "MT754-004",
+              "sequence": "MESSAGE",
+              "currency": "JPY",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "USD",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT754",
+              "scenarioId": "MT754-004",
+              "sequence": "MESSAGE",
+              "currency": "USD",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT754",
+              "scenarioId": "MT754-004",
+              "sequence": "MESSAGE",
+              "currency": "USD",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT754",
+              "scenarioId": "MT754-004",
+              "sequence": "MESSAGE",
+              "currency": "USD",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        }
+      ],
+      "passed": false,
+      "error": "15 counterparty executions failed",
+      "pageContract": {
+        "contractSha256": "8e2e3588eda35c5215f7030d668cf5fdc2fd44fb97dc485b00c15932df375483",
+        "polarity": "NEGATIVE",
+        "visibleFieldIds": [
+          "context.transactionReference",
+          "context.currency",
+          "context.bookingEntity",
+          "context.valueDate",
+          "context.counterpartyBankServiceId"
+        ],
+        "requiredFieldIds": [
+          "context.transactionReference",
+          "context.currency",
+          "context.bookingEntity",
+          "context.valueDate",
+          "context.counterpartyBankServiceId"
+        ]
+      },
+      "finishedAt": "2026-09-15T18:03:42.522Z"
+    },
+    {
+      "businessDomain": "TRADE_FINANCE",
+      "messageType": "MT756",
+      "scenarioId": "MT756-004",
+      "scenarioLabel": "MESSAGE - Message / option B provenance boundary",
+      "scenarioCount": 12,
+      "polarity": "NEGATIVE",
+      "audience": "QA_TEST_ONLY",
+      "sequence": "MESSAGE",
+      "definitionId": "PAGE-MT347:MT756:REIMBURSEMENT-PAYMENT:MESSAGE:MESSAGE",
+      "definitionVersion": "MT347-SR2026-RESOLUTION-PAGE-SCENARIOS",
+      "contractSha256": "f80d438d11f39f2b2668fc54f0da26115bc4ed628c2c575f0c850b9447a82b7c",
+      "query": {
+        "standardsRelease": "SR2026",
+        "messageFamily": "MT347",
+        "messageType": "MT756",
+        "direction": "OUTGOING",
+        "businessDomain": "TRADE_FINANCE",
+        "businessScenarioId": "MT756-001"
+      },
+      "startedAt": "2026-09-15T18:03:42.604Z",
+      "checks": [
+        {
+          "currency": "EUR",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT756",
+              "scenarioId": "MT756-004",
+              "sequence": "MESSAGE",
+              "currency": "EUR",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT756",
+              "scenarioId": "MT756-004",
+              "sequence": "MESSAGE",
+              "currency": "EUR",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT756",
+              "scenarioId": "MT756-004",
+              "sequence": "MESSAGE",
+              "currency": "EUR",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "GBP",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT756",
+              "scenarioId": "MT756-004",
+              "sequence": "MESSAGE",
+              "currency": "GBP",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT756",
+              "scenarioId": "MT756-004",
+              "sequence": "MESSAGE",
+              "currency": "GBP",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT756",
+              "scenarioId": "MT756-004",
+              "sequence": "MESSAGE",
+              "currency": "GBP",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "HKD",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT756",
+              "scenarioId": "MT756-004",
+              "sequence": "MESSAGE",
+              "currency": "HKD",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT756",
+              "scenarioId": "MT756-004",
+              "sequence": "MESSAGE",
+              "currency": "HKD",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT756",
+              "scenarioId": "MT756-004",
+              "sequence": "MESSAGE",
+              "currency": "HKD",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "JPY",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT756",
+              "scenarioId": "MT756-004",
+              "sequence": "MESSAGE",
+              "currency": "JPY",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT756",
+              "scenarioId": "MT756-004",
+              "sequence": "MESSAGE",
+              "currency": "JPY",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT756",
+              "scenarioId": "MT756-004",
+              "sequence": "MESSAGE",
+              "currency": "JPY",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "USD",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT756",
+              "scenarioId": "MT756-004",
+              "sequence": "MESSAGE",
+              "currency": "USD",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT756",
+              "scenarioId": "MT756-004",
+              "sequence": "MESSAGE",
+              "currency": "USD",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT756",
+              "scenarioId": "MT756-004",
+              "sequence": "MESSAGE",
+              "currency": "USD",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"53\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        }
+      ],
+      "passed": false,
+      "error": "15 counterparty executions failed",
+      "pageContract": {
+        "contractSha256": "f80d438d11f39f2b2668fc54f0da26115bc4ed628c2c575f0c850b9447a82b7c",
+        "polarity": "NEGATIVE",
+        "visibleFieldIds": [
+          "context.transactionReference",
+          "context.currency",
+          "context.bookingEntity",
+          "context.valueDate",
+          "context.counterpartyBankServiceId"
+        ],
+        "requiredFieldIds": [
+          "context.transactionReference",
+          "context.currency",
+          "context.bookingEntity",
+          "context.valueDate",
+          "context.counterpartyBankServiceId"
+        ]
+      },
+      "finishedAt": "2026-09-15T18:03:47.066Z"
+    },
+    {
+      "businessDomain": "TRADE_FINANCE",
+      "messageType": "MT765",
+      "scenarioId": "MT765-005",
+      "scenarioLabel": "MESSAGE - Message / option B provenance boundary",
+      "scenarioCount": 6,
+      "polarity": "NEGATIVE",
+      "audience": "QA_TEST_ONLY",
+      "sequence": "MESSAGE",
+      "definitionId": "PAGE-MT347:MT765:GUARANTEE-CLAIM:MESSAGE:MESSAGE",
+      "definitionVersion": "MT347-SR2026-RESOLUTION-PAGE-SCENARIOS",
+      "contractSha256": "98c535f6e49f4ec141423ebf6deed526c4baf8d0cb677f6dfeac840d5a0074dc",
+      "query": {
+        "standardsRelease": "SR2026",
+        "messageFamily": "MT347",
+        "messageType": "MT765",
+        "direction": "OUTGOING",
+        "businessDomain": "TRADE_FINANCE",
+        "businessScenarioId": "MT765-001"
+      },
+      "startedAt": "2026-09-15T18:03:47.143Z",
+      "checks": [
+        {
+          "currency": "EUR",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT765",
+              "scenarioId": "MT765-005",
+              "sequence": "MESSAGE",
+              "currency": "EUR",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"56\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT765",
+              "scenarioId": "MT765-005",
+              "sequence": "MESSAGE",
+              "currency": "EUR",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"56\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT765",
+              "scenarioId": "MT765-005",
+              "sequence": "MESSAGE",
+              "currency": "EUR",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"56\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "GBP",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT765",
+              "scenarioId": "MT765-005",
+              "sequence": "MESSAGE",
+              "currency": "GBP",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"56\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT765",
+              "scenarioId": "MT765-005",
+              "sequence": "MESSAGE",
+              "currency": "GBP",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"56\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT765",
+              "scenarioId": "MT765-005",
+              "sequence": "MESSAGE",
+              "currency": "GBP",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"56\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "HKD",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT765",
+              "scenarioId": "MT765-005",
+              "sequence": "MESSAGE",
+              "currency": "HKD",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"56\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT765",
+              "scenarioId": "MT765-005",
+              "sequence": "MESSAGE",
+              "currency": "HKD",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"56\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT765",
+              "scenarioId": "MT765-005",
+              "sequence": "MESSAGE",
+              "currency": "HKD",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"56\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "JPY",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT765",
+              "scenarioId": "MT765-005",
+              "sequence": "MESSAGE",
+              "currency": "JPY",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"56\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT765",
+              "scenarioId": "MT765-005",
+              "sequence": "MESSAGE",
+              "currency": "JPY",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"56\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT765",
+              "scenarioId": "MT765-005",
+              "sequence": "MESSAGE",
+              "currency": "JPY",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"56\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "USD",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT765",
+              "scenarioId": "MT765-005",
+              "sequence": "MESSAGE",
+              "currency": "USD",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"56\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT765",
+              "scenarioId": "MT765-005",
+              "sequence": "MESSAGE",
+              "currency": "USD",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"56\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT765",
+              "scenarioId": "MT765-005",
+              "sequence": "MESSAGE",
+              "currency": "USD",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"56\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        }
+      ],
+      "passed": false,
+      "error": "15 counterparty executions failed",
+      "pageContract": {
+        "contractSha256": "98c535f6e49f4ec141423ebf6deed526c4baf8d0cb677f6dfeac840d5a0074dc",
+        "polarity": "NEGATIVE",
+        "visibleFieldIds": [
+          "context.transactionReference",
+          "context.currency",
+          "context.bookingEntity",
+          "context.valueDate",
+          "context.counterpartyBankServiceId"
+        ],
+        "requiredFieldIds": [
+          "context.transactionReference",
+          "context.currency",
+          "context.bookingEntity",
+          "context.valueDate",
+          "context.counterpartyBankServiceId"
+        ]
+      },
+      "finishedAt": "2026-09-15T18:03:51.035Z"
+    },
+    {
+      "businessDomain": "TRADE_FINANCE",
+      "messageType": "MT768",
+      "scenarioId": "MT768-004",
+      "scenarioLabel": "MESSAGE - Message / option B provenance boundary",
+      "scenarioCount": 7,
+      "polarity": "NEGATIVE",
+      "audience": "QA_TEST_ONLY",
+      "sequence": "MESSAGE",
+      "definitionId": "PAGE-MT347:MT768:CHARGES-SETTLEMENT:MESSAGE:MESSAGE",
+      "definitionVersion": "MT347-SR2026-RESOLUTION-PAGE-SCENARIOS",
+      "contractSha256": "4e103a607dca98e5c11549e656861f8cbfc39818070f0509ae9cb67fb593a09e",
+      "query": {
+        "standardsRelease": "SR2026",
+        "messageFamily": "MT347",
+        "messageType": "MT768",
+        "direction": "OUTGOING",
+        "businessDomain": "TRADE_FINANCE",
+        "businessScenarioId": "MT768-001"
+      },
+      "startedAt": "2026-09-15T18:03:51.144Z",
+      "checks": [
+        {
+          "currency": "EUR",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT768",
+              "scenarioId": "MT768-004",
+              "sequence": "MESSAGE",
+              "currency": "EUR",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT768",
+              "scenarioId": "MT768-004",
+              "sequence": "MESSAGE",
+              "currency": "EUR",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT768",
+              "scenarioId": "MT768-004",
+              "sequence": "MESSAGE",
+              "currency": "EUR",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "GBP",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT768",
+              "scenarioId": "MT768-004",
+              "sequence": "MESSAGE",
+              "currency": "GBP",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT768",
+              "scenarioId": "MT768-004",
+              "sequence": "MESSAGE",
+              "currency": "GBP",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT768",
+              "scenarioId": "MT768-004",
+              "sequence": "MESSAGE",
+              "currency": "GBP",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "HKD",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT768",
+              "scenarioId": "MT768-004",
+              "sequence": "MESSAGE",
+              "currency": "HKD",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT768",
+              "scenarioId": "MT768-004",
+              "sequence": "MESSAGE",
+              "currency": "HKD",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT768",
+              "scenarioId": "MT768-004",
+              "sequence": "MESSAGE",
+              "currency": "HKD",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "JPY",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT768",
+              "scenarioId": "MT768-004",
+              "sequence": "MESSAGE",
+              "currency": "JPY",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT768",
+              "scenarioId": "MT768-004",
+              "sequence": "MESSAGE",
+              "currency": "JPY",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT768",
+              "scenarioId": "MT768-004",
+              "sequence": "MESSAGE",
+              "currency": "JPY",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "USD",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT768",
+              "scenarioId": "MT768-004",
+              "sequence": "MESSAGE",
+              "currency": "USD",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT768",
+              "scenarioId": "MT768-004",
+              "sequence": "MESSAGE",
+              "currency": "USD",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT768",
+              "scenarioId": "MT768-004",
+              "sequence": "MESSAGE",
+              "currency": "USD",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        }
+      ],
+      "passed": false,
+      "error": "15 counterparty executions failed",
+      "pageContract": {
+        "contractSha256": "4e103a607dca98e5c11549e656861f8cbfc39818070f0509ae9cb67fb593a09e",
+        "polarity": "NEGATIVE",
+        "visibleFieldIds": [
+          "context.transactionReference",
+          "context.currency",
+          "context.bookingEntity",
+          "context.valueDate",
+          "context.counterpartyBankServiceId"
+        ],
+        "requiredFieldIds": [
+          "context.transactionReference",
+          "context.currency",
+          "context.bookingEntity",
+          "context.valueDate",
+          "context.counterpartyBankServiceId"
+        ]
+      },
+      "finishedAt": "2026-09-15T18:03:55.149Z"
+    },
+    {
+      "businessDomain": "TRADE_FINANCE",
+      "messageType": "MT769",
+      "scenarioId": "MT769-004",
+      "scenarioLabel": "MESSAGE - Message / option B provenance boundary",
+      "scenarioCount": 7,
+      "polarity": "NEGATIVE",
+      "audience": "QA_TEST_ONLY",
+      "sequence": "MESSAGE",
+      "definitionId": "PAGE-MT347:MT769:CHARGES-SETTLEMENT:MESSAGE:MESSAGE",
+      "definitionVersion": "MT347-SR2026-RESOLUTION-PAGE-SCENARIOS",
+      "contractSha256": "0cb9ca8254bfeb554a57fd6964542b6dba862b0f3182d070059d9e36dbbc9b30",
+      "query": {
+        "standardsRelease": "SR2026",
+        "messageFamily": "MT347",
+        "messageType": "MT769",
+        "direction": "OUTGOING",
+        "businessDomain": "TRADE_FINANCE",
+        "businessScenarioId": "MT769-001"
+      },
+      "startedAt": "2026-09-15T18:03:55.227Z",
+      "checks": [
+        {
+          "currency": "EUR",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT769",
+              "scenarioId": "MT769-004",
+              "sequence": "MESSAGE",
+              "currency": "EUR",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT769",
+              "scenarioId": "MT769-004",
+              "sequence": "MESSAGE",
+              "currency": "EUR",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT769",
+              "scenarioId": "MT769-004",
+              "sequence": "MESSAGE",
+              "currency": "EUR",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "GBP",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT769",
+              "scenarioId": "MT769-004",
+              "sequence": "MESSAGE",
+              "currency": "GBP",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT769",
+              "scenarioId": "MT769-004",
+              "sequence": "MESSAGE",
+              "currency": "GBP",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT769",
+              "scenarioId": "MT769-004",
+              "sequence": "MESSAGE",
+              "currency": "GBP",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "HKD",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT769",
+              "scenarioId": "MT769-004",
+              "sequence": "MESSAGE",
+              "currency": "HKD",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT769",
+              "scenarioId": "MT769-004",
+              "sequence": "MESSAGE",
+              "currency": "HKD",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT769",
+              "scenarioId": "MT769-004",
+              "sequence": "MESSAGE",
+              "currency": "HKD",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "JPY",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT769",
+              "scenarioId": "MT769-004",
+              "sequence": "MESSAGE",
+              "currency": "JPY",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT769",
+              "scenarioId": "MT769-004",
+              "sequence": "MESSAGE",
+              "currency": "JPY",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT769",
+              "scenarioId": "MT769-004",
+              "sequence": "MESSAGE",
+              "currency": "JPY",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "USD",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT769",
+              "scenarioId": "MT769-004",
+              "sequence": "MESSAGE",
+              "currency": "USD",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT769",
+              "scenarioId": "MT769-004",
+              "sequence": "MESSAGE",
+              "currency": "USD",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            },
+            {
+              "businessDomain": "TRADE_FINANCE",
+              "messageType": "MT769",
+              "scenarioId": "MT769-004",
+              "sequence": "MESSAGE",
+              "currency": "USD",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "passed": false,
+              "error": "negative execute expected HTTP 409, got 422: {\"code\":\"OPTION_CONSTRAINT_VIOLATION\",\"tag\":\"57\",\"option\":\"B\",\"payloadGenerated\":false,\"confirmedResolutionCreated\":false,\"repairQueueCreated\":false}"
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        }
+      ],
+      "passed": false,
+      "error": "15 counterparty executions failed",
+      "pageContract": {
+        "contractSha256": "0cb9ca8254bfeb554a57fd6964542b6dba862b0f3182d070059d9e36dbbc9b30",
+        "polarity": "NEGATIVE",
+        "visibleFieldIds": [
+          "context.transactionReference",
+          "context.currency",
+          "context.bookingEntity",
+          "context.valueDate",
+          "context.counterpartyBankServiceId"
+        ],
+        "requiredFieldIds": [
+          "context.transactionReference",
+          "context.currency",
+          "context.bookingEntity",
+          "context.valueDate",
+          "context.counterpartyBankServiceId"
+        ]
+      },
+      "finishedAt": "2026-09-15T18:03:59.053Z"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "standardsRelease": "SR2026",
+  "messageType": "pacs.008.001.12",
+  "direction": "OUTGOING",
+  "businessFunction": "CUSTOMER_CREDIT_TRANSFER",
+  "fields": { "CdtrAgt.FinInstnId.BICFI": "CCCCUS44" }
+}

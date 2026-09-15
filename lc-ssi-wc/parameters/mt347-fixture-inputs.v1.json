@@ -1,0 +1,66 @@
+{
+  "schemaVersion": "1.0",
+  "fixtureFamily": "MT347-SR2026-SSI",
+  "sourcePolicy": "INPUT_ONLY_NO_EXPECTED_ORACLE",
+  "bankServices": {
+    "BANK-SVC-CITIUS33": "CITIUS33",
+    "BANK-SVC-HSBCHKHH": "HSBCHKHH",
+    "BANK-SVC-BNPAFRPP": "BNPAFRPP",
+    "BANK-SVC-DEUTDEFF": "DEUTDEFF",
+    "BANK-SVC-BARCGB22": "BARCGB22",
+    "BANK-SVC-DEMOHKHH": "DEMOHKHH"
+  },
+  "namedInputTags": {
+    "senderCorrespondentBankServiceId": "53",
+    "intermediaryBankServiceId": "56",
+    "receivingBankServiceId": "57",
+    "beneficiaryBankServiceId": "58"
+  },
+  "routeProfiles": {
+    "DIRECT": {
+      "53": "BANK-SVC-CITIUS33",
+      "54": "BANK-SVC-HSBCHKHH",
+      "57": "BANK-SVC-DEUTDEFF"
+    },
+    "INTERMEDIARY": {
+      "53": "BANK-SVC-CITIUS33",
+      "54": "BANK-SVC-HSBCHKHH",
+      "56": "BANK-SVC-HSBCHKHH",
+      "57": "BANK-SVC-DEUTDEFF"
+    }
+  },
+  "caseRoleOverrides": {
+    "MT400-001": { "54": "BANK-SVC-BNPAFRPP" },
+    "MT752-001": { "54": "BANK-SVC-BNPAFRPP" },
+    "MT756-001": { "54": "BANK-SVC-BNPAFRPP" }
+  },
+  "upstreamTransactionTags": {
+    "58": "BANK-SVC-BARCGB22"
+  },
+  "hybridTransactions": {
+    "MT742-006": { "tag": "58", "institutionBankServiceId": "BANK-SVC-BARCGB22" },
+    "MT742-013": { "tag": "58", "institutionBankServiceId": "BANK-SVC-BARCGB22", "accountReference": "MT347-MT742-013-USD-CREDITED" },
+    "MT754-011": { "tag": "58", "institutionBankServiceId": "BANK-SVC-BARCGB22" },
+    "MT754-013": { "tag": "58", "institutionBankServiceId": "BANK-SVC-BARCGB22", "accountReference": "MT347-MT754-013-USD-CREDITED" }
+  },
+  "messageReceiverBankServices": {
+    "MT300": "BANK-SVC-DEUTDEFF", "MT304": "BANK-SVC-DEUTDEFF",
+    "MT305": "BANK-SVC-DEUTDEFF", "MT306": "BANK-SVC-DEUTDEFF",
+    "MT320": "BANK-SVC-DEUTDEFF", "MT330": "BANK-SVC-DEUTDEFF",
+    "MT340": "BANK-SVC-DEUTDEFF", "MT341": "BANK-SVC-DEUTDEFF",
+    "MT350": "BANK-SVC-DEUTDEFF", "MT360": "BANK-SVC-DEUTDEFF",
+    "MT361": "BANK-SVC-DEUTDEFF", "MT362": "BANK-SVC-DEUTDEFF",
+    "MT364": "BANK-SVC-DEUTDEFF", "MT365": "BANK-SVC-DEUTDEFF",
+    "MT400": "BANK-SVC-DEUTDEFF", "MT730": "BANK-SVC-DEUTDEFF",
+    "MT734": "BANK-SVC-DEUTDEFF", "MT742": "BANK-SVC-DEUTDEFF",
+    "MT750": "BANK-SVC-DEUTDEFF", "MT752": "BANK-SVC-DEUTDEFF",
+    "MT754": "BANK-SVC-DEUTDEFF", "MT756": "BANK-SVC-DEUTDEFF",
+    "MT765": "BANK-SVC-DEUTDEFF", "MT768": "BANK-SVC-DEUTDEFF",
+    "MT769": "BANK-SVC-DEUTDEFF"
+  },
+  "supplementalAccounts": {
+    "MT742-013": "MT347-MT742-013-USD-CREDITED",
+    "MT754-013": "MT347-MT754-013-USD-CREDITED"
+  },
+  "accountServicerBankServiceId": "BANK-SVC-CITIUS33"
+}

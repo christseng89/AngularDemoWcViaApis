@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "3.0",
+  "fixtureFamily": "MT347-SR2026-SSI",
+  "canonicalExecutable": {
+    "positiveBase": {
+      "path": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "count": 152,
+      "sha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B"
+    },
+    "negativeBase": {
+      "path": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "count": 208,
+      "sha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06"
+    },
+    "counterpartyVariants": {
+      "path": "qa/mt347/fixtures/mt347-executable-counterparties.v4.json",
+      "count": 5026,
+      "sha256": "9E2CF4035DB1185B7F8F685717883483731C2C21986FDF2513A69C220BFC3C63"
+    },
+    "expectedFixtureGroups": 359,
+    "supportedCurrencies": [
+      "USD",
+      "EUR",
+      "GBP",
+      "JPY",
+      "HKD"
+    ],
+    "expectedCounterpartiesPerCurrency": 3,
+    "expectedCurrenciesPerGroup": 5,
+    "expectedCandidatesPerGroup": 15
+  },
+  "negativeOraclePolicy": "Negative conditions remain isolated by fixture binding; lookup eligibility is canonical and does not constitute a PASS oracle.",
+  "canonicalSeed": {
+    "path": "fixtures/ssi-demo.v15.3.canonical.seed.json",
+    "sha256": "CE5443676E5D76E6D08FD27F9ED3B58F85609BFF8A3BD9F9899514A3A7667B47"
+  }
+}

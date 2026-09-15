@@ -1,0 +1,1 @@
+import{Body,Controller,Post}from'@nestjs/common';import{SwiftDataImportService,type ImportRequest}from'./swift-data-import.service';@Controller('swift-data/imports')export class SwiftDataImportController{constructor(private readonly service:SwiftDataImportService){}@Post()upload(@Body()body:ImportRequest):unknown{return this.service.import(body)}}

@@ -1,0 +1,2 @@
+import{Module}from'@nestjs/common';import{SsiController}from'./ssi.controller';import{SsiApplicationService}from'./ssi-application.service';import{SqliteSsiRepository}from'./sqlite-ssi.repository';import{MessageController}from'./message.controller';import{MessageMappingService}from'./message-mapping.service';
+@Module({controllers:[SsiController,MessageController],providers:[SsiApplicationService,SqliteSsiRepository,MessageMappingService]})export class AppModule{}

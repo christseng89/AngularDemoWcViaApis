@@ -1,0 +1,7 @@
+{
+  "name": "ssi-web-components", "$schema": "../../node_modules/nx/schemas/project-schema.json", "sourceRoot": "apps/ssi-web-components/src", "projectType": "application",
+  "targets": {
+    "build": { "executor": "@angular-devkit/build-angular:application", "options": { "outputPath": "dist/apps/ssi-web-components", "index": "apps/ssi-web-components/src/index.html", "browser": "apps/ssi-web-components/src/main.ts", "tsConfig": "apps/ssi-web-components/tsconfig.app.json", "styles": [] } },
+    "typecheck": { "executor": "nx:run-commands", "options": { "command": "tsc -p apps/ssi-web-components/tsconfig.app.json --noEmit" } }
+  }, "tags": ["type:app", "scope:wc"]
+}

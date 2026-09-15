@@ -1,0 +1,29 @@
+{
+  "compilerOptions": {
+    "rootDir": ".",
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "node",
+    "lib": ["ES2022", "DOM"],
+    "types": ["node"],
+    "skipLibCheck": true,
+    "experimentalDecorators": true,
+    "noEmit": true,
+    "paths": {
+      "@ssi/domain": ["./libs/domain/src/index.ts"],
+      "@ssi/fin-5x-support": ["./libs/domain/src/lib/fin-5x-support.ts"],
+      "@ssi/contracts": ["./libs/contracts/src/index.ts"],
+      "@ssi/parameter-engine": ["./libs/parameter-engine/src/index.ts"],
+      "@ssi/swift-mapping": ["./libs/swift-ssi-mapping/src/index.ts"]
+    }
+  },
+  "include": ["apps/**/*.ts", "libs/**/*.ts"],
+  "exclude": [
+    "**/*.spec.ts",
+    "**/*.test.ts",
+    "coverage/**",
+    "dist/**",
+    "node_modules/**",
+    "tmp/**"
+  ]
+}

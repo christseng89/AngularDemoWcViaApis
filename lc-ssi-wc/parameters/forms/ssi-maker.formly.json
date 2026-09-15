@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "1.0",
+  "fields": [
+    { "key": "counterpartyId", "type": "input", "props": { "label": "Counterparty", "required": true } },
+    { "key": "scope", "type": "select", "defaultValue": "REUSABLE", "props": { "label": "Scope", "required": true, "options": [{ "label": "Reusable", "value": "REUSABLE" }, { "label": "Transaction only", "value": "TRANSACTION_ONLY" }] } },
+    { "key": "route.currency", "type": "input", "props": { "label": "Currency", "required": true, "maxLength": 3 } },
+    { "key": "route.beneficiaryBic", "type": "input", "props": { "label": "Beneficiary BIC", "required": true } },
+    { "key": "route.accountWithBic", "type": "input", "props": { "label": "Account With Institution", "required": true } },
+    { "key": "route.intermediaryBic", "type": "input", "props": { "label": "Intermediary Institution" } },
+    { "key": "route.accountId", "type": "input", "props": { "label": "Account / Nostro ID" } }
+  ]
+}

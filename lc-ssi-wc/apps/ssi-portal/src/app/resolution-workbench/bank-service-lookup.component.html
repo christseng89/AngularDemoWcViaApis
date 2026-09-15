@@ -1,0 +1,69 @@
+<div class="lookup-control">
+  @if (phase() === "loading") {
+    <output
+      class="lookup-status"
+      [id]="inputId() + '-lookup-status'"
+      aria-live="polite"
+    >
+      <span class="lookup-spinner" aria-hidden="true"></span>
+      {{ loadingMessage() }}
+    </output>
+  } @else if (displayedSelection(); as bank) {
+    <output class="lookup-selection" [attr.for]="inputId()">
+      <strong>{{ bank.bic }}</strong>
+      @if (selectedDescription(bank); as description) {
+        <small>{{ description }}</small>
+      }
+    </output>
+  } @else {
+    <p class="lookup-empty">{{ emptySelectionLabel() }}</p>
+  }
+  <button
+    type="button"
+    class="lookup-picker-button"
+    [disabled]="disabled() || !lookupAvailable()"
+    [attr.aria-describedby]="
+      prerequisiteMessage() ? inputId() + '-lookup-prerequisite' : null
+    "
+    (click)="open($event)"
+  >
+    {{
+      displayedSelection()
+        ? metadata().selectedButtonLabel || "Change"
+        : metadata().buttonLabel || "Select Bank Service"
+    }}
+  </button>
+  @if (prerequisiteMessage(); as message) {
+    <p
+      class="lookup-prerequisite"
+      [id]="inputId() + '-lookup-prerequisite'"
+      role="note"
+    >
+      {{ message }}
+    </p>
+  }
+  @if (phase() === "error" && error(); as lookupError) {
+    <p class="field-error lookup-status" role="alert">{{ lookupError }}</p>
+  } @else if (phase() === "ready" && items().length === 0 && !selected()) {
+    <output class="lookup-status">{{ emptyMessage() }}</output>
+  }
+</div>
+
+@if (pickerOpen()) {
+  <ssi-bank-service-picker-dialog
+    [title]="title()"
+    [serviceLabel]="serviceLabel()"
+    [emptyMessage]="emptyMessage()"
+    [items]="pickerItems()"
+    [loading]="phase() === 'loading'"
+    [error]="error()"
+    [query]="pickerQuery()"
+    [page]="pickerPage()"
+    [total]="availableItems().length"
+    [totalPages]="pickerTotalPages()"
+    (searchRequested)="search($event)"
+    (pageRequested)="moveToPage($event)"
+    (selected)="select($event)"
+    (cancelled)="close()"
+  />
+}

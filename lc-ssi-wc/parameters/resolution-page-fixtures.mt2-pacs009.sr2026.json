@@ -1,0 +1,184 @@
+{
+  "schemaVersion": "1.0",
+  "fixtureVersion": "2026.09.15-task4-ssi-scope",
+  "standardsRelease": "SR2026",
+  "messageFamily": "MT2_PACS009",
+  "executionStatus": "NOT_EXECUTED",
+  "purpose": "Governed Task 2 fixture identities; execution outcomes are recorded separately and must not be inferred from this manifest.",
+  "scenarioIds": [
+    "MT202-OP-BOOK",
+    "MT202-OP-CREDIT-57A",
+    "MT202-OP-DIRECT",
+    "MT202-QA-C81",
+    "MT202-QA-CONTINUITY",
+    "MT202COV-OP-BOOK",
+    "MT202COV-OP-CREDIT-57A",
+    "MT202COV-OP-STANDARD",
+    "MT202COV-QA-CONTINUITY",
+    "MT202COV-QA-INCOMPLETE",
+    "MT205-OP-INITIAL-MT200-201-EQUIVALENCE",
+    "MT205-OP-STANDARD-DOMESTIC-ONWARD",
+    "MT205-QA-CROSS-BORDER",
+    "MT205-QA-PROVENANCE",
+    "MT205COV-OP-CONTINUATION",
+    "MT205COV-QA-CONTINUITY",
+    "MT205COV-QA-CROSS-BORDER"
+  ],
+  "bindings": [
+    {
+      "bindingId": "FIXTURE-MT202-OP-DIRECT",
+      "fixtureSet": "MT2-PACS009-SR2026",
+      "fixtureVersion": "2026.09.15-task4-ssi-scope",
+      "sourceFile": "parameters/resolution-page-scenarios.mt2-pacs009.sr2026.json",
+      "sourceFileSha256": "732265CEC9DADF43C247DD9AEDF4C4AE9605D0E60A5D951199C8B6501D339D49",
+      "polarity": "POSITIVE"
+    },
+    {
+      "bindingId": "FIXTURE-MT202-OP-BOOK",
+      "fixtureSet": "MT2-PACS009-SR2026",
+      "fixtureVersion": "2026.09.15-task4-ssi-scope",
+      "sourceFile": "parameters/resolution-page-scenarios.mt2-pacs009.sr2026.json",
+      "sourceFileSha256": "732265CEC9DADF43C247DD9AEDF4C4AE9605D0E60A5D951199C8B6501D339D49",
+      "polarity": "POSITIVE"
+    },
+    {
+      "bindingId": "FIXTURE-MT202-OP-CREDIT-57A",
+      "fixtureSet": "MT2-PACS009-SR2026",
+      "fixtureVersion": "2026.09.15-task4-ssi-scope",
+      "sourceFile": "parameters/resolution-page-scenarios.mt2-pacs009.sr2026.json",
+      "sourceFileSha256": "732265CEC9DADF43C247DD9AEDF4C4AE9605D0E60A5D951199C8B6501D339D49",
+      "polarity": "POSITIVE"
+    },
+    {
+      "bindingId": "FIXTURE-MT202-QA-C81",
+      "fixtureSet": "MT2-PACS009-SR2026",
+      "fixtureVersion": "2026.09.15-task4-ssi-scope",
+      "sourceFile": "parameters/resolution-page-scenarios.mt2-pacs009.sr2026.json",
+      "sourceFileSha256": "732265CEC9DADF43C247DD9AEDF4C4AE9605D0E60A5D951199C8B6501D339D49",
+      "polarity": "NEGATIVE"
+    },
+    {
+      "bindingId": "FIXTURE-MT202-QA-CONTINUITY",
+      "fixtureSet": "MT2-PACS009-SR2026",
+      "fixtureVersion": "2026.09.15-task4-ssi-scope",
+      "sourceFile": "parameters/resolution-page-scenarios.mt2-pacs009.sr2026.json",
+      "sourceFileSha256": "732265CEC9DADF43C247DD9AEDF4C4AE9605D0E60A5D951199C8B6501D339D49",
+      "polarity": "BOUNDARY"
+    },
+    {
+      "bindingId": "FIXTURE-MT202COV-OP-BOOK",
+      "fixtureSet": "MT2-PACS009-SR2026",
+      "fixtureVersion": "2026.09.15-task4-ssi-scope",
+      "sourceFile": "parameters/resolution-page-scenarios.mt2-pacs009.sr2026.json",
+      "sourceFileSha256": "732265CEC9DADF43C247DD9AEDF4C4AE9605D0E60A5D951199C8B6501D339D49",
+      "polarity": "POSITIVE"
+    },
+    {
+      "bindingId": "FIXTURE-MT202COV-OP-CREDIT-57A",
+      "fixtureSet": "MT2-PACS009-SR2026",
+      "fixtureVersion": "2026.09.15-task4-ssi-scope",
+      "sourceFile": "parameters/resolution-page-scenarios.mt2-pacs009.sr2026.json",
+      "sourceFileSha256": "732265CEC9DADF43C247DD9AEDF4C4AE9605D0E60A5D951199C8B6501D339D49",
+      "polarity": "POSITIVE"
+    },
+    {
+      "bindingId": "FIXTURE-MT202COV-OP-STANDARD",
+      "fixtureSet": "MT2-PACS009-SR2026",
+      "fixtureVersion": "2026.09.15-task4-ssi-scope",
+      "sourceFile": "parameters/resolution-page-scenarios.mt2-pacs009.sr2026.json",
+      "sourceFileSha256": "732265CEC9DADF43C247DD9AEDF4C4AE9605D0E60A5D951199C8B6501D339D49",
+      "polarity": "POSITIVE"
+    },
+    {
+      "bindingId": "FIXTURE-MT202COV-QA-INCOMPLETE",
+      "fixtureSet": "MT2-PACS009-SR2026",
+      "fixtureVersion": "2026.09.15-task4-ssi-scope",
+      "sourceFile": "parameters/resolution-page-scenarios.mt2-pacs009.sr2026.json",
+      "sourceFileSha256": "732265CEC9DADF43C247DD9AEDF4C4AE9605D0E60A5D951199C8B6501D339D49",
+      "polarity": "NEGATIVE"
+    },
+    {
+      "bindingId": "FIXTURE-MT202COV-QA-CONTINUITY",
+      "fixtureSet": "MT2-PACS009-SR2026",
+      "fixtureVersion": "2026.09.15-task4-ssi-scope",
+      "sourceFile": "parameters/resolution-page-scenarios.mt2-pacs009.sr2026.json",
+      "sourceFileSha256": "732265CEC9DADF43C247DD9AEDF4C4AE9605D0E60A5D951199C8B6501D339D49",
+      "polarity": "BOUNDARY"
+    },
+    {
+      "bindingId": "FIXTURE-MT205-OP-INITIAL-MT200-201-EQUIVALENCE",
+      "fixtureSet": "MT2-PACS009-SR2026",
+      "fixtureVersion": "2026.09.15-task4-ssi-scope",
+      "sourceFile": "parameters/resolution-page-scenarios.mt2-pacs009.sr2026.json",
+      "sourceFileSha256": "732265CEC9DADF43C247DD9AEDF4C4AE9605D0E60A5D951199C8B6501D339D49",
+      "polarity": "POSITIVE"
+    },
+    {
+      "bindingId": "FIXTURE-MT205-OP-STANDARD-DOMESTIC-ONWARD",
+      "fixtureSet": "MT2-PACS009-SR2026",
+      "fixtureVersion": "2026.09.15-task4-ssi-scope",
+      "sourceFile": "parameters/resolution-page-scenarios.mt2-pacs009.sr2026.json",
+      "sourceFileSha256": "732265CEC9DADF43C247DD9AEDF4C4AE9605D0E60A5D951199C8B6501D339D49",
+      "polarity": "POSITIVE"
+    },
+    {
+      "bindingId": "FIXTURE-MT205-QA-CROSS-BORDER",
+      "fixtureSet": "MT2-PACS009-SR2026",
+      "fixtureVersion": "2026.09.15-task4-ssi-scope",
+      "sourceFile": "parameters/resolution-page-scenarios.mt2-pacs009.sr2026.json",
+      "sourceFileSha256": "732265CEC9DADF43C247DD9AEDF4C4AE9605D0E60A5D951199C8B6501D339D49",
+      "polarity": "NEGATIVE"
+    },
+    {
+      "bindingId": "FIXTURE-MT205-QA-PROVENANCE",
+      "fixtureSet": "MT2-PACS009-SR2026",
+      "fixtureVersion": "2026.09.15-task4-ssi-scope",
+      "sourceFile": "parameters/resolution-page-scenarios.mt2-pacs009.sr2026.json",
+      "sourceFileSha256": "732265CEC9DADF43C247DD9AEDF4C4AE9605D0E60A5D951199C8B6501D339D49",
+      "polarity": "BOUNDARY"
+    },
+    {
+      "bindingId": "FIXTURE-MT205COV-OP-CONTINUATION",
+      "fixtureSet": "MT2-PACS009-SR2026",
+      "fixtureVersion": "2026.09.15-task4-ssi-scope",
+      "sourceFile": "parameters/resolution-page-scenarios.mt2-pacs009.sr2026.json",
+      "sourceFileSha256": "732265CEC9DADF43C247DD9AEDF4C4AE9605D0E60A5D951199C8B6501D339D49",
+      "polarity": "POSITIVE"
+    },
+    {
+      "bindingId": "FIXTURE-MT205COV-QA-CROSS-BORDER",
+      "fixtureSet": "MT2-PACS009-SR2026",
+      "fixtureVersion": "2026.09.15-task4-ssi-scope",
+      "sourceFile": "parameters/resolution-page-scenarios.mt2-pacs009.sr2026.json",
+      "sourceFileSha256": "732265CEC9DADF43C247DD9AEDF4C4AE9605D0E60A5D951199C8B6501D339D49",
+      "polarity": "NEGATIVE"
+    },
+    {
+      "bindingId": "FIXTURE-MT205COV-QA-CONTINUITY",
+      "fixtureSet": "MT2-PACS009-SR2026",
+      "fixtureVersion": "2026.09.15-task4-ssi-scope",
+      "sourceFile": "parameters/resolution-page-scenarios.mt2-pacs009.sr2026.json",
+      "sourceFileSha256": "732265CEC9DADF43C247DD9AEDF4C4AE9605D0E60A5D951199C8B6501D339D49",
+      "polarity": "BOUNDARY"
+    }
+  ],
+  "sourceMessageFixtures": {
+    "MT205-OP-INITIAL-MT200-201-EQUIVALENCE": [
+      {
+        "fixtureId": "MT205-FROM-MT200",
+        "previousSourceMessageType": "MT200"
+      },
+      {
+        "fixtureId": "MT205-FROM-MT201",
+        "previousSourceMessageType": "MT201",
+        "preserveMultiplicity": true
+      }
+    ],
+    "MT205-OP-STANDARD-DOMESTIC-ONWARD": [
+      {
+        "fixtureId": "MT205-FROM-INSTITUTIONAL-TRANSFER",
+        "previousSourceMessageTypes": ["MT202", "MT203", "MT205"]
+      }
+    ]
+  }
+}

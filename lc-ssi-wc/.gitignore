@@ -1,0 +1,24 @@
+node_modules/
+dist/
+coverage/
+.nx/
+.angular/
+.scannerwork/
+data/*.sqlite*
+.env
+playwright-report/
+test-results/
+tmp/
+
+# Rebuildable QA run artifacts (keep reviewed MD/JSON/DOCX summaries tracked)
+qa/mt2/migration-backups/
+qa/mt2/reports/mt2-139-ui-evidence/
+qa/mt2/reports/mt2-pareto-fixed-evidence/
+qa/mt2/reports/mt2-pareto-fixed-evidence-r3/
+qa/mt2/reports/mt2-resolver-exhaustive-evidence/
+qa/mt2/reports/mt2-resolver-exhaustive-evidence-r3/
+qa/mt2/reports/*.stdout.log
+qa/mt2/reports/*.stderr.log
+
+*.log
+*.sha256.txt

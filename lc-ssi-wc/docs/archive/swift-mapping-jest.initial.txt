@@ -1,0 +1,1 @@
+export default { displayName: 'swift-ssi-mapping', preset: '../../jest.preset.js', testEnvironment: 'node', testMatch: ['**/*.test.ts'], coverageDirectory: '../../coverage/libs/swift-ssi-mapping', coverageThreshold: { global: { branches: 95, functions: 95, lines: 95, statements: 95 } };

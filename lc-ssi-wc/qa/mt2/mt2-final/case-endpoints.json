@@ -1,0 +1,10 @@
+{
+  "baseUrl": "http://localhost:3100/api",
+  "domains": {
+    "COUNTERPARTY_SSI": "/settlements/resolve",
+    "MESSAGE_TYPE_CONTRACT": "/settlements/resolve",
+    "OWN_SSI_NOSTRO": "/own-account-settlements/resolve",
+    "FI_DIRECT_DEBIT": "/fi-direct-debits/resolve",
+    "NOTIFICATION": "/payment-notifications/resolve"
+  }
+}

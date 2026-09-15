@@ -1,0 +1,1632 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Baseline SWIFT Data Service",
+    "version": "1.1.0-prototype",
+    "description": "SR2026 prototype contract. BIC syntax follows ISO 9362; currency codes are supplied by the ISO 4217 Currency service. Licensed SwiftRef/RMA/SSI data remains a production prerequisite."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3100/api"
+    }
+  ],
+  "x-standards-baseline": {
+    "standardsRelease": "SR2026",
+    "bicStandard": "ISO 9362",
+    "currencyStandard": "ISO 4217",
+    "dataClassification": "SYNTHETIC_DEMO"
+  },
+  "x-ui-resources": [
+    {
+      "id": "rma",
+      "label": "RMA Authorisation",
+      "endpoint": "rma-authorisations",
+      "importType": "RMA",
+      "description": "\u7ba1\u7406 BIC \u5c0d\u3001FIN/FINPLUS\u3001\u65b9\u5411\u8207\u8a0a\u606f\u7bc4\u570d\uff1bRMA \u53ea\u4ee3\u8868\u901a\u8a0a\u6388\u6b0a\uff0c\u4e0d\u8b49\u660e SSI \u6216\u5e33\u6236\u6240\u6709\u6b0a\u3002",
+      "columns": [
+        {
+          "path": "ownBic",
+          "label": "Own BIC"
+        },
+        {
+          "path": "counterpartyBic",
+          "label": "Counterparty BIC"
+        },
+        {
+          "path": "service",
+          "label": "Service"
+        },
+        {
+          "path": "direction",
+          "label": "Direction"
+        },
+        {
+          "path": "messageTypes",
+          "label": "Messages"
+        },
+        {
+          "path": "status",
+          "label": "Status"
+        },
+        {
+          "path": "version",
+          "label": "Version"
+        }
+      ],
+      "fields": [
+        {
+          "key": "maker",
+          "label": "Maker",
+          "required": true,
+          "type": "input",
+          "defaultValue": "maker.demo"
+        },
+        {
+          "key": "ownBic",
+          "label": "Own BIC (ISO 9362)",
+          "required": true,
+          "type": "input",
+          "pattern": "^[A-Z0-9]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$",
+          "minLength": 8,
+          "maxLength": 11
+        },
+        {
+          "key": "counterpartyBic",
+          "label": "Counterparty BIC (ISO 9362)",
+          "required": true,
+          "type": "input",
+          "pattern": "^[A-Z0-9]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$",
+          "minLength": 8,
+          "maxLength": 11
+        },
+        {
+          "key": "service",
+          "label": "SWIFT Service",
+          "required": true,
+          "type": "select",
+          "options": ["FIN", "FINPLUS"],
+          "defaultValue": "FIN"
+        },
+        {
+          "key": "direction",
+          "label": "Direction",
+          "required": true,
+          "type": "select",
+          "options": ["INBOUND", "OUTBOUND"],
+          "defaultValue": "OUTBOUND"
+        },
+        {
+          "key": "messageTypes",
+          "label": "Message Types",
+          "required": true,
+          "type": "multicheckbox",
+          "options": [
+            "MT300",
+            "MT320",
+            "MT400",
+            "MT700",
+            "MT740",
+            "MT742",
+            "MT760",
+            "MT765",
+            "pacs.008.001.12",
+            "pacs.009.001.12",
+            "pacs.009.001.12.COV"
+          ]
+        },
+        {
+          "key": "validFrom",
+          "label": "Valid From",
+          "required": true,
+          "type": "input",
+          "inputType": "date",
+          "defaultValue": "2026-01-01"
+        },
+        {
+          "key": "validTo",
+          "label": "Valid To",
+          "required": true,
+          "type": "input",
+          "inputType": "date",
+          "defaultValue": "2027-12-31"
+        }
+      ],
+      "x-lifecycle": ["submit", "approve", "activate", "revise", "revoke"]
+    },
+    {
+      "id": "ssi",
+      "label": "SSI",
+      "endpoint": "ssis",
+      "importType": "SSI",
+      "description": "\u7ba1\u7406\u53ef\u91cd\u7528\u6216\u55ae\u7b46\u4ea4\u6613\u7684 Settlement Instruction\uff1bActual SWIFT Receiver BIC \u5728\u4f7f\u7528\u6642\u5fc5\u9808\u901a\u904e\u5c0d\u61c9\u7684 RMA authorization\u3002",
+      "columns": [
+        {
+          "path": "route.ssiCode",
+          "label": "SSI ID"
+        },
+        {
+          "path": "route.currency",
+          "label": "CCY"
+        },
+        {
+          "paths": ["route.counterpartyBic", "route.counterpartyCountry"],
+          "separator": " \u00b7 ",
+          "label": "Counterparty"
+        },
+        {
+          "path": "route.accountWithBic",
+          "label": "Account With"
+        },
+        {
+          "path": "route.clearingSystem",
+          "label": "RTGS / Clearing"
+        },
+        {
+          "paths": ["route.routePreference", "route.priority"],
+          "separator": " \u00b7 ",
+          "label": "Route Class / Priority"
+        },
+        {
+          "paths": ["route.validFrom", "route.validTo"],
+          "separator": " \u2192 ",
+          "label": "Effective Period"
+        },
+        {
+          "paths": ["status", "version"],
+          "separator": " \u00b7 v",
+          "label": "Status / Version"
+        }
+      ],
+      "exportColumns": [
+        {
+          "path": "route.ssiCode",
+          "label": "SSI ID"
+        },
+        {
+          "path": "route.currency",
+          "label": "Currency"
+        },
+        {
+          "path": "route.counterpartyBic",
+          "label": "Counterparty BIC"
+        },
+        {
+          "path": "route.counterpartyCountry",
+          "label": "Counterparty Country"
+        },
+        {
+          "path": "route.accountWithBic",
+          "label": "Account With"
+        },
+        {
+          "path": "route.settlementCountry",
+          "label": "Settlement Country"
+        },
+        {
+          "path": "route.settlementMarket",
+          "label": "Settlement Market"
+        },
+        {
+          "path": "route.clearingSystem",
+          "label": "Clearing System"
+        },
+        {
+          "path": "route.schemeType",
+          "label": "Scheme Type"
+        },
+        {
+          "path": "route.routePreference",
+          "label": "Route Class"
+        },
+        {
+          "path": "route.priority",
+          "label": "Priority"
+        },
+        {
+          "path": "route.validFrom",
+          "label": "Effective From"
+        },
+        {
+          "path": "route.validTo",
+          "label": "Effective To"
+        },
+        {
+          "path": "scope",
+          "label": "Scope"
+        },
+        {
+          "path": "status",
+          "label": "Status"
+        },
+        {
+          "path": "version",
+          "label": "Version"
+        }
+      ],
+      "fields": [
+        {
+          "key": "maker",
+          "label": "Maker",
+          "required": true,
+          "type": "input",
+          "defaultValue": "maker.demo"
+        },
+        {
+          "key": "route.ssiCode",
+          "label": "SSI ID / Stable Code",
+          "required": true,
+          "type": "input"
+        },
+        {
+          "key": "route.ssiName",
+          "label": "SSI Name",
+          "required": true,
+          "type": "input"
+        },
+        {
+          "key": "counterpartyId",
+          "label": "Counterparty Master ID",
+          "required": true,
+          "type": "input"
+        },
+        {
+          "key": "route.counterpartyName",
+          "label": "Counterparty Name",
+          "required": true,
+          "type": "input"
+        },
+        {
+          "key": "route.counterpartyBic",
+          "label": "Counterparty BIC Matcher",
+          "required": true,
+          "type": "input"
+        },
+        {
+          "key": "route.counterpartyCountry",
+          "label": "Counterparty Country Matcher",
+          "required": true,
+          "type": "input",
+          "maxLength": 3
+        },
+        {
+          "key": "route.applicabilityProfileId",
+          "label": "Applicability Profile ID",
+          "required": true,
+          "type": "input"
+        },
+        {
+          "key": "route.settlementRouteId",
+          "label": "Settlement Route ID",
+          "required": true,
+          "type": "input"
+        },
+        {
+          "key": "scope",
+          "label": "SSI Scope",
+          "description": "STANDING = reusable standing instruction; TRANSACTION_SPECIFIC requires a transaction binding before activation.",
+          "required": true,
+          "type": "select",
+          "options": ["STANDING", "TRANSACTION_SPECIFIC"],
+          "defaultValue": "STANDING"
+        },
+        {
+          "key": "route.currency",
+          "label": "Currency (ISO 4217)",
+          "required": true,
+          "type": "select",
+          "optionsSource": "reference/currencies"
+        },
+        {
+          "key": "route.bookingEntity",
+          "label": "Booking Entity",
+          "required": true,
+          "type": "input"
+        },
+        {
+          "key": "route.settlementCountry",
+          "label": "Settlement / Clearing Country",
+          "required": true,
+          "type": "input",
+          "maxLength": 3
+        },
+        {
+          "key": "route.settlementMarket",
+          "label": "Settlement Market",
+          "required": true,
+          "type": "input"
+        },
+        {
+          "key": "route.clearingSystem",
+          "label": "Related RTGS / Clearing System",
+          "description": "Must reference one concrete active Clearing System Standing Data code; TARGET/TARGET2 are legacy aliases and new SSI must use T2.",
+          "required": true,
+          "type": "input"
+        },
+        {
+          "key": "route.schemeType",
+          "label": "Scheme Type",
+          "description": "RTGS, LVPS, ACH or IPS; non-RTGS rails must not be labelled RTGS.",
+          "required": true,
+          "type": "select",
+          "options": ["RTGS", "LVPS", "ACH", "IPS"]
+        },
+        {
+          "key": "route.routeType",
+          "label": "Route Type",
+          "required": true,
+          "type": "select",
+          "options": [
+            "DIRECT",
+            "CORRESPONDENT",
+            "INTERMEDIARY",
+            "COVER",
+            "CLEARING_AGENT"
+          ]
+        },
+        {
+          "key": "route.routePreference",
+          "label": "Route Class",
+          "description": "PRIMARY, SECONDARY or approved FALLBACK.",
+          "required": true,
+          "type": "select",
+          "options": ["PRIMARY", "SECONDARY", "FALLBACK"]
+        },
+        {
+          "key": "route.priority",
+          "label": "Priority",
+          "description": "Lower numeric value has higher precedence within the same specificity and Route Class.",
+          "required": true,
+          "type": "input",
+          "inputType": "number",
+          "minimum": 1,
+          "maximum": 999
+        },
+        {
+          "key": "route.accountWithBic",
+          "label": "Account With Institution (ISO 9362)",
+          "required": true,
+          "type": "input",
+          "pattern": "^[A-Z0-9]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$",
+          "minLength": 8,
+          "maxLength": 11
+        },
+        {
+          "key": "route.actualReceiverBic",
+          "label": "Actual SWIFT Receiver BIC",
+          "required": true,
+          "type": "input",
+          "pattern": "^[A-Z0-9]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$",
+          "minLength": 8,
+          "maxLength": 11
+        },
+        {
+          "key": "route.accountServicerCountry",
+          "label": "Account Servicer Country",
+          "required": true,
+          "type": "input",
+          "maxLength": 2
+        },
+        {
+          "key": "route.correspondentCountry",
+          "label": "Correspondent Country",
+          "required": true,
+          "type": "input",
+          "maxLength": 2
+        },
+        {
+          "key": "route.beneficiaryBic",
+          "label": "Beneficiary BIC (ISO 9362)",
+          "required": true,
+          "type": "input",
+          "pattern": "^[A-Z0-9]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$",
+          "minLength": 8,
+          "maxLength": 11
+        },
+        {
+          "key": "route.beneficiaryBankCountry",
+          "label": "Beneficiary Bank Country",
+          "required": true,
+          "type": "input",
+          "maxLength": 3
+        },
+        {
+          "key": "route.intermediaryBic",
+          "label": "Intermediary Institution (ISO 9362)",
+          "type": "input",
+          "pattern": "^[A-Z0-9]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$",
+          "maxLength": 11
+        },
+        {
+          "key": "route.accountId",
+          "label": "Account / Nostro ID",
+          "required": true,
+          "type": "input"
+        },
+        {
+          "key": "route.resolutionReason",
+          "label": "Approved Route Rationale",
+          "required": true,
+          "type": "input"
+        },
+        {
+          "key": "route.validFrom",
+          "label": "Valid From",
+          "required": true,
+          "type": "input",
+          "inputType": "date"
+        },
+        {
+          "key": "route.validTo",
+          "label": "Valid To",
+          "required": true,
+          "type": "input",
+          "inputType": "date"
+        }
+      ],
+      "x-lifecycle": ["submit", "approve", "activate", "revise", "revoke"]
+    },
+    {
+      "id": "entity",
+      "label": "Entities",
+      "endpoint": "booking-branch-entities",
+      "description": "\u672c\u884c Booking Branch / Entity Standing Data\uff1b\u4e0d\u662f counterparty bank \u6216 country\u3002",
+      "columns": [
+        {
+          "path": "branchCode",
+          "label": "Code"
+        },
+        {
+          "path": "branchName",
+          "label": "Name"
+        },
+        {
+          "path": "legalEntityCode",
+          "label": "Legal Entity Code"
+        },
+        {
+          "path": "legalEntityName",
+          "label": "Legal Entity Name"
+        },
+        {
+          "path": "countryCode",
+          "label": "Country"
+        },
+        {
+          "path": "validFrom",
+          "label": "Effective From"
+        },
+        {
+          "path": "validTo",
+          "label": "Effective To"
+        },
+        {
+          "path": "status",
+          "label": "Status"
+        },
+        {
+          "path": "version",
+          "label": "Version"
+        }
+      ],
+      "fields": [
+        {
+          "key": "maker",
+          "label": "Maker",
+          "required": true,
+          "type": "input",
+          "defaultValue": "maker.entity"
+        },
+        {
+          "key": "branchCode",
+          "label": "Booking Branch Code",
+          "required": true,
+          "type": "input",
+          "pattern": "^[A-Z]{2}[0-9]{2}$",
+          "minLength": 4,
+          "maxLength": 4
+        },
+        {
+          "key": "branchName",
+          "label": "Booking Branch Name",
+          "required": true,
+          "type": "input"
+        },
+        {
+          "key": "legalEntityCode",
+          "label": "Legal Entity Code",
+          "required": true,
+          "type": "input"
+        },
+        {
+          "key": "legalEntityName",
+          "label": "Legal Entity Name",
+          "required": true,
+          "type": "input"
+        },
+        {
+          "key": "countryCode",
+          "label": "Country Code",
+          "required": true,
+          "type": "input",
+          "pattern": "^[A-Z]{2}$",
+          "minLength": 2,
+          "maxLength": 2
+        },
+        {
+          "key": "validFrom",
+          "label": "Effective From",
+          "required": true,
+          "type": "input",
+          "inputType": "date",
+          "defaultValue": "2026-01-01"
+        },
+        {
+          "key": "validTo",
+          "label": "Effective To",
+          "required": true,
+          "type": "input",
+          "inputType": "date",
+          "defaultValue": "2099-12-31"
+        }
+      ],
+      "x-lifecycle": ["submit", "approve", "activate", "revise", "revoke"]
+    },
+    {
+      "id": "nostro",
+      "label": "Nostro Account",
+      "endpoint": "nostro-accounts",
+      "importType": "NOSTRO",
+      "description": "\u540c\u4e00 Account Servicer \u8207\u5e63\u5225\u53ef\u914d\u7f6e\u591a\u500b\u906e\u7f69\u5e33\u865f\uff0c\u4ee5 purpose\u3001priority\u3001\u6709\u6548\u671f\u89e3\u6790\uff1b\u4e0d\u5f97\u628a RMA \u7576\u5e33\u6236\u6240\u6709\u6b0a\u8b49\u64da\u3002",
+      "columns": [
+        {
+          "path": "ownLegalEntityId",
+          "label": "Legal Entity"
+        },
+        {
+          "path": "accountServicerBic",
+          "label": "Servicer BIC"
+        },
+        {
+          "path": "currency",
+          "label": "Currency"
+        },
+        {
+          "path": "maskedAccountRef",
+          "label": "Masked Account"
+        },
+        {
+          "path": "purpose",
+          "label": "Purpose"
+        },
+        {
+          "path": "priority",
+          "label": "Priority"
+        },
+        {
+          "path": "status",
+          "label": "Status"
+        },
+        {
+          "path": "version",
+          "label": "Version"
+        }
+      ],
+      "fields": [
+        {
+          "key": "maker",
+          "label": "Maker",
+          "required": true,
+          "type": "input",
+          "defaultValue": "maker.demo"
+        },
+        {
+          "key": "ownLegalEntityId",
+          "label": "Own Legal Entity",
+          "required": true,
+          "type": "input",
+          "defaultValue": "BASELINE-HK"
+        },
+        {
+          "key": "accountServicerBic",
+          "label": "Account Servicer BIC (ISO 9362)",
+          "required": true,
+          "type": "input",
+          "pattern": "^[A-Z0-9]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$",
+          "minLength": 8,
+          "maxLength": 11
+        },
+        {
+          "key": "currency",
+          "label": "Currency (ISO 4217)",
+          "required": true,
+          "type": "select",
+          "optionsSource": "reference/currencies"
+        },
+        {
+          "key": "maskedAccountRef",
+          "label": "Masked/Demo Account Reference",
+          "required": true,
+          "type": "input",
+          "pattern": "^DEMO-[A-Z0-9-]{4,40}$"
+        },
+        {
+          "key": "purpose",
+          "label": "Settlement Purpose",
+          "required": true,
+          "type": "select",
+          "options": [
+            "SETTLEMENT",
+            "COLLECTION",
+            "REIMBURSEMENT",
+            "TREASURY",
+            "GUARANTEE_CLAIM"
+          ],
+          "defaultValue": "SETTLEMENT"
+        },
+        {
+          "key": "priority",
+          "label": "Resolution Priority",
+          "required": true,
+          "type": "input",
+          "inputType": "number",
+          "minimum": 1,
+          "maximum": 999,
+          "defaultValue": 10
+        },
+        {
+          "key": "validFrom",
+          "label": "Valid From",
+          "required": true,
+          "type": "input",
+          "inputType": "date",
+          "defaultValue": "2026-01-01"
+        },
+        {
+          "key": "validTo",
+          "label": "Valid To",
+          "required": true,
+          "type": "input",
+          "inputType": "date",
+          "defaultValue": "2027-12-31"
+        }
+      ],
+      "x-lifecycle": ["submit", "approve", "activate", "revise", "revoke"]
+    }
+  ],
+  "paths": {
+    "/rma-authorisations": {
+      "get": {
+        "operationId": "listRma",
+        "responses": {
+          "200": {
+            "description": "RMA records"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createRmaDraft",
+        "requestBody": {
+          "$ref": "#/components/requestBodies/Rma"
+        },
+        "responses": {
+          "201": {
+            "description": "DRAFT created"
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          }
+        }
+      }
+    },
+    "/rma-authorisations/{id}": {
+      "put": {
+        "operationId": "updateRmaDraft",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/Rma"
+        },
+        "responses": {
+          "200": {
+            "description": "DRAFT updated"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "revokeRma",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Logically revoked; audit retained"
+          }
+        }
+      }
+    },
+    "/rma-authorisations/check": {
+      "post": {
+        "operationId": "checkRma",
+        "responses": {
+          "200": {
+            "description": "AUTHORISED, NOT_AUTHORISED, NOT_FOUND or AMBIGUOUS"
+          }
+        }
+      }
+    },
+    "/ssis": {
+      "get": {
+        "operationId": "listSsi",
+        "responses": {
+          "200": {
+            "description": "SSI records"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createSsiDraft",
+        "requestBody": {
+          "$ref": "#/components/requestBodies/Ssi"
+        },
+        "responses": {
+          "201": {
+            "description": "DRAFT created"
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          }
+        }
+      }
+    },
+    "/ssis/{id}": {
+      "put": {
+        "operationId": "updateSsiDraft",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/Ssi"
+        },
+        "responses": {
+          "200": {
+            "description": "DRAFT updated"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "revokeSsi",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Logically revoked; audit retained"
+          }
+        }
+      }
+    },
+    "/nostro-accounts": {
+      "get": {
+        "operationId": "listNostro",
+        "responses": {
+          "200": {
+            "description": "Nostro records"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createNostroDraft",
+        "requestBody": {
+          "$ref": "#/components/requestBodies/Nostro"
+        },
+        "responses": {
+          "201": {
+            "description": "DRAFT created"
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          }
+        }
+      }
+    },
+    "/nostro-accounts/{id}": {
+      "put": {
+        "operationId": "updateNostroDraft",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          }
+        ],
+        "requestBody": {
+          "$ref": "#/components/requestBodies/Nostro"
+        },
+        "responses": {
+          "200": {
+            "description": "DRAFT updated"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "revokeNostro",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Id"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Logically revoked; audit retained"
+          }
+        }
+      }
+    },
+    "/nostro-accounts/resolve": {
+      "post": {
+        "operationId": "resolveNostro",
+        "responses": {
+          "200": {
+            "description": "RESOLVED, NOT_FOUND or AMBIGUOUS"
+          }
+        }
+      }
+    },
+    "/swift-data/imports": {
+      "post": {
+        "operationId": "importSwiftData",
+        "responses": {
+          "200": {
+            "description": "Row-level validation/import result; accepted records remain DRAFT"
+          }
+        }
+      }
+    },
+    "/reference/fin-tag-suggestions": {
+      "post": {
+        "operationId": "suggestReferenceFin5xTags",
+        "description": "Deprecated compatibility adapter. Use POST /reference/fin-tag-resolutions. It maps resolvedFields to the legacy suggestions shape and never supports payment execution.",
+        "responses": {
+          "200": {
+            "description": "Non-payment MT 5x suggestions; paymentExecutable is always false."
+          },
+          "400": {
+            "description": "FIN context incomplete or no verified exact mapping."
+          }
+        },
+        "deprecated": true
+      }
+    },
+    "/settlements/resolve": {
+      "post": {
+        "operationId": "previewExecutableSettlement",
+        "description": "Pre-settlement PAYMENT_SSI preview for an OUTGOING executable MT2 payment. The server derives counterpartyType=BANK from the selectable SR2026 Payment Message Index profile and rejects a client-supplied counterpartyType. MT/MX output format is deliberately absent because it is not a matching or ranking key.",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Mt2BankResolutionRequest" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "Ranked preview; paymentExecutable remains false until confirm.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Mt2ResolutionResponse" } } }
+          },
+          "400": {
+            "description": "Incomplete or non-payment/incoming context, unsupported Message Index profile, target mismatch, or client-supplied counterpartyType."
+          }
+        }
+      }
+    },
+    "/settlements/{resolutionId}/confirm": {
+      "post": {
+        "operationId": "confirmExecutableSettlement",
+        "parameters": [
+          {
+            "name": "resolutionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Rechecks eligibility, Actual Receiver RMA and matching Nostro, then returns canonical roles plus immutable snapshot/token/hash. The caller owns full message assembly, transaction lifecycle and accounting.",
+        "responses": {
+          "200": {
+            "description": "Confirmed PAYMENT_SSI; paymentExecutable true."
+          },
+          "409": {
+            "description": "Preview stale or route no longer eligible."
+          }
+        }
+      }
+    },
+    "/settlements/clearing-options": {
+      "post": {
+        "operationId": "listEligibleResolutionClearingOptions",
+        "description": "Returns only clearing systems referenced by currently Active and eligible SSI routes for the submitted MT2 payment-trigger transaction criteria, intersected with active Clearing System Standing Data. The selectable sourceMessageType is required; counterpartyType=BANK is server-derived and must not be supplied by the client. This is not the full capability catalogue.",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Mt2BankResolutionRequest" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "Eligible SSI-backed clearing override options.",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Mt2ResolutionResponse" } } }
+          }
+        }
+      }
+    },
+    "/own-account-settlements/resolve": {
+      "post": {
+        "operationId": "resolveOwnAccountSettlement",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OwnAccountSettlementRequest" } } } },
+        "responses": { "200": { "description": "MRG-governed own-account result.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Mt2ResolutionResponse" } } } } }
+      }
+    },
+    "/fi-direct-debits/resolve": {
+      "post": {
+        "operationId": "resolveFiDirectDebit",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FiDirectDebitRequest" } } } },
+        "responses": { "200": { "description": "MRG-governed FI direct-debit result.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Mt2ResolutionResponse" } } } } }
+      }
+    },
+    "/payment-notifications/resolve": {
+      "post": {
+        "operationId": "resolvePaymentNotification",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PaymentNotificationRequest" } } } },
+        "responses": { "200": { "description": "MRG-governed payment-notification result.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Mt2ResolutionResponse" } } } } }
+      }
+    },
+    "/reference/clearing-systems": {
+      "get": {
+        "operationId": "listClearingSystems",
+        "parameters": [
+          {
+            "name": "currency",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Currency"
+            }
+          },
+          {
+            "name": "settlementCountry",
+            "in": "query",
+            "required": false,
+            "description": "ISO 3166-1 alpha-2 market hint. Includes exact-market rails and governed PAN_REGIONAL rails whose eligibleCountries contain the requested country.",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]{2}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Active governed clearing-system standing data; TARGET/TARGET2 are legacy aliases for T2.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClearingSystemPage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reference/fin-resolution-catalogue": {
+      "get": {
+        "operationId": "listFinResolutionCatalogue",
+        "description": "Returns the SR-governed outward MT3/MT4/MT7 catalogue with an explicit message-level SSI resolution scope marker and SSI-resolvable tag options.",
+        "parameters": [
+          {
+            "name": "standardsRelease",
+            "in": "query",
+            "schema": { "type": "string", "default": "SR2026" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Parameter-driven FIN Resolution catalogue; each message is marked SSI_RESOLVABLE or NO_SSI_RESOLVABLE_FIELDS."
+          }
+        }
+      }
+    },
+    "/reference/fin-tag-resolutions": {
+      "post": {
+        "operationId": "resolveReferenceFin5xFields",
+        "description": "Primary SR2026-governed, reference-only FIN field resolution for Treasury MT3 and Trade Finance MT4/MT7. No payment execution or confirmation semantics.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "service",
+                  "resolutionMode",
+                  "standardsRelease",
+                  "messageType",
+                  "direction",
+                  "businessFunction",
+                  "transactionReference",
+                  "currency",
+                  "receiverBic",
+                  "valueDate",
+                  "roles"
+                ],
+                "properties": {
+                  "service": {
+                    "const": "FIN"
+                  },
+                  "resolutionMode": {
+                    "enum": ["TREASURY", "TRADE_FINANCE"]
+                  },
+                  "standardsRelease": {
+                    "const": "SR2026"
+                  },
+                  "messageType": {
+                    "type": "string",
+                    "pattern": "^MT[0-9]{3}$"
+                  },
+                  "direction": {
+                    "const": "OUTGOING"
+                  },
+                  "businessFunction": {
+                    "type": "string"
+                  },
+                  "sequence": {
+                    "type": "string"
+                  },
+                  "settlementLeg": {
+                    "type": "string"
+                  },
+                  "fieldOptions": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "transactionReference": {
+                    "type": "string"
+                  },
+                  "currency": {
+                    "type": "string",
+                    "pattern": "^[A-Z]{3}$"
+                  },
+                  "receiverBic": {
+                    "type": "string"
+                  },
+                  "bookingEntity": {
+                    "type": "string"
+                  },
+                  "valueDate": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "roles": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "roleEvidence": {
+                    "type": "object",
+                    "description": "Evidence and canonical settlement-route node identity for each role. Equal BICs are normalized only when canonicalRouteNodeId and ownerSide also match.",
+                    "additionalProperties": {
+                      "type": "object",
+                      "properties": {
+                        "ownerSide": {
+                          "enum": [
+                            "SENDER_SIDE",
+                            "RECEIVER_SIDE",
+                            "TRANSACTION_PARTY"
+                          ]
+                        },
+                        "sourceType": { "type": "string" },
+                        "sourceRecordId": { "type": "string" },
+                        "version": { "type": "string" },
+                        "status": { "type": "string" },
+                        "approvalStatus": { "type": "string" },
+                        "effectiveFrom": { "type": "string", "format": "date" },
+                        "effectiveTo": { "type": "string", "format": "date" },
+                        "canonicalRouteNodeId": {
+                          "type": "string",
+                          "description": "Identity derived from normalized BIC11, branch, account owner/servicer/identifier, currency, clearing context and instruction provenance; a BIC alone is insufficient."
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reference-only resolvedFields result; paymentExecutable is always false.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "usage",
+                    "paymentExecutable",
+                    "confirmationSupported",
+                    "resolvedFields"
+                  ],
+                  "properties": {
+                    "usage": {
+                      "const": "REFERENCE_ONLY"
+                    },
+                    "paymentExecutable": {
+                      "const": false
+                    },
+                    "confirmationSupported": {
+                      "const": false
+                    },
+                    "resolvedFields": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "standardsRelease",
+                          "messageType",
+                          "sequence",
+                          "settlementLeg",
+                          "tag",
+                          "option",
+                          "officialFieldName",
+                          "officialRole",
+                          "businessFunction",
+                          "scopeStatus",
+                          "resolutionStatus",
+                          "reasonCode",
+                          "resolvedValue",
+                          "nvrRefs",
+                          "provenance"
+                        ],
+                        "properties": {
+                          "standardsRelease": {
+                            "type": "string"
+                          },
+                          "messageType": {
+                            "type": "string"
+                          },
+                          "sequence": {
+                            "type": "string"
+                          },
+                          "settlementLeg": {
+                            "type": "string"
+                          },
+                          "tag": {
+                            "type": "string"
+                          },
+                          "option": {
+                            "type": "string"
+                          },
+                          "officialFieldName": {
+                            "type": "string"
+                          },
+                          "officialRole": {
+                            "type": "string"
+                          },
+                          "businessFunction": {
+                            "type": "string"
+                          },
+                          "scopeStatus": {
+                            "enum": ["SSI_SUPPORTED", "OUT_OF_SSI_SCOPE"]
+                          },
+                          "resolutionStatus": {
+                            "description": "Runtime disposition for every audited field slot. Profile-excluded slots are returned explicitly as N_A rather than omitted.",
+                            "enum": [
+                              "RESOLVED",
+                              "NOT_REQUIRED",
+                              "NO_ELIGIBLE_SSI",
+                              "N_A"
+                            ]
+                          },
+                          "reasonCode": {
+                            "description": "Controlled reason such as ROUTE_COMPLETE or MESSAGE_PROFILE_EXCLUDED. A ROUTE_COMPLETE decision is attributed to ROUTE_RESOLVER/CANONICAL_ROUTE in provenance.",
+                            "type": "string"
+                          },
+                          "resolvedValue": {
+                            "type": ["string", "null"]
+                          },
+                          "nvrRefs": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "provenance": {
+                            "description": "For NOT_REQUIRED route decisions, source is ROUTE_RESOLVER and ownerSide is CANONICAL_ROUTE; original candidate source/owner are retained separately when applicable.",
+                            "type": "object"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Context, exact profile, option, or eligible SSI evidence is invalid/missing."
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "Id": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      }
+    },
+    "requestBodies": {
+      "Rma": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/RmaCommand"
+            }
+          }
+        }
+      },
+      "Ssi": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/SsiCommand"
+            }
+          }
+        }
+      },
+      "Nostro": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/NostroCommand"
+            }
+          }
+        }
+      }
+    },
+    "responses": {
+      "ValidationError": {
+        "description": "SWIFT/ISO syntax or business-rule validation failed"
+      }
+    },
+    "schemas": {
+      "Bic": {
+        "type": "string",
+        "pattern": "^[A-Z0-9]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$",
+        "minLength": 8,
+        "maxLength": 11,
+        "description": "ISO 9362 BIC syntax only; directory existence requires licensed Bank/SwiftRef data."
+      },
+      "Currency": {
+        "type": "string",
+        "pattern": "^[A-Z]{3}$",
+        "description": "Must also exist in Currency service ISO 4217 data."
+      },
+      "ClearingSystemReference": {
+        "type": "object",
+        "required": [
+          "code",
+          "name",
+          "supportedCurrency",
+          "settlementCountry",
+          "marketScope",
+          "eligibleCountries",
+          "settlementMarket",
+          "paymentServiceLevel",
+          "schemeType",
+          "status",
+          "validFrom",
+          "validTo"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "supportedCurrency": {
+            "$ref": "#/components/schemas/Currency"
+          },
+          "settlementCountry": {
+            "type": "string",
+            "pattern": "^([A-Z]{2}|ANY)$"
+          },
+          "marketScope": {
+            "enum": ["DOMESTIC", "MARKET_SPECIFIC", "PAN_REGIONAL"]
+          },
+          "eligibleCountries": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Z]{2}$"
+            }
+          },
+          "settlementMarket": {
+            "type": "string",
+            "minLength": 1
+          },
+          "paymentServiceLevel": {
+            "enum": ["HIGH_VALUE", "RETAIL", "INSTANT"]
+          },
+          "schemeType": {
+            "enum": ["RTGS", "LVPS", "ACH", "IPS"]
+          },
+          "status": {
+            "enum": ["ACTIVE", "INACTIVE"]
+          },
+          "validFrom": {
+            "type": "string",
+            "format": "date"
+          },
+          "validTo": {
+            "type": "string",
+            "format": "date"
+          },
+          "legacyAliases": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Accepted only for migration/reference; current UI displays the canonical code."
+          }
+        }
+      },
+      "ClearingSystemPage": {
+        "type": "object",
+        "required": ["items", "source", "aliasPolicy", "disclaimer"],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ClearingSystemReference"
+            }
+          },
+          "source": {
+            "type": "string"
+          },
+          "aliasPolicy": {
+            "type": "string"
+          },
+          "disclaimer": {
+            "type": "string"
+          }
+        }
+      },
+      "SwiftMessageType": {
+        "type": "string",
+        "pattern": "^(MT[0-9]{3}(COV)?|pacs\\.[A-Za-z0-9.]+|\\*)$"
+      },
+      "RmaCommand": {
+        "type": "object",
+        "required": [
+          "ownBic",
+          "counterpartyBic",
+          "service",
+          "direction",
+          "messageTypes",
+          "validFrom",
+          "validTo",
+          "maker"
+        ],
+        "properties": {
+          "ownBic": {
+            "$ref": "#/components/schemas/Bic"
+          },
+          "counterpartyBic": {
+            "$ref": "#/components/schemas/Bic"
+          },
+          "service": {
+            "enum": ["FIN", "FINPLUS"]
+          },
+          "direction": {
+            "enum": ["INBOUND", "OUTBOUND"]
+          },
+          "messageTypes": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "$ref": "#/components/schemas/SwiftMessageType"
+            }
+          },
+          "validFrom": {
+            "type": "string",
+            "format": "date"
+          },
+          "validTo": {
+            "type": "string",
+            "format": "date"
+          },
+          "maker": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "SsiCommand": {
+        "type": "object",
+        "required": ["counterpartyId", "scope", "route", "maker"],
+        "properties": {
+          "counterpartyId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "scope": {
+            "enum": ["STANDING", "TRANSACTION_SPECIFIC"]
+          },
+          "route": {
+            "type": "object",
+            "required": [
+              "currency",
+              "beneficiaryBic",
+              "accountWithBic",
+              "settlementCountry",
+              "settlementMarket",
+              "clearingSystem",
+              "schemeType"
+            ],
+            "properties": {
+              "currency": {
+                "$ref": "#/components/schemas/Currency"
+              },
+              "beneficiaryBic": {
+                "$ref": "#/components/schemas/Bic"
+              },
+              "accountWithBic": {
+                "$ref": "#/components/schemas/Bic"
+              },
+              "intermediaryBic": {
+                "$ref": "#/components/schemas/Bic"
+              },
+              "accountId": {
+                "type": "string"
+              },
+              "settlementCountry": {
+                "type": "string",
+                "pattern": "^[A-Z]{2}$",
+                "description": "ISO 3166-1 alpha-2 settlement-market country; distinct from counterparty/correspondent country."
+              },
+              "settlementMarket": {
+                "type": "string",
+                "minLength": 1
+              },
+              "clearingSystem": {
+                "type": "string",
+                "minLength": 1,
+                "not": {
+                  "enum": ["ANY"]
+                },
+                "description": "Concrete active standing-data code for the related RTGS or clearing scheme."
+              },
+              "schemeType": {
+                "enum": ["RTGS", "LVPS", "ACH", "IPS"],
+                "description": "Governed classification: RTGS, other large-value payment system, ACH, or instant payment scheme."
+              }
+            }
+          },
+          "maker": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "Mt2ResolutionResponse": {
+        "type": "object",
+        "required": ["redirectDomain"],
+        "properties": { "redirectDomain": { "type": ["string", "null"], "description": "Owning MT2 resolution domain when the caller must redirect; null on a terminal decision." } }
+      },
+      "Mt2BankResolutionRequest": {
+        "type": "object",
+        "required": ["counterpartyBankServiceId"],
+        "properties": {
+          "counterpartyBankServiceId": { "$ref": "#/components/schemas/BankServiceId" },
+          "sourceMessageType": { "type": "string" },
+          "messageType": { "type": "string" }
+        },
+        "description": "The service resolves the read-only BIC from the Bank Service identity; callers must not submit a BIC."
+      },
+      "OwnAccountSettlementRequest": {
+        "type": "object",
+        "properties": {
+          "receiverBankServiceId": { "$ref": "#/components/schemas/BankServiceId" },
+          "accountWithBankServiceId": { "$ref": "#/components/schemas/BankServiceId" },
+          "intermediaryBankServiceId": { "$ref": "#/components/schemas/BankServiceId" }
+        }
+      },
+      "FiDirectDebitRequest": {
+        "type": "object",
+        "properties": { "debitInstitutionBankServiceId": { "$ref": "#/components/schemas/BankServiceId" } }
+      },
+      "PaymentNotificationRequest": {
+        "type": "object",
+        "properties": { "orderingInstitutionBankServiceId": { "$ref": "#/components/schemas/BankServiceId" } }
+      },
+      "BankServiceId": {
+        "type": "string",
+        "pattern": "^BANK-SVC-[A-Z0-9]{8,11}$",
+        "description": "Stable Bank Service identity. Its BIC is resolved server-side and is read-only output metadata."
+      },
+      "NostroCommand": {
+        "type": "object",
+        "required": [
+          "ownLegalEntityId",
+          "accountServicerBic",
+          "currency",
+          "maskedAccountRef",
+          "purpose",
+          "priority",
+          "validFrom",
+          "validTo",
+          "maker"
+        ],
+        "properties": {
+          "ownLegalEntityId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "accountServicerBic": {
+            "$ref": "#/components/schemas/Bic"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/Currency"
+          },
+          "maskedAccountRef": {
+            "type": "string",
+            "pattern": "^DEMO-[A-Z0-9-]{4,40}$"
+          },
+          "purpose": {
+            "type": "string",
+            "minLength": 1
+          },
+          "priority": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 999
+          },
+          "validFrom": {
+            "type": "string",
+            "format": "date"
+          },
+          "validTo": {
+            "type": "string",
+            "format": "date"
+          },
+          "maker": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}

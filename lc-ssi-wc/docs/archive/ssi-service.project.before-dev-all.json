@@ -1,0 +1,12 @@
+{
+  "name": "ssi-service",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/ssi-service/src",
+  "projectType": "application",
+  "targets": {
+    "build": { "executor": "@nx/js:tsc", "options": { "outputPath": "dist/apps/ssi-service", "main": "apps/ssi-service/src/main.ts", "tsConfig": "apps/ssi-service/tsconfig.app.json" } },
+    "serve": { "executor": "@nx/js:node", "dependsOn": ["build"], "options": { "buildTarget": "ssi-service:build", "runBuildTargetDependencies": false } },
+    "typecheck": { "executor": "nx:run-commands", "options": { "command": "tsc -p apps/ssi-service/tsconfig.app.json --noEmit" } }
+  },
+  "tags": ["type:app", "scope:backend"]
+}

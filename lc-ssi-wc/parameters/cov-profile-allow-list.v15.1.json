@@ -1,0 +1,21 @@
+{
+  "version": "15.1",
+  "status": "APPROVED",
+  "messageDefinitionId": "pacs.009.001.08",
+  "businessService": "swift.cbprplus.cov.04",
+  "sourceMessageTypes": ["MT202COV", "MT205COV"],
+  "pairs": [
+    { "counterpartyBic": "CITIUS33", "currency": "USD", "bookingEntity": "HK01", "ssiCodes": ["SSI-DEMO-001", "SSI-DEMO-002"] },
+    { "counterpartyBic": "BARCGB22", "currency": "GBP", "bookingEntity": "HK01", "ssiCodes": ["SSI-DEMO-003", "SSI-DEMO-022", "SSI-DEMO-004"] },
+    { "counterpartyBic": "BARCGB22", "currency": "USD", "bookingEntity": "HK01", "ssiCodes": ["SSI-DEMO-024"] },
+    { "counterpartyBic": "DEUTDEFF", "currency": "EUR", "bookingEntity": "HK01", "ssiCodes": ["SSI-DEMO-005", "SSI-DEMO-006", "SSI-DEMO-035"] },
+    { "counterpartyBic": "DBSSSGSG", "currency": "SGD", "bookingEntity": "HK01", "ssiCodes": ["SSI-DEMO-007", "SSI-DEMO-008"] },
+    { "counterpartyBic": "BOTKJPJT", "currency": "JPY", "bookingEntity": "HK01", "ssiCodes": ["SSI-DEMO-009", "SSI-DEMO-010"] },
+    { "counterpartyBic": "HSBCHKHH", "currency": "HKD", "bookingEntity": "HK01", "ssiCodes": ["SSI-DEMO-011", "SSI-DEMO-012"] },
+    { "counterpartyBic": "BOFAUS3N", "currency": "AUD", "bookingEntity": "HK01", "ssiCodes": ["SSI-DEMO-013", "SSI-DEMO-014"] },
+    { "counterpartyBic": "CHASUS33", "currency": "CAD", "bookingEntity": "HK01", "ssiCodes": ["SSI-DEMO-015", "SSI-DEMO-016"] },
+    { "counterpartyBic": "CHASUS33", "currency": "USD", "bookingEntity": "HK01", "ssiCodes": ["SSI-DEMO-021"] },
+    { "counterpartyBic": "SCBLGB2L", "currency": "CHF", "bookingEntity": "HK01", "ssiCodes": ["SSI-DEMO-017", "SSI-DEMO-018"] },
+    { "counterpartyBic": "BNPAFRPP", "currency": "CNY", "bookingEntity": "HK01", "ssiCodes": ["SSI-DEMO-019", "SSI-DEMO-020"] }
+  ]
+}

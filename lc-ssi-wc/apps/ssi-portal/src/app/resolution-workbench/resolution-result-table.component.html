@@ -1,0 +1,78 @@
+<section class="resolution-results" aria-labelledby="resolution-results-title">
+  <div class="resolution-results__heading">
+    <div>
+      <span class="eyebrow">Resolved SSI fields</span>
+      <h3 id="resolution-results-title">Actual resolution result</h3>
+    </div>
+    <span class="result-count">{{ rows().length }} fields</span>
+  </div>
+
+  @if (rows().length > 0) {
+    <div class="resolution-results__scroll">
+      <table class="resolution-result-table">
+        <caption class="sr-only">
+          SSI fields returned by the resolution API
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">Sequence</th>
+            <th scope="col">Tag + option</th>
+            <th scope="col">Role</th>
+            <th scope="col">BIC</th>
+            <th scope="col">Institution</th>
+            <th scope="col">Account</th>
+            <th scope="col">Party ID</th>
+            <th scope="col">Rendered value</th>
+            <th scope="col">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of rows(); track row.key) {
+            <tr [attr.data-status]="row.status">
+              <td>
+                <strong>{{ row.sequenceId || "—" }}</strong>
+                @if (row.settlementLeg) {
+                  <small>{{ row.settlementLeg }}</small>
+                }
+              </td>
+              <td class="result-key">
+                <code>{{ row.tagAndOption || "—" }}</code>
+              </td>
+              <td>
+                <strong>{{ row.role || "—" }}</strong>
+                @if (row.fieldName) {
+                  <small>{{ row.fieldName }}</small>
+                }
+              </td>
+              <td class="result-key">
+                <code>{{ row.bic || "—" }}</code>
+              </td>
+              <td>{{ row.institutionName || "—" }}</td>
+              <td>
+                <code>{{ row.accountReference || "—" }}</code>
+              </td>
+              <td>
+                <code>{{ row.partyIdentifier || "—" }}</code>
+              </td>
+              <td>
+                <code>{{ row.renderedValue || "—" }}</code>
+              </td>
+              <td>
+                <span class="result-status" [attr.data-status]="row.status">
+                  {{ row.statusLabel }}
+                </span>
+                @if (row.reasonCode) {
+                  <small>{{ row.reasonCode }}</small>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  } @else {
+    <output class="resolution-results__empty">
+      {{ emptyMessage() }}
+    </output>
+  }
+</section>

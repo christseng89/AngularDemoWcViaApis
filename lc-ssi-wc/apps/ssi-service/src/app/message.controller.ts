@@ -1,0 +1,3 @@
+import{Body,Controller,Post}from'@nestjs/common';import{MessageMappingService}from'./message-mapping.service';
+interface MessageDescriptor{standardsRelease:string;messageType:string;direction:'INCOMING'|'OUTGOING';businessFunction:string}
+@Controller('messages')export class MessageController{constructor(private readonly service:MessageMappingService){}@Post('extract')extract(@Body()body:{content:string;format:'FIN_LIKE'|'MX_JSON'}):unknown{return this.service.extract(this.service.parse(body.content,body.format))}@Post('generate')generate(@Body()body:{message:MessageDescriptor;roles:Record<string,string>}):unknown{return this.service.generate(body.message,body.roles)}}

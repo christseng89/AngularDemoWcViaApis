@@ -1,0 +1,2279 @@
+{
+  "manifestVersion": "2.0.0",
+  "targetStandardsRelease": "Standards MT November 2026",
+  "generatedOn": "2026-09-08",
+  "status": "GATE_G2_FIN_RESOLUTION_PROFILE_COMPLETE_V15_1",
+  "sourceArtifacts": [
+    {
+      "sourceArtifactId": "SWIFT-US2M-FULL-SR2026-64483D7F",
+      "fileName": "SWIFT/us2m_20260717.pdf",
+      "title": "Category 2 - Financial Institution Transfers for Standards MT November 2026 - Message Reference Guide",
+      "pageCount": 211,
+      "sizeBytes": 1291919,
+      "sha256": "64483d7f7c094db28e03791ab6bbc7a0522daec90487a7dd834228e848fa8323"
+    },
+    {
+      "sourceArtifactId": "SWIFT-US3MA-FULL-SR2026-5B4315EF",
+      "fileName": "SWIFT/us3ma_20260717.pdf",
+      "title": "Category 3 - Treasury Markets - FX, Money Markets and Derivatives for Standards MT November 2026 - Message Reference Guide: Volume 1 (MT 300 - MT 341)",
+      "pageCount": 774,
+      "sizeBytes": 4167299,
+      "sha256": "5b4315ef876ff32c416bf445c0adb063d6e0a1600ef93f55df73f98a175457e5"
+    },
+    {
+      "sourceArtifactId": "SWIFT-US3MB-FULL-SR2026-BC510604",
+      "fileName": "SWIFT/us3mb_20260717.pdf",
+      "title": "Category 3 - Treasury Markets - FX, Money Markets and Derivatives for Standards MT November 2026 - Message Reference Guide: Volume 2 (MT 350 - MT 399)",
+      "pageCount": 635,
+      "sizeBytes": 3343032,
+      "sha256": "bc510604859cf7c5fe43a90176889ad21050ece964a6244ebd92ac6e50faf861"
+    },
+    {
+      "sourceArtifactId": "SWIFT-US4M-FULL-SR2026-71F86522",
+      "fileName": "SWIFT/us4m_20260717.pdf",
+      "title": "Category 4 - Collections and Cash Letters for Standards MT November 2026 - Message Reference Guide",
+      "pageCount": 115,
+      "sizeBytes": 898897,
+      "sha256": "71f865223fd74b19dd5ae721aa84f0288259a1c28600a5b8f8252346bac1c06b"
+    },
+    {
+      "sourceArtifactId": "SWIFT-US7M-FULL-SR2026-1F748A82",
+      "fileName": "SWIFT/us7m_20260717.pdf",
+      "title": "Category 7 - Documentary Credits and Guarantees/Standby Letters of Credit for Standards MT November 2026 - Message Reference Guide",
+      "pageCount": 443,
+      "sizeBytes": 3013082,
+      "sha256": "1f748a8262e5528f6c9bd59ddd5ff1a992542cfcf25d0e8da528241d12fea2a4"
+    }
+  ],
+  "formatDefinitions": {
+    "FI_A": "[/1!a][/34x] + 4!a2!a2!c[3!c]",
+    "LOCATION_B": "[/1!a][/34x] + [35x]",
+    "NAME_ADDRESS_D": "[/1!a][/34x] + 4*35x"
+  },
+  "policyBoundary": [
+    "The local full SR2026 Message Reference Guides govern the base message profile; an applicable Usage Guideline or bilateral policy may only narrow it.",
+    "MRG field eligibility does not prove that a bank-specific value is SSI-resolvable; eligible Own or Counterparty SSI evidence remains required.",
+    "86a is explicitly deferred from Phase 1 and is not present in the FIN field resolver catalogue."
+  ],
+  "messageEvidence": [
+    {
+      "messageType": "MT202",
+      "artifactId": "SWIFT-US2M-FULL-SR2026-64483D7F",
+      "pages": [50, 51, 52],
+      "coverage": "CONTROLLED_FIELD_PROFILE",
+      "status": "FIELD_PROFILE_PROVEN",
+      "fields": [
+        {
+          "sequence": "MESSAGE",
+          "tag": "57",
+          "options": ["A", "D"],
+          "fieldName": "Account With Institution",
+          "presence": "OPTIONAL",
+          "formats": ["FI_A", "NAME_ADDRESS_D"],
+          "nvrRefs": [],
+          "pages": [50, 51, 52],
+          "selectionPolicy": "Option A when BIC-identifiable; Option D only for name/address or controlled bilateral exception with a reason code"
+        }
+      ],
+      "goldenFixture": "qa/mt2/mt2-final/fixtures/mt202-57a-option-selection.v15.1.json"
+    },
+    {
+      "messageType": "MT300",
+      "artifactId": "SWIFT-US3MA-FULL-SR2026-5B4315EF",
+      "pages": [18, 19],
+      "coverage": "FULL_MESSAGE_PROFILE",
+      "status": "FIELD_PROFILE_PROVEN",
+      "fields": [
+        {
+          "sequence": "B1",
+          "settlementLeg": "Amount Bought",
+          "tag": "53",
+          "options": ["A", "J"],
+          "fieldName": "Delivery Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [18]
+        },
+        {
+          "sequence": "B1",
+          "settlementLeg": "Amount Bought",
+          "tag": "56",
+          "options": ["A", "J"],
+          "fieldName": "Intermediary",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [18]
+        },
+        {
+          "sequence": "B1",
+          "settlementLeg": "Amount Bought",
+          "tag": "57",
+          "options": ["A", "J"],
+          "fieldName": "Receiving Agent",
+          "presence": "MANDATORY",
+          "nvrRefs": [],
+          "pages": [18]
+        },
+        {
+          "sequence": "B2",
+          "settlementLeg": "Amount Sold",
+          "tag": "53",
+          "options": ["A", "J"],
+          "fieldName": "Delivery Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [18]
+        },
+        {
+          "sequence": "B2",
+          "settlementLeg": "Amount Sold",
+          "tag": "56",
+          "options": ["A", "J"],
+          "fieldName": "Intermediary",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [18]
+        },
+        {
+          "sequence": "B2",
+          "settlementLeg": "Amount Sold",
+          "tag": "57",
+          "options": ["A", "J"],
+          "fieldName": "Receiving Agent",
+          "presence": "MANDATORY",
+          "nvrRefs": [],
+          "pages": [18]
+        },
+        {
+          "sequence": "B2",
+          "settlementLeg": "Amount Sold",
+          "tag": "58",
+          "options": ["A", "J"],
+          "fieldName": "Beneficiary Institution",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [18]
+        },
+        {
+          "sequence": "D",
+          "settlementLeg": "Split Settlement Details",
+          "tag": "53",
+          "options": ["A", "D", "J"],
+          "fieldName": "Delivery Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [19]
+        },
+        {
+          "sequence": "D",
+          "settlementLeg": "Split Settlement Details",
+          "tag": "56",
+          "options": ["A", "D", "J"],
+          "fieldName": "Intermediary",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [19]
+        },
+        {
+          "sequence": "D",
+          "settlementLeg": "Split Settlement Details",
+          "tag": "57",
+          "options": ["A", "D", "J"],
+          "fieldName": "Receiving Agent",
+          "presence": "MANDATORY",
+          "nvrRefs": [],
+          "pages": [19]
+        },
+        {
+          "sequence": "D",
+          "settlementLeg": "Split Settlement Details",
+          "tag": "58",
+          "options": ["A", "D", "J"],
+          "fieldName": "Beneficiary Institution",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [19]
+        }
+      ]
+    },
+    {
+      "messageType": "MT304",
+      "artifactId": "SWIFT-US3MA-FULL-SR2026-5B4315EF",
+      "pages": [124, 125, 126],
+      "coverage": "FULL_MESSAGE_PROFILE",
+      "status": "FIELD_PROFILE_PROVEN",
+      "fields": [
+        {
+          "sequence": "B1",
+          "settlementLeg": "Amount Bought",
+          "tag": "53",
+          "options": ["A", "J"],
+          "fieldName": "Delivery Agent",
+          "presence": "MANDATORY",
+          "nvrRefs": [],
+          "pages": [124]
+        },
+        {
+          "sequence": "B1",
+          "settlementLeg": "Amount Bought",
+          "tag": "56",
+          "options": ["A", "J"],
+          "fieldName": "Intermediary",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [124]
+        },
+        {
+          "sequence": "B1",
+          "settlementLeg": "Amount Bought",
+          "tag": "57",
+          "options": ["A", "J"],
+          "fieldName": "Receiving Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [124]
+        },
+        {
+          "sequence": "B2",
+          "settlementLeg": "Amount Sold",
+          "tag": "53",
+          "options": ["A", "J"],
+          "fieldName": "Delivery Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [124]
+        },
+        {
+          "sequence": "B2",
+          "settlementLeg": "Amount Sold",
+          "tag": "56",
+          "options": ["A", "J"],
+          "fieldName": "Intermediary",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [124]
+        },
+        {
+          "sequence": "B2",
+          "settlementLeg": "Amount Sold",
+          "tag": "57",
+          "options": ["A", "J"],
+          "fieldName": "Receiving Agent",
+          "presence": "MANDATORY",
+          "nvrRefs": [],
+          "pages": [124]
+        },
+        {
+          "sequence": "B2",
+          "settlementLeg": "Amount Sold",
+          "tag": "58",
+          "options": ["A", "J"],
+          "fieldName": "Beneficiary Institution",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [124]
+        },
+        {
+          "sequence": "E",
+          "settlementLeg": "Net Amount to be Settled",
+          "tag": "53",
+          "options": ["A", "D", "J"],
+          "fieldName": "Delivery Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [125]
+        },
+        {
+          "sequence": "E",
+          "settlementLeg": "Net Amount to be Settled",
+          "tag": "56",
+          "options": ["A", "D", "J"],
+          "fieldName": "Intermediary",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [125]
+        },
+        {
+          "sequence": "E",
+          "settlementLeg": "Net Amount to be Settled",
+          "tag": "57",
+          "options": ["A", "D", "J"],
+          "fieldName": "Receiving Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [126]
+        },
+        {
+          "sequence": "E",
+          "settlementLeg": "Net Amount to be Settled",
+          "tag": "58",
+          "options": ["A", "D", "J"],
+          "fieldName": "Beneficiary Institution",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [126]
+        }
+      ]
+    },
+    {
+      "messageType": "MT305",
+      "artifactId": "SWIFT-US3MA-FULL-SR2026-5B4315EF",
+      "pages": [195],
+      "coverage": "FULL_MESSAGE_PROFILE",
+      "status": "FIELD_PROFILE_PROVEN",
+      "fields": [
+        {
+          "sequence": "A",
+          "settlementLeg": "General Information",
+          "tag": "53",
+          "options": ["A", "J"],
+          "fieldName": "Sender's Correspondent",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [195]
+        },
+        {
+          "sequence": "A",
+          "settlementLeg": "General Information",
+          "tag": "56",
+          "options": ["A", "J"],
+          "fieldName": "Intermediary",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [195]
+        },
+        {
+          "sequence": "A",
+          "settlementLeg": "General Information",
+          "tag": "57",
+          "options": ["A", "J"],
+          "fieldName": "Account With Institution",
+          "presence": "MANDATORY",
+          "nvrRefs": [],
+          "pages": [195]
+        }
+      ]
+    },
+    {
+      "messageType": "MT306",
+      "artifactId": "SWIFT-US3MA-FULL-SR2026-5B4315EF",
+      "pages": [262, 263, 267],
+      "coverage": "FULL_MESSAGE_PROFILE",
+      "status": "FIELD_PROFILE_PROVEN",
+      "fields": [
+        {
+          "sequence": "C",
+          "settlementLeg": "Settlement Instructions for Payment of Premium",
+          "tag": "53",
+          "options": ["A", "J"],
+          "fieldName": "Delivery Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [262]
+        },
+        {
+          "sequence": "C",
+          "settlementLeg": "Settlement Instructions for Payment of Premium",
+          "tag": "56",
+          "options": ["A", "J"],
+          "fieldName": "Intermediary",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C8"],
+          "pages": [262]
+        },
+        {
+          "sequence": "C",
+          "settlementLeg": "Settlement Instructions for Payment of Premium",
+          "tag": "57",
+          "options": ["A", "J"],
+          "fieldName": "Receiving Agent",
+          "presence": "MANDATORY",
+          "nvrRefs": [],
+          "pages": [262]
+        },
+        {
+          "sequence": "C",
+          "settlementLeg": "Settlement Instructions for Payment of Premium",
+          "tag": "58",
+          "options": ["A", "J"],
+          "fieldName": "Beneficiary Institution",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [262]
+        },
+        {
+          "sequence": "E",
+          "settlementLeg": "Binary Payout Amount",
+          "tag": "53",
+          "options": ["A", "J"],
+          "fieldName": "Delivery Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [263]
+        },
+        {
+          "sequence": "E",
+          "settlementLeg": "Binary Payout Amount",
+          "tag": "56",
+          "options": ["A", "J"],
+          "fieldName": "Intermediary",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C8"],
+          "pages": [263]
+        },
+        {
+          "sequence": "E",
+          "settlementLeg": "Binary Payout Amount",
+          "tag": "57",
+          "options": ["A", "J"],
+          "fieldName": "Receiving Agent",
+          "presence": "MANDATORY",
+          "nvrRefs": [],
+          "pages": [263]
+        },
+        {
+          "sequence": "E",
+          "settlementLeg": "Binary Payout Amount",
+          "tag": "58",
+          "options": ["A", "J"],
+          "fieldName": "Beneficiary Institution",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [263]
+        },
+        {
+          "sequence": "L",
+          "settlementLeg": "Additional Amounts",
+          "tag": "53",
+          "options": ["A", "J"],
+          "fieldName": "Delivery Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [267]
+        },
+        {
+          "sequence": "L",
+          "settlementLeg": "Additional Amounts",
+          "tag": "56",
+          "options": ["A", "J"],
+          "fieldName": "Intermediary",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C8"],
+          "pages": [267]
+        },
+        {
+          "sequence": "L",
+          "settlementLeg": "Additional Amounts",
+          "tag": "57",
+          "options": ["A", "J"],
+          "fieldName": "Receiving Agent",
+          "presence": "MANDATORY",
+          "nvrRefs": [],
+          "pages": [267]
+        }
+      ]
+    },
+    {
+      "messageType": "MT320",
+      "artifactId": "SWIFT-US3MA-FULL-SR2026-5B4315EF",
+      "pages": [425, 426, 428],
+      "coverage": "FULL_MESSAGE_PROFILE",
+      "status": "FIELD_PROFILE_PROVEN",
+      "fields": [
+        {
+          "sequence": "C",
+          "settlementLeg": "Settlement Instructions for Amounts Payable by Party A",
+          "tag": "53",
+          "options": ["A", "D", "J"],
+          "fieldName": "Delivery Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [425]
+        },
+        {
+          "sequence": "C",
+          "settlementLeg": "Settlement Instructions for Amounts Payable by Party A",
+          "tag": "56",
+          "options": ["A", "D", "J"],
+          "fieldName": "Intermediary",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C7"],
+          "pages": [425]
+        },
+        {
+          "sequence": "C",
+          "settlementLeg": "Settlement Instructions for Amounts Payable by Party A",
+          "tag": "57",
+          "options": ["A", "D", "J"],
+          "fieldName": "Receiving Agent",
+          "presence": "MANDATORY",
+          "nvrRefs": [],
+          "pages": [425]
+        },
+        {
+          "sequence": "C",
+          "settlementLeg": "Settlement Instructions for Amounts Payable by Party A",
+          "tag": "58",
+          "options": ["A", "D", "J"],
+          "fieldName": "Beneficiary Institution",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [425]
+        },
+        {
+          "sequence": "D",
+          "settlementLeg": "Settlement Instructions for Amounts Payable by Party B",
+          "tag": "53",
+          "options": ["A", "D", "J"],
+          "fieldName": "Delivery Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [426]
+        },
+        {
+          "sequence": "D",
+          "settlementLeg": "Settlement Instructions for Amounts Payable by Party B",
+          "tag": "56",
+          "options": ["A", "D", "J"],
+          "fieldName": "Intermediary",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C7"],
+          "pages": [426]
+        },
+        {
+          "sequence": "D",
+          "settlementLeg": "Settlement Instructions for Amounts Payable by Party B",
+          "tag": "57",
+          "options": ["A", "D", "J"],
+          "fieldName": "Receiving Agent",
+          "presence": "MANDATORY",
+          "nvrRefs": [],
+          "pages": [426]
+        },
+        {
+          "sequence": "D",
+          "settlementLeg": "Settlement Instructions for Amounts Payable by Party B",
+          "tag": "58",
+          "options": ["A", "D", "J"],
+          "fieldName": "Beneficiary Institution",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [426]
+        },
+        {
+          "sequence": "E",
+          "settlementLeg": "Settlement Instructions for Interests Payable by Party A",
+          "tag": "53",
+          "options": ["A", "D", "J"],
+          "fieldName": "Delivery Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [426]
+        },
+        {
+          "sequence": "E",
+          "settlementLeg": "Settlement Instructions for Interests Payable by Party A",
+          "tag": "56",
+          "options": ["A", "D", "J"],
+          "fieldName": "Intermediary",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C7"],
+          "pages": [426]
+        },
+        {
+          "sequence": "E",
+          "settlementLeg": "Settlement Instructions for Interests Payable by Party A",
+          "tag": "57",
+          "options": ["A", "D", "J"],
+          "fieldName": "Receiving Agent",
+          "presence": "MANDATORY",
+          "nvrRefs": [],
+          "pages": [426]
+        },
+        {
+          "sequence": "E",
+          "settlementLeg": "Settlement Instructions for Interests Payable by Party A",
+          "tag": "58",
+          "options": ["A", "D", "J"],
+          "fieldName": "Beneficiary Institution",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [426]
+        },
+        {
+          "sequence": "F",
+          "settlementLeg": "Settlement Instructions for Interests Payable by Party B",
+          "tag": "53",
+          "options": ["A", "D", "J"],
+          "fieldName": "Delivery Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [426]
+        },
+        {
+          "sequence": "F",
+          "settlementLeg": "Settlement Instructions for Interests Payable by Party B",
+          "tag": "56",
+          "options": ["A", "D", "J"],
+          "fieldName": "Intermediary",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C7"],
+          "pages": [426]
+        },
+        {
+          "sequence": "F",
+          "settlementLeg": "Settlement Instructions for Interests Payable by Party B",
+          "tag": "57",
+          "options": ["A", "D", "J"],
+          "fieldName": "Receiving Agent",
+          "presence": "MANDATORY",
+          "nvrRefs": [],
+          "pages": [426]
+        },
+        {
+          "sequence": "F",
+          "settlementLeg": "Settlement Instructions for Interests Payable by Party B",
+          "tag": "58",
+          "options": ["A", "D", "J"],
+          "fieldName": "Beneficiary Institution",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [426]
+        },
+        {
+          "sequence": "I",
+          "settlementLeg": "Additional Amounts",
+          "tag": "53",
+          "options": ["A", "D", "J"],
+          "fieldName": "Delivery Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [428]
+        },
+        {
+          "sequence": "I",
+          "settlementLeg": "Additional Amounts",
+          "tag": "56",
+          "options": ["A", "D", "J"],
+          "fieldName": "Intermediary",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C7"],
+          "pages": [428]
+        },
+        {
+          "sequence": "I",
+          "settlementLeg": "Additional Amounts",
+          "tag": "57",
+          "options": ["A", "D", "J"],
+          "fieldName": "Receiving Agent",
+          "presence": "MANDATORY",
+          "nvrRefs": [],
+          "pages": [428]
+        }
+      ]
+    },
+    {
+      "messageType": "MT330",
+      "artifactId": "SWIFT-US3MA-FULL-SR2026-5B4315EF",
+      "pages": [558, 559],
+      "coverage": "FULL_MESSAGE_PROFILE",
+      "status": "FIELD_PROFILE_PROVEN",
+      "fields": [
+        {
+          "sequence": "C",
+          "settlementLeg": "Settlement Instructions for Amounts Payable by Party A",
+          "tag": "53",
+          "options": ["A", "D", "J"],
+          "fieldName": "Delivery Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [558]
+        },
+        {
+          "sequence": "C",
+          "settlementLeg": "Settlement Instructions for Amounts Payable by Party A",
+          "tag": "56",
+          "options": ["A", "D", "J"],
+          "fieldName": "Intermediary",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C8"],
+          "pages": [558]
+        },
+        {
+          "sequence": "C",
+          "settlementLeg": "Settlement Instructions for Amounts Payable by Party A",
+          "tag": "57",
+          "options": ["A", "D", "J"],
+          "fieldName": "Receiving Agent",
+          "presence": "MANDATORY",
+          "nvrRefs": [],
+          "pages": [558]
+        },
+        {
+          "sequence": "C",
+          "settlementLeg": "Settlement Instructions for Amounts Payable by Party A",
+          "tag": "58",
+          "options": ["A", "D", "J"],
+          "fieldName": "Beneficiary Institution",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [558]
+        },
+        {
+          "sequence": "D",
+          "settlementLeg": "Settlement Instructions for Amounts Payable by Party B",
+          "tag": "53",
+          "options": ["A", "D", "J"],
+          "fieldName": "Delivery Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [558]
+        },
+        {
+          "sequence": "D",
+          "settlementLeg": "Settlement Instructions for Amounts Payable by Party B",
+          "tag": "56",
+          "options": ["A", "D", "J"],
+          "fieldName": "Intermediary",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C8"],
+          "pages": [558]
+        },
+        {
+          "sequence": "D",
+          "settlementLeg": "Settlement Instructions for Amounts Payable by Party B",
+          "tag": "57",
+          "options": ["A", "D", "J"],
+          "fieldName": "Receiving Agent",
+          "presence": "MANDATORY",
+          "nvrRefs": [],
+          "pages": [559]
+        },
+        {
+          "sequence": "D",
+          "settlementLeg": "Settlement Instructions for Amounts Payable by Party B",
+          "tag": "58",
+          "options": ["A", "D", "J"],
+          "fieldName": "Beneficiary Institution",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [559]
+        },
+        {
+          "sequence": "E",
+          "settlementLeg": "Settlement Instructions for Interests Payable by Party A",
+          "tag": "53",
+          "options": ["A", "D", "J"],
+          "fieldName": "Delivery Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [559]
+        },
+        {
+          "sequence": "E",
+          "settlementLeg": "Settlement Instructions for Interests Payable by Party A",
+          "tag": "56",
+          "options": ["A", "D", "J"],
+          "fieldName": "Intermediary",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C8"],
+          "pages": [559]
+        },
+        {
+          "sequence": "E",
+          "settlementLeg": "Settlement Instructions for Interests Payable by Party A",
+          "tag": "57",
+          "options": ["A", "D", "J"],
+          "fieldName": "Receiving Agent",
+          "presence": "MANDATORY",
+          "nvrRefs": [],
+          "pages": [559]
+        },
+        {
+          "sequence": "E",
+          "settlementLeg": "Settlement Instructions for Interests Payable by Party A",
+          "tag": "58",
+          "options": ["A", "D", "J"],
+          "fieldName": "Beneficiary Institution",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [559]
+        },
+        {
+          "sequence": "F",
+          "settlementLeg": "Settlement Instructions for Interests Payable by Party B",
+          "tag": "53",
+          "options": ["A", "D", "J"],
+          "fieldName": "Delivery Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [559]
+        },
+        {
+          "sequence": "F",
+          "settlementLeg": "Settlement Instructions for Interests Payable by Party B",
+          "tag": "56",
+          "options": ["A", "D", "J"],
+          "fieldName": "Intermediary",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C8"],
+          "pages": [559]
+        },
+        {
+          "sequence": "F",
+          "settlementLeg": "Settlement Instructions for Interests Payable by Party B",
+          "tag": "57",
+          "options": ["A", "D", "J"],
+          "fieldName": "Receiving Agent",
+          "presence": "MANDATORY",
+          "nvrRefs": [],
+          "pages": [559]
+        },
+        {
+          "sequence": "F",
+          "settlementLeg": "Settlement Instructions for Interests Payable by Party B",
+          "tag": "58",
+          "options": ["A", "D", "J"],
+          "fieldName": "Beneficiary Institution",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [559]
+        }
+      ]
+    },
+    {
+      "messageType": "MT340",
+      "artifactId": "SWIFT-US3MA-FULL-SR2026-5B4315EF",
+      "pages": [640, 641],
+      "coverage": "FULL_MESSAGE_PROFILE",
+      "status": "FIELD_PROFILE_PROVEN",
+      "fields": [
+        {
+          "sequence": "C",
+          "settlementLeg": "Settlement Instructions for Settlement Amount Payable by Party B",
+          "tag": "53",
+          "options": ["A", "D", "J"],
+          "fieldName": "Delivery Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [640]
+        },
+        {
+          "sequence": "C",
+          "settlementLeg": "Settlement Instructions for Settlement Amount Payable by Party B",
+          "tag": "56",
+          "options": ["A", "D", "J"],
+          "fieldName": "Intermediary",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C8"],
+          "pages": [640]
+        },
+        {
+          "sequence": "C",
+          "settlementLeg": "Settlement Instructions for Settlement Amount Payable by Party B",
+          "tag": "57",
+          "options": ["A", "D", "J"],
+          "fieldName": "Receiving Agent",
+          "presence": "MANDATORY",
+          "nvrRefs": [],
+          "pages": [640]
+        },
+        {
+          "sequence": "C",
+          "settlementLeg": "Settlement Instructions for Settlement Amount Payable by Party B",
+          "tag": "58",
+          "options": ["A", "D", "J"],
+          "fieldName": "Beneficiary Institution",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [640]
+        },
+        {
+          "sequence": "D",
+          "settlementLeg": "Settlement Instructions for Settlement Amount Payable by Party A",
+          "tag": "53",
+          "options": ["A", "D", "J"],
+          "fieldName": "Delivery Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [640]
+        },
+        {
+          "sequence": "D",
+          "settlementLeg": "Settlement Instructions for Settlement Amount Payable by Party A",
+          "tag": "56",
+          "options": ["A", "D", "J"],
+          "fieldName": "Intermediary",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C8"],
+          "pages": [640]
+        },
+        {
+          "sequence": "D",
+          "settlementLeg": "Settlement Instructions for Settlement Amount Payable by Party A",
+          "tag": "57",
+          "options": ["A", "D", "J"],
+          "fieldName": "Receiving Agent",
+          "presence": "MANDATORY",
+          "nvrRefs": [],
+          "pages": [640]
+        },
+        {
+          "sequence": "D",
+          "settlementLeg": "Settlement Instructions for Settlement Amount Payable by Party A",
+          "tag": "58",
+          "options": ["A", "D", "J"],
+          "fieldName": "Beneficiary Institution",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [640]
+        },
+        {
+          "sequence": "F",
+          "settlementLeg": "Additional Amounts",
+          "tag": "53",
+          "options": ["A", "D", "J"],
+          "fieldName": "Delivery Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [641]
+        },
+        {
+          "sequence": "F",
+          "settlementLeg": "Additional Amounts",
+          "tag": "56",
+          "options": ["A", "D", "J"],
+          "fieldName": "Intermediary",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C8"],
+          "pages": [641]
+        },
+        {
+          "sequence": "F",
+          "settlementLeg": "Additional Amounts",
+          "tag": "57",
+          "options": ["A", "D", "J"],
+          "fieldName": "Receiving Agent",
+          "presence": "MANDATORY",
+          "nvrRefs": [],
+          "pages": [641]
+        }
+      ]
+    },
+    {
+      "messageType": "MT341",
+      "artifactId": "SWIFT-US3MA-FULL-SR2026-5B4315EF",
+      "pages": [722],
+      "coverage": "FULL_MESSAGE_PROFILE",
+      "status": "FIELD_PROFILE_PROVEN",
+      "fields": [
+        {
+          "sequence": "C",
+          "settlementLeg": "Settlement Instructions for the Settlement Amount",
+          "tag": "53",
+          "options": ["A", "D", "J"],
+          "fieldName": "Delivery Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [722]
+        },
+        {
+          "sequence": "C",
+          "settlementLeg": "Settlement Instructions for the Settlement Amount",
+          "tag": "56",
+          "options": ["A", "D", "J"],
+          "fieldName": "Intermediary",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C2"],
+          "pages": [722]
+        },
+        {
+          "sequence": "C",
+          "settlementLeg": "Settlement Instructions for the Settlement Amount",
+          "tag": "57",
+          "options": ["A", "D", "J"],
+          "fieldName": "Receiving Agent",
+          "presence": "MANDATORY",
+          "nvrRefs": [],
+          "pages": [722]
+        },
+        {
+          "sequence": "C",
+          "settlementLeg": "Settlement Instructions for the Settlement Amount",
+          "tag": "58",
+          "options": ["A", "D", "J"],
+          "fieldName": "Beneficiary Institution",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [722]
+        }
+      ]
+    },
+    {
+      "messageType": "MT350",
+      "artifactId": "SWIFT-US3MB-FULL-SR2026-BC510604",
+      "pages": [17],
+      "coverage": "FULL_MESSAGE_PROFILE",
+      "status": "FIELD_PROFILE_PROVEN",
+      "fields": [
+        {
+          "sequence": "C",
+          "settlementLeg": "Settlement Instructions",
+          "tag": "53",
+          "options": ["A", "D", "J"],
+          "fieldName": "Delivery Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [17]
+        },
+        {
+          "sequence": "C",
+          "settlementLeg": "Settlement Instructions",
+          "tag": "56",
+          "options": ["A", "D", "J"],
+          "fieldName": "Intermediary",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C3"],
+          "pages": [17]
+        },
+        {
+          "sequence": "C",
+          "settlementLeg": "Settlement Instructions",
+          "tag": "57",
+          "options": ["A", "D", "J"],
+          "fieldName": "Receiving Agent",
+          "presence": "MANDATORY",
+          "nvrRefs": [],
+          "pages": [17]
+        },
+        {
+          "sequence": "C",
+          "settlementLeg": "Settlement Instructions",
+          "tag": "58",
+          "options": ["A", "D", "J"],
+          "fieldName": "Beneficiary Institution",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [17]
+        }
+      ]
+    },
+    {
+      "messageType": "MT360",
+      "artifactId": "SWIFT-US3MB-FULL-SR2026-BC510604",
+      "pages": [51, 53, 54, 55],
+      "coverage": "FULL_MESSAGE_PROFILE",
+      "status": "FIELD_PROFILE_PROVEN",
+      "fields": [
+        {
+          "sequence": "D",
+          "settlementLeg": "Payment Instructions for Interest Payable by Party B",
+          "tag": "53",
+          "options": ["A", "D", "J"],
+          "fieldName": "Delivery Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C13"],
+          "pages": [51]
+        },
+        {
+          "sequence": "D",
+          "settlementLeg": "Payment Instructions for Interest Payable by Party B",
+          "tag": "56",
+          "options": ["A", "D", "J"],
+          "fieldName": "Intermediary",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C13", "C14"],
+          "pages": [51]
+        },
+        {
+          "sequence": "D",
+          "settlementLeg": "Payment Instructions for Interest Payable by Party B",
+          "tag": "57",
+          "options": ["A", "D", "J"],
+          "fieldName": "Receiving Agent",
+          "presence": "MANDATORY",
+          "nvrRefs": ["C13"],
+          "pages": [51]
+        },
+        {
+          "sequence": "G",
+          "settlementLeg": "Payment Instructions for Interest Payable by Party A",
+          "tag": "53",
+          "options": ["A", "D", "J"],
+          "fieldName": "Delivery Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C13"],
+          "pages": [53]
+        },
+        {
+          "sequence": "G",
+          "settlementLeg": "Payment Instructions for Interest Payable by Party A",
+          "tag": "56",
+          "options": ["A", "D", "J"],
+          "fieldName": "Intermediary",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C13", "C14"],
+          "pages": [53]
+        },
+        {
+          "sequence": "G",
+          "settlementLeg": "Payment Instructions for Interest Payable by Party A",
+          "tag": "57",
+          "options": ["A", "D", "J"],
+          "fieldName": "Receiving Agent",
+          "presence": "MANDATORY",
+          "nvrRefs": ["C13"],
+          "pages": [53]
+        },
+        {
+          "sequence": "L",
+          "settlementLeg": "Additional Amounts Payable by Party B",
+          "tag": "53",
+          "options": ["A", "D", "J"],
+          "fieldName": "Delivery Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C13"],
+          "pages": [54]
+        },
+        {
+          "sequence": "L",
+          "settlementLeg": "Additional Amounts Payable by Party B",
+          "tag": "56",
+          "options": ["A", "D", "J"],
+          "fieldName": "Intermediary",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C13", "C14"],
+          "pages": [54]
+        },
+        {
+          "sequence": "L",
+          "settlementLeg": "Additional Amounts Payable by Party B",
+          "tag": "57",
+          "options": ["A", "D", "J"],
+          "fieldName": "Receiving Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C13"],
+          "pages": [54]
+        },
+        {
+          "sequence": "M",
+          "settlementLeg": "Additional Amounts Payable by Party A",
+          "tag": "53",
+          "options": ["A", "D", "J"],
+          "fieldName": "Delivery Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C13"],
+          "pages": [55]
+        },
+        {
+          "sequence": "M",
+          "settlementLeg": "Additional Amounts Payable by Party A",
+          "tag": "56",
+          "options": ["A", "D", "J"],
+          "fieldName": "Intermediary",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C13", "C14"],
+          "pages": [55]
+        },
+        {
+          "sequence": "M",
+          "settlementLeg": "Additional Amounts Payable by Party A",
+          "tag": "57",
+          "options": ["A", "D", "J"],
+          "fieldName": "Receiving Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C13"],
+          "pages": [55]
+        }
+      ]
+    },
+    {
+      "messageType": "MT361",
+      "artifactId": "SWIFT-US3MB-FULL-SR2026-BC510604",
+      "pages": [210, 212, 214, 215, 216],
+      "coverage": "FULL_MESSAGE_PROFILE",
+      "status": "FIELD_PROFILE_PROVEN",
+      "fields": [
+        {
+          "sequence": "D",
+          "settlementLeg": "Payment Instructions for Interest Payable by Party B",
+          "tag": "53",
+          "options": ["A", "D", "J"],
+          "fieldName": "Delivery Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C13"],
+          "pages": [210]
+        },
+        {
+          "sequence": "D",
+          "settlementLeg": "Payment Instructions for Interest Payable by Party B",
+          "tag": "56",
+          "options": ["A", "D", "J"],
+          "fieldName": "Intermediary",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C13", "C14"],
+          "pages": [210]
+        },
+        {
+          "sequence": "D",
+          "settlementLeg": "Payment Instructions for Interest Payable by Party B",
+          "tag": "57",
+          "options": ["A", "D", "J"],
+          "fieldName": "Receiving Agent",
+          "presence": "MANDATORY",
+          "nvrRefs": ["C13"],
+          "pages": [210]
+        },
+        {
+          "sequence": "G",
+          "settlementLeg": "Payment Instructions for Interest Payable by Party A",
+          "tag": "53",
+          "options": ["A", "D", "J"],
+          "fieldName": "Delivery Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C13"],
+          "pages": [212]
+        },
+        {
+          "sequence": "G",
+          "settlementLeg": "Payment Instructions for Interest Payable by Party A",
+          "tag": "56",
+          "options": ["A", "D", "J"],
+          "fieldName": "Intermediary",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C13", "C14"],
+          "pages": [212]
+        },
+        {
+          "sequence": "G",
+          "settlementLeg": "Payment Instructions for Interest Payable by Party A",
+          "tag": "57",
+          "options": ["A", "D", "J"],
+          "fieldName": "Receiving Agent",
+          "presence": "MANDATORY",
+          "nvrRefs": ["C13"],
+          "pages": [212]
+        },
+        {
+          "sequence": "K",
+          "settlementLeg": "Exchanges of Principal Payable by Party B",
+          "tag": "53",
+          "options": ["A", "D", "J"],
+          "fieldName": "Delivery Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C13"],
+          "pages": [214]
+        },
+        {
+          "sequence": "K",
+          "settlementLeg": "Exchanges of Principal Payable by Party B",
+          "tag": "56",
+          "options": ["A", "D", "J"],
+          "fieldName": "Intermediary",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C13", "C14"],
+          "pages": [214]
+        },
+        {
+          "sequence": "K",
+          "settlementLeg": "Exchanges of Principal Payable by Party B",
+          "tag": "57",
+          "options": ["A", "D", "J"],
+          "fieldName": "Receiving Agent",
+          "presence": "MANDATORY",
+          "nvrRefs": ["C13"],
+          "pages": [214]
+        },
+        {
+          "sequence": "L",
+          "settlementLeg": "Exchanges of Principal Payable by Party A",
+          "tag": "53",
+          "options": ["A", "D", "J"],
+          "fieldName": "Delivery Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C13"],
+          "pages": [215]
+        },
+        {
+          "sequence": "L",
+          "settlementLeg": "Exchanges of Principal Payable by Party A",
+          "tag": "56",
+          "options": ["A", "D", "J"],
+          "fieldName": "Intermediary",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C13", "C14"],
+          "pages": [215]
+        },
+        {
+          "sequence": "L",
+          "settlementLeg": "Exchanges of Principal Payable by Party A",
+          "tag": "57",
+          "options": ["A", "D", "J"],
+          "fieldName": "Receiving Agent",
+          "presence": "MANDATORY",
+          "nvrRefs": ["C13"],
+          "pages": [215]
+        },
+        {
+          "sequence": "M",
+          "settlementLeg": "Additional Amounts Payable by Party B",
+          "tag": "53",
+          "options": ["A", "D", "J"],
+          "fieldName": "Delivery Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C13"],
+          "pages": [216]
+        },
+        {
+          "sequence": "M",
+          "settlementLeg": "Additional Amounts Payable by Party B",
+          "tag": "56",
+          "options": ["A", "D", "J"],
+          "fieldName": "Intermediary",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C13", "C14"],
+          "pages": [216]
+        },
+        {
+          "sequence": "M",
+          "settlementLeg": "Additional Amounts Payable by Party B",
+          "tag": "57",
+          "options": ["A", "D", "J"],
+          "fieldName": "Receiving Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C13"],
+          "pages": [216]
+        },
+        {
+          "sequence": "N",
+          "settlementLeg": "Additional Amounts Payable by Party A",
+          "tag": "53",
+          "options": ["A", "D", "J"],
+          "fieldName": "Delivery Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C13"],
+          "pages": [216]
+        },
+        {
+          "sequence": "N",
+          "settlementLeg": "Additional Amounts Payable by Party A",
+          "tag": "56",
+          "options": ["A", "D", "J"],
+          "fieldName": "Intermediary",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C13", "C14"],
+          "pages": [216]
+        },
+        {
+          "sequence": "N",
+          "settlementLeg": "Additional Amounts Payable by Party A",
+          "tag": "57",
+          "options": ["A", "D", "J"],
+          "fieldName": "Receiving Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C13"],
+          "pages": [216]
+        }
+      ]
+    },
+    {
+      "messageType": "MT362",
+      "artifactId": "SWIFT-US3MB-FULL-SR2026-BC510604",
+      "pages": [396, 397],
+      "coverage": "FULL_MESSAGE_PROFILE",
+      "status": "FIELD_PROFILE_PROVEN",
+      "fields": [
+        {
+          "sequence": "C",
+          "settlementLeg": "(Net) Amount(s) Payable by Party B",
+          "tag": "53",
+          "options": ["A", "D", "J"],
+          "fieldName": "Delivery Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [396]
+        },
+        {
+          "sequence": "C",
+          "settlementLeg": "(Net) Amount(s) Payable by Party B",
+          "tag": "56",
+          "options": ["A", "D", "J"],
+          "fieldName": "Intermediary",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C7"],
+          "pages": [396]
+        },
+        {
+          "sequence": "C",
+          "settlementLeg": "(Net) Amount(s) Payable by Party B",
+          "tag": "57",
+          "options": ["A", "D", "J"],
+          "fieldName": "Receiving Agent",
+          "presence": "MANDATORY",
+          "nvrRefs": ["C4", "C5"],
+          "pages": [396]
+        },
+        {
+          "sequence": "E",
+          "settlementLeg": "(Net) Amount(s) Payable by Party A",
+          "tag": "53",
+          "options": ["A", "D", "J"],
+          "fieldName": "Delivery Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [397]
+        },
+        {
+          "sequence": "E",
+          "settlementLeg": "(Net) Amount(s) Payable by Party A",
+          "tag": "56",
+          "options": ["A", "D", "J"],
+          "fieldName": "Intermediary",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C7"],
+          "pages": [397]
+        },
+        {
+          "sequence": "E",
+          "settlementLeg": "(Net) Amount(s) Payable by Party A",
+          "tag": "57",
+          "options": ["A", "D", "J"],
+          "fieldName": "Receiving Agent",
+          "presence": "MANDATORY",
+          "nvrRefs": ["C4", "C5"],
+          "pages": [397]
+        }
+      ]
+    },
+    {
+      "messageType": "MT364",
+      "artifactId": "SWIFT-US3MB-FULL-SR2026-BC510604",
+      "pages": [448],
+      "coverage": "FULL_MESSAGE_PROFILE",
+      "status": "FIELD_PROFILE_PROVEN",
+      "fields": [
+        {
+          "sequence": "L",
+          "settlementLeg": "Fee Payable by Party B",
+          "tag": "53",
+          "options": ["A", "D", "J"],
+          "fieldName": "Delivery Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [448]
+        },
+        {
+          "sequence": "L",
+          "settlementLeg": "Fee Payable by Party B",
+          "tag": "56",
+          "options": ["A", "D", "J"],
+          "fieldName": "Intermediary",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C3"],
+          "pages": [448]
+        },
+        {
+          "sequence": "L",
+          "settlementLeg": "Fee Payable by Party B",
+          "tag": "57",
+          "options": ["A", "D", "J"],
+          "fieldName": "Receiving Agent",
+          "presence": "MANDATORY",
+          "nvrRefs": [],
+          "pages": [448]
+        },
+        {
+          "sequence": "M",
+          "settlementLeg": "Fee Payable by Party A",
+          "tag": "53",
+          "options": ["A", "D", "J"],
+          "fieldName": "Delivery Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [448]
+        },
+        {
+          "sequence": "M",
+          "settlementLeg": "Fee Payable by Party A",
+          "tag": "56",
+          "options": ["A", "D", "J"],
+          "fieldName": "Intermediary",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C3"],
+          "pages": [448]
+        },
+        {
+          "sequence": "M",
+          "settlementLeg": "Fee Payable by Party A",
+          "tag": "57",
+          "options": ["A", "D", "J"],
+          "fieldName": "Receiving Agent",
+          "presence": "MANDATORY",
+          "nvrRefs": [],
+          "pages": [448]
+        }
+      ]
+    },
+    {
+      "messageType": "MT365",
+      "artifactId": "SWIFT-US3MB-FULL-SR2026-BC510604",
+      "pages": [490, 491],
+      "coverage": "FULL_MESSAGE_PROFILE",
+      "status": "FIELD_PROFILE_PROVEN",
+      "fields": [
+        {
+          "sequence": "J",
+          "settlementLeg": "Re-exchange of Principal Payable by Party B",
+          "tag": "53",
+          "options": ["A", "D", "J"],
+          "fieldName": "Delivery Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [490]
+        },
+        {
+          "sequence": "J",
+          "settlementLeg": "Re-exchange of Principal Payable by Party B",
+          "tag": "56",
+          "options": ["A", "D", "J"],
+          "fieldName": "Intermediary",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C3"],
+          "pages": [490]
+        },
+        {
+          "sequence": "J",
+          "settlementLeg": "Re-exchange of Principal Payable by Party B",
+          "tag": "57",
+          "options": ["A", "D", "J"],
+          "fieldName": "Receiving Agent",
+          "presence": "MANDATORY",
+          "nvrRefs": [],
+          "pages": [490]
+        },
+        {
+          "sequence": "K",
+          "settlementLeg": "Re-exchange of Principal Payable by Party A",
+          "tag": "53",
+          "options": ["A", "D", "J"],
+          "fieldName": "Delivery Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [490]
+        },
+        {
+          "sequence": "K",
+          "settlementLeg": "Re-exchange of Principal Payable by Party A",
+          "tag": "56",
+          "options": ["A", "D", "J"],
+          "fieldName": "Intermediary",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C3"],
+          "pages": [490]
+        },
+        {
+          "sequence": "K",
+          "settlementLeg": "Re-exchange of Principal Payable by Party A",
+          "tag": "57",
+          "options": ["A", "D", "J"],
+          "fieldName": "Receiving Agent",
+          "presence": "MANDATORY",
+          "nvrRefs": [],
+          "pages": [490]
+        },
+        {
+          "sequence": "L",
+          "settlementLeg": "Fee Payable by Party B",
+          "tag": "53",
+          "options": ["A", "D", "J"],
+          "fieldName": "Delivery Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [490]
+        },
+        {
+          "sequence": "L",
+          "settlementLeg": "Fee Payable by Party B",
+          "tag": "56",
+          "options": ["A", "D", "J"],
+          "fieldName": "Intermediary",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C3"],
+          "pages": [490]
+        },
+        {
+          "sequence": "L",
+          "settlementLeg": "Fee Payable by Party B",
+          "tag": "57",
+          "options": ["A", "D", "J"],
+          "fieldName": "Receiving Agent",
+          "presence": "MANDATORY",
+          "nvrRefs": [],
+          "pages": [491]
+        },
+        {
+          "sequence": "M",
+          "settlementLeg": "Fee Payable by Party A",
+          "tag": "53",
+          "options": ["A", "D", "J"],
+          "fieldName": "Delivery Agent",
+          "presence": "OPTIONAL",
+          "nvrRefs": [],
+          "pages": [491]
+        },
+        {
+          "sequence": "M",
+          "settlementLeg": "Fee Payable by Party A",
+          "tag": "56",
+          "options": ["A", "D", "J"],
+          "fieldName": "Intermediary",
+          "presence": "OPTIONAL",
+          "nvrRefs": ["C3"],
+          "pages": [491]
+        },
+        {
+          "sequence": "M",
+          "settlementLeg": "Fee Payable by Party A",
+          "tag": "57",
+          "options": ["A", "D", "J"],
+          "fieldName": "Receiving Agent",
+          "presence": "MANDATORY",
+          "nvrRefs": [],
+          "pages": [491]
+        }
+      ]
+    },
+    {
+      "messageType": "MT400",
+      "artifactId": "SWIFT-US4M-FULL-SR2026-71F86522",
+      "pages": [12, 13, 16, 17, 18],
+      "coverage": "FULL_MESSAGE_PROFILE",
+      "status": "FIELD_PROFILE_PROVEN",
+      "fields": [
+        {
+          "sequence": "MESSAGE",
+          "tag": "52",
+          "options": ["A", "D"],
+          "fieldName": "Ordering Bank",
+          "presence": "OPTIONAL",
+          "formats": ["FI_A", "NAME_ADDRESS_D"],
+          "nvrRefs": [],
+          "pages": [16]
+        },
+        {
+          "sequence": "MESSAGE",
+          "tag": "53",
+          "options": ["A", "B", "D"],
+          "fieldName": "Sender's Correspondent",
+          "presence": "OPTIONAL",
+          "formats": ["FI_A", "LOCATION_B", "NAME_ADDRESS_D"],
+          "nvrRefs": [],
+          "pages": [16, 17]
+        },
+        {
+          "sequence": "MESSAGE",
+          "tag": "54",
+          "options": ["A", "B", "D"],
+          "fieldName": "Receiver's Correspondent",
+          "presence": "CONDITIONAL_C1",
+          "formats": ["FI_A", "LOCATION_B", "NAME_ADDRESS_D"],
+          "nvrRefs": ["C1"],
+          "pages": [13, 17]
+        },
+        {
+          "sequence": "MESSAGE",
+          "tag": "57",
+          "options": ["A", "D"],
+          "fieldName": "Account With Bank",
+          "presence": "CONDITIONAL_C1",
+          "formats": ["FI_A", "NAME_ADDRESS_D"],
+          "nvrRefs": ["C1"],
+          "pages": [13, 17, 18]
+        },
+        {
+          "sequence": "MESSAGE",
+          "tag": "58",
+          "options": ["A", "B", "D"],
+          "fieldName": "Beneficiary Bank",
+          "presence": "OPTIONAL",
+          "formats": ["FI_A", "LOCATION_B", "NAME_ADDRESS_D"],
+          "nvrRefs": [],
+          "pages": [18]
+        }
+      ]
+    },
+    {
+      "messageType": "MT700",
+      "artifactId": "SWIFT-US7M-FULL-SR2026-1F748A82",
+      "pages": [16, 22, 36, 37, 38],
+      "coverage": "FULL_MESSAGE_PROFILE",
+      "status": "FIELD_PROFILE_PROVEN",
+      "fields": [
+        {
+          "sequence": "MESSAGE",
+          "tag": "51",
+          "options": ["A", "D"],
+          "fieldName": "Applicant Bank",
+          "presence": "OPTIONAL",
+          "formats": ["FI_A", "NAME_ADDRESS_D"],
+          "nvrRefs": [],
+          "pages": [22]
+        },
+        {
+          "sequence": "MESSAGE",
+          "tag": "58",
+          "options": ["A", "D"],
+          "fieldName": "Requested Confirmation Party",
+          "presence": "OPTIONAL",
+          "formats": ["FI_A", "NAME_ADDRESS_D"],
+          "nvrRefs": [],
+          "pages": [36]
+        },
+        {
+          "sequence": "MESSAGE",
+          "tag": "53",
+          "options": ["A", "D"],
+          "fieldName": "Reimbursing Bank",
+          "presence": "OPTIONAL",
+          "formats": ["FI_A", "NAME_ADDRESS_D"],
+          "nvrRefs": [],
+          "pages": [37]
+        },
+        {
+          "sequence": "MESSAGE",
+          "tag": "57",
+          "options": ["A", "B", "D"],
+          "fieldName": "'Advise Through' Bank",
+          "presence": "OPTIONAL",
+          "formats": ["FI_A", "LOCATION_B", "NAME_ADDRESS_D"],
+          "nvrRefs": [],
+          "pages": [38]
+        }
+      ]
+    },
+    {
+      "messageType": "MT705",
+      "artifactId": "SWIFT-US7M-FULL-SR2026-1F748A82",
+      "pages": [47, 58],
+      "coverage": "FULL_MESSAGE_PROFILE",
+      "status": "FIELD_PROFILE_PROVEN",
+      "fields": [
+        {
+          "sequence": "MESSAGE",
+          "tag": "57",
+          "options": ["A", "B", "D"],
+          "fieldName": "'Advise Through' Bank",
+          "presence": "OPTIONAL",
+          "formats": ["FI_A", "LOCATION_B", "NAME_ADDRESS_D"],
+          "nvrRefs": [],
+          "pages": [58]
+        }
+      ]
+    },
+    {
+      "messageType": "MT707",
+      "artifactId": "SWIFT-US7M-FULL-SR2026-1F748A82",
+      "pages": [63, 68, 91, 92],
+      "coverage": "FULL_MESSAGE_PROFILE",
+      "status": "FIELD_PROFILE_PROVEN",
+      "fields": [
+        {
+          "sequence": "MESSAGE",
+          "tag": "52",
+          "options": ["A", "D"],
+          "fieldName": "Issuing Bank",
+          "presence": "CONDITIONAL_C3",
+          "formats": ["FI_A", "NAME_ADDRESS_D"],
+          "nvrRefs": ["C3"],
+          "pages": [68]
+        },
+        {
+          "sequence": "MESSAGE",
+          "tag": "58",
+          "options": ["A", "D"],
+          "fieldName": "Requested Confirmation Party",
+          "presence": "CONDITIONAL_C1",
+          "formats": ["FI_A", "NAME_ADDRESS_D"],
+          "nvrRefs": ["C1"],
+          "pages": [91]
+        },
+        {
+          "sequence": "MESSAGE",
+          "tag": "53",
+          "options": ["A", "D"],
+          "fieldName": "Reimbursing Bank",
+          "presence": "CONDITIONAL_C1",
+          "formats": ["FI_A", "NAME_ADDRESS_D"],
+          "nvrRefs": ["C1"],
+          "pages": [91]
+        },
+        {
+          "sequence": "MESSAGE",
+          "tag": "57",
+          "options": ["A", "B", "D"],
+          "fieldName": "'Advise Through' Bank",
+          "presence": "CONDITIONAL_C1",
+          "formats": ["FI_A", "LOCATION_B", "NAME_ADDRESS_D"],
+          "nvrRefs": ["C1"],
+          "pages": [92]
+        }
+      ]
+    },
+    {
+      "messageType": "MT710",
+      "artifactId": "SWIFT-US7M-FULL-SR2026-1F748A82",
+      "pages": [104, 111, 113, 127, 128, 129],
+      "coverage": "FULL_MESSAGE_PROFILE",
+      "status": "FIELD_PROFILE_PROVEN",
+      "fields": [
+        {
+          "sequence": "MESSAGE",
+          "tag": "52",
+          "options": ["A", "D"],
+          "fieldName": "Issuing Bank",
+          "presence": "CONDITIONAL_C4",
+          "formats": ["FI_A", "NAME_ADDRESS_D"],
+          "nvrRefs": ["C4"],
+          "pages": [111]
+        },
+        {
+          "sequence": "MESSAGE",
+          "tag": "51",
+          "options": ["A", "D"],
+          "fieldName": "Applicant Bank",
+          "presence": "OPTIONAL",
+          "formats": ["FI_A", "NAME_ADDRESS_D"],
+          "nvrRefs": [],
+          "pages": [113]
+        },
+        {
+          "sequence": "MESSAGE",
+          "tag": "58",
+          "options": ["A", "D"],
+          "fieldName": "Requested Confirmation Party",
+          "presence": "OPTIONAL",
+          "formats": ["FI_A", "NAME_ADDRESS_D"],
+          "nvrRefs": [],
+          "pages": [127]
+        },
+        {
+          "sequence": "MESSAGE",
+          "tag": "53",
+          "options": ["A", "D"],
+          "fieldName": "Reimbursing Bank",
+          "presence": "OPTIONAL",
+          "formats": ["FI_A", "NAME_ADDRESS_D"],
+          "nvrRefs": [],
+          "pages": [128]
+        },
+        {
+          "sequence": "MESSAGE",
+          "tag": "57",
+          "options": ["A", "B", "D"],
+          "fieldName": "'Advise Through' Bank",
+          "presence": "OPTIONAL",
+          "formats": ["FI_A", "LOCATION_B", "NAME_ADDRESS_D"],
+          "nvrRefs": [],
+          "pages": [129]
+        }
+      ]
+    },
+    {
+      "messageType": "MT720",
+      "artifactId": "SWIFT-US7M-FULL-SR2026-1F748A82",
+      "pages": [140, 146, 162, 163, 164],
+      "coverage": "FULL_MESSAGE_PROFILE",
+      "status": "FIELD_PROFILE_PROVEN",
+      "fields": [
+        {
+          "sequence": "MESSAGE",
+          "tag": "52",
+          "options": ["A", "D"],
+          "fieldName": "Issuing Bank of the Original Documentary Credit",
+          "presence": "CONDITIONAL_C4",
+          "formats": ["FI_A", "NAME_ADDRESS_D"],
+          "nvrRefs": ["C4"],
+          "pages": [146]
+        },
+        {
+          "sequence": "MESSAGE",
+          "tag": "58",
+          "options": ["A", "D"],
+          "fieldName": "Requested Confirmation Party",
+          "presence": "OPTIONAL",
+          "formats": ["FI_A", "NAME_ADDRESS_D"],
+          "nvrRefs": [],
+          "pages": [162]
+        },
+        {
+          "sequence": "MESSAGE",
+          "tag": "57",
+          "options": ["A", "B", "D"],
+          "fieldName": "'Advise Through' Bank",
+          "presence": "OPTIONAL",
+          "formats": ["FI_A", "LOCATION_B", "NAME_ADDRESS_D"],
+          "nvrRefs": [],
+          "pages": [163, 164]
+        }
+      ]
+    },
+    {
+      "messageType": "MT730",
+      "artifactId": "SWIFT-US7M-FULL-SR2026-1F748A82",
+      "pages": [177, 180],
+      "coverage": "FULL_MESSAGE_PROFILE",
+      "status": "FIELD_PROFILE_PROVEN",
+      "fields": [
+        {
+          "sequence": "MESSAGE",
+          "tag": "57",
+          "options": ["A", "D"],
+          "fieldName": "Account With Bank",
+          "presence": "CONDITIONAL_C1_C2",
+          "formats": ["FI_A", "NAME_ADDRESS_D"],
+          "nvrRefs": ["C1"],
+          "pages": [180]
+        }
+      ]
+    },
+    {
+      "messageType": "MT734",
+      "artifactId": "SWIFT-US7M-FULL-SR2026-1F748A82",
+      "pages": [187, 190],
+      "coverage": "FULL_MESSAGE_PROFILE",
+      "status": "FIELD_PROFILE_PROVEN",
+      "fields": [
+        {
+          "sequence": "MESSAGE",
+          "tag": "57",
+          "options": ["A", "B", "D"],
+          "fieldName": "Account With Bank",
+          "presence": "OPTIONAL",
+          "formats": ["FI_A", "LOCATION_B", "NAME_ADDRESS_D"],
+          "nvrRefs": [],
+          "pages": [190]
+        }
+      ]
+    },
+    {
+      "messageType": "MT740",
+      "artifactId": "SWIFT-US7M-FULL-SR2026-1F748A82",
+      "pages": [203, 206],
+      "coverage": "FULL_MESSAGE_PROFILE",
+      "status": "FIELD_PROFILE_PROVEN",
+      "fields": [
+        {
+          "sequence": "MESSAGE",
+          "tag": "58",
+          "options": ["A", "D"],
+          "fieldName": "Negotiating Bank",
+          "presence": "CONDITIONAL_C3",
+          "formats": ["FI_A", "NAME_ADDRESS_D"],
+          "nvrRefs": ["C3"],
+          "pages": [206]
+        }
+      ]
+    },
+    {
+      "messageType": "MT742",
+      "artifactId": "SWIFT-US7M-FULL-SR2026-1F748A82",
+      "pages": [215, 217, 220],
+      "coverage": "FULL_MESSAGE_PROFILE",
+      "status": "FIELD_PROFILE_PROVEN",
+      "fields": [
+        {
+          "sequence": "MESSAGE",
+          "tag": "52",
+          "options": ["A", "D"],
+          "fieldName": "Issuing Bank",
+          "presence": "MANDATORY",
+          "formats": ["FI_A", "NAME_ADDRESS_D"],
+          "nvrRefs": [],
+          "pages": [217]
+        },
+        {
+          "sequence": "MESSAGE",
+          "tag": "57",
+          "options": ["A", "B", "D"],
+          "fieldName": "Account With Bank",
+          "presence": "OPTIONAL",
+          "formats": ["FI_A", "LOCATION_B", "NAME_ADDRESS_D"],
+          "nvrRefs": [],
+          "pages": [220]
+        },
+        {
+          "sequence": "MESSAGE",
+          "tag": "58",
+          "options": ["A", "D"],
+          "fieldName": "Beneficiary Bank",
+          "presence": "OPTIONAL",
+          "formats": ["FI_A", "NAME_ADDRESS_D"],
+          "nvrRefs": [],
+          "pages": [220]
+        }
+      ]
+    },
+    {
+      "messageType": "MT750",
+      "artifactId": "SWIFT-US7M-FULL-SR2026-1F748A82",
+      "pages": [244, 248],
+      "coverage": "FULL_MESSAGE_PROFILE",
+      "status": "FIELD_PROFILE_PROVEN",
+      "fields": [
+        {
+          "sequence": "MESSAGE",
+          "tag": "57",
+          "options": ["A", "B", "D"],
+          "fieldName": "Account With Bank",
+          "presence": "OPTIONAL",
+          "formats": ["FI_A", "LOCATION_B", "NAME_ADDRESS_D"],
+          "nvrRefs": [],
+          "pages": [248]
+        }
+      ]
+    },
+    {
+      "messageType": "MT752",
+      "artifactId": "SWIFT-US7M-FULL-SR2026-1F748A82",
+      "pages": [252, 256, 257],
+      "coverage": "FULL_MESSAGE_PROFILE",
+      "status": "FIELD_PROFILE_PROVEN",
+      "fields": [
+        {
+          "sequence": "MESSAGE",
+          "tag": "53",
+          "options": ["A", "B", "D"],
+          "fieldName": "Sender's Correspondent",
+          "presence": "OPTIONAL",
+          "formats": ["FI_A", "LOCATION_B", "NAME_ADDRESS_D"],
+          "nvrRefs": [],
+          "pages": [256, 257]
+        },
+        {
+          "sequence": "MESSAGE",
+          "tag": "54",
+          "options": ["A", "B", "D"],
+          "fieldName": "Receiver's Correspondent",
+          "presence": "OPTIONAL",
+          "formats": ["FI_A", "LOCATION_B", "NAME_ADDRESS_D"],
+          "nvrRefs": [],
+          "pages": [257]
+        }
+      ]
+    },
+    {
+      "messageType": "MT754",
+      "artifactId": "SWIFT-US7M-FULL-SR2026-1F748A82",
+      "pages": [264, 270, 271],
+      "coverage": "FULL_MESSAGE_PROFILE",
+      "status": "FIELD_PROFILE_PROVEN",
+      "fields": [
+        {
+          "sequence": "MESSAGE",
+          "tag": "53",
+          "options": ["A", "B", "D"],
+          "fieldName": "Reimbursing Bank",
+          "presence": "CONDITIONAL_C2",
+          "formats": ["FI_A", "LOCATION_B", "NAME_ADDRESS_D"],
+          "nvrRefs": ["C2"],
+          "pages": [270]
+        },
+        {
+          "sequence": "MESSAGE",
+          "tag": "57",
+          "options": ["A", "B", "D"],
+          "fieldName": "Account With Bank",
+          "presence": "CONDITIONAL_C2",
+          "formats": ["FI_A", "LOCATION_B", "NAME_ADDRESS_D"],
+          "nvrRefs": ["C2"],
+          "pages": [270]
+        },
+        {
+          "sequence": "MESSAGE",
+          "tag": "58",
+          "options": ["A", "D"],
+          "fieldName": "Beneficiary Bank",
+          "presence": "OPTIONAL",
+          "formats": ["FI_A", "NAME_ADDRESS_D"],
+          "nvrRefs": [],
+          "pages": [271]
+        }
+      ]
+    },
+    {
+      "messageType": "MT756",
+      "artifactId": "SWIFT-US7M-FULL-SR2026-1F748A82",
+      "pages": [275, 277, 278],
+      "coverage": "FULL_MESSAGE_PROFILE",
+      "status": "FIELD_PROFILE_PROVEN",
+      "fields": [
+        {
+          "sequence": "MESSAGE",
+          "tag": "53",
+          "options": ["A", "B", "D"],
+          "fieldName": "Sender's Correspondent",
+          "presence": "OPTIONAL",
+          "formats": ["FI_A", "LOCATION_B", "NAME_ADDRESS_D"],
+          "nvrRefs": [],
+          "pages": [277, 278]
+        },
+        {
+          "sequence": "MESSAGE",
+          "tag": "54",
+          "options": ["A", "B", "D"],
+          "fieldName": "Receiver's Correspondent",
+          "presence": "OPTIONAL",
+          "formats": ["FI_A", "LOCATION_B", "NAME_ADDRESS_D"],
+          "nvrRefs": [],
+          "pages": [278]
+        }
+      ]
+    },
+    {
+      "messageType": "MT760",
+      "artifactId": "SWIFT-US7M-FULL-SR2026-1F748A82",
+      "pages": [294, 309, 311, 312, 316, 328, 331],
+      "coverage": "FULL_MESSAGE_PROFILE",
+      "status": "FIELD_PROFILE_PROVEN",
+      "fields": [
+        {
+          "sequence": "B",
+          "tag": "52",
+          "options": ["A", "D"],
+          "fieldName": "Issuer",
+          "presence": "MANDATORY",
+          "formats": ["FI_A", "NAME_ADDRESS_D"],
+          "nvrRefs": [],
+          "pages": [309]
+        },
+        {
+          "sequence": "B",
+          "tag": "56",
+          "options": ["A", "D"],
+          "fieldName": "Advising Bank",
+          "presence": "CONDITIONAL_C7",
+          "formats": ["FI_A", "NAME_ADDRESS_D"],
+          "nvrRefs": ["C7"],
+          "pages": [311]
+        },
+        {
+          "sequence": "B",
+          "tag": "57",
+          "options": ["A", "D"],
+          "fieldName": "'Advise Through' Bank",
+          "presence": "OPTIONAL",
+          "formats": ["FI_A", "NAME_ADDRESS_D"],
+          "nvrRefs": [],
+          "pages": [312]
+        },
+        {
+          "sequence": "B",
+          "tag": "58",
+          "options": ["A", "D"],
+          "fieldName": "Requested Confirmation Party",
+          "presence": "CONDITIONAL_C9",
+          "formats": ["FI_A", "NAME_ADDRESS_D"],
+          "nvrRefs": ["C9"],
+          "pages": [316]
+        },
+        {
+          "sequence": "C",
+          "tag": "52",
+          "options": ["A", "D"],
+          "fieldName": "Issuer",
+          "presence": "OPTIONAL",
+          "formats": ["FI_A", "NAME_ADDRESS_D"],
+          "nvrRefs": [],
+          "pages": [328]
+        },
+        {
+          "sequence": "C",
+          "tag": "57",
+          "options": ["A", "D"],
+          "fieldName": "'Advise Through' Bank",
+          "presence": "OPTIONAL",
+          "formats": ["FI_A", "NAME_ADDRESS_D"],
+          "nvrRefs": [],
+          "pages": [331]
+        }
+      ]
+    },
+    {
+      "messageType": "MT765",
+      "artifactId": "SWIFT-US7M-FULL-SR2026-1F748A82",
+      "pages": [354, 355, 356, 363, 364],
+      "coverage": "FULL_MESSAGE_PROFILE",
+      "status": "FIELD_PROFILE_PROVEN",
+      "fields": [
+        {
+          "sequence": "MESSAGE",
+          "tag": "52",
+          "options": ["A", "D"],
+          "fieldName": "Issuer",
+          "presence": "MANDATORY",
+          "formats": ["FI_A", "NAME_ADDRESS_D"],
+          "nvrRefs": [],
+          "pages": [356]
+        },
+        {
+          "sequence": "MESSAGE",
+          "tag": "56",
+          "options": ["A", "B", "D"],
+          "fieldName": "Intermediary",
+          "presence": "OPTIONAL",
+          "formats": ["FI_A", "LOCATION_B", "NAME_ADDRESS_D"],
+          "nvrRefs": [],
+          "pages": [363]
+        },
+        {
+          "sequence": "MESSAGE",
+          "tag": "57",
+          "options": ["A", "B", "D"],
+          "fieldName": "Account With Institution",
+          "presence": "OPTIONAL",
+          "formats": ["FI_A", "LOCATION_B", "NAME_ADDRESS_D"],
+          "nvrRefs": [],
+          "pages": [363, 364]
+        }
+      ]
+    },
+    {
+      "messageType": "MT768",
+      "artifactId": "SWIFT-US7M-FULL-SR2026-1F748A82",
+      "pages": [389, 392],
+      "coverage": "FULL_MESSAGE_PROFILE",
+      "status": "FIELD_PROFILE_PROVEN",
+      "fields": [
+        {
+          "sequence": "MESSAGE",
+          "tag": "57",
+          "options": ["A", "B", "D"],
+          "fieldName": "Account With Bank",
+          "presence": "CONDITIONAL_C1_C2",
+          "formats": ["FI_A", "LOCATION_B", "NAME_ADDRESS_D"],
+          "nvrRefs": ["C1"],
+          "pages": [392]
+        }
+      ]
+    },
+    {
+      "messageType": "MT769",
+      "artifactId": "SWIFT-US7M-FULL-SR2026-1F748A82",
+      "pages": [396, 400],
+      "coverage": "FULL_MESSAGE_PROFILE",
+      "status": "FIELD_PROFILE_PROVEN",
+      "fields": [
+        {
+          "sequence": "MESSAGE",
+          "tag": "57",
+          "options": ["A", "B", "D"],
+          "fieldName": "Account With Bank",
+          "presence": "CONDITIONAL_C1_C3",
+          "formats": ["FI_A", "LOCATION_B", "NAME_ADDRESS_D"],
+          "nvrRefs": ["C1"],
+          "pages": [400]
+        }
+      ]
+    }
+  ]
+}

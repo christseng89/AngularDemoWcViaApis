@@ -1,0 +1,2326 @@
+{
+  "schemaVersion": "1.0",
+  "kind": "MT347_BROWSER_UI_UAT_INDEPENDENT_ADJUDICATION",
+  "sourceReport": "controlled-ui-positive-uat.json",
+  "sourceWorkbookSha256": "82C6ABCFD91E7D35E1382F8C86BF796D8DBF05CF8C8D94F9F0C7B5889AB52C9A",
+  "inputPolicy": "parameters/mt347-fixture-inputs.v1.json",
+  "adjudicatedAt": "2026-09-12T15:33:35.021Z",
+  "summary": {
+    "executed": 91,
+    "passed": 91,
+    "failed": 0,
+    "notExecutable": 0,
+    "fixtureOracleGaps": 47,
+    "snapshotHashes": [
+      "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08"
+    ]
+  },
+  "failed": [],
+  "results": [
+    {
+      "testCaseId": "MT300-001",
+      "bindingId": "FIX-MT300-001@v1",
+      "messageType": "MT300",
+      "sequence": "B1",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT300-001@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {
+        "B1.53A": "CITIUS33",
+        "B1.57A": "DEUTDEFF"
+      },
+      "actualTags": {
+        "B1.53A": "CITIUS33",
+        "B1.57A": "DEUTDEFF"
+      },
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "machine-readable exact tag-set + HTTP/DOM/binding",
+      "independentExpected": {
+        "B1.53A": "CITIUS33",
+        "B1.57A": "DEUTDEFF"
+      }
+    },
+    {
+      "testCaseId": "MT300-002",
+      "bindingId": "FIX-MT300-002@v1",
+      "messageType": "MT300",
+      "sequence": "B1",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT300-002@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {
+        "B1.53A": "CITIUS33",
+        "B1.56A": "HSBCHKHH",
+        "B1.57A": "DEUTDEFF"
+      },
+      "actualTags": {
+        "B1.53A": "CITIUS33",
+        "B1.56A": "HSBCHKHH",
+        "B1.57A": "DEUTDEFF"
+      },
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "machine-readable exact tag-set + HTTP/DOM/binding",
+      "independentExpected": {
+        "B1.53A": "CITIUS33",
+        "B1.56A": "HSBCHKHH",
+        "B1.57A": "DEUTDEFF"
+      }
+    },
+    {
+      "testCaseId": "MT300-016",
+      "bindingId": "FIX-MT300-016@v1",
+      "messageType": "MT300",
+      "sequence": "B1",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT300-016@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {
+        "B1.53A": "//FW021000021\nCITIUS33",
+        "B1.57A": "DEUTDEFF"
+      },
+      "domSuccess": true,
+      "passed": false,
+      "discrepancies": [
+        "resolved tag set mismatch"
+      ],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD clearing-code placement/non-duplication",
+      "independentExpected": {
+        "B1.53A": "//FW021000021\nCITIUS33"
+      },
+      "clearingCodeOccurrenceCount": 1
+    },
+    {
+      "testCaseId": "MT304-001",
+      "bindingId": "FIX-MT304-001@v1",
+      "messageType": "MT304",
+      "sequence": "B1",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT304-001@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {
+        "B1.53A": "CITIUS33",
+        "B1.57A": "DEUTDEFF"
+      },
+      "actualTags": {
+        "B1.53A": "CITIUS33",
+        "B1.57A": "DEUTDEFF"
+      },
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "machine-readable exact tag-set + HTTP/DOM/binding",
+      "independentExpected": {
+        "B1.53A": "CITIUS33",
+        "B1.57A": "DEUTDEFF"
+      }
+    },
+    {
+      "testCaseId": "MT304-002",
+      "bindingId": "FIX-MT304-002@v1",
+      "messageType": "MT304",
+      "sequence": "B1",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT304-002@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {
+        "B1.53A": "CITIUS33",
+        "B1.56A": "HSBCHKHH",
+        "B1.57A": "DEUTDEFF"
+      },
+      "actualTags": {
+        "B1.53A": "CITIUS33",
+        "B1.56A": "HSBCHKHH",
+        "B1.57A": "DEUTDEFF"
+      },
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "machine-readable exact tag-set + HTTP/DOM/binding",
+      "independentExpected": {
+        "B1.53A": "CITIUS33",
+        "B1.56A": "HSBCHKHH",
+        "B1.57A": "DEUTDEFF"
+      }
+    },
+    {
+      "testCaseId": "MT304-016",
+      "bindingId": "FIX-MT304-016@v1",
+      "messageType": "MT304",
+      "sequence": "B1",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT304-016@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {
+        "B1.53A": "//FW021000021\nCITIUS33"
+      },
+      "domSuccess": true,
+      "passed": false,
+      "discrepancies": [
+        "resolved tag set mismatch"
+      ],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD clearing-code placement/non-duplication",
+      "independentExpected": {
+        "B1.53A": "//FW021000021\nCITIUS33"
+      },
+      "clearingCodeOccurrenceCount": 1
+    },
+    {
+      "testCaseId": "MT305-001",
+      "bindingId": "FIX-MT305-001@v1",
+      "messageType": "MT305",
+      "sequence": "A",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT305-001@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {
+        "A.53A": "CITIUS33",
+        "A.57A": "DEUTDEFF"
+      },
+      "actualTags": {
+        "A.53A": "CITIUS33",
+        "A.57A": "DEUTDEFF"
+      },
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "machine-readable exact tag-set + HTTP/DOM/binding",
+      "independentExpected": {
+        "A.53A": "CITIUS33",
+        "A.57A": "DEUTDEFF"
+      }
+    },
+    {
+      "testCaseId": "MT305-002",
+      "bindingId": "FIX-MT305-002@v1",
+      "messageType": "MT305",
+      "sequence": "A",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT305-002@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {
+        "A.53A": "CITIUS33",
+        "A.56A": "HSBCHKHH",
+        "A.57A": "DEUTDEFF"
+      },
+      "actualTags": {
+        "A.53A": "CITIUS33",
+        "A.56A": "HSBCHKHH",
+        "A.57A": "DEUTDEFF"
+      },
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "machine-readable exact tag-set + HTTP/DOM/binding",
+      "independentExpected": {
+        "A.53A": "CITIUS33",
+        "A.56A": "HSBCHKHH",
+        "A.57A": "DEUTDEFF"
+      }
+    },
+    {
+      "testCaseId": "MT305-006",
+      "bindingId": "FIX-MT305-006@v1",
+      "messageType": "MT305",
+      "sequence": "A",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT305-006@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {
+        "A.53A": "//FW021000021\nCITIUS33",
+        "A.57A": "DEUTDEFF"
+      },
+      "domSuccess": true,
+      "passed": false,
+      "discrepancies": [
+        "resolved tag set mismatch"
+      ],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD clearing-code placement/non-duplication",
+      "independentExpected": {
+        "A.53A": "//FW021000021\nCITIUS33"
+      },
+      "clearingCodeOccurrenceCount": 1
+    },
+    {
+      "testCaseId": "MT306-001",
+      "bindingId": "FIX-MT306-001@v1",
+      "messageType": "MT306",
+      "sequence": "C",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT306-001@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {
+        "C.53A": "CITIUS33",
+        "C.57A": "DEUTDEFF",
+        "C.58A": "BARCGB22"
+      },
+      "actualTags": {
+        "C.53A": "CITIUS33",
+        "C.57A": "DEUTDEFF",
+        "C.58A": "BARCGB22"
+      },
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "machine-readable exact tag-set + HTTP/DOM/binding",
+      "independentExpected": {
+        "C.53A": "CITIUS33",
+        "C.57A": "DEUTDEFF",
+        "C.58A": "BARCGB22"
+      }
+    },
+    {
+      "testCaseId": "MT306-002",
+      "bindingId": "FIX-MT306-002@v1",
+      "messageType": "MT306",
+      "sequence": "C",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT306-002@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {
+        "C.53A": "CITIUS33",
+        "C.56A": "HSBCHKHH",
+        "C.57A": "DEUTDEFF",
+        "C.58A": "BARCGB22"
+      },
+      "actualTags": {
+        "C.53A": "CITIUS33",
+        "C.56A": "HSBCHKHH",
+        "C.57A": "DEUTDEFF",
+        "C.58A": "BARCGB22"
+      },
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "machine-readable exact tag-set + HTTP/DOM/binding",
+      "independentExpected": {
+        "C.53A": "CITIUS33",
+        "C.56A": "HSBCHKHH",
+        "C.57A": "DEUTDEFF",
+        "C.58A": "BARCGB22"
+      }
+    },
+    {
+      "testCaseId": "MT306-019",
+      "bindingId": "FIX-MT306-019@v1",
+      "messageType": "MT306",
+      "sequence": "C",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT306-019@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {
+        "C.53A": "//FW021000021\nCITIUS33",
+        "C.57A": "DEUTDEFF"
+      },
+      "domSuccess": true,
+      "passed": false,
+      "discrepancies": [
+        "resolved tag set mismatch"
+      ],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD clearing-code placement/non-duplication",
+      "independentExpected": {
+        "C.53A": "//FW021000021\nCITIUS33"
+      },
+      "clearingCodeOccurrenceCount": 1
+    },
+    {
+      "testCaseId": "MT320-001",
+      "bindingId": "FIX-MT320-001@v1",
+      "messageType": "MT320",
+      "sequence": "C",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT320-001@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {
+        "C.53A": "CITIUS33",
+        "C.57A": "DEUTDEFF",
+        "C.58A": "BARCGB22"
+      },
+      "actualTags": {
+        "C.53A": "CITIUS33",
+        "C.57A": "DEUTDEFF",
+        "C.58A": "BARCGB22"
+      },
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "machine-readable exact tag-set + HTTP/DOM/binding",
+      "independentExpected": {
+        "C.53A": "CITIUS33",
+        "C.57A": "DEUTDEFF",
+        "C.58A": "BARCGB22"
+      }
+    },
+    {
+      "testCaseId": "MT320-002",
+      "bindingId": "FIX-MT320-002@v1",
+      "messageType": "MT320",
+      "sequence": "C",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT320-002@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {
+        "C.53A": "CITIUS33",
+        "C.56A": "HSBCHKHH",
+        "C.57A": "DEUTDEFF",
+        "C.58A": "BARCGB22"
+      },
+      "actualTags": {
+        "C.53A": "CITIUS33",
+        "C.56A": "HSBCHKHH",
+        "C.57A": "DEUTDEFF",
+        "C.58A": "BARCGB22"
+      },
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "machine-readable exact tag-set + HTTP/DOM/binding",
+      "independentExpected": {
+        "C.53A": "CITIUS33",
+        "C.56A": "HSBCHKHH",
+        "C.57A": "DEUTDEFF",
+        "C.58A": "BARCGB22"
+      }
+    },
+    {
+      "testCaseId": "MT320-031",
+      "bindingId": "FIX-MT320-031@v1",
+      "messageType": "MT320",
+      "sequence": "C",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT320-031@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {
+        "C.53A": "//FW021000021\nCITIUS33",
+        "C.57A": "DEUTDEFF"
+      },
+      "domSuccess": true,
+      "passed": false,
+      "discrepancies": [
+        "resolved tag set mismatch"
+      ],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD clearing-code placement/non-duplication",
+      "independentExpected": {
+        "C.53A": "//FW021000021\nCITIUS33"
+      },
+      "clearingCodeOccurrenceCount": 1
+    },
+    {
+      "testCaseId": "MT330-001",
+      "bindingId": "FIX-MT330-001@v1",
+      "messageType": "MT330",
+      "sequence": "C",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT330-001@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {
+        "C.53A": "CITIUS33",
+        "C.57A": "DEUTDEFF",
+        "C.58A": "BARCGB22"
+      },
+      "actualTags": {
+        "C.53A": "CITIUS33",
+        "C.57A": "DEUTDEFF",
+        "C.58A": "BARCGB22"
+      },
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "machine-readable exact tag-set + HTTP/DOM/binding",
+      "independentExpected": {
+        "C.53A": "CITIUS33",
+        "C.57A": "DEUTDEFF",
+        "C.58A": "BARCGB22"
+      }
+    },
+    {
+      "testCaseId": "MT330-002",
+      "bindingId": "FIX-MT330-002@v1",
+      "messageType": "MT330",
+      "sequence": "C",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT330-002@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {
+        "C.53A": "CITIUS33",
+        "C.56A": "HSBCHKHH",
+        "C.57A": "DEUTDEFF",
+        "C.58A": "BARCGB22"
+      },
+      "actualTags": {
+        "C.53A": "CITIUS33",
+        "C.56A": "HSBCHKHH",
+        "C.57A": "DEUTDEFF",
+        "C.58A": "BARCGB22"
+      },
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "machine-readable exact tag-set + HTTP/DOM/binding",
+      "independentExpected": {
+        "C.53A": "CITIUS33",
+        "C.56A": "HSBCHKHH",
+        "C.57A": "DEUTDEFF",
+        "C.58A": "BARCGB22"
+      }
+    },
+    {
+      "testCaseId": "MT330-025",
+      "bindingId": "FIX-MT330-025@v1",
+      "messageType": "MT330",
+      "sequence": "C",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT330-025@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {
+        "C.53A": "//FW021000021\nCITIUS33",
+        "C.57A": "DEUTDEFF"
+      },
+      "domSuccess": true,
+      "passed": false,
+      "discrepancies": [
+        "resolved tag set mismatch"
+      ],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD clearing-code placement/non-duplication",
+      "independentExpected": {
+        "C.53A": "//FW021000021\nCITIUS33"
+      },
+      "clearingCodeOccurrenceCount": 1
+    },
+    {
+      "testCaseId": "MT340-001",
+      "bindingId": "FIX-MT340-001@v1",
+      "messageType": "MT340",
+      "sequence": "C",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT340-001@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {
+        "C.53A": "CITIUS33",
+        "C.57A": "DEUTDEFF",
+        "C.58A": "BARCGB22"
+      },
+      "actualTags": {
+        "C.53A": "CITIUS33",
+        "C.57A": "DEUTDEFF",
+        "C.58A": "BARCGB22"
+      },
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "machine-readable exact tag-set + HTTP/DOM/binding",
+      "independentExpected": {
+        "C.53A": "CITIUS33",
+        "C.57A": "DEUTDEFF",
+        "C.58A": "BARCGB22"
+      }
+    },
+    {
+      "testCaseId": "MT340-002",
+      "bindingId": "FIX-MT340-002@v1",
+      "messageType": "MT340",
+      "sequence": "C",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT340-002@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {
+        "C.53A": "CITIUS33",
+        "C.56A": "HSBCHKHH",
+        "C.57A": "DEUTDEFF",
+        "C.58A": "BARCGB22"
+      },
+      "actualTags": {
+        "C.53A": "CITIUS33",
+        "C.56A": "HSBCHKHH",
+        "C.57A": "DEUTDEFF",
+        "C.58A": "BARCGB22"
+      },
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "machine-readable exact tag-set + HTTP/DOM/binding",
+      "independentExpected": {
+        "C.53A": "CITIUS33",
+        "C.56A": "HSBCHKHH",
+        "C.57A": "DEUTDEFF",
+        "C.58A": "BARCGB22"
+      }
+    },
+    {
+      "testCaseId": "MT340-019",
+      "bindingId": "FIX-MT340-019@v1",
+      "messageType": "MT340",
+      "sequence": "C",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT340-019@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {
+        "C.53A": "//FW021000021\nCITIUS33",
+        "C.57A": "DEUTDEFF"
+      },
+      "domSuccess": true,
+      "passed": false,
+      "discrepancies": [
+        "resolved tag set mismatch"
+      ],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD clearing-code placement/non-duplication",
+      "independentExpected": {
+        "C.53A": "//FW021000021\nCITIUS33"
+      },
+      "clearingCodeOccurrenceCount": 1
+    },
+    {
+      "testCaseId": "MT341-001",
+      "bindingId": "FIX-MT341-001@v1",
+      "messageType": "MT341",
+      "sequence": "C",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT341-001@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {
+        "C.53A": "CITIUS33",
+        "C.57A": "DEUTDEFF",
+        "C.58A": "BARCGB22"
+      },
+      "actualTags": {
+        "C.53A": "CITIUS33",
+        "C.57A": "DEUTDEFF",
+        "C.58A": "BARCGB22"
+      },
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "machine-readable exact tag-set + HTTP/DOM/binding",
+      "independentExpected": {
+        "C.53A": "CITIUS33",
+        "C.57A": "DEUTDEFF",
+        "C.58A": "BARCGB22"
+      }
+    },
+    {
+      "testCaseId": "MT341-002",
+      "bindingId": "FIX-MT341-002@v1",
+      "messageType": "MT341",
+      "sequence": "C",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT341-002@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {
+        "C.53A": "CITIUS33",
+        "C.56A": "HSBCHKHH",
+        "C.57A": "DEUTDEFF",
+        "C.58A": "BARCGB22"
+      },
+      "actualTags": {
+        "C.53A": "CITIUS33",
+        "C.56A": "HSBCHKHH",
+        "C.57A": "DEUTDEFF",
+        "C.58A": "BARCGB22"
+      },
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "machine-readable exact tag-set + HTTP/DOM/binding",
+      "independentExpected": {
+        "C.53A": "CITIUS33",
+        "C.56A": "HSBCHKHH",
+        "C.57A": "DEUTDEFF",
+        "C.58A": "BARCGB22"
+      }
+    },
+    {
+      "testCaseId": "MT341-007",
+      "bindingId": "FIX-MT341-007@v1",
+      "messageType": "MT341",
+      "sequence": "C",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT341-007@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {
+        "C.53A": "//FW021000021\nCITIUS33",
+        "C.57A": "DEUTDEFF"
+      },
+      "domSuccess": true,
+      "passed": false,
+      "discrepancies": [
+        "resolved tag set mismatch"
+      ],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD clearing-code placement/non-duplication",
+      "independentExpected": {
+        "C.53A": "//FW021000021\nCITIUS33"
+      },
+      "clearingCodeOccurrenceCount": 1
+    },
+    {
+      "testCaseId": "MT350-001",
+      "bindingId": "FIX-MT350-001@v1",
+      "messageType": "MT350",
+      "sequence": "C",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT350-001@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {
+        "C.53A": "CITIUS33",
+        "C.57A": "DEUTDEFF",
+        "C.58A": "BARCGB22"
+      },
+      "actualTags": {
+        "C.53A": "CITIUS33",
+        "C.57A": "DEUTDEFF",
+        "C.58A": "BARCGB22"
+      },
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "machine-readable exact tag-set + HTTP/DOM/binding",
+      "independentExpected": {
+        "C.53A": "CITIUS33",
+        "C.57A": "DEUTDEFF",
+        "C.58A": "BARCGB22"
+      }
+    },
+    {
+      "testCaseId": "MT350-002",
+      "bindingId": "FIX-MT350-002@v1",
+      "messageType": "MT350",
+      "sequence": "C",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT350-002@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {
+        "C.53A": "CITIUS33",
+        "C.56A": "HSBCHKHH",
+        "C.57A": "DEUTDEFF",
+        "C.58A": "BARCGB22"
+      },
+      "actualTags": {
+        "C.53A": "CITIUS33",
+        "C.56A": "HSBCHKHH",
+        "C.57A": "DEUTDEFF",
+        "C.58A": "BARCGB22"
+      },
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "machine-readable exact tag-set + HTTP/DOM/binding",
+      "independentExpected": {
+        "C.53A": "CITIUS33",
+        "C.56A": "HSBCHKHH",
+        "C.57A": "DEUTDEFF",
+        "C.58A": "BARCGB22"
+      }
+    },
+    {
+      "testCaseId": "MT350-007",
+      "bindingId": "FIX-MT350-007@v1",
+      "messageType": "MT350",
+      "sequence": "C",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT350-007@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {
+        "C.53A": "//FW021000021\nCITIUS33",
+        "C.57A": "DEUTDEFF"
+      },
+      "domSuccess": true,
+      "passed": false,
+      "discrepancies": [
+        "resolved tag set mismatch"
+      ],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD clearing-code placement/non-duplication",
+      "independentExpected": {
+        "C.53A": "//FW021000021\nCITIUS33"
+      },
+      "clearingCodeOccurrenceCount": 1
+    },
+    {
+      "testCaseId": "MT360-001",
+      "bindingId": "FIX-MT360-001@v1",
+      "messageType": "MT360",
+      "sequence": "D",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT360-001@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {
+        "D.53A": "CITIUS33",
+        "D.57A": "DEUTDEFF"
+      },
+      "actualTags": {
+        "D.53A": "CITIUS33",
+        "D.57A": "DEUTDEFF"
+      },
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "machine-readable exact tag-set + HTTP/DOM/binding",
+      "independentExpected": {
+        "D.53A": "CITIUS33",
+        "D.57A": "DEUTDEFF"
+      }
+    },
+    {
+      "testCaseId": "MT360-002",
+      "bindingId": "FIX-MT360-002@v1",
+      "messageType": "MT360",
+      "sequence": "D",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT360-002@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {
+        "D.53A": "CITIUS33",
+        "D.56A": "HSBCHKHH",
+        "D.57A": "DEUTDEFF"
+      },
+      "actualTags": {
+        "D.53A": "CITIUS33",
+        "D.56A": "HSBCHKHH",
+        "D.57A": "DEUTDEFF"
+      },
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "machine-readable exact tag-set + HTTP/DOM/binding",
+      "independentExpected": {
+        "D.53A": "CITIUS33",
+        "D.56A": "HSBCHKHH",
+        "D.57A": "DEUTDEFF"
+      }
+    },
+    {
+      "testCaseId": "MT360-029",
+      "bindingId": "FIX-MT360-029@v1",
+      "messageType": "MT360",
+      "sequence": "D",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT360-029@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {
+        "D.53A": "//FW021000021\nCITIUS33",
+        "D.57A": "DEUTDEFF"
+      },
+      "domSuccess": true,
+      "passed": false,
+      "discrepancies": [
+        "resolved tag set mismatch"
+      ],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD clearing-code placement/non-duplication",
+      "independentExpected": {
+        "D.53A": "//FW021000021\nCITIUS33"
+      },
+      "clearingCodeOccurrenceCount": 1
+    },
+    {
+      "testCaseId": "MT361-001",
+      "bindingId": "FIX-MT361-001@v1",
+      "messageType": "MT361",
+      "sequence": "D",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT361-001@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {
+        "D.53A": "CITIUS33",
+        "D.57A": "DEUTDEFF"
+      },
+      "actualTags": {
+        "D.53A": "CITIUS33",
+        "D.57A": "DEUTDEFF"
+      },
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "machine-readable exact tag-set + HTTP/DOM/binding",
+      "independentExpected": {
+        "D.53A": "CITIUS33",
+        "D.57A": "DEUTDEFF"
+      }
+    },
+    {
+      "testCaseId": "MT361-002",
+      "bindingId": "FIX-MT361-002@v1",
+      "messageType": "MT361",
+      "sequence": "D",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT361-002@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {
+        "D.53A": "CITIUS33",
+        "D.56A": "HSBCHKHH",
+        "D.57A": "DEUTDEFF"
+      },
+      "actualTags": {
+        "D.53A": "CITIUS33",
+        "D.56A": "HSBCHKHH",
+        "D.57A": "DEUTDEFF"
+      },
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "machine-readable exact tag-set + HTTP/DOM/binding",
+      "independentExpected": {
+        "D.53A": "CITIUS33",
+        "D.56A": "HSBCHKHH",
+        "D.57A": "DEUTDEFF"
+      }
+    },
+    {
+      "testCaseId": "MT361-043",
+      "bindingId": "FIX-MT361-043@v1",
+      "messageType": "MT361",
+      "sequence": "D",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT361-043@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {
+        "D.53A": "//FW021000021\nCITIUS33",
+        "D.57A": "DEUTDEFF"
+      },
+      "domSuccess": true,
+      "passed": false,
+      "discrepancies": [
+        "resolved tag set mismatch"
+      ],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD clearing-code placement/non-duplication",
+      "independentExpected": {
+        "D.53A": "//FW021000021\nCITIUS33"
+      },
+      "clearingCodeOccurrenceCount": 1
+    },
+    {
+      "testCaseId": "MT362-001",
+      "bindingId": "FIX-MT362-001@v1",
+      "messageType": "MT362",
+      "sequence": "C",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT362-001@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {
+        "C.53A": "CITIUS33",
+        "C.57A": "DEUTDEFF"
+      },
+      "actualTags": {
+        "C.53A": "CITIUS33",
+        "C.57A": "DEUTDEFF"
+      },
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "machine-readable exact tag-set + HTTP/DOM/binding",
+      "independentExpected": {
+        "C.53A": "CITIUS33",
+        "C.57A": "DEUTDEFF"
+      }
+    },
+    {
+      "testCaseId": "MT362-002",
+      "bindingId": "FIX-MT362-002@v1",
+      "messageType": "MT362",
+      "sequence": "C",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT362-002@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {
+        "C.53A": "CITIUS33",
+        "C.56A": "HSBCHKHH",
+        "C.57A": "DEUTDEFF"
+      },
+      "actualTags": {
+        "C.53A": "CITIUS33",
+        "C.56A": "HSBCHKHH",
+        "C.57A": "DEUTDEFF"
+      },
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "machine-readable exact tag-set + HTTP/DOM/binding",
+      "independentExpected": {
+        "C.53A": "CITIUS33",
+        "C.56A": "HSBCHKHH",
+        "C.57A": "DEUTDEFF"
+      }
+    },
+    {
+      "testCaseId": "MT362-015",
+      "bindingId": "FIX-MT362-015@v1",
+      "messageType": "MT362",
+      "sequence": "C",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT362-015@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {
+        "C.53A": "//FW021000021\nCITIUS33",
+        "C.57A": "DEUTDEFF"
+      },
+      "domSuccess": true,
+      "passed": false,
+      "discrepancies": [
+        "resolved tag set mismatch"
+      ],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD clearing-code placement/non-duplication",
+      "independentExpected": {
+        "C.53A": "//FW021000021\nCITIUS33"
+      },
+      "clearingCodeOccurrenceCount": 1
+    },
+    {
+      "testCaseId": "MT364-001",
+      "bindingId": "FIX-MT364-001@v1",
+      "messageType": "MT364",
+      "sequence": "L",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT364-001@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {
+        "L.53A": "CITIUS33",
+        "L.57A": "DEUTDEFF"
+      },
+      "actualTags": {
+        "L.53A": "CITIUS33",
+        "L.57A": "DEUTDEFF"
+      },
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "machine-readable exact tag-set + HTTP/DOM/binding",
+      "independentExpected": {
+        "L.53A": "CITIUS33",
+        "L.57A": "DEUTDEFF"
+      }
+    },
+    {
+      "testCaseId": "MT364-002",
+      "bindingId": "FIX-MT364-002@v1",
+      "messageType": "MT364",
+      "sequence": "L",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT364-002@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {
+        "L.53A": "CITIUS33",
+        "L.56A": "HSBCHKHH",
+        "L.57A": "DEUTDEFF"
+      },
+      "actualTags": {
+        "L.53A": "CITIUS33",
+        "L.56A": "HSBCHKHH",
+        "L.57A": "DEUTDEFF"
+      },
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "machine-readable exact tag-set + HTTP/DOM/binding",
+      "independentExpected": {
+        "L.53A": "CITIUS33",
+        "L.56A": "HSBCHKHH",
+        "L.57A": "DEUTDEFF"
+      }
+    },
+    {
+      "testCaseId": "MT364-013",
+      "bindingId": "FIX-MT364-013@v1",
+      "messageType": "MT364",
+      "sequence": "L",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT364-013@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {
+        "L.53A": "//FW021000021\nCITIUS33",
+        "L.57A": "DEUTDEFF"
+      },
+      "domSuccess": true,
+      "passed": false,
+      "discrepancies": [
+        "resolved tag set mismatch"
+      ],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD clearing-code placement/non-duplication",
+      "independentExpected": {
+        "L.53A": "//FW021000021\nCITIUS33"
+      },
+      "clearingCodeOccurrenceCount": 1
+    },
+    {
+      "testCaseId": "MT365-001",
+      "bindingId": "FIX-MT365-001@v1",
+      "messageType": "MT365",
+      "sequence": "J",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT365-001@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {
+        "J.53A": "CITIUS33",
+        "J.57A": "DEUTDEFF"
+      },
+      "actualTags": {
+        "J.53A": "CITIUS33",
+        "J.57A": "DEUTDEFF"
+      },
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "machine-readable exact tag-set + HTTP/DOM/binding",
+      "independentExpected": {
+        "J.53A": "CITIUS33",
+        "J.57A": "DEUTDEFF"
+      }
+    },
+    {
+      "testCaseId": "MT365-002",
+      "bindingId": "FIX-MT365-002@v1",
+      "messageType": "MT365",
+      "sequence": "J",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT365-002@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {
+        "J.53A": "CITIUS33",
+        "J.56A": "HSBCHKHH",
+        "J.57A": "DEUTDEFF"
+      },
+      "actualTags": {
+        "J.53A": "CITIUS33",
+        "J.56A": "HSBCHKHH",
+        "J.57A": "DEUTDEFF"
+      },
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "machine-readable exact tag-set + HTTP/DOM/binding",
+      "independentExpected": {
+        "J.53A": "CITIUS33",
+        "J.56A": "HSBCHKHH",
+        "J.57A": "DEUTDEFF"
+      }
+    },
+    {
+      "testCaseId": "MT365-025",
+      "bindingId": "FIX-MT365-025@v1",
+      "messageType": "MT365",
+      "sequence": "J",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT365-025@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {
+        "J.53A": "//FW021000021\nCITIUS33",
+        "J.57A": "DEUTDEFF"
+      },
+      "domSuccess": true,
+      "passed": false,
+      "discrepancies": [
+        "resolved tag set mismatch"
+      ],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD clearing-code placement/non-duplication",
+      "independentExpected": {
+        "J.53A": "//FW021000021\nCITIUS33"
+      },
+      "clearingCodeOccurrenceCount": 1
+    },
+    {
+      "testCaseId": "MT400-001",
+      "bindingId": "FIX-MT400-001@v1",
+      "messageType": "MT400",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT400-001@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {
+        "MESSAGE.53A": "CITIUS33",
+        "MESSAGE.54A": "BNPAFRPP",
+        "MESSAGE.57A": "DEUTDEFF"
+      },
+      "actualTags": {
+        "MESSAGE.53A": "CITIUS33",
+        "MESSAGE.54A": "BNPAFRPP",
+        "MESSAGE.57A": "DEUTDEFF"
+      },
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "machine-readable exact tag-set + HTTP/DOM/binding",
+      "independentExpected": {
+        "MESSAGE.53A": "CITIUS33",
+        "MESSAGE.54A": "BNPAFRPP",
+        "MESSAGE.57A": "DEUTDEFF"
+      }
+    },
+    {
+      "testCaseId": "MT400-002",
+      "bindingId": "FIX-MT400-002@v1",
+      "messageType": "MT400",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT400-002@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {},
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD governed omission exact empty resolved set",
+      "independentExpected": {}
+    },
+    {
+      "testCaseId": "MT400-005",
+      "bindingId": "FIX-MT400-005@v1",
+      "messageType": "MT400",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT400-005@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {},
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD governed omission exact empty resolved set",
+      "independentExpected": {}
+    },
+    {
+      "testCaseId": "MT400-007",
+      "bindingId": "FIX-MT400-007@v1",
+      "messageType": "MT400",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT400-007@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {
+        "MESSAGE.53A": "//FW021000021\nCITIUS33"
+      },
+      "domSuccess": true,
+      "passed": false,
+      "discrepancies": [
+        "resolved tag set mismatch"
+      ],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD clearing-code placement/non-duplication",
+      "independentExpected": {
+        "MESSAGE.53A": "//FW021000021\nCITIUS33"
+      },
+      "clearingCodeOccurrenceCount": 1
+    },
+    {
+      "testCaseId": "MT730-001",
+      "bindingId": "FIX-MT730-001@v1",
+      "messageType": "MT730",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT730-001@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {
+        "MESSAGE.57A": "DEUTDEFF"
+      },
+      "actualTags": {
+        "MESSAGE.57A": "DEUTDEFF"
+      },
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "machine-readable exact tag-set + HTTP/DOM/binding",
+      "independentExpected": {
+        "MESSAGE.57A": "DEUTDEFF"
+      }
+    },
+    {
+      "testCaseId": "MT730-002",
+      "bindingId": "FIX-MT730-002@v1",
+      "messageType": "MT730",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT730-002@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {},
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD governed omission exact empty resolved set",
+      "independentExpected": {}
+    },
+    {
+      "testCaseId": "MT730-005",
+      "bindingId": "FIX-MT730-005@v1",
+      "messageType": "MT730",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT730-005@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {},
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD governed omission exact empty resolved set",
+      "independentExpected": {}
+    },
+    {
+      "testCaseId": "MT730-007",
+      "bindingId": "FIX-MT730-007@v1",
+      "messageType": "MT730",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT730-007@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {
+        "MESSAGE.57A": "//FW021000021\nCITIUS33"
+      },
+      "domSuccess": true,
+      "passed": false,
+      "discrepancies": [
+        "resolved tag set mismatch"
+      ],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD clearing-code placement/non-duplication",
+      "independentExpected": {
+        "MESSAGE.57A": "//FW021000021\nCITIUS33"
+      },
+      "clearingCodeOccurrenceCount": 1
+    },
+    {
+      "testCaseId": "MT734-001",
+      "bindingId": "FIX-MT734-001@v1",
+      "messageType": "MT734",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT734-001@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {
+        "MESSAGE.57A": "DEUTDEFF"
+      },
+      "actualTags": {
+        "MESSAGE.57A": "DEUTDEFF"
+      },
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "machine-readable exact tag-set + HTTP/DOM/binding",
+      "independentExpected": {
+        "MESSAGE.57A": "DEUTDEFF"
+      }
+    },
+    {
+      "testCaseId": "MT734-002",
+      "bindingId": "FIX-MT734-002@v1",
+      "messageType": "MT734",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT734-002@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {},
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD governed omission exact empty resolved set",
+      "independentExpected": {}
+    },
+    {
+      "testCaseId": "MT734-005",
+      "bindingId": "FIX-MT734-005@v1",
+      "messageType": "MT734",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT734-005@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {
+        "MESSAGE.57A": "//FW021000021\nCITIUS33"
+      },
+      "domSuccess": true,
+      "passed": false,
+      "discrepancies": [
+        "resolved tag set mismatch"
+      ],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD clearing-code placement/non-duplication",
+      "independentExpected": {
+        "MESSAGE.57A": "//FW021000021\nCITIUS33"
+      },
+      "clearingCodeOccurrenceCount": 1
+    },
+    {
+      "testCaseId": "MT742-001",
+      "bindingId": "FIX-MT742-001@v1",
+      "messageType": "MT742",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT742-001@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {
+        "MESSAGE.57A": "DEUTDEFF"
+      },
+      "actualTags": {
+        "MESSAGE.57A": "DEUTDEFF"
+      },
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "machine-readable exact tag-set + HTTP/DOM/binding",
+      "independentExpected": {
+        "MESSAGE.57A": "DEUTDEFF"
+      }
+    },
+    {
+      "testCaseId": "MT742-002",
+      "bindingId": "FIX-MT742-002@v1",
+      "messageType": "MT742",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT742-002@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {},
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD governed omission exact empty resolved set",
+      "independentExpected": {}
+    },
+    {
+      "testCaseId": "MT742-005",
+      "bindingId": "FIX-MT742-005@v1",
+      "messageType": "MT742",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT742-005@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {
+        "MESSAGE.57A": "//FW021000021\nCITIUS33"
+      },
+      "domSuccess": true,
+      "passed": false,
+      "discrepancies": [
+        "resolved tag set mismatch"
+      ],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD clearing-code placement/non-duplication",
+      "independentExpected": {
+        "MESSAGE.57A": "//FW021000021\nCITIUS33"
+      },
+      "clearingCodeOccurrenceCount": 1
+    },
+    {
+      "testCaseId": "MT742-006",
+      "bindingId": "FIX-MT742-006@v1",
+      "messageType": "MT742",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT742-006@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {
+        "MESSAGE.58A": "BARCGB22"
+      },
+      "actualTags": {
+        "MESSAGE.58A": "BARCGB22"
+      },
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "machine-readable exact tag-set + HTTP/DOM/binding",
+      "independentExpected": {
+        "MESSAGE.58A": "BARCGB22"
+      }
+    },
+    {
+      "testCaseId": "MT742-012",
+      "bindingId": "FIX-MT742-012@v1",
+      "messageType": "MT742",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT742-012@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {
+        "MESSAGE.57A": "DEUTDEFF"
+      },
+      "domSuccess": true,
+      "passed": false,
+      "discrepancies": [
+        "resolved tag set mismatch"
+      ],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD field-presence plus independent input-policy BIC",
+      "independentExpected": {
+        "MESSAGE.57A": "DEUTDEFF"
+      }
+    },
+    {
+      "testCaseId": "MT742-013",
+      "bindingId": "FIX-MT742-013@v1",
+      "messageType": "MT742",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT742-013@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {
+        "MESSAGE.58A": "/MT347-MT742-013-USD-CREDITED\nBARCGB22"
+      },
+      "actualTags": {
+        "MESSAGE.58A": "/MT347-MT742-013-USD-CREDITED\nBARCGB22"
+      },
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "machine-readable exact tag-set + HTTP/DOM/binding",
+      "independentExpected": {
+        "MESSAGE.58A": "/MT347-MT742-013-USD-CREDITED\nBARCGB22"
+      }
+    },
+    {
+      "testCaseId": "MT750-001",
+      "bindingId": "FIX-MT750-001@v1",
+      "messageType": "MT750",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT750-001@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {
+        "MESSAGE.57A": "DEUTDEFF"
+      },
+      "actualTags": {
+        "MESSAGE.57A": "DEUTDEFF"
+      },
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "machine-readable exact tag-set + HTTP/DOM/binding",
+      "independentExpected": {
+        "MESSAGE.57A": "DEUTDEFF"
+      }
+    },
+    {
+      "testCaseId": "MT750-002",
+      "bindingId": "FIX-MT750-002@v1",
+      "messageType": "MT750",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT750-002@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {},
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD governed omission exact empty resolved set",
+      "independentExpected": {}
+    },
+    {
+      "testCaseId": "MT750-005",
+      "bindingId": "FIX-MT750-005@v1",
+      "messageType": "MT750",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT750-005@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {
+        "MESSAGE.57A": "//FW021000021\nCITIUS33"
+      },
+      "domSuccess": true,
+      "passed": false,
+      "discrepancies": [
+        "resolved tag set mismatch"
+      ],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD clearing-code placement/non-duplication",
+      "independentExpected": {
+        "MESSAGE.57A": "//FW021000021\nCITIUS33"
+      },
+      "clearingCodeOccurrenceCount": 1
+    },
+    {
+      "testCaseId": "MT752-001",
+      "bindingId": "FIX-MT752-001@v1",
+      "messageType": "MT752",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT752-001@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {
+        "MESSAGE.53A": "CITIUS33",
+        "MESSAGE.54A": "BNPAFRPP"
+      },
+      "actualTags": {
+        "MESSAGE.53A": "CITIUS33",
+        "MESSAGE.54A": "BNPAFRPP"
+      },
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "machine-readable exact tag-set + HTTP/DOM/binding",
+      "independentExpected": {
+        "MESSAGE.53A": "CITIUS33",
+        "MESSAGE.54A": "BNPAFRPP"
+      }
+    },
+    {
+      "testCaseId": "MT752-002",
+      "bindingId": "FIX-MT752-002@v1",
+      "messageType": "MT752",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT752-002@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {},
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD governed omission exact empty resolved set",
+      "independentExpected": {}
+    },
+    {
+      "testCaseId": "MT752-005",
+      "bindingId": "FIX-MT752-005@v1",
+      "messageType": "MT752",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT752-005@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {
+        "MESSAGE.53A": "//FW021000021\nCITIUS33"
+      },
+      "domSuccess": true,
+      "passed": false,
+      "discrepancies": [
+        "resolved tag set mismatch"
+      ],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD clearing-code placement/non-duplication",
+      "independentExpected": {
+        "MESSAGE.53A": "//FW021000021\nCITIUS33"
+      },
+      "clearingCodeOccurrenceCount": 1
+    },
+    {
+      "testCaseId": "MT754-001",
+      "bindingId": "FIX-MT754-001@v1",
+      "messageType": "MT754",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT754-001@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {
+        "MESSAGE.57A": "DEUTDEFF"
+      },
+      "actualTags": {
+        "MESSAGE.57A": "DEUTDEFF"
+      },
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "machine-readable exact tag-set + HTTP/DOM/binding",
+      "independentExpected": {
+        "MESSAGE.57A": "DEUTDEFF"
+      }
+    },
+    {
+      "testCaseId": "MT754-002",
+      "bindingId": "FIX-MT754-002@v1",
+      "messageType": "MT754",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT754-002@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {},
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD governed omission exact empty resolved set",
+      "independentExpected": {}
+    },
+    {
+      "testCaseId": "MT754-005",
+      "bindingId": "FIX-MT754-005@v1",
+      "messageType": "MT754",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT754-005@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {
+        "MESSAGE.53A": "CITIUS33"
+      },
+      "domSuccess": true,
+      "passed": false,
+      "discrepancies": [
+        "resolved tag set mismatch"
+      ],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD field-presence plus independent input-policy BIC",
+      "independentExpected": {
+        "MESSAGE.53A": "CITIUS33"
+      }
+    },
+    {
+      "testCaseId": "MT754-006",
+      "bindingId": "FIX-MT754-006@v1",
+      "messageType": "MT754",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT754-006@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {
+        "MESSAGE.57A": "DEUTDEFF"
+      },
+      "domSuccess": true,
+      "passed": false,
+      "discrepancies": [
+        "resolved tag set mismatch"
+      ],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD field-presence plus independent input-policy BIC",
+      "independentExpected": {
+        "MESSAGE.57A": "DEUTDEFF"
+      }
+    },
+    {
+      "testCaseId": "MT754-008",
+      "bindingId": "FIX-MT754-008@v1",
+      "messageType": "MT754",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT754-008@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {
+        "MESSAGE.57A": "//FW021000021\nCITIUS33"
+      },
+      "domSuccess": true,
+      "passed": false,
+      "discrepancies": [
+        "resolved tag set mismatch"
+      ],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD clearing-code placement/non-duplication",
+      "independentExpected": {
+        "MESSAGE.57A": "//FW021000021\nCITIUS33"
+      },
+      "clearingCodeOccurrenceCount": 1
+    },
+    {
+      "testCaseId": "MT754-011",
+      "bindingId": "FIX-MT754-011@v1",
+      "messageType": "MT754",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT754-011@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {
+        "MESSAGE.58A": "BARCGB22"
+      },
+      "actualTags": {
+        "MESSAGE.58A": "BARCGB22"
+      },
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "machine-readable exact tag-set + HTTP/DOM/binding",
+      "independentExpected": {
+        "MESSAGE.58A": "BARCGB22"
+      }
+    },
+    {
+      "testCaseId": "MT754-012",
+      "bindingId": "FIX-MT754-012@v1",
+      "messageType": "MT754",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT754-012@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {
+        "MESSAGE.57A": "DEUTDEFF"
+      },
+      "domSuccess": true,
+      "passed": false,
+      "discrepancies": [
+        "resolved tag set mismatch"
+      ],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD field-presence plus independent input-policy BIC",
+      "independentExpected": {
+        "MESSAGE.57A": "DEUTDEFF"
+      }
+    },
+    {
+      "testCaseId": "MT754-013",
+      "bindingId": "FIX-MT754-013@v1",
+      "messageType": "MT754",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT754-013@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {
+        "MESSAGE.58A": "/MT347-MT754-013-USD-CREDITED\nBARCGB22"
+      },
+      "actualTags": {
+        "MESSAGE.58A": "/MT347-MT754-013-USD-CREDITED\nBARCGB22"
+      },
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "machine-readable exact tag-set + HTTP/DOM/binding",
+      "independentExpected": {
+        "MESSAGE.58A": "/MT347-MT754-013-USD-CREDITED\nBARCGB22"
+      }
+    },
+    {
+      "testCaseId": "MT756-001",
+      "bindingId": "FIX-MT756-001@v1",
+      "messageType": "MT756",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT756-001@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {
+        "MESSAGE.53A": "CITIUS33",
+        "MESSAGE.54A": "BNPAFRPP"
+      },
+      "actualTags": {
+        "MESSAGE.53A": "CITIUS33",
+        "MESSAGE.54A": "BNPAFRPP"
+      },
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "machine-readable exact tag-set + HTTP/DOM/binding",
+      "independentExpected": {
+        "MESSAGE.53A": "CITIUS33",
+        "MESSAGE.54A": "BNPAFRPP"
+      }
+    },
+    {
+      "testCaseId": "MT756-002",
+      "bindingId": "FIX-MT756-002@v1",
+      "messageType": "MT756",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT756-002@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {},
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD governed omission exact empty resolved set",
+      "independentExpected": {}
+    },
+    {
+      "testCaseId": "MT756-005",
+      "bindingId": "FIX-MT756-005@v1",
+      "messageType": "MT756",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT756-005@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {
+        "MESSAGE.53A": "//FW021000021\nCITIUS33"
+      },
+      "domSuccess": true,
+      "passed": false,
+      "discrepancies": [
+        "resolved tag set mismatch"
+      ],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD clearing-code placement/non-duplication",
+      "independentExpected": {
+        "MESSAGE.53A": "//FW021000021\nCITIUS33"
+      },
+      "clearingCodeOccurrenceCount": 1
+    },
+    {
+      "testCaseId": "MT756-006",
+      "bindingId": "FIX-MT756-006@v1",
+      "messageType": "MT756",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT756-006@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {
+        "MESSAGE.53A": "CITIUS33"
+      },
+      "domSuccess": true,
+      "passed": false,
+      "discrepancies": [
+        "resolved tag set mismatch"
+      ],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD exact emitted/omitted predicate plus independent input-policy BIC",
+      "independentExpected": {
+        "MESSAGE.53A": "CITIUS33"
+      }
+    },
+    {
+      "testCaseId": "MT756-008",
+      "bindingId": "FIX-MT756-008@v1",
+      "messageType": "MT756",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT756-008@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {},
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD governed omission exact empty resolved set",
+      "independentExpected": {}
+    },
+    {
+      "testCaseId": "MT756-012",
+      "bindingId": "FIX-MT756-012@v1",
+      "messageType": "MT756",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT756-012@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {
+        "MESSAGE.53A": "CITIUS33",
+        "MESSAGE.54A": "HSBCHKHH"
+      },
+      "domSuccess": true,
+      "passed": false,
+      "discrepancies": [
+        "resolved tag set mismatch"
+      ],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD field-presence plus independent input-policy BIC",
+      "independentExpected": {
+        "MESSAGE.53A": "CITIUS33",
+        "MESSAGE.54A": "HSBCHKHH"
+      }
+    },
+    {
+      "testCaseId": "MT765-001",
+      "bindingId": "FIX-MT765-001@v1",
+      "messageType": "MT765",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT765-001@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {
+        "MESSAGE.57A": "DEUTDEFF"
+      },
+      "actualTags": {
+        "MESSAGE.57A": "DEUTDEFF"
+      },
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "machine-readable exact tag-set + HTTP/DOM/binding",
+      "independentExpected": {
+        "MESSAGE.57A": "DEUTDEFF"
+      }
+    },
+    {
+      "testCaseId": "MT765-002",
+      "bindingId": "FIX-MT765-002@v1",
+      "messageType": "MT765",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT765-002@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {
+        "MESSAGE.56A": "HSBCHKHH",
+        "MESSAGE.57A": "DEUTDEFF"
+      },
+      "actualTags": {
+        "MESSAGE.56A": "HSBCHKHH",
+        "MESSAGE.57A": "DEUTDEFF"
+      },
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "machine-readable exact tag-set + HTTP/DOM/binding",
+      "independentExpected": {
+        "MESSAGE.56A": "HSBCHKHH",
+        "MESSAGE.57A": "DEUTDEFF"
+      }
+    },
+    {
+      "testCaseId": "MT765-003",
+      "bindingId": "FIX-MT765-003@v1",
+      "messageType": "MT765",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT765-003@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {},
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD governed omission exact empty resolved set",
+      "independentExpected": {}
+    },
+    {
+      "testCaseId": "MT765-006",
+      "bindingId": "FIX-MT765-006@v1",
+      "messageType": "MT765",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT765-006@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {
+        "MESSAGE.56A": "//FW021000021\nCITIUS33"
+      },
+      "domSuccess": true,
+      "passed": false,
+      "discrepancies": [
+        "resolved tag set mismatch"
+      ],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD clearing-code placement/non-duplication",
+      "independentExpected": {
+        "MESSAGE.56A": "//FW021000021\nCITIUS33"
+      },
+      "clearingCodeOccurrenceCount": 1
+    },
+    {
+      "testCaseId": "MT768-001",
+      "bindingId": "FIX-MT768-001@v1",
+      "messageType": "MT768",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT768-001@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {
+        "MESSAGE.57A": "DEUTDEFF"
+      },
+      "actualTags": {
+        "MESSAGE.57A": "DEUTDEFF"
+      },
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "machine-readable exact tag-set + HTTP/DOM/binding",
+      "independentExpected": {
+        "MESSAGE.57A": "DEUTDEFF"
+      }
+    },
+    {
+      "testCaseId": "MT768-002",
+      "bindingId": "FIX-MT768-002@v1",
+      "messageType": "MT768",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT768-002@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {},
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD governed omission exact empty resolved set",
+      "independentExpected": {}
+    },
+    {
+      "testCaseId": "MT768-005",
+      "bindingId": "FIX-MT768-005@v1",
+      "messageType": "MT768",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT768-005@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {},
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD governed omission exact empty resolved set",
+      "independentExpected": {}
+    },
+    {
+      "testCaseId": "MT768-007",
+      "bindingId": "FIX-MT768-007@v1",
+      "messageType": "MT768",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT768-007@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {
+        "MESSAGE.57A": "//FW021000021\nCITIUS33"
+      },
+      "domSuccess": true,
+      "passed": false,
+      "discrepancies": [
+        "resolved tag set mismatch"
+      ],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD clearing-code placement/non-duplication",
+      "independentExpected": {
+        "MESSAGE.57A": "//FW021000021\nCITIUS33"
+      },
+      "clearingCodeOccurrenceCount": 1
+    },
+    {
+      "testCaseId": "MT769-001",
+      "bindingId": "FIX-MT769-001@v1",
+      "messageType": "MT769",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT769-001@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {
+        "MESSAGE.57A": "DEUTDEFF"
+      },
+      "actualTags": {
+        "MESSAGE.57A": "DEUTDEFF"
+      },
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "machine-readable exact tag-set + HTTP/DOM/binding",
+      "independentExpected": {
+        "MESSAGE.57A": "DEUTDEFF"
+      }
+    },
+    {
+      "testCaseId": "MT769-002",
+      "bindingId": "FIX-MT769-002@v1",
+      "messageType": "MT769",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT769-002@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {},
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD governed omission exact empty resolved set",
+      "independentExpected": {}
+    },
+    {
+      "testCaseId": "MT769-005",
+      "bindingId": "FIX-MT769-005@v1",
+      "messageType": "MT769",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT769-005@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {},
+      "domSuccess": true,
+      "passed": true,
+      "discrepancies": [],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD governed omission exact empty resolved set",
+      "independentExpected": {}
+    },
+    {
+      "testCaseId": "MT769-007",
+      "bindingId": "FIX-MT769-007@v1",
+      "messageType": "MT769",
+      "sequence": "MESSAGE",
+      "executed": true,
+      "httpStatus": 200,
+      "selectedBindingId": "FIX-MT769-007@v1",
+      "snapshotHash": "70ef9716c2692555a59950d75d6cb458b83cb4b94371f26b26060acc849fac08",
+      "expectedTags": {},
+      "actualTags": {
+        "MESSAGE.57A": "//FW021000021\nCITIUS33"
+      },
+      "domSuccess": true,
+      "passed": false,
+      "discrepancies": [
+        "resolved tag set mismatch"
+      ],
+      "qaVerdict": "PASS",
+      "qaBasis": "TDD clearing-code placement/non-duplication",
+      "independentExpected": {
+        "MESSAGE.57A": "//FW021000021\nCITIUS33"
+      },
+      "clearingCodeOccurrenceCount": 1
+    }
+  ]
+}

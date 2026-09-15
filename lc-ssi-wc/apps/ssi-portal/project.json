@@ -1,0 +1,50 @@
+{
+  "name": "ssi-portal",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/ssi-portal/src",
+  "projectType": "application",
+  "targets": {
+    "build": {
+      "executor": "@angular-devkit/build-angular:application",
+      "options": {
+        "outputPath": "dist/apps/ssi-portal",
+        "index": "apps/ssi-portal/src/index.html",
+        "browser": "apps/ssi-portal/src/main.ts",
+        "tsConfig": "apps/ssi-portal/tsconfig.app.json",
+        "allowedCommonJsDependencies": ["exceljs"],
+        "styles": ["apps/ssi-portal/src/styles.css"],
+        "assets": [
+          { "glob": "**/*", "input": "apps/ssi-portal/public", "output": "/" }
+        ]
+      }
+    },
+    "serve": {
+      "executor": "@angular-devkit/build-angular:dev-server",
+      "continuous": true,
+      "options": {
+        "buildTarget": "ssi-portal:build",
+        "port": 4400,
+        "proxyConfig": "apps/ssi-portal/proxy.conf.json"
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc -p apps/ssi-portal/tsconfig.app.json --noEmit"
+      }
+    },
+    "test": {
+      "executor": "@nx/jest:jest",
+      "outputs": ["{workspaceRoot}/coverage/apps/ssi-portal"],
+      "options": { "jestConfig": "apps/ssi-portal/jest.config.ts" },
+      "configurations": {
+        "ci": {
+          "ci": true,
+          "codeCoverage": true,
+          "coverageReporters": ["json-summary", "lcov", "text-summary"]
+        }
+      }
+    }
+  },
+  "tags": ["type:app", "scope:ui"]
+}

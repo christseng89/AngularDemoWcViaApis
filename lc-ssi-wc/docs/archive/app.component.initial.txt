@@ -1,0 +1,40 @@
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { ReactiveFormsModule, FormGroup } from '@angular/forms';
+import { FormlyForm, type FormlyFieldConfig } from '@ngx-formly/core';
+import { firstValueFrom } from 'rxjs';
+
+type View = 'dashboard' | 'maker' | 'checker' | 'resolver' | 'message' | 'audit';
+interface SsiRow { id: string; counterpartyId: string; scope: string; status: string; maker: string; checker?: string; route: Record<string, string>; version: number; }
+
+@Component({
+  selector: 'ssi-root', standalone: true, imports: [ReactiveFormsModule, FormlyForm],
+  templateUrl: './app.component.html', changeDetection: ChangeDetectionStrategy.OnPush,
+})
+export class AppComponent {
+  private readonly http = inject(HttpClient); private readonly api = 'http://localhost:3100/api';
+  readonly view = signal<View>('dashboard'); readonly rows = signal<readonly SsiRow[]>([]);
+  readonly notice = signal<{ kind: 'info' | 'warning' | 'error'; text: string } | null>(null);
+  readonly result = signal<unknown>(null); readonly pending = computed(() => this.rows().filter((row) => row.status === 'PENDING_APPROVAL'));
+  readonly form = new FormGroup({});
+  model: Record<string, unknown> = { maker: 'maker.demo', scope: 'REUSABLE', route: { currency: 'USD' } };
+  readonly fields: FormlyFieldConfig[] = [
+    { key: 'maker', type: 'input', props: { label: 'Maker 使用者', required: true } },
+    { key: 'counterpartyId', type: 'input', props: { label: '交易對手', required: true, placeholder: 'BANK-001' } },
+    { key: 'scope', type: 'select', props: { label: 'SSI Scope', required: true, options: [{ label: 'Reusable', value: 'REUSABLE' }, { label: 'Transaction only', value: 'TRANSACTION_ONLY' }] } },
+    { key: 'route.currency', type: 'input', props: { label: '幣別', required: true, maxLength: 3 } },
+    { key: 'route.beneficiaryBic', type: 'input', props: { label: 'Beneficiary BIC', required: true } },
+    { key: 'route.accountWithBic', type: 'input', props: { label: 'Account With Institution', required: true } },
+    { key: 'route.intermediaryBic', type: 'input', props: { label: 'Intermediary Institution' } },
+    { key: 'route.accountId', type: 'input', props: { label: 'Account／Nostro ID' } },
+  ];
+  pseudoContent = 'STANDARDS_RELEASE=SR2026\nMESSAGE_TYPE=MT742\nDIRECTION=INCOMING\nBUSINESS_FUNCTION=REIMBURSEMENT_CLAIM\n:57A:BBBBUS33\n:58A:CCCCUS44';
+
+  constructor() { void this.refresh(); }
+  async refresh(): Promise<void> { try { this.rows.set(await firstValueFrom(this.http.get<SsiRow[]>(`${this.api}/ssis`))); } catch { this.notice.set({ kind: 'warning', text: 'BFF 尚未啟動；啟動後重新整理即可。' }); } }
+  navigate(view: View): void { this.view.set(view); this.result.set(null); }
+  async create(): Promise<void> { if (this.form.invalid) return; try { await firstValueFrom(this.http.post(`${this.api}/ssis`, this.model)); this.notice.set({ kind: 'info', text: 'SSI 草稿已建立。' }); await this.refresh(); this.navigate('dashboard'); } catch { this.notice.set({ kind: 'error', text: '建立失敗，請檢查服務與欄位。' }); } }
+  async act(row: SsiRow, action: 'submit' | 'approve' | 'activate'): Promise<void> { const actor = action === 'submit' ? row.maker : 'checker.demo'; try { await firstValueFrom(this.http.post(`${this.api}/ssis/${row.id}/${action}`, { actor })); await this.refresh(); } catch (error) { this.notice.set({ kind: 'error', text: `動作 ${action} 被拒絕。` }); } }
+  async resolve(): Promise<void> { try { this.result.set(await firstValueFrom(this.http.post(`${this.api}/resolve`, { counterpartyId: 'BANK-001', currency: 'USD', businessFunction: 'REIMBURSEMENT_CLAIM', transactionReference: 'DEMO-TX-001' }))); } catch { this.notice.set({ kind: 'error', text: '找不到唯一且有效的 SSI。' }); } }
+  async extract(): Promise<void> { try { this.result.set(await firstValueFrom(this.http.post(`${this.api}/messages/extract`, { format: 'FIN_LIKE', content: this.pseudoContent }))); } catch { this.notice.set({ kind: 'error', text: 'Pseudo message 解析失敗。' }); } }
+}

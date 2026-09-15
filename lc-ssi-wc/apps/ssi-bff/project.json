@@ -1,0 +1,43 @@
+{
+  "name": "ssi-bff",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/ssi-bff/src",
+  "projectType": "application",
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "options": {
+        "outputPath": "dist/apps/ssi-bff",
+        "main": "apps/ssi-bff/src/main.ts",
+        "tsConfig": "apps/ssi-bff/tsconfig.app.json"
+      }
+    },
+    "serve": {
+      "executor": "@nx/js:node",
+      "continuous": true,
+      "dependsOn": ["build"],
+      "options": {
+        "buildTarget": "ssi-bff:build",
+        "runBuildTargetDependencies": false,
+        "port": 0
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": { "command": "tsc -p apps/ssi-bff/tsconfig.app.json --noEmit" }
+    },
+    "test": {
+      "executor": "@nx/jest:jest",
+      "outputs": ["{workspaceRoot}/coverage/apps/ssi-bff"],
+      "options": { "jestConfig": "apps/ssi-bff/jest.config.ts" },
+      "configurations": {
+        "ci": {
+          "ci": true,
+          "codeCoverage": true,
+          "coverageReporters": ["json-summary", "lcov", "text-summary"]
+        }
+      }
+    }
+  },
+  "tags": ["type:app", "scope:bff"]
+}

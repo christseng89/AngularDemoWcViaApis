@@ -1,0 +1,7 @@
+{
+  "standardsRelease": "SR2026",
+  "messageType": "pacs.009.001.12",
+  "direction": "OUTGOING",
+  "businessFunction": "FINANCIAL_INSTITUTION_TRANSFER",
+  "fields": { "CdtrAgt.FinInstnId.BICFI": "BBBBUS33" }
+}

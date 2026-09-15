@@ -1,0 +1,959 @@
+{
+  "schemaVersion": "1.0",
+  "kind": "GENERIC_SSI_BROWSER_UAT_MATRIX",
+  "startedAt": "2026-09-13T14:50:25.155Z",
+  "portalUrl": "http://localhost:4400/",
+  "browserPath": "C:/Program Files/Google/Chrome/Application/chrome.exe",
+  "configuredCurrencies": null,
+  "results": [
+    {
+      "businessDomain": "TREASURY",
+      "messageType": "MT300",
+      "scenarioId": "MT300-001",
+      "scenarioLabel": "B1 - Amount Bought / direct canonical route",
+      "scenarioCount": 16,
+      "polarity": "POSITIVE",
+      "sequence": "B1",
+      "definitionId": "PAGE-MT347:MT300:FX-CONFIRMATION:B1:AMOUNT-BOUGHT",
+      "definitionVersion": "MT347-SR2026-RESOLUTION-PAGE-SCENARIOS",
+      "contractSha256": "ffc5295fd8d2ad1ddfff932e2740ddf66feab6e856d51148d713554a3e5e073a",
+      "query": {
+        "standardsRelease": "SR2026",
+        "messageFamily": "MT347",
+        "messageType": "MT300",
+        "direction": "OUTGOING",
+        "businessDomain": "TREASURY",
+        "businessScenarioId": "MT300-001"
+      },
+      "startedAt": "2026-09-13T14:50:30.240Z",
+      "checks": [
+        {
+          "currency": "EUR",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TREASURY",
+              "messageType": "MT300",
+              "scenarioId": "MT300-001",
+              "sequence": "B1",
+              "currency": "EUR",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "executeHttpStatus": 200,
+              "resultOutcome": "REFERENCE_ONLY",
+              "oracle": {
+                "sourceWorkbook": "qa/mt347/tdd/MT347_SR2026_SSI_TDD_CONTROLLED_v5.xlsx",
+                "sourceWorkbookSha256": "82C6ABCFD91E7D35E1382F8C86BF796D8DBF05CF8C8D94F9F0C7B5889AB52C9A",
+                "mrgEvidence": "us3ma_20260717.pdf p.18; C4 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.21-22",
+                "expectedResolvedKeys": [
+                  "B1.53A",
+                  "B1.57A"
+                ],
+                "expectedRoleValues": {
+                  "DELIVERY_AGENT": "CITIUS33",
+                  "RECEIVING_AGENT": "DEUTDEFF"
+                },
+                "expandedCellOracle": true
+              },
+              "resultFields": [
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "53A",
+                  "bic": "CITIUS33",
+                  "resolutionStatus": "RESOLVED",
+                  "reasonCode": "RESOLVED_FROM_OWN_SSI"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "56A",
+                  "bic": null,
+                  "resolutionStatus": "NOT_REQUIRED",
+                  "reasonCode": "OPTIONAL_FIELD_OMITTED"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "57A",
+                  "bic": "DEUTDEFF",
+                  "resolutionStatus": "RESOLVED",
+                  "reasonCode": "RESOLVED_FROM_COUNTERPARTY_SSI"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "58A",
+                  "bic": null,
+                  "resolutionStatus": "N_A",
+                  "reasonCode": "MESSAGE_PROFILE_EXCLUDED"
+                }
+              ],
+              "passed": true
+            },
+            {
+              "businessDomain": "TREASURY",
+              "messageType": "MT300",
+              "scenarioId": "MT300-001",
+              "sequence": "B1",
+              "currency": "EUR",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "executeHttpStatus": 200,
+              "resultOutcome": "REFERENCE_ONLY",
+              "oracle": {
+                "sourceWorkbook": "qa/mt347/tdd/MT347_SR2026_SSI_TDD_CONTROLLED_v5.xlsx",
+                "sourceWorkbookSha256": "82C6ABCFD91E7D35E1382F8C86BF796D8DBF05CF8C8D94F9F0C7B5889AB52C9A",
+                "mrgEvidence": "us3ma_20260717.pdf p.18; C4 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.21-22",
+                "expectedResolvedKeys": [
+                  "B1.53A",
+                  "B1.57A"
+                ],
+                "expectedRoleValues": {
+                  "DELIVERY_AGENT": "CITIUS33",
+                  "RECEIVING_AGENT": "BOFAUS3N"
+                },
+                "expandedCellOracle": true
+              },
+              "resultFields": [
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "53A",
+                  "bic": "CITIUS33",
+                  "resolutionStatus": "RESOLVED",
+                  "reasonCode": "RESOLVED_FROM_OWN_SSI"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "56A",
+                  "bic": null,
+                  "resolutionStatus": "NOT_REQUIRED",
+                  "reasonCode": "OPTIONAL_FIELD_OMITTED"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "57A",
+                  "bic": "BOFAUS3N",
+                  "resolutionStatus": "RESOLVED",
+                  "reasonCode": "RESOLVED_FROM_COUNTERPARTY_SSI"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "58A",
+                  "bic": null,
+                  "resolutionStatus": "N_A",
+                  "reasonCode": "MESSAGE_PROFILE_EXCLUDED"
+                }
+              ],
+              "passed": true
+            },
+            {
+              "businessDomain": "TREASURY",
+              "messageType": "MT300",
+              "scenarioId": "MT300-001",
+              "sequence": "B1",
+              "currency": "EUR",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "executeHttpStatus": 200,
+              "resultOutcome": "REFERENCE_ONLY",
+              "oracle": {
+                "sourceWorkbook": "qa/mt347/tdd/MT347_SR2026_SSI_TDD_CONTROLLED_v5.xlsx",
+                "sourceWorkbookSha256": "82C6ABCFD91E7D35E1382F8C86BF796D8DBF05CF8C8D94F9F0C7B5889AB52C9A",
+                "mrgEvidence": "us3ma_20260717.pdf p.18; C4 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.21-22",
+                "expectedResolvedKeys": [
+                  "B1.53A",
+                  "B1.57A"
+                ],
+                "expectedRoleValues": {
+                  "DELIVERY_AGENT": "CITIUS33",
+                  "RECEIVING_AGENT": "CHASUS33"
+                },
+                "expandedCellOracle": true
+              },
+              "resultFields": [
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "53A",
+                  "bic": "CITIUS33",
+                  "resolutionStatus": "RESOLVED",
+                  "reasonCode": "RESOLVED_FROM_OWN_SSI"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "56A",
+                  "bic": null,
+                  "resolutionStatus": "NOT_REQUIRED",
+                  "reasonCode": "OPTIONAL_FIELD_OMITTED"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "57A",
+                  "bic": "CHASUS33",
+                  "resolutionStatus": "RESOLVED",
+                  "reasonCode": "RESOLVED_FROM_COUNTERPARTY_SSI"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "58A",
+                  "bic": null,
+                  "resolutionStatus": "N_A",
+                  "reasonCode": "MESSAGE_PROFILE_EXCLUDED"
+                }
+              ],
+              "passed": true
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "GBP",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TREASURY",
+              "messageType": "MT300",
+              "scenarioId": "MT300-001",
+              "sequence": "B1",
+              "currency": "GBP",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "executeHttpStatus": 200,
+              "resultOutcome": "REFERENCE_ONLY",
+              "oracle": {
+                "sourceWorkbook": "qa/mt347/tdd/MT347_SR2026_SSI_TDD_CONTROLLED_v5.xlsx",
+                "sourceWorkbookSha256": "82C6ABCFD91E7D35E1382F8C86BF796D8DBF05CF8C8D94F9F0C7B5889AB52C9A",
+                "mrgEvidence": "us3ma_20260717.pdf p.18; C4 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.21-22",
+                "expectedResolvedKeys": [
+                  "B1.53A",
+                  "B1.57A"
+                ],
+                "expectedRoleValues": {
+                  "DELIVERY_AGENT": "CITIUS33",
+                  "RECEIVING_AGENT": "DEUTDEFF"
+                },
+                "expandedCellOracle": true
+              },
+              "resultFields": [
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "53A",
+                  "bic": "CITIUS33",
+                  "resolutionStatus": "RESOLVED",
+                  "reasonCode": "RESOLVED_FROM_OWN_SSI"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "56A",
+                  "bic": null,
+                  "resolutionStatus": "NOT_REQUIRED",
+                  "reasonCode": "OPTIONAL_FIELD_OMITTED"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "57A",
+                  "bic": "DEUTDEFF",
+                  "resolutionStatus": "RESOLVED",
+                  "reasonCode": "RESOLVED_FROM_COUNTERPARTY_SSI"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "58A",
+                  "bic": null,
+                  "resolutionStatus": "N_A",
+                  "reasonCode": "MESSAGE_PROFILE_EXCLUDED"
+                }
+              ],
+              "passed": true
+            },
+            {
+              "businessDomain": "TREASURY",
+              "messageType": "MT300",
+              "scenarioId": "MT300-001",
+              "sequence": "B1",
+              "currency": "GBP",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "executeHttpStatus": 200,
+              "resultOutcome": "REFERENCE_ONLY",
+              "oracle": {
+                "sourceWorkbook": "qa/mt347/tdd/MT347_SR2026_SSI_TDD_CONTROLLED_v5.xlsx",
+                "sourceWorkbookSha256": "82C6ABCFD91E7D35E1382F8C86BF796D8DBF05CF8C8D94F9F0C7B5889AB52C9A",
+                "mrgEvidence": "us3ma_20260717.pdf p.18; C4 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.21-22",
+                "expectedResolvedKeys": [
+                  "B1.53A",
+                  "B1.57A"
+                ],
+                "expectedRoleValues": {
+                  "DELIVERY_AGENT": "CITIUS33",
+                  "RECEIVING_AGENT": "BOFAUS3N"
+                },
+                "expandedCellOracle": true
+              },
+              "resultFields": [
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "53A",
+                  "bic": "CITIUS33",
+                  "resolutionStatus": "RESOLVED",
+                  "reasonCode": "RESOLVED_FROM_OWN_SSI"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "56A",
+                  "bic": null,
+                  "resolutionStatus": "NOT_REQUIRED",
+                  "reasonCode": "OPTIONAL_FIELD_OMITTED"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "57A",
+                  "bic": "BOFAUS3N",
+                  "resolutionStatus": "RESOLVED",
+                  "reasonCode": "RESOLVED_FROM_COUNTERPARTY_SSI"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "58A",
+                  "bic": null,
+                  "resolutionStatus": "N_A",
+                  "reasonCode": "MESSAGE_PROFILE_EXCLUDED"
+                }
+              ],
+              "passed": true
+            },
+            {
+              "businessDomain": "TREASURY",
+              "messageType": "MT300",
+              "scenarioId": "MT300-001",
+              "sequence": "B1",
+              "currency": "GBP",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "executeHttpStatus": 200,
+              "resultOutcome": "REFERENCE_ONLY",
+              "oracle": {
+                "sourceWorkbook": "qa/mt347/tdd/MT347_SR2026_SSI_TDD_CONTROLLED_v5.xlsx",
+                "sourceWorkbookSha256": "82C6ABCFD91E7D35E1382F8C86BF796D8DBF05CF8C8D94F9F0C7B5889AB52C9A",
+                "mrgEvidence": "us3ma_20260717.pdf p.18; C4 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.21-22",
+                "expectedResolvedKeys": [
+                  "B1.53A",
+                  "B1.57A"
+                ],
+                "expectedRoleValues": {
+                  "DELIVERY_AGENT": "CITIUS33",
+                  "RECEIVING_AGENT": "CHASUS33"
+                },
+                "expandedCellOracle": true
+              },
+              "resultFields": [
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "53A",
+                  "bic": "CITIUS33",
+                  "resolutionStatus": "RESOLVED",
+                  "reasonCode": "RESOLVED_FROM_OWN_SSI"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "56A",
+                  "bic": null,
+                  "resolutionStatus": "NOT_REQUIRED",
+                  "reasonCode": "OPTIONAL_FIELD_OMITTED"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "57A",
+                  "bic": "CHASUS33",
+                  "resolutionStatus": "RESOLVED",
+                  "reasonCode": "RESOLVED_FROM_COUNTERPARTY_SSI"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "58A",
+                  "bic": null,
+                  "resolutionStatus": "N_A",
+                  "reasonCode": "MESSAGE_PROFILE_EXCLUDED"
+                }
+              ],
+              "passed": true
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "HKD",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TREASURY",
+              "messageType": "MT300",
+              "scenarioId": "MT300-001",
+              "sequence": "B1",
+              "currency": "HKD",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "executeHttpStatus": 200,
+              "resultOutcome": "REFERENCE_ONLY",
+              "oracle": {
+                "sourceWorkbook": "qa/mt347/tdd/MT347_SR2026_SSI_TDD_CONTROLLED_v5.xlsx",
+                "sourceWorkbookSha256": "82C6ABCFD91E7D35E1382F8C86BF796D8DBF05CF8C8D94F9F0C7B5889AB52C9A",
+                "mrgEvidence": "us3ma_20260717.pdf p.18; C4 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.21-22",
+                "expectedResolvedKeys": [
+                  "B1.53A",
+                  "B1.57A"
+                ],
+                "expectedRoleValues": {
+                  "DELIVERY_AGENT": "CITIUS33",
+                  "RECEIVING_AGENT": "DEUTDEFF"
+                },
+                "expandedCellOracle": true
+              },
+              "resultFields": [
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "53A",
+                  "bic": "CITIUS33",
+                  "resolutionStatus": "RESOLVED",
+                  "reasonCode": "RESOLVED_FROM_OWN_SSI"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "56A",
+                  "bic": null,
+                  "resolutionStatus": "NOT_REQUIRED",
+                  "reasonCode": "OPTIONAL_FIELD_OMITTED"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "57A",
+                  "bic": "DEUTDEFF",
+                  "resolutionStatus": "RESOLVED",
+                  "reasonCode": "RESOLVED_FROM_COUNTERPARTY_SSI"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "58A",
+                  "bic": null,
+                  "resolutionStatus": "N_A",
+                  "reasonCode": "MESSAGE_PROFILE_EXCLUDED"
+                }
+              ],
+              "passed": true
+            },
+            {
+              "businessDomain": "TREASURY",
+              "messageType": "MT300",
+              "scenarioId": "MT300-001",
+              "sequence": "B1",
+              "currency": "HKD",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "executeHttpStatus": 200,
+              "resultOutcome": "REFERENCE_ONLY",
+              "oracle": {
+                "sourceWorkbook": "qa/mt347/tdd/MT347_SR2026_SSI_TDD_CONTROLLED_v5.xlsx",
+                "sourceWorkbookSha256": "82C6ABCFD91E7D35E1382F8C86BF796D8DBF05CF8C8D94F9F0C7B5889AB52C9A",
+                "mrgEvidence": "us3ma_20260717.pdf p.18; C4 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.21-22",
+                "expectedResolvedKeys": [
+                  "B1.53A",
+                  "B1.57A"
+                ],
+                "expectedRoleValues": {
+                  "DELIVERY_AGENT": "CITIUS33",
+                  "RECEIVING_AGENT": "BOFAUS3N"
+                },
+                "expandedCellOracle": true
+              },
+              "resultFields": [
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "53A",
+                  "bic": "CITIUS33",
+                  "resolutionStatus": "RESOLVED",
+                  "reasonCode": "RESOLVED_FROM_OWN_SSI"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "56A",
+                  "bic": null,
+                  "resolutionStatus": "NOT_REQUIRED",
+                  "reasonCode": "OPTIONAL_FIELD_OMITTED"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "57A",
+                  "bic": "BOFAUS3N",
+                  "resolutionStatus": "RESOLVED",
+                  "reasonCode": "RESOLVED_FROM_COUNTERPARTY_SSI"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "58A",
+                  "bic": null,
+                  "resolutionStatus": "N_A",
+                  "reasonCode": "MESSAGE_PROFILE_EXCLUDED"
+                }
+              ],
+              "passed": true
+            },
+            {
+              "businessDomain": "TREASURY",
+              "messageType": "MT300",
+              "scenarioId": "MT300-001",
+              "sequence": "B1",
+              "currency": "HKD",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "executeHttpStatus": 200,
+              "resultOutcome": "REFERENCE_ONLY",
+              "oracle": {
+                "sourceWorkbook": "qa/mt347/tdd/MT347_SR2026_SSI_TDD_CONTROLLED_v5.xlsx",
+                "sourceWorkbookSha256": "82C6ABCFD91E7D35E1382F8C86BF796D8DBF05CF8C8D94F9F0C7B5889AB52C9A",
+                "mrgEvidence": "us3ma_20260717.pdf p.18; C4 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.21-22",
+                "expectedResolvedKeys": [
+                  "B1.53A",
+                  "B1.57A"
+                ],
+                "expectedRoleValues": {
+                  "DELIVERY_AGENT": "CITIUS33",
+                  "RECEIVING_AGENT": "CHASUS33"
+                },
+                "expandedCellOracle": true
+              },
+              "resultFields": [
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "53A",
+                  "bic": "CITIUS33",
+                  "resolutionStatus": "RESOLVED",
+                  "reasonCode": "RESOLVED_FROM_OWN_SSI"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "56A",
+                  "bic": null,
+                  "resolutionStatus": "NOT_REQUIRED",
+                  "reasonCode": "OPTIONAL_FIELD_OMITTED"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "57A",
+                  "bic": "CHASUS33",
+                  "resolutionStatus": "RESOLVED",
+                  "reasonCode": "RESOLVED_FROM_COUNTERPARTY_SSI"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "58A",
+                  "bic": null,
+                  "resolutionStatus": "N_A",
+                  "reasonCode": "MESSAGE_PROFILE_EXCLUDED"
+                }
+              ],
+              "passed": true
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "JPY",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TREASURY",
+              "messageType": "MT300",
+              "scenarioId": "MT300-001",
+              "sequence": "B1",
+              "currency": "JPY",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "executeHttpStatus": 200,
+              "resultOutcome": "REFERENCE_ONLY",
+              "oracle": {
+                "sourceWorkbook": "qa/mt347/tdd/MT347_SR2026_SSI_TDD_CONTROLLED_v5.xlsx",
+                "sourceWorkbookSha256": "82C6ABCFD91E7D35E1382F8C86BF796D8DBF05CF8C8D94F9F0C7B5889AB52C9A",
+                "mrgEvidence": "us3ma_20260717.pdf p.18; C4 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.21-22",
+                "expectedResolvedKeys": [
+                  "B1.53A",
+                  "B1.57A"
+                ],
+                "expectedRoleValues": {
+                  "DELIVERY_AGENT": "CITIUS33",
+                  "RECEIVING_AGENT": "DEUTDEFF"
+                },
+                "expandedCellOracle": true
+              },
+              "resultFields": [
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "53A",
+                  "bic": "CITIUS33",
+                  "resolutionStatus": "RESOLVED",
+                  "reasonCode": "RESOLVED_FROM_OWN_SSI"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "56A",
+                  "bic": null,
+                  "resolutionStatus": "NOT_REQUIRED",
+                  "reasonCode": "OPTIONAL_FIELD_OMITTED"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "57A",
+                  "bic": "DEUTDEFF",
+                  "resolutionStatus": "RESOLVED",
+                  "reasonCode": "RESOLVED_FROM_COUNTERPARTY_SSI"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "58A",
+                  "bic": null,
+                  "resolutionStatus": "N_A",
+                  "reasonCode": "MESSAGE_PROFILE_EXCLUDED"
+                }
+              ],
+              "passed": true
+            },
+            {
+              "businessDomain": "TREASURY",
+              "messageType": "MT300",
+              "scenarioId": "MT300-001",
+              "sequence": "B1",
+              "currency": "JPY",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "executeHttpStatus": 200,
+              "resultOutcome": "REFERENCE_ONLY",
+              "oracle": {
+                "sourceWorkbook": "qa/mt347/tdd/MT347_SR2026_SSI_TDD_CONTROLLED_v5.xlsx",
+                "sourceWorkbookSha256": "82C6ABCFD91E7D35E1382F8C86BF796D8DBF05CF8C8D94F9F0C7B5889AB52C9A",
+                "mrgEvidence": "us3ma_20260717.pdf p.18; C4 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.21-22",
+                "expectedResolvedKeys": [
+                  "B1.53A",
+                  "B1.57A"
+                ],
+                "expectedRoleValues": {
+                  "DELIVERY_AGENT": "CITIUS33",
+                  "RECEIVING_AGENT": "BOFAUS3N"
+                },
+                "expandedCellOracle": true
+              },
+              "resultFields": [
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "53A",
+                  "bic": "CITIUS33",
+                  "resolutionStatus": "RESOLVED",
+                  "reasonCode": "RESOLVED_FROM_OWN_SSI"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "56A",
+                  "bic": null,
+                  "resolutionStatus": "NOT_REQUIRED",
+                  "reasonCode": "OPTIONAL_FIELD_OMITTED"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "57A",
+                  "bic": "BOFAUS3N",
+                  "resolutionStatus": "RESOLVED",
+                  "reasonCode": "RESOLVED_FROM_COUNTERPARTY_SSI"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "58A",
+                  "bic": null,
+                  "resolutionStatus": "N_A",
+                  "reasonCode": "MESSAGE_PROFILE_EXCLUDED"
+                }
+              ],
+              "passed": true
+            },
+            {
+              "businessDomain": "TREASURY",
+              "messageType": "MT300",
+              "scenarioId": "MT300-001",
+              "sequence": "B1",
+              "currency": "JPY",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "executeHttpStatus": 200,
+              "resultOutcome": "REFERENCE_ONLY",
+              "oracle": {
+                "sourceWorkbook": "qa/mt347/tdd/MT347_SR2026_SSI_TDD_CONTROLLED_v5.xlsx",
+                "sourceWorkbookSha256": "82C6ABCFD91E7D35E1382F8C86BF796D8DBF05CF8C8D94F9F0C7B5889AB52C9A",
+                "mrgEvidence": "us3ma_20260717.pdf p.18; C4 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.21-22",
+                "expectedResolvedKeys": [
+                  "B1.53A",
+                  "B1.57A"
+                ],
+                "expectedRoleValues": {
+                  "DELIVERY_AGENT": "CITIUS33",
+                  "RECEIVING_AGENT": "CHASUS33"
+                },
+                "expandedCellOracle": true
+              },
+              "resultFields": [
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "53A",
+                  "bic": "CITIUS33",
+                  "resolutionStatus": "RESOLVED",
+                  "reasonCode": "RESOLVED_FROM_OWN_SSI"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "56A",
+                  "bic": null,
+                  "resolutionStatus": "NOT_REQUIRED",
+                  "reasonCode": "OPTIONAL_FIELD_OMITTED"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "57A",
+                  "bic": "CHASUS33",
+                  "resolutionStatus": "RESOLVED",
+                  "reasonCode": "RESOLVED_FROM_COUNTERPARTY_SSI"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "58A",
+                  "bic": null,
+                  "resolutionStatus": "N_A",
+                  "reasonCode": "MESSAGE_PROFILE_EXCLUDED"
+                }
+              ],
+              "passed": true
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        },
+        {
+          "currency": "USD",
+          "lookupHttpStatus": 200,
+          "ssiChoiceCount": 3,
+          "defaultBankServiceId": "BANK-SVC-DEUTDEFF",
+          "defaultBic": "DEUTDEFF",
+          "executions": [
+            {
+              "businessDomain": "TREASURY",
+              "messageType": "MT300",
+              "scenarioId": "MT300-001",
+              "sequence": "B1",
+              "currency": "USD",
+              "bankServiceId": "BANK-SVC-DEUTDEFF",
+              "bic": "DEUTDEFF",
+              "executeHttpStatus": 200,
+              "resultOutcome": "REFERENCE_ONLY",
+              "oracle": {
+                "sourceWorkbook": "qa/mt347/tdd/MT347_SR2026_SSI_TDD_CONTROLLED_v5.xlsx",
+                "sourceWorkbookSha256": "82C6ABCFD91E7D35E1382F8C86BF796D8DBF05CF8C8D94F9F0C7B5889AB52C9A",
+                "mrgEvidence": "us3ma_20260717.pdf p.18; C4 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.21-22",
+                "expectedResolvedKeys": [
+                  "B1.53A",
+                  "B1.57A"
+                ],
+                "expectedRoleValues": {
+                  "DELIVERY_AGENT": "CITIUS33",
+                  "RECEIVING_AGENT": "DEUTDEFF"
+                },
+                "expandedCellOracle": false
+              },
+              "resultFields": [
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "53A",
+                  "bic": "CITIUS33",
+                  "resolutionStatus": "RESOLVED",
+                  "reasonCode": "RESOLVED_FROM_OWN_SSI"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "56A",
+                  "bic": null,
+                  "resolutionStatus": "NOT_REQUIRED",
+                  "reasonCode": "OPTIONAL_FIELD_OMITTED"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "57A",
+                  "bic": "DEUTDEFF",
+                  "resolutionStatus": "RESOLVED",
+                  "reasonCode": "RESOLVED_FROM_COUNTERPARTY_SSI"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "58A",
+                  "bic": null,
+                  "resolutionStatus": "N_A",
+                  "reasonCode": "MESSAGE_PROFILE_EXCLUDED"
+                }
+              ],
+              "passed": true
+            },
+            {
+              "businessDomain": "TREASURY",
+              "messageType": "MT300",
+              "scenarioId": "MT300-001",
+              "sequence": "B1",
+              "currency": "USD",
+              "bankServiceId": "BANK-SVC-BOFAUS3N",
+              "bic": "BOFAUS3N",
+              "executeHttpStatus": 200,
+              "resultOutcome": "REFERENCE_ONLY",
+              "oracle": {
+                "sourceWorkbook": "qa/mt347/tdd/MT347_SR2026_SSI_TDD_CONTROLLED_v5.xlsx",
+                "sourceWorkbookSha256": "82C6ABCFD91E7D35E1382F8C86BF796D8DBF05CF8C8D94F9F0C7B5889AB52C9A",
+                "mrgEvidence": "us3ma_20260717.pdf p.18; C4 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.21-22",
+                "expectedResolvedKeys": [
+                  "B1.53A",
+                  "B1.57A"
+                ],
+                "expectedRoleValues": {
+                  "DELIVERY_AGENT": "CITIUS33",
+                  "RECEIVING_AGENT": "BOFAUS3N"
+                },
+                "expandedCellOracle": true
+              },
+              "resultFields": [
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "53A",
+                  "bic": "CITIUS33",
+                  "resolutionStatus": "RESOLVED",
+                  "reasonCode": "RESOLVED_FROM_OWN_SSI"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "56A",
+                  "bic": null,
+                  "resolutionStatus": "NOT_REQUIRED",
+                  "reasonCode": "OPTIONAL_FIELD_OMITTED"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "57A",
+                  "bic": "BOFAUS3N",
+                  "resolutionStatus": "RESOLVED",
+                  "reasonCode": "RESOLVED_FROM_COUNTERPARTY_SSI"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "58A",
+                  "bic": null,
+                  "resolutionStatus": "N_A",
+                  "reasonCode": "MESSAGE_PROFILE_EXCLUDED"
+                }
+              ],
+              "passed": true
+            },
+            {
+              "businessDomain": "TREASURY",
+              "messageType": "MT300",
+              "scenarioId": "MT300-001",
+              "sequence": "B1",
+              "currency": "USD",
+              "bankServiceId": "BANK-SVC-CHASUS33",
+              "bic": "CHASUS33",
+              "executeHttpStatus": 200,
+              "resultOutcome": "REFERENCE_ONLY",
+              "oracle": {
+                "sourceWorkbook": "qa/mt347/tdd/MT347_SR2026_SSI_TDD_CONTROLLED_v5.xlsx",
+                "sourceWorkbookSha256": "82C6ABCFD91E7D35E1382F8C86BF796D8DBF05CF8C8D94F9F0C7B5889AB52C9A",
+                "mrgEvidence": "us3ma_20260717.pdf p.18; C4 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.21-22",
+                "expectedResolvedKeys": [
+                  "B1.53A",
+                  "B1.57A"
+                ],
+                "expectedRoleValues": {
+                  "DELIVERY_AGENT": "CITIUS33",
+                  "RECEIVING_AGENT": "CHASUS33"
+                },
+                "expandedCellOracle": true
+              },
+              "resultFields": [
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "53A",
+                  "bic": "CITIUS33",
+                  "resolutionStatus": "RESOLVED",
+                  "reasonCode": "RESOLVED_FROM_OWN_SSI"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "56A",
+                  "bic": null,
+                  "resolutionStatus": "NOT_REQUIRED",
+                  "reasonCode": "OPTIONAL_FIELD_OMITTED"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "57A",
+                  "bic": "CHASUS33",
+                  "resolutionStatus": "RESOLVED",
+                  "reasonCode": "RESOLVED_FROM_COUNTERPARTY_SSI"
+                },
+                {
+                  "sequenceId": "B1",
+                  "tagAndOption": "58A",
+                  "bic": null,
+                  "resolutionStatus": "N_A",
+                  "reasonCode": "MESSAGE_PROFILE_EXCLUDED"
+                }
+              ],
+              "passed": true
+            }
+          ],
+          "noHorizontalScroll": {
+            "clientWidth": 1440,
+            "scrollWidth": 1440
+          }
+        }
+      ],
+      "passed": true,
+      "error": null,
+      "pageContract": {
+        "contractSha256": "ffc5295fd8d2ad1ddfff932e2740ddf66feab6e856d51148d713554a3e5e073a",
+        "polarity": "POSITIVE",
+        "visibleFieldIds": [
+          "context.transactionReference",
+          "context.currency",
+          "context.bookingEntity",
+          "context.valueDate",
+          "context.counterpartyBankServiceId"
+        ],
+        "requiredFieldIds": [
+          "context.transactionReference",
+          "context.currency",
+          "context.bookingEntity",
+          "context.valueDate",
+          "context.counterpartyBankServiceId"
+        ]
+      },
+      "finishedAt": "2026-09-13T14:51:09.904Z"
+    }
+  ]
+}

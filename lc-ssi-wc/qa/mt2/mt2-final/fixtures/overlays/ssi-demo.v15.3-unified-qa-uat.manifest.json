@@ -1,0 +1,312 @@
+{
+  "schemaVersion": "1.0",
+  "fixtureId": "QA-UAT-EC-PURPOSE-01-V15.3",
+  "status": "PROPOSED_QA_UAT_ONLY",
+  "baDecision": "APPROVED",
+  "identityMethod": "SQLITE_WAL_AWARE_LOGICAL_SNAPSHOT_V1",
+  "sourceSnapshot": {
+    "path": "qa/mt2/mt2-final/fixtures/overlays/ssi-demo.v15.2-own-account-uat.sqlite",
+    "physicalSha256": "C7C07A2DD74DD223CE8D0354DCA85B78816793B4C65D7163D5CDD1EC3B8C7F21",
+    "logicalSha256": "371696807835A8C0C1A9CA0BD9BCF4D7D8BD37D457DB20404B53C6D772FA8721",
+    "manifestPath": "qa/mt2/mt2-final/fixtures/overlays/ssi-demo.v15.2-own-account-uat.manifest.json",
+    "manifestSha256": "52A3A9CAFE3ECBDAD8A9B05F5429BF500D00D85FEB978B6FBEE28BACF8AD7D4C"
+  },
+  "overlaySnapshot": {
+    "path": "qa/mt2/mt2-final/fixtures/overlays/ssi-demo.v15.3-unified-qa-uat.sqlite",
+    "physicalSha256": "7F7AFE003524300174E93C02060D7447FDE7B08D093808070E466BBCDE8D0101",
+    "logicalSha256": "FD6A4C064FE81F42AAB1D3E30C293F45FD3908FA6BF2C92FBBF3381FCAD378A6",
+    "bytes": 10440704
+  },
+  "migration": {
+    "rule": "EC-PURPOSE-01",
+    "atomic": true,
+    "removedGenericApplicability": [
+      {
+        "applicabilityId": "12fed8b5-20a9-4fa0-b684-cfc08bd307fe:APPL:2",
+        "ssiId": "12fed8b5-20a9-4fa0-b684-cfc08bd307fe"
+      },
+      {
+        "applicabilityId": "1a386704-017a-4439-bb65-29fc3fd6e8dc:APPL:2",
+        "ssiId": "1a386704-017a-4439-bb65-29fc3fd6e8dc"
+      },
+      {
+        "applicabilityId": "1bb2ba6f-b11d-4ed8-8213-482dbfa6afd4:APPL:2",
+        "ssiId": "1bb2ba6f-b11d-4ed8-8213-482dbfa6afd4"
+      },
+      {
+        "applicabilityId": "22a11830-f848-4281-805f-8e693c98b364:APPL:7",
+        "ssiId": "22a11830-f848-4281-805f-8e693c98b364"
+      },
+      {
+        "applicabilityId": "2927617a-e7e4-479e-9bc4-27a6705383ee:APPL:2",
+        "ssiId": "2927617a-e7e4-479e-9bc4-27a6705383ee"
+      },
+      {
+        "applicabilityId": "351807b1-c715-4f53-8fbd-058cc9a14eab:APPL:2",
+        "ssiId": "351807b1-c715-4f53-8fbd-058cc9a14eab"
+      },
+      {
+        "applicabilityId": "38df686a-9022-4ad6-8ac7-22435411d983:APPL:2",
+        "ssiId": "38df686a-9022-4ad6-8ac7-22435411d983"
+      },
+      {
+        "applicabilityId": "42aae02a-0597-4982-b4c0-4b27bb44a549:APPL:2",
+        "ssiId": "42aae02a-0597-4982-b4c0-4b27bb44a549"
+      },
+      {
+        "applicabilityId": "45ea4c86-67d4-40b7-935d-904a6e3ffd12:APPL:7",
+        "ssiId": "45ea4c86-67d4-40b7-935d-904a6e3ffd12"
+      },
+      {
+        "applicabilityId": "50531295-c91a-4eb5-9c21-69d2dab38b7c:APPL:7",
+        "ssiId": "50531295-c91a-4eb5-9c21-69d2dab38b7c"
+      },
+      {
+        "applicabilityId": "50d51f4c-9905-46f2-ac93-e0e1a4330019:APPL:2",
+        "ssiId": "50d51f4c-9905-46f2-ac93-e0e1a4330019"
+      },
+      {
+        "applicabilityId": "54c26b29-e351-4391-aa38-8614aab63c4f:APPL:2",
+        "ssiId": "54c26b29-e351-4391-aa38-8614aab63c4f"
+      },
+      {
+        "applicabilityId": "946b7448-f719-4bd4-8d83-f66c597e1f6d:APPL:2",
+        "ssiId": "946b7448-f719-4bd4-8d83-f66c597e1f6d"
+      },
+      {
+        "applicabilityId": "9532ba2c-717f-42b6-8437-5ff7e270fccb:APPL:2",
+        "ssiId": "9532ba2c-717f-42b6-8437-5ff7e270fccb"
+      },
+      {
+        "applicabilityId": "a1e1ac1a-a16f-414c-ac70-85731ed84d3f:APPL:2",
+        "ssiId": "a1e1ac1a-a16f-414c-ac70-85731ed84d3f"
+      },
+      {
+        "applicabilityId": "b96e8d9a-327b-4fb0-9777-a9ad9d86ac43:APPL:3",
+        "ssiId": "b96e8d9a-327b-4fb0-9777-a9ad9d86ac43"
+      },
+      {
+        "applicabilityId": "c12bd429-cf8c-4b57-9575-299bbe58d680:APPL:8",
+        "ssiId": "c12bd429-cf8c-4b57-9575-299bbe58d680"
+      },
+      {
+        "applicabilityId": "ca1d12d4-1208-40d5-a8fe-bcd040bda6e3:APPL:2",
+        "ssiId": "ca1d12d4-1208-40d5-a8fe-bcd040bda6e3"
+      },
+      {
+        "applicabilityId": "ca4a553d-77f0-4f30-b2a7-c83c4d81f52b:APPL:2",
+        "ssiId": "ca4a553d-77f0-4f30-b2a7-c83c4d81f52b"
+      },
+      {
+        "applicabilityId": "cc4f488c-99e1-40ad-a59d-a7d73f643de4:APPL:2",
+        "ssiId": "cc4f488c-99e1-40ad-a59d-a7d73f643de4"
+      },
+      {
+        "applicabilityId": "cd50ca60-1ec8-4a16-b61c-b03abf6a9c58:APPL:8",
+        "ssiId": "cd50ca60-1ec8-4a16-b61c-b03abf6a9c58"
+      },
+      {
+        "applicabilityId": "d60d207b-29b2-4352-8314-89378edcf139:APPL:2",
+        "ssiId": "d60d207b-29b2-4352-8314-89378edcf139"
+      },
+      {
+        "applicabilityId": "e029ad81-7715-4c2a-9452-75876508cacb:APPL:2",
+        "ssiId": "e029ad81-7715-4c2a-9452-75876508cacb"
+      },
+      {
+        "applicabilityId": "eb1a6c37-f327-4038-8241-8aac9f5d20b9:APPL:2",
+        "ssiId": "eb1a6c37-f327-4038-8241-8aac9f5d20b9"
+      },
+      {
+        "applicabilityId": "ed799438-a80b-4787-85e5-443a0ca5c5bb:APPL:2",
+        "ssiId": "ed799438-a80b-4787-85e5-443a0ca5c5bb"
+      },
+      {
+        "applicabilityId": "f4bae14b-a208-45ae-990a-df840fb9af9f:APPL:2",
+        "ssiId": "f4bae14b-a208-45ae-990a-df840fb9af9f"
+      }
+    ],
+    "createdGenericRoutes": [
+      {
+        "pair": 1,
+        "counterpartyBic": "CITIUS33",
+        "currency": "USD",
+        "ssiId": "b0c18c9a-2ff7-59d4-96d0-f600853b8408",
+        "ssiCode": "SSI-UAT-GEN-01",
+        "ssiVersion": 1,
+        "accountReference": "DEMO-NOSTRO-001-PRIMARY",
+        "actualReceiverBic": "CITIUS33"
+      },
+      {
+        "pair": 2,
+        "counterpartyBic": "BARCGB22",
+        "currency": "GBP",
+        "ssiId": "1a9bbd1f-b884-5fbf-87d4-1e8c79a13800",
+        "ssiCode": "SSI-UAT-GEN-02",
+        "ssiVersion": 1,
+        "accountReference": "DEMO-NOSTRO-002-PRIMARY",
+        "actualReceiverBic": "BARCGB22"
+      },
+      {
+        "pair": 3,
+        "counterpartyBic": "BARCGB22",
+        "currency": "USD",
+        "ssiId": "e5f71960-aff2-5f27-b01f-58194e54e736",
+        "ssiCode": "SSI-UAT-GEN-03",
+        "ssiVersion": 1,
+        "accountReference": "DEMO-NOSTRO-001-PRIMARY",
+        "actualReceiverBic": "CITIUS33"
+      },
+      {
+        "pair": 4,
+        "counterpartyBic": "DEUTDEFF",
+        "currency": "EUR",
+        "ssiId": "163482f1-a692-5908-ad22-7e94c8634890",
+        "ssiCode": "SSI-UAT-GEN-04",
+        "ssiVersion": 1,
+        "accountReference": "DEMO-NOSTRO-003-PRIMARY",
+        "actualReceiverBic": "DEUTDEFF"
+      },
+      {
+        "pair": 5,
+        "counterpartyBic": "DBSSSGSG",
+        "currency": "SGD",
+        "ssiId": "6d14da92-faf4-5611-854a-ef2c42350913",
+        "ssiCode": "SSI-UAT-GEN-05",
+        "ssiVersion": 1,
+        "accountReference": "DEMO-NOSTRO-004-PRIMARY",
+        "actualReceiverBic": "DBSSSGSG"
+      },
+      {
+        "pair": 6,
+        "counterpartyBic": "BOTKJPJT",
+        "currency": "JPY",
+        "ssiId": "4a32aa4b-5f8a-5b43-bf52-7b00ad2f8673",
+        "ssiCode": "SSI-UAT-GEN-06",
+        "ssiVersion": 1,
+        "accountReference": "DEMO-NOSTRO-005-PRIMARY",
+        "actualReceiverBic": "BOTKJPJT"
+      },
+      {
+        "pair": 7,
+        "counterpartyBic": "HSBCHKHH",
+        "currency": "HKD",
+        "ssiId": "c07bb708-f81e-5976-b6de-62171bdcab57",
+        "ssiCode": "SSI-UAT-GEN-07",
+        "ssiVersion": 1,
+        "accountReference": "DEMO-NOSTRO-006-PRIMARY",
+        "actualReceiverBic": "HSBCHKHH"
+      },
+      {
+        "pair": 8,
+        "counterpartyBic": "BOFAUS3N",
+        "currency": "AUD",
+        "ssiId": "7e285998-4c3c-5d63-b05a-b613cd39c7b1",
+        "ssiCode": "SSI-UAT-GEN-08",
+        "ssiVersion": 1,
+        "accountReference": "DEMO-NOSTRO-007-PRIMARY",
+        "actualReceiverBic": "CTBAAU2S"
+      },
+      {
+        "pair": 9,
+        "counterpartyBic": "CHASUS33",
+        "currency": "CAD",
+        "ssiId": "91765d67-8e0c-52f4-92a1-501ef37bba23",
+        "ssiCode": "SSI-UAT-GEN-09",
+        "ssiVersion": 1,
+        "accountReference": "DEMO-NOSTRO-008-PRIMARY",
+        "actualReceiverBic": "ROYCCAT2"
+      },
+      {
+        "pair": 10,
+        "counterpartyBic": "CHASUS33",
+        "currency": "USD",
+        "ssiId": "a6486f75-a0a8-5207-9c28-cedf30f4f990",
+        "ssiCode": "SSI-UAT-GEN-10",
+        "ssiVersion": 1,
+        "accountReference": "DEMO-NOSTRO-001-PRIMARY",
+        "actualReceiverBic": "CITIUS33"
+      },
+      {
+        "pair": 11,
+        "counterpartyBic": "SCBLGB2L",
+        "currency": "CHF",
+        "ssiId": "123b04ec-75bc-5d16-8232-d2eaebea7907",
+        "ssiCode": "SSI-UAT-GEN-11",
+        "ssiVersion": 1,
+        "accountReference": "DEMO-NOSTRO-009-PRIMARY",
+        "actualReceiverBic": "UBSWCHZH80A"
+      },
+      {
+        "pair": 12,
+        "counterpartyBic": "BNPAFRPP",
+        "currency": "CNY",
+        "ssiId": "dadfc78e-619e-5fca-ba19-69a5732fd246",
+        "ssiCode": "SSI-UAT-GEN-12",
+        "ssiVersion": 1,
+        "accountReference": "DEMO-NOSTRO-010-PRIMARY",
+        "actualReceiverBic": "BKCHCNBJ"
+      }
+    ],
+    "excludedFromGeneric": [
+      {
+        "ssiCode": "SSI-DEMO-035",
+        "reason": "EURO1_SCHEME_SPECIFIC"
+      },
+      {
+        "ssiCode": "SSI-DEMO-041",
+        "reason": "LIMITED_NEGATIVE_ONLY"
+      },
+      {
+        "ssiCode": "SSI-DEMO-042",
+        "reason": "LIMITED_NEGATIVE_ONLY"
+      }
+    ]
+  },
+  "qaTieFixture": {
+    "counterpartyBic": "QATIGB2L",
+    "currency": "GBP",
+    "classification": "PROPOSED_QA_ONLY",
+    "usageGroup": "QA_AMBIGUITY_FIXTURE",
+    "records": [
+      {
+        "ssiId": "6a7b0357-3036-5f6d-a1db-55711c60a908",
+        "ssiCode": "SSI-QA-TIE-1",
+        "ssiVersion": 1,
+        "accountReference": "QA-TIE-GBP-1",
+        "priority": 10,
+        "routePreference": "PRIMARY",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      {
+        "ssiId": "c3490516-6311-547c-855b-2c5847e74e36",
+        "ssiCode": "SSI-QA-TIE-2",
+        "ssiVersion": 1,
+        "accountReference": "QA-TIE-GBP-2",
+        "priority": 10,
+        "routePreference": "PRIMARY",
+        "specificity": "NAMED_COUNTERPARTY"
+      }
+    ],
+    "nostroRecords": [
+      {
+        "nostroId": "9c854d0c-3cfb-5092-a103-273fe8a14c5c",
+        "version": 1,
+        "accountReference": "QA-TIE-GBP-1"
+      },
+      {
+        "nostroId": "48b0d256-8502-5d4b-bb14-4b06a7889dee",
+        "version": 1,
+        "accountReference": "QA-TIE-GBP-2"
+      }
+    ],
+    "rmaId": "f6dcf873-3c4e-5760-bd94-95e0db879cc0"
+  },
+  "acceptancePlan": {
+    "path": "qa/mt2/reports/MT2XX_v15.3_migration_expected_20260912.json",
+    "sha256": "3F7973EA0DFD3F34C16518A5B41562BAAAA0BDC3E0CF61B5EB014967DA9EC57E",
+    "formalCases": 48,
+    "tieControls": 4,
+    "requiresPerCaseComparison": true
+  }
+}

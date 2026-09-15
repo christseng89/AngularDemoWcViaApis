@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "1.0",
+  "artifact": "memory/lc-ssi-wc-operating-model-zh-v2.md",
+  "version": "v2.8.18",
+  "effectiveDate": "2026-09-15",
+  "sha256": "5D3B1730409BB974137CCCEC59E7E2635F2E2C75FFCB452AD0C5983EBFC80318",
+  "changeReason": "Add an independent DBA/Database Performance Engineer as a mandatory data-volume and latency gate; require database-side filtering/join/sort evidence and exact seed, fixture, eligibility, and logical-snapshot parity across Operational API, QA automation, and Browser UI.",
+  "scope": "All current and future SSI Resolution Message Families and their Generic UI consumers.",
+  "maker": "/root",
+  "independentChecker": "/root/ba_independent_nvr_review; /root/qa_payment_all_scenarios",
+  "checkerStatus": "PENDING_REVIEW",
+  "checkedAt": null,
+  "referencedArtifacts": [
+    {
+      "artifact": "memory/mt347-oas-page-parameters-ui-standard-v1.md",
+      "version": "v1",
+      "sha256": "49802BC555A7609CDFF60C7B868C2C81FFE9A14977468E4EB61321A0842F5184"
+    }
+  ],
+  "reviewEvidence": {
+    "ba": {
+      "checker": "/root/ba_independent_nvr_review",
+      "status": "PENDING_REVIEW",
+      "scope": "RMA versus SSI route, MT/MX display format, FIN/FINPLUS execution transport, Core/COV profile, actual Receiver, and contingency governance"
+    },
+    "qa": {
+      "checker": "/root/qa_payment_all_scenarios",
+      "status": "PENDING_REVIEW",
+      "scope": "Exact-profile RMA acceptance matrix, FINPLUS default, FIN-only fail-closed, compatibility-view snapshot stability, and transport-change reconfirmation"
+    },
+    "dba": {
+      "checker": "/root/dba_performance_review",
+      "status": "PENDING_REVIEW",
+      "scope": "Query plans, indexes, row counts, cold/hot latency, WAL/locking, and exact Operational/API/UI/QA logical-snapshot parity"
+    },
+    "sonarLoopbackException": {
+      "checker": "/root/qa_payment_all_scenarios",
+      "status": "PENDING_REVIEW",
+      "scope": "Verify the HTTP exception is restricted to loopback-only repo-local QA/Sonar tooling and all other HTTP/TLS findings remain actionable"
+    }
+  }
+}

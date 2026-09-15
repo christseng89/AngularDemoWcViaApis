@@ -1,0 +1,132 @@
+<div
+  class="modal-backdrop"
+  role="presentation"
+  (click)="cancel()"
+  (keydown.escape)="cancel()"
+>
+  <dialog
+    #dialog
+    class="bank-service-dialog"
+    open
+    aria-modal="true"
+    [attr.aria-label]="title()"
+    (click)="$event.stopPropagation()"
+    (keydown.escape)="cancel()"
+  >
+    <header class="dialog-header">
+      <div>
+        <p class="eyebrow">{{ serviceLabel() }}</p>
+        <h2>{{ title() }}</h2>
+      </div>
+      <button
+        type="button"
+        class="icon-button"
+        aria-label="Close"
+        (click)="cancel()"
+      >
+        ×
+      </button>
+    </header>
+
+    <p class="data-disclaimer">
+      Select a governed Bank Service identity. The stable service ID is
+      submitted; the bank name and BIC are displayed.
+    </p>
+
+    <form
+      class="picker-search"
+      role="search"
+      (submit)="$event.preventDefault(); search(searchInput.value)"
+    >
+      <label for="bank-service-picker-query">Search BIC or bank name</label>
+      <div>
+        <input
+          #searchInput
+          id="bank-service-picker-query"
+          type="search"
+          autocomplete="off"
+          [value]="query()"
+          [disabled]="loading()"
+        />
+        <button type="submit" [disabled]="loading()">
+          {{ loading() ? "Searching…" : "Search" }}
+        </button>
+      </div>
+    </form>
+
+    <div class="picker-status" aria-live="polite">
+      @if (error(); as message) {
+        <p class="error" role="alert">{{ message }}</p>
+      } @else if (loading() && items().length === 0) {
+        <p>Loading Bank Services…</p>
+      }
+    </div>
+
+    @if (!loading() || items().length > 0) {
+      <div class="table-scroll">
+        <table>
+          <caption class="sr-only">
+            Bank Service search results
+          </caption>
+          <thead>
+            <tr>
+              <th>BIC</th>
+              <th>Institution</th>
+              <th>Location</th>
+              <th>Standard</th>
+              <th><span class="sr-only">Action</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (bank of items(); track bank.bankServiceId) {
+              <tr>
+                <td>
+                  <strong>{{ bank.bic }}</strong>
+                </td>
+                <td>{{ bank.displayValue }}</td>
+                <td>{{ bank.location || "—" }}</td>
+                <td>{{ bank.standard || "—" }}</td>
+                <td>
+                  <button
+                    type="button"
+                    class="select-button"
+                    (click)="selected.emit(bank)"
+                  >
+                    Select
+                  </button>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="5" class="empty">{{ emptyMessage() }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+
+    <footer class="picker-footer">
+      <span
+        >Total {{ total() }} · Page {{ page() }} / {{ totalPages() || 1 }}</span
+      >
+      <div>
+        <button
+          type="button"
+          [disabled]="page() <= 1 || loading()"
+          (click)="pageRequested.emit(page() - 1)"
+        >
+          Previous
+        </button>
+        <button
+          type="button"
+          [disabled]="page() >= totalPages() || loading()"
+          (click)="pageRequested.emit(page() + 1)"
+        >
+          Next
+        </button>
+        <button type="button" (click)="cancel()">Cancel</button>
+      </div>
+    </footer>
+  </dialog>
+</div>

@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "1.0",
+  "policies": [
+    {
+      "policyId": "MT347-SR2026-HK01-EXECUTABLE-SSI",
+      "scope": "EXECUTABLE_SSI",
+      "bookingEntity": "HK01",
+      "currencies": ["EUR", "GBP", "HKD", "JPY", "USD"],
+      "defaultBankServiceId": "BANK-SVC-DEUTDEFF"
+    }
+  ]
+}

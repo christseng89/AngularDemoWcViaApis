@@ -1,0 +1,111 @@
+<section class="definition-index-workspace">
+  @if (selected(); as item) {
+    <button class="back-button" type="button" (click)="close()">
+      <span aria-hidden="true">←</span> Back to scenarios
+    </button>
+    <ssi-resolution-workbench
+      [query]="scopedQuery(item)"
+      [pageSize]="pageSize()"
+    />
+  } @else {
+    <header class="workbench-header">
+      <div>
+        <span class="eyebrow">SSI WORKBENCH</span>
+        <h1>{{ domainLabel() }} settlement instructions</h1>
+        <p>
+          Choose a transaction, select its scenario, then review the details
+          before resolving.
+        </p>
+      </div>
+      @if (index(); as currentIndex) {
+        <div class="workbench-step-summary" aria-label="Progress">
+          <span class="step-number">{{
+            selectedMessageType() ? "02" : "01"
+          }}</span>
+          <span>{{
+            selectedMessageType() ? "Choose scenario" : "Choose transaction"
+          }}</span>
+        </div>
+        <details class="audit-details">
+          <summary>Technical source details</summary>
+          <dl class="context-list">
+            <div>
+              <dt>Schema</dt>
+              <dd>{{ currentIndex.schemaVersion }}</dd>
+            </div>
+            <div>
+              <dt>Index version</dt>
+              <dd>{{ currentIndex.indexVersion }}</dd>
+            </div>
+            <div>
+              <dt>Definitions</dt>
+              <dd>{{ currentIndex.items.length }}</dd>
+            </div>
+          </dl>
+        </details>
+      }
+    </header>
+
+    @if (failure(); as currentFailure) {
+      <ssi-resolution-failure [failure]="currentFailure" (retry)="load()" />
+    } @else if (loading() && !index()) {
+      <output class="loading-state" aria-live="polite">
+        <span class="loading-pulse" aria-hidden="true"></span>
+        Loading executable page definitions…
+      </output>
+    } @else {
+      @if (selectedMessageType(); as messageType) {
+        <button class="back-button" type="button" (click)="backToMessages()">
+          <span aria-hidden="true">←</span> Change transaction
+        </button>
+        <div class="step-heading">
+          <span class="eyebrow">STEP 02 · {{ messageType }}</span>
+          <h2>Choose a scenario</h2>
+          <p>
+            The scenarios below are provided by the SSI API for this
+            transaction.
+          </p>
+        </div>
+        <div class="definition-list definition-list--scenarios">
+          @for (item of messageDefinitions(); track item.definitionId) {
+            <button type="button" (click)="open(item)">
+              <strong>{{ item.title }}</strong>
+              <span class="definition-arrow" aria-hidden="true">→</span>
+              <span class="sr-only">Open scenario</span>
+            </button>
+          } @empty {
+            <p class="empty-state">
+              No scenarios are available for this transaction.
+            </p>
+          }
+        </div>
+      } @else {
+        <div class="step-heading">
+          <span class="eyebrow">STEP 01</span>
+          <h2>Choose a transaction</h2>
+          <p>Start with the SWIFT message you are working on.</p>
+        </div>
+        <label class="index-search">
+          Search transactions
+          <input
+            type="search"
+            [value]="search()"
+            placeholder="Search message or description"
+            (input)="search.set($any($event.target).value)"
+          />
+        </label>
+        <div class="definition-list definition-list--messages">
+          @for (group of messageGroups(); track group.messageType) {
+            <button type="button" (click)="chooseMessage(group.messageType)">
+              <strong>{{ group.messageType }}</strong>
+              <span>{{ group.definitions.length }} available scenarios</span>
+              <span class="definition-arrow" aria-hidden="true">→</span>
+            </button>
+          } @empty {
+            <p class="empty-state">No transactions match your search.</p>
+          }
+        </div>
+      }
+    }
+  }
+</section>

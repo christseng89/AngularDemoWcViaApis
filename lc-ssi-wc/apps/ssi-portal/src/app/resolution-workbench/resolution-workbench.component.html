@@ -1,0 +1,59 @@
+<section class="workbench-shell">
+  @if (failure(); as currentFailure) {
+    <ssi-resolution-failure [failure]="currentFailure" (retry)="retry()" />
+  }
+
+  @if (loading() && !model()) {
+    <output class="loading-state" aria-live="polite">
+      <span class="loading-pulse" aria-hidden="true"></span>
+      Loading server-provided page parameters…
+    </output>
+  } @else if (model(); as page) {
+    <header class="workbench-header">
+      <div>
+        <span class="eyebrow">STEP 03 · REVIEW AND RESOLVE</span>
+        <h1>{{ page.title }}</h1>
+        @if (page.description) {
+          <p>{{ page.description }}</p>
+        }
+        <dl class="definition-summary">
+          @for (item of page.context; track item.id) {
+            <div>
+              <dt>{{ item.label }}</dt>
+              <dd>{{ item.value }}</dd>
+            </div>
+          }
+        </dl>
+      </div>
+      <details class="audit-details workbench-audit">
+        <summary>Technical audit details</summary>
+        <dl class="context-list">
+          @for (item of page.sourceAudit; track item.id) {
+            <div>
+              <dt>{{ item.label }}</dt>
+              <dd>{{ item.value }}</dd>
+            </div>
+          }
+        </dl>
+      </details>
+    </header>
+
+    <ssi-generic-parameter-form
+      [model]="page"
+      [submitting]="submitting()"
+      [pageSize]="pageSize()"
+      (submitted)="submit($event)"
+      (cancelled)="cancel()"
+    />
+
+    @if (result(); as currentResult) {
+      <ssi-resolution-result-dialog
+        [result]="currentResult"
+        [page]="page"
+        (closed)="closeResult()"
+      />
+    }
+  } @else if (!failure()) {
+    <p class="empty-state">Choose a transaction and scenario to begin.</p>
+  }
+</section>

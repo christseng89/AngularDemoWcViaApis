@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "fixtureClass": "QA_NEGATIVE_MISSING_BIC",
+  "items": [
+    {
+      "counterpartyId": "QA-NEG-BANK-MISSING-BIC-01",
+      "name": "QA Negative Bank — Missing Directory Identity 01",
+      "country": "US",
+      "partyType": "BANK",
+      "bankServiceId": null
+    },
+    {
+      "counterpartyId": "QA-NEG-BANK-MISSING-BIC-02",
+      "name": "QA Negative Bank — Missing Directory Identity 02",
+      "country": "GB",
+      "partyType": "BANK",
+      "bankServiceId": null
+    }
+  ]
+}

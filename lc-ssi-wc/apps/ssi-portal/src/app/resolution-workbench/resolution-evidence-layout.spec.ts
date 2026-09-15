@@ -1,0 +1,49 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+describe("resolution evidence layout", () => {
+  const directory = join(
+    process.cwd(),
+    "apps/ssi-portal/src/app/resolution-workbench",
+  );
+  const component = readFileSync(
+    join(directory, "resolution-evidence.component.ts"),
+    "utf8",
+  );
+  const stylesheet = readFileSync(
+    join(directory, "resolution-workbench.css"),
+    "utf8",
+  );
+
+  it("places the compact outcome summary above the full-width result table", () => {
+    expect(component).toContain('class="outcome-summary"');
+    expect(component.indexOf('class="outcome-summary"')).toBeLessThan(
+      component.indexOf("<ssi-resolution-result-table"),
+    );
+    expect(stylesheet).toMatch(
+      /\.outcome,\s*\.failure\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\);/,
+    );
+    expect(component.indexOf("Payload generated")).toBeGreaterThan(
+      component.indexOf("<details"),
+    );
+  });
+
+  it("contains wide result content without forcing a page-level scrollbar", () => {
+    expect(stylesheet).toMatch(
+      /\.resolution-results\s*\{[\s\S]*?max-width:\s*100%;[\s\S]*?overflow:\s*hidden;/,
+    );
+    expect(stylesheet).toMatch(
+      /\.resolution-results__scroll\s*\{[\s\S]*?overflow-x:\s*auto;/,
+    );
+    expect(stylesheet).not.toContain("min-width: 86rem;");
+  });
+
+  it("keeps technical booleans out of the primary outcome summary", () => {
+    const summaryEnd = component.indexOf("<ssi-resolution-result-table");
+    const primarySummary = component.slice(0, summaryEnd);
+
+    expect(primarySummary).not.toContain("Payload generated");
+    expect(primarySummary).not.toContain("Resolution created");
+    expect(primarySummary).not.toContain("Repair queue created");
+  });
+});

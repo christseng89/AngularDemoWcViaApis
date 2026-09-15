@@ -1,0 +1,48 @@
+import type { MessageDirection, PseudoMessage } from '@ssi/contracts';
+
+export class PseudoMessageParseError extends Error {
+  constructor(readonly code: string, message: string) { super(message); this.name = 'PseudoMessageParseError'; }
+}
+
+export class PseudoMessageParser {
+  parse(content: string, format: 'FIN_LIKE' | 'MX_JSON'): PseudoMessage {
+    return format === 'FIN_LIKE' ? this.parseFinLike(content) : this.parseJson(content);
+  }
+
+  private parseFinLike(content: string): PseudoMessage {
+    const headers: Record<string, string> = {};
+    const fields: Record<string, string> = {};
+    for (const raw of content.split(/\r?\n/).map((line) => line.trim()).filter(Boolean)) {
+      const field = raw.match(/^:([^:]+):(.+)$/);
+      if (field?.[1] && field[2]) { fields[field[1]] = field[2]; continue; }
+      const header = raw.match(/^([A-Z_]+)=(.+)$/);
+      if (header?.[1] && header[2]) { headers[header[1]] = header[2]; continue; }
+      throw new PseudoMessageParseError('INVALID_PSEUDO_LINE', `Unsupported pseudo message line: ${raw}`);
+    }
+    return this.toMessage(headers, fields);
+  }
+
+  private parseJson(content: string): PseudoMessage {
+    let value: unknown;
+    try { value = JSON.parse(content); } catch { throw new PseudoMessageParseError('INVALID_JSON', 'Invalid pseudo MX JSON'); }
+    if (typeof value !== 'object' || value === null) throw new PseudoMessageParseError('INVALID_JSON_SHAPE', 'Object expected');
+    const input = value as Record<string, unknown>;
+    return this.toMessage({
+      STANDARDS_RELEASE: String(input['standardsRelease'] ?? ''), MESSAGE_TYPE: String(input['messageType'] ?? ''),
+      DIRECTION: String(input['direction'] ?? ''), BUSINESS_FUNCTION: String(input['businessFunction'] ?? ''),
+    }, typeof input['fields'] === 'object' && input['fields'] !== null ? input['fields'] as Record<string, string> : {});
+  }
+
+  private toMessage(headers: Record<string, string>, fields: Record<string, string>): PseudoMessage {
+    const required = ['STANDARDS_RELEASE', 'MESSAGE_TYPE', 'DIRECTION', 'BUSINESS_FUNCTION'] as const;
+    for (const key of required) if (!headers[key]) throw new PseudoMessageParseError('MISSING_HEADER', `${key} is required`);
+    if (headers['DIRECTION'] !== 'INCOMING' && headers['DIRECTION'] !== 'OUTGOING') {
+      throw new PseudoMessageParseError('INVALID_DIRECTION', 'Direction must be INCOMING or OUTGOING');
+    }
+    return Object.freeze({
+      standardsRelease: headers['STANDARDS_RELEASE']!, messageType: headers['MESSAGE_TYPE']!,
+      direction: headers['DIRECTION'] as MessageDirection, businessFunction: headers['BUSINESS_FUNCTION']!,
+      fields: Object.freeze({ ...fields }),
+    });
+  }
+}

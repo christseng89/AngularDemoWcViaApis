@@ -1,0 +1,7 @@
+{
+  "standardsRelease": "SR2026",
+  "messageType": "pacs.009.001.12.COV",
+  "direction": "OUTGOING",
+  "businessFunction": "COVER_TRANSFER",
+  "fields": { "IntrmyAgt1.FinInstnId.BICFI": "AAAAGB2L" }
+}

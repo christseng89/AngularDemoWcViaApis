@@ -1,0 +1,23 @@
+{
+  "version": "1.0.0",
+  "rules": [
+    {
+      "id": "transaction-only-account-crosscheck",
+      "when": [
+        { "path": "scope", "operator": "EQ", "value": "TRANSACTION_ONLY" },
+        { "path": "route.accountId", "operator": "PRESENT" }
+      ],
+      "severity": "ERROR",
+      "code": "SSI_CROSSCHECK_REQUIRED",
+      "message": "Transaction-only account must be cross-checked and independently approved.",
+      "targetPath": "route.accountId"
+    },
+    {
+      "id": "intermediary-information",
+      "when": [{ "path": "route.intermediaryBic", "operator": "PRESENT" }],
+      "severity": "INFO",
+      "code": "INTERMEDIARY_ROUTE_USED",
+      "message": "Settlement will use an intermediary institution."
+    }
+  ]
+}

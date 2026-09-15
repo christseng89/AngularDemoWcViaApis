@@ -1,0 +1,202 @@
+{
+  "metadata": {
+    "generatedAt": "2026-09-10T15:03:52.240066+00:00",
+    "sourceLiveDatabase": "D:\\Baseline_V6_20251231\\lc-ssi-wc\\data\\ssi-demo.sqlite",
+    "sourceDatabase": "C:\\Users\\samfi\\OneDrive\\Documents\\ChatGPT\\Baseline-SSI\\MT2_QA_Package_v6\\ssi-demo.consistent-snapshot.sqlite",
+    "sourceDatabaseSha256": "7492CC264BCDBC7EE43DC7028CDCDC12385898BFD4BDCCA02798D2B5A3AB4EF3",
+    "snapshotMethod": "sqlite3.Connection.backup from read-only WAL-aware connection",
+    "disclaimer": "Synthetic prototype data only; never use as payment instructions."
+  },
+  "records": [
+    {
+      "seedId": "QA-NOSTRO-HK01-USD-001",
+      "recordType": "OWN_NOSTRO",
+      "messageTypes": "MT200,MT202,MT202COV",
+      "businessScenario": "本行 HK01 單一 USD Nostro／Sender reimbursement source",
+      "data": {
+        "ownLegalEntityId": "HK01",
+        "accountServicerBic": "CITIUS33",
+        "currency": "USD",
+        "maskedAccountRef": "/QA-HK01-USD-001",
+        "purpose": "SETTLEMENT",
+        "priority": 10,
+        "status": "ACTIVE"
+      }
+    },
+    {
+      "seedId": "QA-NOSTRO-HK01-USD-002",
+      "recordType": "OWN_NOSTRO",
+      "messageTypes": "MT200",
+      "businessScenario": "本行 HK01 第二個 USD Nostro／multiple-account 53B scenario",
+      "data": {
+        "ownLegalEntityId": "HK01",
+        "accountServicerBic": "CITIUS33",
+        "currency": "USD",
+        "maskedAccountRef": "/QA-HK01-USD-002",
+        "purpose": "SETTLEMENT",
+        "priority": 20,
+        "status": "ACTIVE"
+      }
+    },
+    {
+      "seedId": "QA-REL-CITI-USD-ONE",
+      "recordType": "ACCOUNT_RELATIONSHIP",
+      "messageTypes": "MT200,MT202",
+      "businessScenario": "single direct Sender↔Receiver USD account",
+      "data": {
+        "ownEntity": "HK01",
+        "receiverBic": "CITIUS33",
+        "currency": "USD",
+        "direct": true,
+        "eligibleAccountCount": 1,
+        "validFrom": "2026-01-01",
+        "validTo": "2026-12-31"
+      }
+    },
+    {
+      "seedId": "QA-REL-CITI-USD-MULTI",
+      "recordType": "ACCOUNT_RELATIONSHIP",
+      "messageTypes": "MT200",
+      "businessScenario": "multiple direct accounts; MT 53B required",
+      "data": {
+        "ownEntity": "HK01",
+        "receiverBic": "CITIUS33",
+        "currency": "USD",
+        "direct": true,
+        "eligibleAccountCount": 2,
+        "accountRefs": [
+          "/QA-USD-001",
+          "/QA-USD-002"
+        ]
+      }
+    },
+    {
+      "seedId": "QA-SSI-BARC-USD-INT",
+      "recordType": "COUNTERPARTY_SSI_ROUTE",
+      "messageTypes": "MT202,MT202COV,MT205,MT205COV",
+      "businessScenario": "intermediary precedes account-with institution",
+      "data": {
+        "counterpartyId": "CP-BARCGB22",
+        "currency": "USD",
+        "intermediaryBic": "HSBCHKHH",
+        "accountWithBic": "CITIUS33",
+        "beneficiaryBic": null,
+        "beneficiaryBicPolicy": "not a route output; 58a/Cdtr comes from request or upstream context",
+        "routePreference": "QA_PRIMARY",
+        "priority": 5
+      }
+    },
+    {
+      "seedId": "QA-SSI-DEUT-EUR-54",
+      "recordType": "RECEIVER_CORRESPONDENT_ROUTE",
+      "messageTypes": "MT202,MT202COV",
+      "businessScenario": "non-Receiver-branch FI in 54a with explicit provenance",
+      "data": {
+        "counterpartyId": "CP-DEUTDEFF",
+        "currency": "EUR",
+        "receiverCorrespondentBic": "BNPAFRPP",
+        "relationshipType": "OTHER_FI",
+        "receiverBranchOf": null,
+        "sourceOwner": "COUNTERPARTY_SSI"
+      }
+    },
+    {
+      "seedId": "QA-RMA-P009-CORE",
+      "recordType": "RMA_AUTHORISATION",
+      "messageTypes": "MT202,MT205",
+      "businessScenario": "SR2026 exact Core RMA",
+      "data": {
+        "direction": "OUTBOUND",
+        "messageDefinitionId": "pacs.009.001.08",
+        "businessService": "swift.cbprplus.04",
+        "status": "ACTIVE"
+      }
+    },
+    {
+      "seedId": "QA-RMA-P009-COV",
+      "recordType": "RMA_AUTHORISATION",
+      "messageTypes": "MT202COV,MT205COV",
+      "businessScenario": "SR2026 exact COV RMA",
+      "data": {
+        "direction": "OUTBOUND",
+        "messageDefinitionId": "pacs.009.001.08",
+        "businessService": "swift.cbprplus.cov.04",
+        "status": "ACTIVE"
+      }
+    },
+    {
+      "seedId": "QA-COV-UPSTREAM-001",
+      "recordType": "IMMUTABLE_UPSTREAM_FIXTURE",
+      "messageTypes": "MT202COV,MT205COV",
+      "businessScenario": "complete cover Sequence B copied unchanged",
+      "data": {
+        "field119": "COV",
+        "field121": "00000000-0000-4000-8000-000000000001",
+        "sequenceBComplete": true,
+        "contentSha256": "TO_BE_COMPUTED_AT_INGESTION"
+      }
+    },
+    {
+      "seedId": "QA-MANDATE-204-001",
+      "recordType": "FI_DIRECT_DEBIT_MANDATE",
+      "messageTypes": "MT204",
+      "businessScenario": "active bilateral mandate and MUG",
+      "data": {
+        "mandateId": "QA-MANDATE-204-001",
+        "senderBic": "DEMOHKHH",
+        "debitInstitutionBic": "CITIUS33",
+        "mugActive": true,
+        "status": "ACTIVE"
+      }
+    },
+    {
+      "seedId": "QA-RMA-P010",
+      "recordType": "RMA_AUTHORISATION",
+      "messageTypes": "MT204",
+      "businessScenario": "SR2026 exact pacs.010 RMA",
+      "data": {
+        "direction": "OUTBOUND",
+        "messageDefinitionId": "pacs.010.001.03",
+        "businessService": "swift.cbprplus.04",
+        "status": "ACTIVE"
+      }
+    },
+    {
+      "seedId": "QA-NOTIFY-210-FI",
+      "recordType": "NOTIFICATION_CONTEXT",
+      "messageTypes": "MT210",
+      "businessScenario": "FI ordering party; exactly 52a",
+      "data": {
+        "orderingPartyType": "FI",
+        "orderingInstitutionBic": "CHASUS33",
+        "customer": null,
+        "eligibleAccountCount": 1
+      }
+    },
+    {
+      "seedId": "QA-NOTIFY-210-CUST",
+      "recordType": "NOTIFICATION_CONTEXT",
+      "messageTypes": "MT210",
+      "businessScenario": "customer ordering party; exactly 50a",
+      "data": {
+        "orderingPartyType": "CUSTOMER",
+        "orderingCustomer": "QA CUSTOMER",
+        "orderingInstitutionBic": null,
+        "eligibleAccountCount": 2,
+        "selectedAccount": "QA-NOSTRO-USD-001"
+      }
+    },
+    {
+      "seedId": "QA-RMA-C057",
+      "recordType": "RMA_AUTHORISATION",
+      "messageTypes": "MT210",
+      "businessScenario": "SR2026 exact camt.057 RMA",
+      "data": {
+        "direction": "OUTBOUND",
+        "messageDefinitionId": "camt.057.001.06",
+        "businessService": "swift.cbprplus.04",
+        "status": "ACTIVE"
+      }
+    }
+  ]
+}

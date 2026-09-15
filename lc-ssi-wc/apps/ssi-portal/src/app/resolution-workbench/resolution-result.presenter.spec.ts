@@ -1,0 +1,94 @@
+import type { ResolutionPageFieldResult } from "@ssi/contracts";
+import {
+  emptyResolutionMessage,
+  resolutionResultRows,
+} from "./resolution-result.presenter";
+
+const resolved: ResolutionPageFieldResult = {
+  fieldId: "future-field",
+  sequenceId: "Q9",
+  settlementLeg: "Future leg",
+  swiftTag: "79",
+  swiftOption: "Z",
+  fieldName: "Future institution",
+  role: "FUTURE_ROLE",
+  outcome: "RESOLVED",
+  resolutionStatus: "RESOLVED",
+  value: "/ACCOUNT\nFUTRHKHH",
+  institution: {
+    bankServiceId: "bank-service-17",
+    bic: "FUTRHKHH",
+    name: "Future Bank",
+  },
+  partyIdentifier: "/PARTY",
+  accountReference: "ACCOUNT",
+  provenance: {
+    source: "FUTURE_SOURCE",
+    sourceRecordId: "record-17",
+    ownerSide: "SENDER",
+    version: "3",
+    fieldProfileArtifactId: "profile-79z",
+    fieldProfileEvidencePages: [17, 18],
+  },
+  evidenceIds: ["evidence-17"],
+};
+
+describe("resolution result presenter", () => {
+  it("maps every API result field without looking it up in input controls", () => {
+    expect(resolutionResultRows([resolved])).toEqual([
+      expect.objectContaining({
+        sequenceId: "Q9",
+        swiftTag: "79",
+        swiftOption: "Z",
+        tagAndOption: "79Z",
+        role: "FUTURE_ROLE",
+        renderedValue: "/ACCOUNT\nFUTRHKHH",
+        bic: "FUTRHKHH",
+        institutionName: "Future Bank",
+        accountReference: "ACCOUNT",
+        partyIdentifier: "/PARTY",
+        statusLabel: "RESOLVED",
+        provenance:
+          "FUTURE_SOURCE · record-17 · SENDER · 3 · profile-79z · pages 17, 18",
+      }),
+    ]);
+  });
+
+  it("does not fabricate institution or account data for not-required rows", () => {
+    const [row] = resolutionResultRows([
+      {
+        ...resolved,
+        outcome: "NOT_REQUIRED",
+        resolutionStatus: "NOT_REQUIRED",
+        value: undefined,
+        institution: undefined,
+        partyIdentifier: undefined,
+        accountReference: undefined,
+      },
+    ]);
+
+    expect(row).toMatchObject({
+      renderedValue: "",
+      bic: "",
+      institutionName: "",
+      accountReference: "",
+      partyIdentifier: "",
+      statusLabel: "NOT REQUIRED",
+    });
+  });
+
+  it("shows the tag alone when the API does not supply an option", () => {
+    const [row] = resolutionResultRows([{ ...resolved, swiftOption: "" }]);
+
+    expect(row?.tagAndOption).toBe("79");
+  });
+
+  it("distinguishes an empty not-required result from an absent result", () => {
+    expect(emptyResolutionMessage("NOT_REQUIRED")).toBe(
+      "Field-level SSI is not required for this scenario.",
+    );
+    expect(emptyResolutionMessage("RESOLVED")).toBe(
+      "No field-level SSI resolution results were returned.",
+    );
+  });
+});

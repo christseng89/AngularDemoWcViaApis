@@ -1,0 +1,106 @@
+import { BadRequestException, Injectable } from "@nestjs/common";
+import { createHash } from "node:crypto";
+import {
+  SsiApplicationService,
+  type CreateSsiCommand,
+} from "../ssi-application.service";
+import {
+  RmaApplicationService,
+  type RmaCommand,
+} from "../rma/rma-application.service";
+import {
+  NostroApplicationService,
+  type NostroCommand,
+} from "../nostro/nostro-application.service";
+export interface ImportRequest {
+  dataType: "SSI" | "RMA" | "NOSTRO";
+  fileName: string;
+  checksum?: string;
+  dryRun?: boolean;
+  idempotencyKey: string;
+  records: unknown[];
+}
+const validEnvelope = (request: ImportRequest): boolean =>
+  Boolean(request.fileName?.endsWith(".json")) &&
+  Boolean(request.idempotencyKey) &&
+  Array.isArray(request.records) &&
+  request.records.length >= 1 &&
+  request.records.length <= 500 &&
+  ["SSI", "RMA", "NOSTRO"].includes(request.dataType);
+
+const checksumFor = (records: unknown[]): string =>
+  createHash("sha256").update(JSON.stringify(records)).digest("hex");
+
+@Injectable()
+export class SwiftDataImportService {
+  private readonly completed = new Map<string, unknown>();
+  constructor(
+    private readonly ssi: SsiApplicationService,
+    private readonly rma: RmaApplicationService,
+    private readonly nostro: NostroApplicationService,
+  ) {}
+  import(request: ImportRequest): unknown {
+    if (!validEnvelope(request)) throw new BadRequestException("INVALID_IMPORT_ENVELOPE");
+    const actual = checksumFor(request.records);
+    if (request.checksum && request.checksum.toLowerCase() !== actual)
+      throw new BadRequestException("CHECKSUM_MISMATCH");
+    if (this.completed.has(request.idempotencyKey))
+      return this.completed.get(request.idempotencyKey);
+    const results = request.records.map((record, index) =>
+      this.importRecord(request, record, index),
+    );
+    const response = this.importResponse(request, actual, results);
+    if (!request.dryRun) this.completed.set(request.idempotencyKey, response);
+    return response;
+  }
+
+  private importRecord(
+    request: ImportRequest,
+    record: unknown,
+    index: number,
+  ): Record<string, unknown> {
+    try {
+      if (request.dryRun) {
+        this.validateRecord(request.dataType, record);
+        return { row: index + 1, status: "VALIDATED" };
+      }
+      const created = this.createRecord(request.dataType, record);
+      return { row: index + 1, status: "DRAFT_CREATED", id: created.id };
+    } catch (error) {
+      return {
+        row: index + 1,
+        status: "REJECTED",
+        code: error instanceof Error ? error.message : "UNKNOWN_ERROR",
+      };
+    }
+  }
+
+  private validateRecord(dataType: ImportRequest["dataType"], record: unknown): void {
+    if (dataType === "SSI") this.ssi.validate(record as CreateSsiCommand);
+    else if (dataType === "RMA") this.rma.validateCommand(record as RmaCommand);
+    else this.nostro.validateCommand(record as NostroCommand);
+  }
+
+  private createRecord(dataType: ImportRequest["dataType"], record: unknown) {
+    if (dataType === "SSI") return this.ssi.create(record as CreateSsiCommand);
+    if (dataType === "RMA") return this.rma.create(record as RmaCommand);
+    return this.nostro.create(record as NostroCommand);
+  }
+
+  private importResponse(
+    request: ImportRequest,
+    checksum: string,
+    results: readonly Record<string, unknown>[],
+  ): Record<string, unknown> {
+    return {
+      dataType: request.dataType,
+      fileName: request.fileName,
+      dryRun: Boolean(request.dryRun),
+      checksum,
+      total: results.length,
+      accepted: results.filter((r) => r.status !== "REJECTED").length,
+      rejected: results.filter((r) => r.status === "REJECTED").length,
+      results,
+    };
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "fixtureVersion": "15.1",
+  "standardsRelease": "SR2026",
+  "messageType": "MT202",
+  "field": "57a",
+  "evidence": {
+    "artifactId": "SWIFT-US2M-FULL-SR2026-64483D7F",
+    "sha256": "64483D7F7C094DB28E03791AB6BBC7A0522DAEC90487A7DD834228E848FA8323",
+    "pages": [50, 51, 52]
+  },
+  "cases": [
+    {
+      "id": "MT202-57A-BIC",
+      "partyIdentifiableByBic": true,
+      "requiresNameAndAddress": false,
+      "bilateralOptionD": false,
+      "expectedOption": "A",
+      "reasonRequired": false
+    },
+    {
+      "id": "MT202-57D-NAME-ADDRESS",
+      "partyIdentifiableByBic": false,
+      "requiresNameAndAddress": true,
+      "bilateralOptionD": false,
+      "expectedOption": "D",
+      "reasonRequired": true,
+      "reason": "PARTY_NOT_BIC_IDENTIFIABLE"
+    },
+    {
+      "id": "MT202-57D-BILATERAL",
+      "partyIdentifiableByBic": true,
+      "requiresNameAndAddress": false,
+      "bilateralOptionD": true,
+      "expectedOption": "D",
+      "reasonRequired": true,
+      "reason": "BILATERAL_AGREEMENT"
+    }
+  ]
+}

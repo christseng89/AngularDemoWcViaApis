@@ -1,0 +1,1060 @@
+{
+  "schemaVersion": "1.0",
+  "reportType": "V15.3_BROWSER_DATA_QUALITY_409",
+  "generatedAt": "2026-09-14T05:00:32.059Z",
+  "channel": "Playwright Chromium browser UI with captured network evidence",
+  "runtimeEnvironment": "development",
+  "statusPolicyVersion": "SSI-CONFIG-HTTP-01",
+  "portalUrl": "http://localhost:4400/",
+  "request": {
+    "consumer": "CENTRAL_PAYMENT",
+    "correlationId": "d93b6114-06b3-4c68-a1d3-9948b0b75811",
+    "currency": "GBP",
+    "product": "CENTRAL_PAYMENT",
+    "businessFunction": "INTERBANK_TRANSFER",
+    "paymentLeg": "INTERBANK_SETTLEMENT",
+    "direction": "OUTBOUND",
+    "bookingEntity": "HK01",
+    "valueDate": "2026-09-12",
+    "amount": "1000000",
+    "messagingService": "FINPLUS",
+    "messageType": "pacs.009.001.08",
+    "transactionReference": "BROWSER-DATA-QUALITY-409",
+    "sourceMessageType": "MT202",
+    "counterpartyBankServiceId": "BANK-SVC-BARCGB22",
+    "paymentBeneficiaryInstitutionInput": "BARCGB22"
+  },
+  "responseStatus": 200,
+  "responseBody": {
+    "mx": {
+      "httpStatus": 200,
+      "decision": "RESOLVED",
+      "messageDefinitionId": "pacs.009.001.08",
+      "businessService": "swift.cbprplus.04",
+      "redirectDomain": null,
+      "canonicalScenario": "FI_TO_FI_TRANSFER",
+      "validationScope": "canonical route + MRG; full serialized XML requires controlled Translation Portal golden fixture",
+      "canonicalRoles": {
+        "creditor": "BARCGB22",
+        "creditorSource": "REQUEST_PASS_THROUGH",
+        "receivingRoute": "resolved independently",
+        "selectedSsi": "SSI-UAT-GEN-02",
+        "instructedAgent": "BARCGB22",
+        "creditorAgent": "BARCGB22"
+      },
+      "code": "SSI_RESOLVED",
+      "chosenRoute": {
+        "ssiId": "1a9bbd1f-b884-5fbf-87d4-1e8c79a13800",
+        "ssiCode": "SSI-UAT-GEN-02",
+        "ssiVersion": 1,
+        "settlementRouteId": "ROUTE-GBP-BARCGB22",
+        "currency": "GBP",
+        "accountId": "DEMO-NOSTRO-002-PRIMARY",
+        "nostroId": "8df71888-7903-4f17-82a3-da90e6309ce5",
+        "nostroVersion": 4,
+        "matchedApplicabilityId": "1a9bbd1f-b884-5fbf-87d4-1e8c79a13800:APPL:1",
+        "routePurpose": "INTERBANK_TRANSFER",
+        "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+        "specificity": "NAMED_COUNTERPARTY"
+      },
+      "alternatives": [],
+      "roleProvenance": {
+        "instructedAgent": {
+          "value": "BARCGB22",
+          "source": "COUNTERPARTY_SSI",
+          "ssiCode": "SSI-UAT-GEN-02",
+          "ssiVersion": 1,
+          "sourceField": "actualReceiverBic"
+        },
+        "creditorAgent": {
+          "value": "BARCGB22",
+          "source": "COUNTERPARTY_SSI",
+          "ssiCode": "SSI-UAT-GEN-02",
+          "ssiVersion": 1,
+          "sourceField": "accountWithBic"
+        }
+      },
+      "messageComposerContext": {
+        "SttlmMtd": {
+          "value": "INDA",
+          "source": "SETTLEMENT_POLICY"
+        },
+        "Dbtr": {
+          "value": "DEMOHKHH",
+          "source": "OWN_ENTITY"
+        },
+        "SttlmAcct": {
+          "value": "DEMO-NOSTRO-002-PRIMARY",
+          "source": "OWN_SSI_NOSTRO",
+          "nostroId": "8df71888-7903-4f17-82a3-da90e6309ce5",
+          "nostroVersion": 4
+        },
+        "Cdtr": {
+          "value": "BARCGB22",
+          "source": "REQUEST_PASS_THROUGH"
+        }
+      }
+    },
+    "mt": {
+      "renderer": "MT compatibility view from the same confirmed canonical snapshot",
+      "tags": {
+        "58A": "BARCGB22",
+        "53B": "/DEMO-NOSTRO-002-PRIMARY"
+      },
+      "omitted": [
+        "57a"
+      ],
+      "assertions": [
+        "58a unchanged from resolution key",
+        "must not read SSI.beneficiaryBic"
+      ]
+    },
+    "chosenRoute": {
+      "ssiId": "1a9bbd1f-b884-5fbf-87d4-1e8c79a13800",
+      "ssiCode": "SSI-UAT-GEN-02",
+      "ssiVersion": 1,
+      "settlementRouteId": "ROUTE-GBP-BARCGB22",
+      "currency": "GBP",
+      "accountId": "DEMO-NOSTRO-002-PRIMARY",
+      "nostroId": "8df71888-7903-4f17-82a3-da90e6309ce5",
+      "nostroVersion": 4,
+      "matchedApplicabilityId": "1a9bbd1f-b884-5fbf-87d4-1e8c79a13800:APPL:1",
+      "routePurpose": "INTERBANK_TRANSFER",
+      "selectedBy": "EXACT_BUSINESS_PURPOSE_MATCH",
+      "specificity": "NAMED_COUNTERPARTY"
+    },
+    "resolutionDecision": "RESOLVED",
+    "code": "SSI_RESOLVED",
+    "alternatives": [],
+    "excludedCandidates": [
+      {
+        "ssiId": "6a7b0357-3036-5f6d-a1db-55711c60a908",
+        "ssiCode": "SSI-QA-TIE-1",
+        "reason": "COUNTERPARTY_SCOPE_MISMATCH",
+        "evidence": [
+          {
+            "criterion": "STATUS",
+            "outcome": "PASS",
+            "expected": "ACTIVE",
+            "actual": "ACTIVE",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "CURRENCY",
+            "outcome": "PASS",
+            "expected": "GBP",
+            "actual": "GBP",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "APPLICABILITY",
+            "outcome": "PASS",
+            "expected": "active/effective SSI_APPLICABILITY",
+            "actual": "6a7b0357-3036-5f6d-a1db-55711c60a908:APPL:1",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "CONSUMER",
+            "outcome": "PASS",
+            "expected": "CENTRAL_PAYMENT",
+            "actual": "CENTRAL_PAYMENT",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "PRODUCT",
+            "outcome": "PASS",
+            "expected": "CENTRAL_PAYMENT",
+            "actual": "CENTRAL_PAYMENT",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "BUSINESS_FUNCTION",
+            "outcome": "PASS",
+            "expected": "INTERBANK_TRANSFER",
+            "actual": "INTERBANK_TRANSFER",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "PAYMENT_LEG",
+            "outcome": "PASS",
+            "expected": "INTERBANK_SETTLEMENT",
+            "actual": "INTERBANK_SETTLEMENT",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "COUNTERPARTY_SCOPE",
+            "outcome": "FAIL",
+            "expected": "BARCGB22 or approved GB/ANY matcher",
+            "actual": "QATIGB2L",
+            "reasonCode": "COUNTERPARTY_SCOPE_MISMATCH"
+          },
+          {
+            "criterion": "COUNTERPARTY_TYPE",
+            "outcome": "PASS",
+            "expected": "BANK",
+            "actual": "BANK",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "GLOBAL_FALLBACK_APPROVAL",
+            "outcome": "PASS",
+            "expected": "approvedGlobal=true",
+            "actual": "false",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "SETTLEMENT_COUNTRY",
+            "outcome": "PASS",
+            "expected": "DERIVE_FROM_ROUTE",
+            "actual": "GB",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "SETTLEMENT_MARKET",
+            "outcome": "PASS",
+            "expected": "DERIVE_FROM_ROUTE",
+            "actual": "GB_STERLING",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "CLEARING_SYSTEM",
+            "outcome": "PASS",
+            "expected": "DERIVE_FROM_ROUTE",
+            "actual": "CHAPS",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "CLEARING_STANDING_DATA",
+            "outcome": "PASS",
+            "expected": "GBP active governed clearing system",
+            "actual": "CHAPS",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "CLEARING_SCHEME_TYPE",
+            "outcome": "PASS",
+            "expected": "RTGS",
+            "actual": "RTGS",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "NOSTRO_CURRENCY",
+            "outcome": "PASS",
+            "expected": "GBP",
+            "actual": "GBP",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "BOOKING_ENTITY",
+            "outcome": "PASS",
+            "expected": "HK01",
+            "actual": "HK01",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "DIRECTION",
+            "outcome": "PASS",
+            "expected": "OUTBOUND",
+            "actual": "OUTBOUND",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "MESSAGING_SERVICE",
+            "outcome": "PASS",
+            "expected": "FINPLUS",
+            "actual": "FINPLUS",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "MESSAGE_TYPE",
+            "outcome": "PASS",
+            "expected": "pacs.009.001.08",
+            "actual": "pacs.009.001.12,pacs.009.001.08",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "COV_PROFILE",
+            "outcome": "PASS",
+            "expected": "NOT_APPLICABLE",
+            "actual": "NOT_APPLICABLE",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "VALUE_DATE",
+            "outcome": "PASS",
+            "expected": "2026-09-12",
+            "actual": "2026-01-01..2027-12-31",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "AMOUNT_LIMIT",
+            "outcome": "PASS",
+            "expected": "1000000",
+            "actual": "OPEN..OPEN",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "LIVE_CLEARING_PARTICIPATION",
+            "outcome": "NOT_EVALUATED",
+            "expected": "CHAPS",
+            "actual": "STANDING_DATA_VALIDATED_LIVE_DIRECTORY_REQUIRED",
+            "reasonCode": "LIVE_REACHABILITY_NOT_EVALUATED"
+          }
+        ]
+      },
+      {
+        "ssiId": "c3490516-6311-547c-855b-2c5847e74e36",
+        "ssiCode": "SSI-QA-TIE-2",
+        "reason": "COUNTERPARTY_SCOPE_MISMATCH",
+        "evidence": [
+          {
+            "criterion": "STATUS",
+            "outcome": "PASS",
+            "expected": "ACTIVE",
+            "actual": "ACTIVE",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "CURRENCY",
+            "outcome": "PASS",
+            "expected": "GBP",
+            "actual": "GBP",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "APPLICABILITY",
+            "outcome": "PASS",
+            "expected": "active/effective SSI_APPLICABILITY",
+            "actual": "c3490516-6311-547c-855b-2c5847e74e36:APPL:1",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "CONSUMER",
+            "outcome": "PASS",
+            "expected": "CENTRAL_PAYMENT",
+            "actual": "CENTRAL_PAYMENT",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "PRODUCT",
+            "outcome": "PASS",
+            "expected": "CENTRAL_PAYMENT",
+            "actual": "CENTRAL_PAYMENT",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "BUSINESS_FUNCTION",
+            "outcome": "PASS",
+            "expected": "INTERBANK_TRANSFER",
+            "actual": "INTERBANK_TRANSFER",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "PAYMENT_LEG",
+            "outcome": "PASS",
+            "expected": "INTERBANK_SETTLEMENT",
+            "actual": "INTERBANK_SETTLEMENT",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "COUNTERPARTY_SCOPE",
+            "outcome": "FAIL",
+            "expected": "BARCGB22 or approved GB/ANY matcher",
+            "actual": "QATIGB2L",
+            "reasonCode": "COUNTERPARTY_SCOPE_MISMATCH"
+          },
+          {
+            "criterion": "COUNTERPARTY_TYPE",
+            "outcome": "PASS",
+            "expected": "BANK",
+            "actual": "BANK",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "GLOBAL_FALLBACK_APPROVAL",
+            "outcome": "PASS",
+            "expected": "approvedGlobal=true",
+            "actual": "false",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "SETTLEMENT_COUNTRY",
+            "outcome": "PASS",
+            "expected": "DERIVE_FROM_ROUTE",
+            "actual": "GB",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "SETTLEMENT_MARKET",
+            "outcome": "PASS",
+            "expected": "DERIVE_FROM_ROUTE",
+            "actual": "GB_STERLING",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "CLEARING_SYSTEM",
+            "outcome": "PASS",
+            "expected": "DERIVE_FROM_ROUTE",
+            "actual": "CHAPS",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "CLEARING_STANDING_DATA",
+            "outcome": "PASS",
+            "expected": "GBP active governed clearing system",
+            "actual": "CHAPS",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "CLEARING_SCHEME_TYPE",
+            "outcome": "PASS",
+            "expected": "RTGS",
+            "actual": "RTGS",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "NOSTRO_CURRENCY",
+            "outcome": "PASS",
+            "expected": "GBP",
+            "actual": "GBP",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "BOOKING_ENTITY",
+            "outcome": "PASS",
+            "expected": "HK01",
+            "actual": "HK01",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "DIRECTION",
+            "outcome": "PASS",
+            "expected": "OUTBOUND",
+            "actual": "OUTBOUND",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "MESSAGING_SERVICE",
+            "outcome": "PASS",
+            "expected": "FINPLUS",
+            "actual": "FINPLUS",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "MESSAGE_TYPE",
+            "outcome": "PASS",
+            "expected": "pacs.009.001.08",
+            "actual": "pacs.009.001.12,pacs.009.001.08",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "COV_PROFILE",
+            "outcome": "PASS",
+            "expected": "NOT_APPLICABLE",
+            "actual": "NOT_APPLICABLE",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "VALUE_DATE",
+            "outcome": "PASS",
+            "expected": "2026-09-12",
+            "actual": "2026-01-01..2027-12-31",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "AMOUNT_LIMIT",
+            "outcome": "PASS",
+            "expected": "1000000",
+            "actual": "OPEN..OPEN",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "LIVE_CLEARING_PARTICIPATION",
+            "outcome": "NOT_EVALUATED",
+            "expected": "CHAPS",
+            "actual": "STANDING_DATA_VALIDATED_LIVE_DIRECTORY_REQUIRED",
+            "reasonCode": "LIVE_REACHABILITY_NOT_EVALUATED"
+          }
+        ]
+      },
+      {
+        "ssiId": "50531295-c91a-4eb5-9c21-69d2dab38b7c",
+        "ssiCode": "SSI-DEMO-042",
+        "reason": "COUNTERPARTY_SCOPE_MISMATCH",
+        "evidence": [
+          {
+            "criterion": "STATUS",
+            "outcome": "PASS",
+            "expected": "ACTIVE",
+            "actual": "ACTIVE",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "CURRENCY",
+            "outcome": "PASS",
+            "expected": "GBP",
+            "actual": "GBP",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "APPLICABILITY",
+            "outcome": "PASS",
+            "expected": "active/effective SSI_APPLICABILITY",
+            "actual": "50531295-c91a-4eb5-9c21-69d2dab38b7c:APPL:5",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "CONSUMER",
+            "outcome": "PASS",
+            "expected": "CENTRAL_PAYMENT",
+            "actual": "ANY",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "PRODUCT",
+            "outcome": "PASS",
+            "expected": "CENTRAL_PAYMENT",
+            "actual": "ANY",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "BUSINESS_FUNCTION",
+            "outcome": "PASS",
+            "expected": "INTERBANK_TRANSFER",
+            "actual": "ANY",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "PAYMENT_LEG",
+            "outcome": "PASS",
+            "expected": "INTERBANK_SETTLEMENT",
+            "actual": "INTERBANK_SETTLEMENT",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "COUNTERPARTY_SCOPE",
+            "outcome": "FAIL",
+            "expected": "BARCGB22 or approved GB/ANY matcher",
+            "actual": "NSSIUSN1",
+            "reasonCode": "COUNTERPARTY_SCOPE_MISMATCH"
+          },
+          {
+            "criterion": "COUNTERPARTY_TYPE",
+            "outcome": "PASS",
+            "expected": "BANK",
+            "actual": "BANK",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "GLOBAL_FALLBACK_APPROVAL",
+            "outcome": "PASS",
+            "expected": "approvedGlobal=true",
+            "actual": "false",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "SETTLEMENT_COUNTRY",
+            "outcome": "PASS",
+            "expected": "DERIVE_FROM_ROUTE",
+            "actual": "GB",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "SETTLEMENT_MARKET",
+            "outcome": "PASS",
+            "expected": "DERIVE_FROM_ROUTE",
+            "actual": "GB_STERLING",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "CLEARING_SYSTEM",
+            "outcome": "PASS",
+            "expected": "DERIVE_FROM_ROUTE",
+            "actual": "CHAPS",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "CLEARING_STANDING_DATA",
+            "outcome": "PASS",
+            "expected": "GBP active governed clearing system",
+            "actual": "CHAPS",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "CLEARING_SCHEME_TYPE",
+            "outcome": "PASS",
+            "expected": "RTGS",
+            "actual": "RTGS",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "NOSTRO_CURRENCY",
+            "outcome": "PASS",
+            "expected": "GBP",
+            "actual": "GBP",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "BOOKING_ENTITY",
+            "outcome": "PASS",
+            "expected": "HK01",
+            "actual": "HK01",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "DIRECTION",
+            "outcome": "PASS",
+            "expected": "OUTBOUND",
+            "actual": "OUTBOUND",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "MESSAGING_SERVICE",
+            "outcome": "PASS",
+            "expected": "FINPLUS",
+            "actual": "FINPLUS",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "MESSAGE_TYPE",
+            "outcome": "PASS",
+            "expected": "pacs.009.001.08",
+            "actual": "pacs.008.001.12,pacs.009.001.12,pacs.009.001.08",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "COV_PROFILE",
+            "outcome": "PASS",
+            "expected": "NOT_APPLICABLE",
+            "actual": "NOT_APPLICABLE",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "VALUE_DATE",
+            "outcome": "PASS",
+            "expected": "2026-09-12",
+            "actual": "2026-01-01..2027-12-31",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "AMOUNT_LIMIT",
+            "outcome": "PASS",
+            "expected": "1000000",
+            "actual": "OPEN..OPEN",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "LIVE_CLEARING_PARTICIPATION",
+            "outcome": "NOT_EVALUATED",
+            "expected": "CHAPS",
+            "actual": "STANDING_DATA_VALIDATED_LIVE_DIRECTORY_REQUIRED",
+            "reasonCode": "LIVE_REACHABILITY_NOT_EVALUATED"
+          }
+        ]
+      },
+      {
+        "ssiId": "e73224f3-5b8b-4702-ad97-a88c87cdc3a6",
+        "ssiCode": "SSI-DEMO-026",
+        "reason": "PROFILE_VERSION_MISMATCH",
+        "evidence": [
+          {
+            "criterion": "STATUS",
+            "outcome": "PASS",
+            "expected": "ACTIVE",
+            "actual": "ACTIVE",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "CURRENCY",
+            "outcome": "PASS",
+            "expected": "GBP",
+            "actual": "GBP",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "APPLICABILITY",
+            "outcome": "PASS",
+            "expected": "active/effective SSI_APPLICABILITY",
+            "actual": "e73224f3-5b8b-4702-ad97-a88c87cdc3a6:APPL:5",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "CONSUMER",
+            "outcome": "PASS",
+            "expected": "CENTRAL_PAYMENT",
+            "actual": "ANY",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "PRODUCT",
+            "outcome": "PASS",
+            "expected": "CENTRAL_PAYMENT",
+            "actual": "ANY",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "BUSINESS_FUNCTION",
+            "outcome": "PASS",
+            "expected": "INTERBANK_TRANSFER",
+            "actual": "ANY",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "PAYMENT_LEG",
+            "outcome": "PASS",
+            "expected": "INTERBANK_SETTLEMENT",
+            "actual": "INTERBANK_SETTLEMENT",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "COUNTERPARTY_SCOPE",
+            "outcome": "PASS",
+            "expected": "BARCGB22 or approved GB/ANY matcher",
+            "actual": "ANY",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "COUNTERPARTY_TYPE",
+            "outcome": "PASS",
+            "expected": "BANK",
+            "actual": "BANK",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "GLOBAL_FALLBACK_APPROVAL",
+            "outcome": "PASS",
+            "expected": "approvedGlobal=true",
+            "actual": "true",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "SETTLEMENT_COUNTRY",
+            "outcome": "PASS",
+            "expected": "DERIVE_FROM_ROUTE",
+            "actual": "GB",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "SETTLEMENT_MARKET",
+            "outcome": "PASS",
+            "expected": "DERIVE_FROM_ROUTE",
+            "actual": "GB_STERLING",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "CLEARING_SYSTEM",
+            "outcome": "PASS",
+            "expected": "DERIVE_FROM_ROUTE",
+            "actual": "CHAPS",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "CLEARING_STANDING_DATA",
+            "outcome": "PASS",
+            "expected": "GBP active governed clearing system",
+            "actual": "CHAPS",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "CLEARING_SCHEME_TYPE",
+            "outcome": "PASS",
+            "expected": "RTGS",
+            "actual": "RTGS",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "NOSTRO_CURRENCY",
+            "outcome": "PASS",
+            "expected": "GBP",
+            "actual": "GBP",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "BOOKING_ENTITY",
+            "outcome": "PASS",
+            "expected": "HK01",
+            "actual": "HK01",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "DIRECTION",
+            "outcome": "PASS",
+            "expected": "OUTBOUND",
+            "actual": "OUTBOUND",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "MESSAGING_SERVICE",
+            "outcome": "PASS",
+            "expected": "FINPLUS",
+            "actual": "FINPLUS",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "MESSAGE_TYPE",
+            "outcome": "FAIL",
+            "expected": "pacs.009.001.08",
+            "actual": "pacs.008.001.12,pacs.009.001.12",
+            "reasonCode": "MESSAGE_TYPE_NOT_SUPPORTED"
+          },
+          {
+            "criterion": "COV_PROFILE",
+            "outcome": "PASS",
+            "expected": "NOT_APPLICABLE",
+            "actual": "NOT_APPLICABLE",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "VALUE_DATE",
+            "outcome": "PASS",
+            "expected": "2026-09-12",
+            "actual": "2026-01-01..2027-12-31",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "AMOUNT_LIMIT",
+            "outcome": "PASS",
+            "expected": "1000000",
+            "actual": "OPEN..OPEN",
+            "reasonCode": "MATCHED"
+          },
+          {
+            "criterion": "LIVE_CLEARING_PARTICIPATION",
+            "outcome": "NOT_EVALUATED",
+            "expected": "CHAPS",
+            "actual": "STANDING_DATA_VALIDATED_LIVE_DIRECTORY_REQUIRED",
+            "reasonCode": "LIVE_REACHABILITY_NOT_EVALUATED"
+          }
+        ]
+      }
+    ],
+    "fieldProvenance": {
+      "58A": {
+        "source": "TRANSACTION_CONTEXT",
+        "evidenceId": "BARCGB22"
+      }
+    },
+    "roleProvenance": {
+      "instructedAgent": {
+        "value": "BARCGB22",
+        "source": "COUNTERPARTY_SSI",
+        "ssiCode": "SSI-UAT-GEN-02",
+        "ssiVersion": 1,
+        "sourceField": "actualReceiverBic"
+      },
+      "creditorAgent": {
+        "value": "BARCGB22",
+        "source": "COUNTERPARTY_SSI",
+        "ssiCode": "SSI-UAT-GEN-02",
+        "ssiVersion": 1,
+        "sourceField": "accountWithBic"
+      }
+    },
+    "snapshotHash": "fbbec554b395c7754868bec8983fb74734bc87ec5e0b3cf5a0a94a563d351994",
+    "snapshotIdentityMethod": "SQLITE_WAL_AWARE_LOGICAL_SNAPSHOT_V1",
+    "resolutionToken": "ebee427d-b559-4e43-8278-1ced9bdfd3f3",
+    "correlationId": "d93b6114-06b3-4c68-a1d3-9948b0b75811",
+    "evidenceGates": [
+      {
+        "criterion": "STATUS",
+        "outcome": "PASS",
+        "expected": "ACTIVE",
+        "actual": "ACTIVE",
+        "reasonCode": "MATCHED"
+      },
+      {
+        "criterion": "CURRENCY",
+        "outcome": "PASS",
+        "expected": "GBP",
+        "actual": "GBP",
+        "reasonCode": "MATCHED"
+      },
+      {
+        "criterion": "APPLICABILITY",
+        "outcome": "PASS",
+        "expected": "active/effective SSI_APPLICABILITY",
+        "actual": "1a9bbd1f-b884-5fbf-87d4-1e8c79a13800:APPL:1",
+        "reasonCode": "MATCHED"
+      },
+      {
+        "criterion": "CONSUMER",
+        "outcome": "PASS",
+        "expected": "CENTRAL_PAYMENT",
+        "actual": "CENTRAL_PAYMENT",
+        "reasonCode": "MATCHED"
+      },
+      {
+        "criterion": "PRODUCT",
+        "outcome": "PASS",
+        "expected": "CENTRAL_PAYMENT",
+        "actual": "CENTRAL_PAYMENT",
+        "reasonCode": "MATCHED"
+      },
+      {
+        "criterion": "BUSINESS_FUNCTION",
+        "outcome": "PASS",
+        "expected": "INTERBANK_TRANSFER",
+        "actual": "INTERBANK_TRANSFER",
+        "reasonCode": "MATCHED"
+      },
+      {
+        "criterion": "PAYMENT_LEG",
+        "outcome": "PASS",
+        "expected": "INTERBANK_SETTLEMENT",
+        "actual": "INTERBANK_SETTLEMENT",
+        "reasonCode": "MATCHED"
+      },
+      {
+        "criterion": "COUNTERPARTY_SCOPE",
+        "outcome": "PASS",
+        "expected": "BARCGB22 or approved GB/ANY matcher",
+        "actual": "BARCGB22",
+        "reasonCode": "MATCHED"
+      },
+      {
+        "criterion": "COUNTERPARTY_TYPE",
+        "outcome": "PASS",
+        "expected": "BANK",
+        "actual": "BANK",
+        "reasonCode": "MATCHED"
+      },
+      {
+        "criterion": "GLOBAL_FALLBACK_APPROVAL",
+        "outcome": "PASS",
+        "expected": "approvedGlobal=true",
+        "actual": "false",
+        "reasonCode": "MATCHED"
+      },
+      {
+        "criterion": "SETTLEMENT_COUNTRY",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "GB",
+        "reasonCode": "MATCHED"
+      },
+      {
+        "criterion": "SETTLEMENT_MARKET",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "GB_STERLING",
+        "reasonCode": "MATCHED"
+      },
+      {
+        "criterion": "CLEARING_SYSTEM",
+        "outcome": "PASS",
+        "expected": "DERIVE_FROM_ROUTE",
+        "actual": "CHAPS",
+        "reasonCode": "MATCHED"
+      },
+      {
+        "criterion": "CLEARING_STANDING_DATA",
+        "outcome": "PASS",
+        "expected": "GBP active governed clearing system",
+        "actual": "CHAPS",
+        "reasonCode": "MATCHED"
+      },
+      {
+        "criterion": "CLEARING_SCHEME_TYPE",
+        "outcome": "PASS",
+        "expected": "RTGS",
+        "actual": "RTGS",
+        "reasonCode": "MATCHED"
+      },
+      {
+        "criterion": "NOSTRO_CURRENCY",
+        "outcome": "PASS",
+        "expected": "GBP",
+        "actual": "GBP",
+        "reasonCode": "MATCHED"
+      },
+      {
+        "criterion": "BOOKING_ENTITY",
+        "outcome": "PASS",
+        "expected": "HK01",
+        "actual": "HK01",
+        "reasonCode": "MATCHED"
+      },
+      {
+        "criterion": "DIRECTION",
+        "outcome": "PASS",
+        "expected": "OUTBOUND",
+        "actual": "OUTBOUND",
+        "reasonCode": "MATCHED"
+      },
+      {
+        "criterion": "MESSAGING_SERVICE",
+        "outcome": "PASS",
+        "expected": "FINPLUS",
+        "actual": "FINPLUS",
+        "reasonCode": "MATCHED"
+      },
+      {
+        "criterion": "MESSAGE_TYPE",
+        "outcome": "PASS",
+        "expected": "pacs.009.001.08",
+        "actual": "pacs.009.001.12,pacs.009.001.08",
+        "reasonCode": "MATCHED"
+      },
+      {
+        "criterion": "COV_PROFILE",
+        "outcome": "PASS",
+        "expected": "NOT_APPLICABLE",
+        "actual": "NOT_APPLICABLE",
+        "reasonCode": "MATCHED"
+      },
+      {
+        "criterion": "VALUE_DATE",
+        "outcome": "PASS",
+        "expected": "2026-09-12",
+        "actual": "2026-01-01..2027-12-31",
+        "reasonCode": "MATCHED"
+      },
+      {
+        "criterion": "AMOUNT_LIMIT",
+        "outcome": "PASS",
+        "expected": "1000000",
+        "actual": "OPEN..OPEN",
+        "reasonCode": "MATCHED"
+      },
+      {
+        "criterion": "LIVE_CLEARING_PARTICIPATION",
+        "outcome": "NOT_EVALUATED",
+        "expected": "CHAPS",
+        "actual": "STANDING_DATA_VALIDATED_LIVE_DIRECTORY_REQUIRED",
+        "reasonCode": "LIVE_REACHABILITY_NOT_EVALUATED"
+      }
+    ],
+    "renderingDecisions": {
+      "MT202.53a": {
+        "outcome": "INCLUDE",
+        "option": "B",
+        "renderedTag": "53B",
+        "rule": "MRG_MT202_53A_MULTIPLE_DIRECT_ACCOUNTS"
+      },
+      "MT202.57a": {
+        "outcome": "OMITTED_BY_RULE",
+        "rule": "MRG_MT202_57A_RECEIVER_IS_AWI"
+      },
+      "pacs.009.CdtrAgt": {
+        "outcome": "INCLUDE",
+        "reason": "OPTIONAL_ROLE_RETAINED_NO_EQUIVALENT_OMISSION_RULE"
+      }
+    }
+  },
+  "uiText": "3. Resolution 結果\n✓ RESOLVED\nPREVIEW RESOLUTION TOKEN\nebee427d-b559-4e43-8278-1ced9bdfd3f3\nPREVIEW SNAPSHOT SHA-256\nfbbec554b395c7754868bec8983fb74734bc87ec5e0b3cf5a0a94a563d351994\nChosen SSI Route\nSSI-UAT-GEN-02\nv1 · GBP · DEMO-NOSTRO-002-PRIMARY\nSSI ID 1a9bbd1f-b884-5fbf-87d4-1e8c79a13800\n3. Confirm Resolution\nMT202 5x Tag response\n{\n  \"renderer\": \"MT compatibility view from the same confirmed canonical snapshot\",\n  \"tags\": {\n    \"58A\": \"BARCGB22\",\n    \"53B\": \"/DEMO-NOSTRO-002-PRIMARY\"\n  },\n  \"omitted\": [\n    \"57a\"\n  ],\n  \"assertions\": [\n    \"58a unchanged from resolution key\",\n    \"must not read SSI.beneficiaryBic\"\n  ]\n}\n同一 canonical API response；切換格式不會重新解析或改變 route。",
+  "assertions": {
+    "browserRequestTargetsCorruptScope": true,
+    "http409": false,
+    "controlledCode": false,
+    "developmentRuntimePolicy": false,
+    "notRetryable": false,
+    "failClosed": false,
+    "issueDetails": false,
+    "remediationProvided": false,
+    "governanceDestination": false,
+    "uiLabelsDataProblem": false,
+    "noConfirmAction": false,
+    "noSettlementPayload": false
+  },
+  "passed": false
+}

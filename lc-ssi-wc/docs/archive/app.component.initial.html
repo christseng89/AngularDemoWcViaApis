@@ -1,0 +1,28 @@
+<div class="shell">
+  <aside>
+    <div class="brand"><span>SSI</span><div>Control Room<small>Prototype · SR2026</small></div></div>
+    <nav>
+      <button (click)="navigate('dashboard')" [class.active]="view()==='dashboard'">總覽</button>
+      <button (click)="navigate('maker')" [class.active]="view()==='maker'">Maker 建立</button>
+      <button (click)="navigate('checker')" [class.active]="view()==='checker'">Checker 審批 <em>{{ pending().length }}</em></button>
+      <button (click)="navigate('resolver')" [class.active]="view()==='resolver'">SSI Resolution</button>
+      <button (click)="navigate('message')" [class.active]="view()==='message'">MT／MX Tag Lab</button>
+      <button (click)="navigate('audit')" [class.active]="view()==='audit'">稽核與事件</button>
+    </nav>
+    <p class="scope">Pseudo SSI fields only<br>Not SWIFT network messages</p>
+  </aside>
+  <main>
+    <header><div><p class="eyebrow">ENTERPRISE SETTLEMENT DATA</p><h1>@switch(view()){ @case('dashboard'){運作總覽} @case('maker'){建立 SSI} @case('checker'){四眼審批} @case('resolver'){交易解析} @case('message'){SSI Tag Laboratory} @case('audit'){稽核軌跡} }</h1></div><button class="ghost" (click)="refresh()">重新整理</button></header>
+    @if (notice(); as n) { <div class="notice" [class]="n.kind">{{ n.text }}<button (click)="notice.set(null)">×</button></div> }
+
+    @if (view()==='dashboard') {
+      <section class="metrics"><article><small>SSI 總數</small><strong>{{ rows().length }}</strong></article><article><small>等待審批</small><strong>{{ pending().length }}</strong></article><article><small>已啟用</small><strong>{{ rows().filter(r => r.status==='ACTIVE').length }}</strong></article></section>
+      <section class="panel"><div class="panel-title"><h2>Settlement Instructions</h2><button class="primary" (click)="navigate('maker')">＋ 新增 SSI</button></div><table><thead><tr><th>Counterparty</th><th>Currency</th><th>Scope</th><th>Status</th><th>Version</th><th>Action</th></tr></thead><tbody>@for(row of rows(); track row.id){<tr><td><b>{{ row.counterpartyId }}</b><small>{{ row.route['accountWithBic'] }}</small></td><td>{{ row.route['currency'] }}</td><td>{{ row.scope }}</td><td><span class="status">{{ row.status }}</span></td><td>v{{ row.version }}</td><td>@if(row.status==='DRAFT'){<button (click)="act(row,'submit')">Submit</button>} @if(row.status==='APPROVED'){<button (click)="act(row,'activate')">Activate</button>}</td></tr>}@empty{<tr><td colspan="6" class="empty">尚無 SSI。由 Maker 建立第一筆資料。</td></tr>}</tbody></table></section>
+    }
+    @if (view()==='maker') { <section class="panel form-panel"><p class="kicker">PARAMETER-DRIVEN FORMLY</p><h2>建立 Settlement Instruction</h2><form [formGroup]="form" (ngSubmit)="create()"><formly-form [form]="form" [fields]="fields" [model]="model"/><div class="actions"><button type="button" class="ghost" (click)="navigate('dashboard')">取消</button><button class="primary" type="submit">儲存草稿</button></div></form></section> }
+    @if (view()==='checker') { <section class="panel"><div class="panel-title"><div><p class="kicker">FOUR-EYES CONTROL</p><h2>等待獨立審批</h2></div></div>@for(row of pending(); track row.id){<article class="approval"><div><b>{{ row.counterpartyId }} · {{ row.route['currency'] }}</b><p>{{ row.route['beneficiaryBic'] }} → {{ row.route['accountWithBic'] }}</p></div><button class="primary" (click)="act(row,'approve')">Checker Approve</button></article>}@empty{<p class="empty">沒有等待審批的項目。</p>}</section> }
+    @if (view()==='resolver') { <section class="split"><article class="panel"><p class="kicker">TRADE FINANCE / TREASURY</p><h2>取得交易 SSI</h2><p>以 BANK-001、USD 與示範交易參考進行 fail-closed resolution。</p><button class="primary" (click)="resolve()">Resolve SSI</button></article><pre class="result">{{ result() | json }}</pre></section> }
+    @if (view()==='message') { <section class="split"><article class="panel"><p class="kicker">PSEUDO FIN-LIKE INPUT</p><h2>擷取 SSI Tags</h2><textarea [(value)]="pseudoContent" (input)="pseudoContent=$any($event.target).value"></textarea><button class="primary" (click)="extract()">Extract Roles</button><p class="scope-note">只解析 SSI 欄位子集；不驗證完整 FIN/MX。</p></article><pre class="result">{{ result() | json }}</pre></section> }
+    @if (view()==='audit') { <section class="panel"><p class="kicker">APPEND-ONLY EVIDENCE</p><h2>Audit／Outbox／Inbox</h2><p>所有 Maker、Checker、Resolution、Import 與 Mapping 決策均保留版本及操作者。</p><button class="ghost" (click)="navigate('dashboard')">返回總覽</button></section> }
+  </main>
+</div>

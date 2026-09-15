@@ -1,0 +1,22 @@
+import { Body, Controller, Post } from '@nestjs/common';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { SsiMappingEngine, type SsiMapping } from '../../../../../libs/swift-ssi-mapping/src/lib/mapping';
+import { PseudoMessageParser } from '../../../../../libs/swift-ssi-mapping/src/lib/pseudo-parser';
+import type { PseudoMessage } from '@ssi/contracts';
+
+function engine(): SsiMappingEngine {
+  const path = join(process.cwd(), 'parameters', 'ssi-mappings.sr2026.json');
+  const catalogue = JSON.parse(readFileSync(path, 'utf8')) as { mappings: SsiMapping[] };
+  return new SsiMappingEngine(catalogue.mappings);
+}
+
+@Controller('messages')
+export class MessageController {
+  @Post('extract') extract(@Body() body: { content: string; format: 'FIN_LIKE' | 'MX_JSON' }): unknown {
+    return engine().extract(new PseudoMessageParser().parse(body.content, body.format));
+  }
+  @Post('generate') generate(@Body() body: { message: Omit<PseudoMessage, 'fields'>; roles: Record<string, string> }): unknown {
+    return { fields: engine().generate(body.message, body.roles), disclaimer: 'SSI-field subset only; not a complete SWIFT message.' };
+  }
+}

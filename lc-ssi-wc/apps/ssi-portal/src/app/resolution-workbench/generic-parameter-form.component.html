@@ -1,0 +1,155 @@
+@if (model(); as page) {
+  <form class="parameter-form" [formGroup]="form" novalidate>
+    @for (section of page.fieldSections; track section.id) {
+      <fieldset class="parameter-section">
+        <legend>{{ section.label }}</legend>
+        <div class="parameter-grid">
+          @for (field of section.fields; track field.fieldId) {
+            @if (form.controls[field.fieldId]; as control) {
+              <div
+                class="parameter-field"
+                [class.parameter-field--wide]="
+                  field.columnSpan === 2 ||
+                  (field.columnSpan === undefined && field.control === 'TEXT')
+                "
+              >
+                @if (field.control === "HIDDEN") {
+                  <input [formControlName]="field.fieldId" type="hidden" />
+                } @else if (field.lookup) {
+                  <fieldset class="bank-service-fieldset">
+                    <legend>
+                      {{ field.displayLabel }}
+                      @if (field.required) {
+                        <span class="required" aria-hidden="true">*</span>
+                      }
+                    </legend>
+                    <input
+                      [id]="field.inputId"
+                      [formControlName]="field.fieldId"
+                      type="hidden"
+                    />
+                    <ssi-bank-service-lookup
+                      [metadata]="field.lookup"
+                      [title]="field.displayLabel"
+                      [inputId]="field.inputId"
+                      [value]="lookupValue(control.value)"
+                      [context]="lookupContext()"
+                      [dependencyLabels]="page.fieldLabels"
+                      [pageSize]="pageSize()"
+                      [disabled]="field.readOnly === true || submitting()"
+                      (valueSelected)="updateLookup(field.fieldId, $event)"
+                    />
+                  </fieldset>
+                } @else if (field.control === "CHECKBOX") {
+                  <label class="checkbox-label" [for]="field.inputId">
+                    <input
+                      [id]="field.inputId"
+                      type="checkbox"
+                      [checked]="control.value === true"
+                      [disabled]="field.readOnly || submitting()"
+                      (change)="updateCheckbox(field.fieldId, $event)"
+                    />
+                    <span>{{ field.displayLabel }}</span>
+                  </label>
+                } @else {
+                  <label [for]="field.inputId">
+                    {{ field.displayLabel }}
+                    @if (field.required) {
+                      <span class="required" aria-hidden="true">*</span>
+                    }
+                  </label>
+                  @if (field.control === "SELECT") {
+                    <select
+                      [id]="field.inputId"
+                      [formControlName]="field.fieldId"
+                      [attr.aria-describedby]="
+                        field.helpText ? field.inputId + '-help' : null
+                      "
+                      [attr.aria-invalid]="control.invalid && control.touched"
+                    >
+                      @for (option of field.options ?? []; track option.value) {
+                        <option
+                          [value]="option.value"
+                          [disabled]="option.disabled ?? false"
+                        >
+                          {{ option.label }}
+                        </option>
+                      }
+                    </select>
+                  } @else if (field.control === "RADIO") {
+                    <div
+                      class="radio-group"
+                      role="radiogroup"
+                      [attr.aria-label]="field.displayLabel"
+                    >
+                      @for (option of field.options ?? []; track option.value) {
+                        <label>
+                          <input
+                            type="radio"
+                            [formControlName]="field.fieldId"
+                            [value]="option.value"
+                            [disabled]="option.disabled ?? false"
+                          />
+                          {{ option.label }}
+                        </label>
+                      }
+                    </div>
+                  } @else {
+                    <input
+                      [id]="field.inputId"
+                      [type]="field.inputType"
+                      [formControlName]="field.fieldId"
+                      [readOnly]="field.readOnly"
+                      [placeholder]="field.placeholder ?? ''"
+                      [attr.aria-describedby]="
+                        field.helpText ? field.inputId + '-help' : null
+                      "
+                      [attr.aria-invalid]="control.invalid && control.touched"
+                    />
+                  }
+                }
+                @if (field.helpText) {
+                  <small [id]="field.inputId + '-help'">{{
+                    field.helpText
+                  }}</small>
+                }
+                @if (
+                  field.optionSource?.restrictionMessage;
+                  as restrictionMessage
+                ) {
+                  <small class="field-restriction" role="note">{{
+                    restrictionMessage
+                  }}</small>
+                }
+                @if (control.invalid && control.touched) {
+                  <p class="field-error" [id]="field.errorId" role="alert">
+                    {{ field.displayLabel }} is invalid or incomplete.
+                  </p>
+                }
+              </div>
+            }
+          }
+        </div>
+      </fieldset>
+    }
+
+    <div class="workbench-actions">
+      <button type="button" [disabled]="submitting()" (click)="cancel()">
+        Cancel
+      </button>
+      <button
+        type="button"
+        [disabled]="resolveDisabled()"
+        [attr.aria-busy]="submitting()"
+        (click)="submit()"
+      >
+        @if (submitting()) {
+          <span class="lookup-spinner" aria-hidden="true"></span>
+          <output aria-live="polite">Resolving…</output>
+        } @else {
+          {{ page.actionLabel }}
+        }
+      </button>
+    </div>
+  </form>
+}

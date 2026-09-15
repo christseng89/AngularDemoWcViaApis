@@ -1,0 +1,8 @@
+{
+  "name": "mock-reference-services", "$schema": "../../node_modules/nx/schemas/project-schema.json", "sourceRoot": "apps/mock-reference-services/src", "projectType": "application",
+  "targets": {
+    "build": { "executor": "@nx/js:tsc", "options": { "outputPath": "dist/apps/mock-reference-services", "main": "apps/mock-reference-services/src/main.ts", "tsConfig": "apps/mock-reference-services/tsconfig.app.json" } },
+    "serve": { "executor": "@nx/js:node", "dependsOn": ["build"], "options": { "buildTarget": "mock-reference-services:build", "runBuildTargetDependencies": false } },
+    "typecheck": { "executor": "nx:run-commands", "options": { "command": "tsc -p apps/mock-reference-services/tsconfig.app.json --noEmit" } }
+  }, "tags": ["type:app", "scope:mock"]
+}

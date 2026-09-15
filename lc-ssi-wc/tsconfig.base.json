@@ -1,0 +1,19 @@
+{
+  "compileOnSave": false,
+  "compilerOptions": {
+    "rootDir": ".", "sourceMap": true, "declaration": false,
+    "moduleResolution": "bundler", "emitDecoratorMetadata": true, "experimentalDecorators": true,
+    "importHelpers": true, "target": "ES2022", "module": "ESNext", "lib": ["ES2022", "DOM"],
+    "strict": true, "noImplicitOverride": true, "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true, "noFallthroughCasesInSwitch": true,
+    "paths": {
+      "@ssi/domain": ["./libs/domain/src/index.ts"],
+      "@ssi/payment-settlement-profile": ["./libs/domain/src/lib/payment-settlement-profile.ts"],
+      "@ssi/fin-5x-support": ["./libs/domain/src/lib/fin-5x-support.ts"],
+      "@ssi/contracts": ["./libs/contracts/src/index.ts"],
+      "@ssi/parameter-engine": ["./libs/parameter-engine/src/index.ts"],
+      "@ssi/swift-mapping": ["./libs/swift-ssi-mapping/src/index.ts"]
+    }
+  },
+  "exclude": ["node_modules", "tmp", "docs/archive"]
+}

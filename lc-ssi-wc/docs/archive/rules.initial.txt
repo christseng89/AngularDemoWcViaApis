@@ -1,0 +1,46 @@
+import type { Diagnostic, Severity } from '@ssi/contracts';
+
+export type Operator = 'EQ' | 'NE' | 'IN' | 'PRESENT';
+
+export interface Condition {
+  readonly path: string;
+  readonly operator: Operator;
+  readonly value?: string | readonly string[];
+}
+
+export interface DeclarativeRule {
+  readonly id: string;
+  readonly when: readonly Condition[];
+  readonly severity: Severity;
+  readonly code: string;
+  readonly message: string;
+  readonly targetPath?: string;
+}
+
+function readPath(model: Readonly<Record<string, unknown>>, path: string): unknown {
+  return path.split('.').reduce<unknown>((value, key) =>
+    typeof value === 'object' && value !== null ? (value as Record<string, unknown>)[key] : undefined,
+  model);
+}
+
+function matches(actual: unknown, condition: Condition): boolean {
+  switch (condition.operator) {
+    case 'PRESENT': return actual !== undefined && actual !== null && actual !== '';
+    case 'EQ': return actual === condition.value;
+    case 'NE': return actual !== condition.value;
+    case 'IN': return Array.isArray(condition.value) && condition.value.includes(String(actual));
+  }
+}
+
+export class ParameterRuleEngine {
+  evaluate(model: Readonly<Record<string, unknown>>, rules: readonly DeclarativeRule[]): readonly Diagnostic[] {
+    return rules
+      .filter((rule) => rule.when.every((condition) => matches(readPath(model, condition.path), condition)))
+      .map((rule) => Object.freeze({
+        code: rule.code,
+        severity: rule.severity,
+        message: rule.message,
+        ...(rule.targetPath === undefined ? {} : { path: rule.targetPath }),
+      }));
+  }
+}

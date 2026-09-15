@@ -1,0 +1,2537 @@
+{
+  "duplicatedLinesDensity": 0.7,
+  "project": "lc-ssi-wc",
+  "projectVersion": "worktree-ffe9c85085d3200692df45a3c64c911e5fa87b9857d7b82cf25ca92dbbc1f7e1",
+  "identityKind": "worktree",
+  "revision": null,
+  "analysisTime": "2026-09-15T22:09:33+0000",
+  "worktreeDigest": "ffe9c85085d3200692df45a3c64c911e5fa87b9857d7b82cf25ca92dbbc1f7e1",
+  "sourceDigest": "ffe9c85085d3200692df45a3c64c911e5fa87b9857d7b82cf25ca92dbbc1f7e1",
+  "sourceManifest": {
+    "algorithm": "sha256",
+    "digest": "ffe9c85085d3200692df45a3c64c911e5fa87b9857d7b82cf25ca92dbbc1f7e1",
+    "files": [
+      {
+        "path": "apps/mock-reference-services/jest.config.ts",
+        "bytes": 328,
+        "sha256": "5b81fca4928e67255652eb9a7f28b9e2f17ef4ab5218281a52ab6c1b9dcc4e7f"
+      },
+      {
+        "path": "apps/mock-reference-services/project.json",
+        "bytes": 1614,
+        "sha256": "19c0a7b5dd12a45442869dc6bc72f0b29be974bcbe51a4fcdf0a2bc073068229"
+      },
+      {
+        "path": "apps/mock-reference-services/src/main.ts",
+        "bytes": 12454,
+        "sha256": "b9a57107bf9143e1164c946298b53a8c8391aacdfaf193c6a6f120ec2b7ff7de"
+      },
+      {
+        "path": "apps/mock-reference-services/tsconfig.app.json",
+        "bytes": 273,
+        "sha256": "263a6734e037159efbe553044aed33e81062dfed799e034d218d2f6ba51abfa9"
+      },
+      {
+        "path": "apps/ssi-bff/jest.config.ts",
+        "bytes": 296,
+        "sha256": "e75d79a581377bbe7a2e2da447d94c65d7c46d809331950a9754742c7d61feb5"
+      },
+      {
+        "path": "apps/ssi-bff/project.json",
+        "bytes": 1188,
+        "sha256": "99b44ef5095919b2d62a370cb2c9c175ba9f1e9b9b4e7a81fc1410163edc4fad"
+      },
+      {
+        "path": "apps/ssi-bff/src/main.ts",
+        "bytes": 21483,
+        "sha256": "ac8f611af47969496c6bd101c213c5f1f697ada04a273ecddbd60caa42f5e975"
+      },
+      {
+        "path": "apps/ssi-bff/src/upstream-api.interceptor.ts",
+        "bytes": 7910,
+        "sha256": "4f5778aa656ce141c33856013fcc5624a93d67c259570123cd11a20679e4063a"
+      },
+      {
+        "path": "apps/ssi-bff/tsconfig.app.json",
+        "bytes": 273,
+        "sha256": "263a6734e037159efbe553044aed33e81062dfed799e034d218d2f6ba51abfa9"
+      },
+      {
+        "path": "apps/ssi-portal/jest.config.ts",
+        "bytes": 783,
+        "sha256": "9d12d89c08cd4cb147448c09558902e5133f59da595680a10fa9bc4b73ba761b"
+      },
+      {
+        "path": "apps/ssi-portal/project.json",
+        "bytes": 1544,
+        "sha256": "1ef4463213d7c1031510dadcdef28a1432b53dc3c60455215c0a835c511529b2"
+      },
+      {
+        "path": "apps/ssi-portal/proxy.conf.json",
+        "bytes": 106,
+        "sha256": "798dd35a9ce0eaec2ac9a7cce0370489f86e42b7df54c47637575778450f313a"
+      },
+      {
+        "path": "apps/ssi-portal/public/openapi/swift-data-service.v1.json",
+        "bytes": 82234,
+        "sha256": "d632fd4916769d67546e603612c2342d378fad193a042a415114c9522fa097b9"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/alert.component.ts",
+        "bytes": 1744,
+        "sha256": "7104be0613462ffbeb0fa83b00513e59f706253d24ccd41e7722f702d8f35991"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/alert.model.ts",
+        "bytes": 571,
+        "sha256": "c89b5acc2805cfb9b8718079ac35734589f962b49054f1fce2d6688586092889"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/app.component.html",
+        "bytes": 80185,
+        "sha256": "18b9dd25dab8ac0cecc295c1f65dbf0d2875b32bcf439efbafbdc1e631b78d0f"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/app.component.ts",
+        "bytes": 127093,
+        "sha256": "de1676afe3ce5fa15a4a7b9b5af42385e113e7fa94db81e43caa6cd8484bf94a"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/audit-presentation.ts",
+        "bytes": 3665,
+        "sha256": "3bb7f406948c60fb3038a1868291125662c1b2a0c9d6ab6c121cb2e488001741"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/bank-service-picker-dialog.component.css",
+        "bytes": 2769,
+        "sha256": "3a42b66aeabe3d99e5eceea2d6321d6531c2a4119c3b8d6af6d52738ddcb56b3"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/bank-service-picker-dialog.component.html",
+        "bytes": 3540,
+        "sha256": "07f6df7205d8c7570fced812daad440b6def6717b5071565894f946461e30bab"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/bank-service-picker-dialog.component.ts",
+        "bytes": 2488,
+        "sha256": "99e75934a8f9a81488ea300af06551164a78ab403fb2f9e1a31f909f37da7d79"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/demo-suggestion-candidates.ts",
+        "bytes": 8453,
+        "sha256": "2bec42a617b8887a3177280f1af55e0934f8442d4de31a4ec74d48d13a6e49c5"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/fin-5x-route-analysis.ts",
+        "bytes": 6603,
+        "sha256": "4f1b7601afa39b9fdca7cc0b54864c9da573d40c28854f604ef99abd0f3cef22"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/formly-types.ts",
+        "bytes": 2654,
+        "sha256": "5e24d2bf25d04629369bb047fb4d50be410b5fb9e968c06c20942250fb9ec340"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/mt2-resolution-presentation.ts",
+        "bytes": 4243,
+        "sha256": "2ac646baa9708375c006e66dd4c54a8d25a096fbcb9b0a852b69e5523d8ee664"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/official-field-name.ts",
+        "bytes": 338,
+        "sha256": "1ae2e30e4d2fb64d8ae0fb7634554dc88f90857c23fb52eca52a175be1685d2b"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/operational-issue.component.ts",
+        "bytes": 985,
+        "sha256": "80d5caf8e4deec278307e150f9e3f208a30f4b6f9549e69954490d18e5f3c7c9"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/operational-issue.ts",
+        "bytes": 4270,
+        "sha256": "99e88c36f9070eeaa01d1b1a7dde055a0abbac42fe0eb37e7f9b304f8c99b1f1"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/payment-message-index.ts",
+        "bytes": 2185,
+        "sha256": "5bfa801ae817804be7fadee01dae611db45c82da73b088a119685f6baa44e6d2"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/payment-message-scenarios.ts",
+        "bytes": 5626,
+        "sha256": "b550cbb9ff16e883dadb3c0e71388467c1d8487f4b51b9d00771836e77ec44cc"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-route-selection.ts",
+        "bytes": 513,
+        "sha256": "fb1b16daaf83fec61d5891cdb1954f594a75b516ef261b9549d52fdad4488a1d"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/bank-service-lookup.component.html",
+        "bytes": 2021,
+        "sha256": "7a7117caa0374a8b45747649bd36da960603cfaffe3a3f1170f3be027df0499d"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/bank-service-lookup.component.ts",
+        "bytes": 8133,
+        "sha256": "60076a17a59f1fe571eacef9d740d73e7ae7b1eb17fa0330b69935f3e025161b"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/bank-service-presentation.ts",
+        "bytes": 307,
+        "sha256": "4b07c7a7c72d0d79af69af377d8b1a208570757e4df2f5d57e52e0b3eeb1f4d8"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/generic-parameter-form.component.html",
+        "bytes": 6294,
+        "sha256": "2a0a275f09027ad9bca133d692605c306b8d5ccb3c80f4a1d2c573d284a667ac"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/generic-parameter-form.component.ts",
+        "bytes": 5841,
+        "sha256": "5e9d08e9030a097891a87845794edc178a38e1e4f70a7dfdd913f8de688160ad"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/index.ts",
+        "bytes": 237,
+        "sha256": "0bcd0628f9e6c972210a931c49ad529e24af8e63a787dc5ec0418ec3e9174ad1"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/lookup-resolution-key.ts",
+        "bytes": 1095,
+        "sha256": "c5e527cd9925de40169323f0fa57caa69251739e3c8d18f2c3b0f799e46cb28e"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/page-definition-index-table.component.html",
+        "bytes": 17874,
+        "sha256": "ec12b49672bf20cec95339d122a33ae4e31fa2face62ad8359778e2474a06ec4"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/page-definition-index-workspace.component.html",
+        "bytes": 4047,
+        "sha256": "96846bafb1aeefe0b471f167561551607736d8bad9d78d542f3ff7d49851cdc7"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/page-definition-index-workspace.component.ts",
+        "bytes": 11346,
+        "sha256": "a2b4787f179ae3fc88e68a0d05f4453140258e85923b56d6e536c983a9d2b66e"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/page-definition-index.ts",
+        "bytes": 7052,
+        "sha256": "83aa9a39649a934093bb786bc98156bbc8042670d3bbc74d2ee5a0f4d60c6caf"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/page-parameter.client.ts",
+        "bytes": 6020,
+        "sha256": "1502b0f03fb0d3d8ed9c653711bce78be5e7e984285f3681bafc0f02f1787efd"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/page-parameter.contract.ts",
+        "bytes": 454,
+        "sha256": "15235d1905ba90cafd1e88474c831749daade5143b5e6abd62bbe160b0538481"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/pagination.ts",
+        "bytes": 1782,
+        "sha256": "0c07809c5e5c6fec3ec739e628a50e58c8ad0e1ab3b61d574c9ff9fcd6848920"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/parameter-dependencies.ts",
+        "bytes": 1782,
+        "sha256": "010d6d9d68e3f4269985d8b5e75f62c1ad7b0751026969db47354f1e5a25415d"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/parameter-form-values.ts",
+        "bytes": 1861,
+        "sha256": "3a8289c41e4e14746a8f58e347834996ca726fd6fdce4dcfa4bfe778471a43de"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/parameter-lookup.facade.ts",
+        "bytes": 7105,
+        "sha256": "4a0cdbf4f7c77f078aad89e22c646450014b35e9659a87ab7aa4f8a6eeecdcb4"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/parameter-model.mapper.ts",
+        "bytes": 10789,
+        "sha256": "3dc7bc1d9c9300262ec5ce4109f3cd91bfe9b76f92e013931268b4bbd71e0234"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/resolution-evidence.component.ts",
+        "bytes": 3800,
+        "sha256": "c09bc40db5544bcb7be6a9f7badd42efe7aec21dcbd8a86633d179628f10e56e"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/resolution-failure.component.ts",
+        "bytes": 935,
+        "sha256": "cea98e45c555104bf4760c8373ecdfbebff2a75d8dff3f701ef102264d051f98"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/resolution-generated-outputs.component.ts",
+        "bytes": 1687,
+        "sha256": "d89d3b787b8de1581995b7ec9d26d8247a4ce8a1ac57404cd22e63abb39e1e8c"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/resolution-result-dialog.component.html",
+        "bytes": 906,
+        "sha256": "64b699de0410b7ee1ff1c4afee5ec92181354388a4ddc33b3f136f4d183fcb20"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/resolution-result-dialog.component.ts",
+        "bytes": 1986,
+        "sha256": "5bd3dc0ce0048f571c76862e21eb05fa69b87a553412dd024f90be04c48d419a"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/resolution-result-table.component.html",
+        "bytes": 2623,
+        "sha256": "ccaefa0b0719d5d241155f0c1d830bf6845253a395e2d5558eafcc6cdf9229af"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/resolution-result-table.component.ts",
+        "bytes": 786,
+        "sha256": "e59b48ce37604b0e0f07af42329e2fd6ffd394c79c5323e876e5c10ce87ead5c"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/resolution-result.presenter.ts",
+        "bytes": 2587,
+        "sha256": "08d25c90cfb4397c58c4b4d7926da6b345976a2b438158fd6b5d52ec89526178"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/resolution-workbench.component.html",
+        "bytes": 1741,
+        "sha256": "14894223218ffed1236f9a6d1e2b131efccff9b8a7a6d50b928bd44772131cd7"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/resolution-workbench.component.ts",
+        "bytes": 2667,
+        "sha256": "74293839c302de98820692a68b3c5d805e74a63d7e965c01fbdfbe2f66e23c3b"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/resolution-workbench.css",
+        "bytes": 17635,
+        "sha256": "326627dc98a1246419dff36ce08dd9271e90b3e56b511d168da568850969ae9a"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/resolution-workbench.facade.ts",
+        "bytes": 5757,
+        "sha256": "e97e040245a50c620dfb2334b8900d1b981185ef5824f82a6dbc1adfe6344988"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/scenario-display-order.ts",
+        "bytes": 802,
+        "sha256": "bd693e8001db2d3f962291baaf23a18e746e1ea6d93f6cc0abb43b03dd0246b0"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/runtime-settings.service.ts",
+        "bytes": 1236,
+        "sha256": "7156fbabbd98d745186c7f2ae76885d18454c16c33190f10fac766ea0632f11e"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/scalar-text.ts",
+        "bytes": 229,
+        "sha256": "f9aa5906bb7d132f458ff1dce34f5db9244a7996f075aee9f0cd2c245642078f"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/settings-page.component.css",
+        "bytes": 5058,
+        "sha256": "df67c78c6f81c3dd3546ccd3f5c80d8ec8ff10e8a85eda4e18c9518b85c5e224"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/settings-page.component.ts",
+        "bytes": 9989,
+        "sha256": "925eb181fe538950b59d1353afbf2686488252331c218b331f0ea78e3c9f9ed8"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/ssi-account-reference-copy.ts",
+        "bytes": 1281,
+        "sha256": "eb73f9b3d33e9845c7e37955ed19de0b9b22e2ae380805ff3202fd2d224264da"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/ssi-maintenance-index.ts",
+        "bytes": 7141,
+        "sha256": "b7b5f73528947e1b214ef28a92e72b9178c12ac35562dda9c5c0d47182dc2c9e"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/swift-data-crud.component.css",
+        "bytes": 3050,
+        "sha256": "564eab5c4ff5708d84ce02a53200d9f63b333698bea260b650f9280a515abb40"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/swift-data-crud.component.html",
+        "bytes": 11035,
+        "sha256": "081b72ad5c20f85f5e47bd621ec0b362acbf2397145dda7f0aa3f08a2336d5f3"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/swift-data-crud.component.ts",
+        "bytes": 26591,
+        "sha256": "5a82df87742989a5022459aa9aee4d095b48d1be401113f84bf6b94c1c646f6a"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/tag-support-state.ts",
+        "bytes": 4485,
+        "sha256": "5e42e3d15b20b0be50c60620a53b5874918aa604765265525d6378edb1ce7074"
+      },
+      {
+        "path": "apps/ssi-portal/src/index.html",
+        "bytes": 226,
+        "sha256": "8eda973977ffe1b7413387fd1321e7dc722ec5e45d5a2c434d2a4d04bdf81bda"
+      },
+      {
+        "path": "apps/ssi-portal/src/main.ts",
+        "bytes": 686,
+        "sha256": "fc4679ece22bd4e3948d7979a31a5e8b19c666673c4e7c41a8f1c4f392b33264"
+      },
+      {
+        "path": "apps/ssi-portal/src/styles.css",
+        "bytes": 49103,
+        "sha256": "ad3e963a2dc0bbd137273f4f9143efc371332efaf2214abf3b0fbf298cb622b3"
+      },
+      {
+        "path": "apps/ssi-portal/tsconfig.app.json",
+        "bytes": 172,
+        "sha256": "644ce707b1897a18a5cd9d18398f384971e810747e9243686370f59440f0783c"
+      },
+      {
+        "path": "apps/ssi-portal/tsconfig.spec.json",
+        "bytes": 160,
+        "sha256": "2a3a751307584362a367bfad22668315444457985a312369e9833398132decbd"
+      },
+      {
+        "path": "apps/ssi-service/jest.config.ts",
+        "bytes": 607,
+        "sha256": "79b34f760a955547c9746a2935ebc00a5fd23dc27a8ad42e361e816abc19ef02"
+      },
+      {
+        "path": "apps/ssi-service/project.json",
+        "bytes": 1618,
+        "sha256": "f1e492bc387b520f8ecb2f5a294db8aa6b621785eb9722cf9251011f41975914"
+      },
+      {
+        "path": "apps/ssi-service/src/app/app.module.ts",
+        "bytes": 8182,
+        "sha256": "f7cad8840596ae17d0de69b66a9d2487af574e170d403e847894ecc765ba4fe7"
+      },
+      {
+        "path": "apps/ssi-service/src/app/audit-retention/audit-retention.controller.ts",
+        "bytes": 375,
+        "sha256": "d35689450d8cf6a02f758876504dd551512a77fac9ab0b9f3812647e7470e9ce"
+      },
+      {
+        "path": "apps/ssi-service/src/app/audit-retention/audit-retention.policy.ts",
+        "bytes": 2386,
+        "sha256": "a3c327583e550fdf103e7593a24ecd6b3941f64b0c37030d38cec9d2e157c160"
+      },
+      {
+        "path": "apps/ssi-service/src/app/audit-retention/audit-retention.repository.ts",
+        "bytes": 6013,
+        "sha256": "23eadaba001db126ccfd15c4110e5de0e778c59594cf4d61f4606b3ebec0450d"
+      },
+      {
+        "path": "apps/ssi-service/src/app/audit-retention/audit-retention.service.ts",
+        "bytes": 2988,
+        "sha256": "83a5a4af6c884007eecfce3bfd093ba4a27027d06b5d07c69d9b0a50bf824ba3"
+      },
+      {
+        "path": "apps/ssi-service/src/app/bank-service-directory.ts",
+        "bytes": 1117,
+        "sha256": "bcf5e51e5c75114f211bab2ea467c98671f9c85f7265788b50d35fa5b245170b"
+      },
+      {
+        "path": "apps/ssi-service/src/app/batch-resolution.service.ts",
+        "bytes": 5632,
+        "sha256": "e3e00c51c6d81c91496f28ce7e5c78403ab9ff4773379a9bac6fbb8bf4f3b48e"
+      },
+      {
+        "path": "apps/ssi-service/src/app/canonical-json.ts",
+        "bytes": 1336,
+        "sha256": "38bae395e611374c2c367fe9cfe97c0d39d9a639a605bd16b671769ca35b3ac6"
+      },
+      {
+        "path": "apps/ssi-service/src/app/clearing-systems.reference.ts",
+        "bytes": 886,
+        "sha256": "d34e969878ea33ad887209fc206835f5af0ff9841779f9ec29425795b2ed94d7"
+      },
+      {
+        "path": "apps/ssi-service/src/app/counterparty-ssi-resolution.service.ts",
+        "bytes": 34412,
+        "sha256": "aa7e753b3984b53d09dda4afbda3ae53892f7949ea02048e33d0e7eb8e8abd56"
+      },
+      {
+        "path": "apps/ssi-service/src/app/database-snapshot-identity.service.ts",
+        "bytes": 3972,
+        "sha256": "17db2311637b0fd7003837f202317e481fa7cbfeb1d877dd76fe48f64d8e43a6"
+      },
+      {
+        "path": "apps/ssi-service/src/app/development-data-reload.service.ts",
+        "bytes": 8897,
+        "sha256": "b3dd7fdaf0c0880621d436cb50a09decfa2596d30b400dc72b7df7825bf39aa8"
+      },
+      {
+        "path": "apps/ssi-service/src/app/entity/entity-application.service.ts",
+        "bytes": 4702,
+        "sha256": "43891bd9c25d6f88cf69279d9a718073e6eea33dede7df0851d81c2902aee31d"
+      },
+      {
+        "path": "apps/ssi-service/src/app/entity/entity.controller.ts",
+        "bytes": 1437,
+        "sha256": "58d2998797c1d5519c8504e9a5c2004a6ce146a91e787eb8cf044ac8f24cdd15"
+      },
+      {
+        "path": "apps/ssi-service/src/app/entity/entity.repository.ts",
+        "bytes": 575,
+        "sha256": "69673a640831b6ef210a042d9973e4af5a339a17213203d023a9f0629778bfe7"
+      },
+      {
+        "path": "apps/ssi-service/src/app/fin-5x-support-contract.ts",
+        "bytes": 1812,
+        "sha256": "82dae1f76c64d3fc97132702ae63dbdd92d3d074a07990b7160679adbdf4985e"
+      },
+      {
+        "path": "apps/ssi-service/src/app/fin-controlled-fixture.service.ts",
+        "bytes": 9854,
+        "sha256": "e020e3bbbfd0c639712c195897f2e4b11b87bd8b5b7ce21986f52aa57fd53337"
+      },
+      {
+        "path": "apps/ssi-service/src/app/fin-controlled-resolution.service.ts",
+        "bytes": 4848,
+        "sha256": "dda56584ada6fe4a083333e50157811710cb67ffbcc5e75267ea762b84f2f3f6"
+      },
+      {
+        "path": "apps/ssi-service/src/app/fin-field-resolution.controller.ts",
+        "bytes": 2425,
+        "sha256": "d9bf52aa0181960f2af3a18fe98941e212367a745aa952c34bac1fb0c5374cf8"
+      },
+      {
+        "path": "apps/ssi-service/src/app/fin-field-resolution.policy.ts",
+        "bytes": 5824,
+        "sha256": "a7dd9a6e366f3d9e90b987912df97d6d5ea0e46d02fb659f1691d18fb9b1564c"
+      },
+      {
+        "path": "apps/ssi-service/src/app/fin-field-resolution.service.ts",
+        "bytes": 22134,
+        "sha256": "aad99c272b79fbd2846feb27699afeca7722b21d0358681010a3cc966bf85c1b"
+      },
+      {
+        "path": "apps/ssi-service/src/app/imports/swift-data-import.controller.ts",
+        "bytes": 350,
+        "sha256": "5db4f958b64db18908229045b551752ef800d049d77efe88a1cef8186b00bed2"
+      },
+      {
+        "path": "apps/ssi-service/src/app/imports/swift-data-import.service.ts",
+        "bytes": 3709,
+        "sha256": "dcb05cb63273b9ad7e0127dff0c99509ebbfcc65245202703fed325b3a9847f7"
+      },
+      {
+        "path": "apps/ssi-service/src/app/index-pagination.policy.ts",
+        "bytes": 1216,
+        "sha256": "16325f4a80a7f063130b41ff6c585e2f5c74e356d58b8ca98394e6c3b8b81d9c"
+      },
+      {
+        "path": "apps/ssi-service/src/app/mapping-catalogue.service.ts",
+        "bytes": 6373,
+        "sha256": "bd02d56d7b68359a3c5a6e59b01cc359291aceca078ec01e20fc00d1c4fdc9bd"
+      },
+      {
+        "path": "apps/ssi-service/src/app/message-domain-resolution.controller.ts",
+        "bytes": 1180,
+        "sha256": "61cbfc91cb4ef7b47a317aef5915a8b6f184ad3e5ba3f7af1bd32a58f0c86359"
+      },
+      {
+        "path": "apps/ssi-service/src/app/message-domain-resolution.service.ts",
+        "bytes": 29756,
+        "sha256": "56bd79fd3d33a9e294c45bb14f9bc76636a46bf7b6bfb83526a7c6a965efbf4a"
+      },
+      {
+        "path": "apps/ssi-service/src/app/message-mapping.service.ts",
+        "bytes": 36716,
+        "sha256": "435692b3c98c4b3720bb8382290c411a681c1fcdeca1537918d9096b889360f8"
+      },
+      {
+        "path": "apps/ssi-service/src/app/message.controller.ts",
+        "bytes": 677,
+        "sha256": "f881de13b544e927ce91553d3e382568f22bce47412e29cbcbfb2a51229f1aa8"
+      },
+      {
+        "path": "apps/ssi-service/src/app/mt2-settlement-request.policy.ts",
+        "bytes": 3721,
+        "sha256": "9afe0d4b2785a716dd9817333c40f055322560b75871cadfd390f659f09f6c23"
+      },
+      {
+        "path": "apps/ssi-service/src/app/nostro/nostro-application.service.ts",
+        "bytes": 8914,
+        "sha256": "09face8a439e34f6fcc6ea11db5d66779f30e95fb9a2bcb30caa73d98b4351a4"
+      },
+      {
+        "path": "apps/ssi-service/src/app/nostro/nostro.controller.ts",
+        "bytes": 1773,
+        "sha256": "f1d64390e0ac1f0c1e0908c9ffef58e16f201e490da76658968aceaeee93088f"
+      },
+      {
+        "path": "apps/ssi-service/src/app/nostro/nostro.repository.ts",
+        "bytes": 4416,
+        "sha256": "7f821c1894fffe3cdeec22ae9004c71bbb5e43cd2eb70398d39935292f07e3ff"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/composite-resolution-page-definition.source.ts",
+        "bytes": 1125,
+        "sha256": "fe9a46de058527242e1c447e676208eecd21cb3e8a58e13908310449cb0b067b"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/mapping-resolution-page-definition.source.ts",
+        "bytes": 48801,
+        "sha256": "58345f280cdf4e318f62a813147972046ff816c9bdee4d982d1b297bfc6e4190"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/page-parameter-business-date.policy.ts",
+        "bytes": 6809,
+        "sha256": "2f8a9a381bc42002271894b415a1c37dc63490dbf2c1a442f0e79b7c8dec6778"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/page-parameter-environment.policy.ts",
+        "bytes": 742,
+        "sha256": "6c44b8fc1efb9e4be465b3f5204d1e2a50914e9cd553126f63043e8fc071cba2"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/page-parameter-lookup-defaults.service.ts",
+        "bytes": 3314,
+        "sha256": "a731d0a414cff0bed77140fecc823406ab1d88944cfaebd0679ab9d4b1d13191"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/page-parameter-lookup.service.ts",
+        "bytes": 19083,
+        "sha256": "6dfe3d98e8bafa7e9a1e3dbbad644bf511291e567879d59f3baf0bd46e5e63cc"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/page-parameter-validation-disposition.ts",
+        "bytes": 1099,
+        "sha256": "ed91b75cbac7bd3c45cf1d0d28747e59a5c7becd224d214bcd9833da03f38381"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/payment-governed-applicability.service.ts",
+        "bytes": 8964,
+        "sha256": "f78fe11c812ae8efeadb252f29df0d440dcae66eec0afa0576e84d66e26bc927"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/payment-own-account-eligibility.policy.ts",
+        "bytes": 2528,
+        "sha256": "2b43772c2e7670c0b556397ac7076ef12791ad6c7f35b29575823b76bc5feb39"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/payment-resolution-page-definition.source.ts",
+        "bytes": 32167,
+        "sha256": "b86c54443ac8448bd2061e19accb5449d949b0fb95acf743ef4510f3dda6292b"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/payment-resolution-page-submission.adapter.ts",
+        "bytes": 20130,
+        "sha256": "b49d76c64e39b4d628bdf7e301347cebfc1a8208aa8f163ee546e02cd8a35355"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/resolution-page-action.registry.ts",
+        "bytes": 783,
+        "sha256": "05f80af5004d93a2d0bae935a1d44e2e48a621f077d15205cc23d7b2bda8d182"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/resolution-page-aggregation.service.ts",
+        "bytes": 16719,
+        "sha256": "aeb0a14dfa6f32746bd2a569a3273fddb3fb9c7c9c5a972556c0dadbcdc2a974"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/resolution-page-cross-tag.validator.ts",
+        "bytes": 3374,
+        "sha256": "d26c89408f65c5d0193cd7f4137dc83b17b019adffea38db13b5e624480f5131"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/resolution-page-definition.controller.ts",
+        "bytes": 4452,
+        "sha256": "2a55d063bff71aacf1ea7e2c2242e2bb8c3164b8c9b1698c73af6b4daa98a4ad"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/resolution-page-definition.source.ts",
+        "bytes": 571,
+        "sha256": "1e0224fabbf310f70110c1f7fe8c5299a4e759681df5fdbbb539c7f1efa950f8"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/resolution-page-definition.validator.ts",
+        "bytes": 15315,
+        "sha256": "ce616ff9061c94ee54dcf4ed6cec4d01cca36411b7c1494c790ac0dd11a2af1c"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/resolution-page-fixture-manifest.service.ts",
+        "bytes": 3954,
+        "sha256": "05a95e03baa7d8e230291ef8c416ec508e17c8ffdad8d55a758e38dd21f6ee6d"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/resolution-page-oas-field-policy.service.ts",
+        "bytes": 8779,
+        "sha256": "959141a7501dc5a65227914f2aa381844bb91353d6606fcabdfd6f917ba4f144"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/resolution-page-scenario-catalogue.service.ts",
+        "bytes": 33272,
+        "sha256": "0f165dd4f3a1e87cf35b44ba16b5eaacfbd0e25bcd473be1ecf7b358fe52e217"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/resolution-page-submission.adapter.ts",
+        "bytes": 34684,
+        "sha256": "40dd3bfb22c7a4fb227b9f3f10580af0fe9599ad9f864d073e0ae2d552a06733"
+      },
+      {
+        "path": "apps/ssi-service/src/app/payment-message-index.service.ts",
+        "bytes": 6622,
+        "sha256": "07516bd9558655237a02aa74ae0bf4d91d35c550cd71efa583fe929c96bbe677"
+      },
+      {
+        "path": "apps/ssi-service/src/app/payment-settlement-profile.ts",
+        "bytes": 1843,
+        "sha256": "71e13e75b8cbcdba53cdea38a464798a198b346881bbf88537c247c709551641"
+      },
+      {
+        "path": "apps/ssi-service/src/app/reference-suggestion.controller.ts",
+        "bytes": 2084,
+        "sha256": "661469032d4201c59254f90cbdc88008fa2bde4a3dc6d934e6c857d77322ef56"
+      },
+      {
+        "path": "apps/ssi-service/src/app/rma/rma-application.service.ts",
+        "bytes": 9003,
+        "sha256": "12d5d02819acca345eea0d18a3420710ac171244e69c39147b7f88014549b8ea"
+      },
+      {
+        "path": "apps/ssi-service/src/app/rma/rma.controller.ts",
+        "bytes": 1809,
+        "sha256": "3c68c041ce5fe01751c36576fe2958d4ecd36f2654dda5e6e0f57ef314d0e359"
+      },
+      {
+        "path": "apps/ssi-service/src/app/rma/rma.repository.ts",
+        "bytes": 4459,
+        "sha256": "2cd1aaf01839b8cad016328bc35d4430069ced8c23d6c860443ddc0f9aa2e399"
+      },
+      {
+        "path": "apps/ssi-service/src/app/route-resolution.policy.ts",
+        "bytes": 21873,
+        "sha256": "6cdb863f5f5faaf4674d9667c93d5ffd7c05915ba9f20d2566d808c3fdf65b1d"
+      },
+      {
+        "path": "apps/ssi-service/src/app/runtime-environment.policy.ts",
+        "bytes": 668,
+        "sha256": "16f49d238314e00f474d6e2ac101a57c79c41ebbbdb22eb75249aa1f26d38685"
+      },
+      {
+        "path": "apps/ssi-service/src/app/runtime-settings.controller.ts",
+        "bytes": 826,
+        "sha256": "97e814d2846f44680a2b74789ace5041d066634c14e5f9d86544b7d3c3e411f8"
+      },
+      {
+        "path": "apps/ssi-service/src/app/sample-import.service.ts",
+        "bytes": 3121,
+        "sha256": "69f9e99f94c573cadc703aba3a50011d84bc59678d27e628e6c31dd0022cc0a0"
+      },
+      {
+        "path": "apps/ssi-service/src/app/sample.controller.ts",
+        "bytes": 506,
+        "sha256": "f12dcbdd0e62dcbda411cf3d155574832548a78b8a663ed4c403e06a13c3f08c"
+      },
+      {
+        "path": "apps/ssi-service/src/app/scalar-text.ts",
+        "bytes": 229,
+        "sha256": "f9aa5906bb7d132f458ff1dce34f5db9244a7996f075aee9f0cd2c245642078f"
+      },
+      {
+        "path": "apps/ssi-service/src/app/settlement.controller.ts",
+        "bytes": 36127,
+        "sha256": "0054f15344b4b22dac42a19b06d523403d197bf34d933746a0c9402bea5eaa0a"
+      },
+      {
+        "path": "apps/ssi-service/src/app/shared/governed-lifecycle-controller.delegate.ts",
+        "bytes": 1617,
+        "sha256": "3ca7932be5ffc95e75b8cce2a3585f41ee5500489b393857880569b23059dd2f"
+      },
+      {
+        "path": "apps/ssi-service/src/app/shared/sqlite-governed.repository.ts",
+        "bytes": 4387,
+        "sha256": "fc858efa546a4bfe9e754fa5f579a5f32b034ded0b12184bd988290bb7bba06f"
+      },
+      {
+        "path": "apps/ssi-service/src/app/sqlite-ssi.repository.ts",
+        "bytes": 14373,
+        "sha256": "aec678d78a788198e831eb4ad2b3d412f5b00d1a0b520f81efa79c6b68e8ae6f"
+      },
+      {
+        "path": "apps/ssi-service/src/app/ssi-application.service.ts",
+        "bytes": 32526,
+        "sha256": "22acbcdcba3cb5241bcc35d2e6bc722701ce4796fcc9d4fed78fec00e5f0b9ec"
+      },
+      {
+        "path": "apps/ssi-service/src/app/ssi-data-quality.service.ts",
+        "bytes": 5880,
+        "sha256": "637fe4d538aa75116876d763620b0c96448384410a609c384f41fa4ca346f7e7"
+      },
+      {
+        "path": "apps/ssi-service/src/app/ssi.controller.ts",
+        "bytes": 2245,
+        "sha256": "20f387c32ed052d353b2fdcbf4c8b4aa62b6cf97ef6c0624f84c746416c28368"
+      },
+      {
+        "path": "apps/ssi-service/src/app/value-date.ts",
+        "bytes": 603,
+        "sha256": "e8d164bf223b6f930a343559d6c35def8f1dd3d348b44229127d5a3e495dc29a"
+      },
+      {
+        "path": "apps/ssi-service/src/main.ts",
+        "bytes": 505,
+        "sha256": "13a7f33a2cef6d276ff6dda0a7f00b1b8a9c4f8b5b7bbba710171b7ef83b089c"
+      },
+      {
+        "path": "apps/ssi-service/tsconfig.app.json",
+        "bytes": 247,
+        "sha256": "531cab6ab6342ad3b6d6ddc83dde3136826d4a059b86873a8f0296bbd8fb55c3"
+      },
+      {
+        "path": "apps/ssi-service/tsconfig.spec.json",
+        "bytes": 160,
+        "sha256": "2a3a751307584362a367bfad22668315444457985a312369e9833398132decbd"
+      },
+      {
+        "path": "apps/ssi-web-components/jest.config.ts",
+        "bytes": 314,
+        "sha256": "9b7582d249210c8e506a6df5b347a38261260734b25c2b3b69d7a6069f483a31"
+      },
+      {
+        "path": "apps/ssi-web-components/project.json",
+        "bytes": 1364,
+        "sha256": "79493d80b5f77ec6ee0ac85dfc9958aec5f024d3630cd444e9c06e1df0515540"
+      },
+      {
+        "path": "apps/ssi-web-components/src/index.html",
+        "bytes": 307,
+        "sha256": "8f9c50148bedcbb9bef1e03b521d5915b9ed33b379f29caba71e5c1343d4eabd"
+      },
+      {
+        "path": "apps/ssi-web-components/src/main.ts",
+        "bytes": 538,
+        "sha256": "9ec59da506b366da9ce614f8fa37d951c1a796a3cac8042ca6c42c67a93a0bb7"
+      },
+      {
+        "path": "apps/ssi-web-components/src/resolution-widget.component.ts",
+        "bytes": 1616,
+        "sha256": "889172312a5319168e49272af9f3fc1f55b94c29805aee9bae3d4a67f7aaa934"
+      },
+      {
+        "path": "apps/ssi-web-components/tsconfig.app.json",
+        "bytes": 166,
+        "sha256": "23107c531e2aa4d1d2ea1ff993849d6e923abadbf32a77897e31d173a89b39f7"
+      },
+      {
+        "path": "libs/contracts/src/index.ts",
+        "bytes": 1029,
+        "sha256": "0302d5dd086ea65a85a1d60a9413e7e9e155affda269ceb8ec34611f87dad646"
+      },
+      {
+        "path": "libs/contracts/src/page-parameters.ts",
+        "bytes": 20324,
+        "sha256": "abb678d34f4bcd800dd1bedeb7b1609485dc2dd4f0f79bbb300fb0eb3016bb06"
+      },
+      {
+        "path": "libs/domain/jest.config.ts",
+        "bytes": 433,
+        "sha256": "e2f4ab955afd889421c9a0fefc073567a9a21e3eae6883e9dd09961815eaf88b"
+      },
+      {
+        "path": "libs/domain/project.json",
+        "bytes": 615,
+        "sha256": "1f8f0035718dc8b4cbf53d07cfd35f03165568789038dfdbad8c98841ea1f48c"
+      },
+      {
+        "path": "libs/domain/src/index.ts",
+        "bytes": 99,
+        "sha256": "415ea2c6d6541d4c35f43133cd2d18a86eeadecb88d2283b879bf8fc0b3e2a46"
+      },
+      {
+        "path": "libs/domain/src/lib/fin-5x-support.ts",
+        "bytes": 1783,
+        "sha256": "29132f5d4101f42a8f9d6d3b8bed11630688fb6a52941497eab7bf22851c6eed"
+      },
+      {
+        "path": "libs/domain/src/lib/payment-settlement-profile.ts",
+        "bytes": 7593,
+        "sha256": "776b74a4d5afc8db672fcbcfb68ccdd061f43d35501c2ec3d7ce4ea51e95a9d4"
+      },
+      {
+        "path": "libs/domain/src/lib/resolution.ts",
+        "bytes": 1813,
+        "sha256": "859d948024a5ba0fa090aa58d712281e5fff1d65056e4b14f97168e85ff9832e"
+      },
+      {
+        "path": "libs/domain/src/lib/ssi.ts",
+        "bytes": 3875,
+        "sha256": "43abbd5a0b98c72cba5d368b21b24e0eba754c959463f7908f455f4ee37f2cdb"
+      },
+      {
+        "path": "libs/domain/tsconfig.lib.json",
+        "bytes": 197,
+        "sha256": "0dc3b7ea29b0ebc67ab7d0fbf3e8dad5a8474aedde4ce64e11d53ee125c67e2e"
+      },
+      {
+        "path": "libs/domain/tsconfig.spec.json",
+        "bytes": 137,
+        "sha256": "8caa55cba3ca3f953d96eb2822ddaea87fbbc8958e3eb519298f393f89b21610"
+      },
+      {
+        "path": "libs/parameter-engine/jest.config.ts",
+        "bytes": 453,
+        "sha256": "fcbe79dd164d6c3d6cc15a384b349042ee404bfa779aa1cc743933cd244bff7b"
+      },
+      {
+        "path": "libs/parameter-engine/project.json",
+        "bytes": 597,
+        "sha256": "ccda82f54881d8bb748358d7284290464e34bde0f023f84fa2f937717d78f46d"
+      },
+      {
+        "path": "libs/parameter-engine/src/index.ts",
+        "bytes": 75,
+        "sha256": "f226fbdfbdf9a937a0bd486184b086baf54b7288e2229a1d8caf0629aa39ba46"
+      },
+      {
+        "path": "libs/parameter-engine/src/lib/bank-service-catalogue.ts",
+        "bytes": 3830,
+        "sha256": "7d4fa6e580f0dde821f972e4b3b23add269210484902671808d2fffce7572a92"
+      },
+      {
+        "path": "libs/parameter-engine/src/lib/rules.ts",
+        "bytes": 1619,
+        "sha256": "bc2ab0cf09bdd30965f8afad7423bfb3e7eacbf7a9c9aa84c0874b3b79eafd55"
+      },
+      {
+        "path": "libs/parameter-engine/src/lib/scalar-text.ts",
+        "bytes": 229,
+        "sha256": "f9aa5906bb7d132f458ff1dce34f5db9244a7996f075aee9f0cd2c245642078f"
+      },
+      {
+        "path": "libs/parameter-engine/tsconfig.lib.json",
+        "bytes": 197,
+        "sha256": "0dc3b7ea29b0ebc67ab7d0fbf3e8dad5a8474aedde4ce64e11d53ee125c67e2e"
+      },
+      {
+        "path": "libs/parameter-engine/tsconfig.spec.json",
+        "bytes": 137,
+        "sha256": "8caa55cba3ca3f953d96eb2822ddaea87fbbc8958e3eb519298f393f89b21610"
+      },
+      {
+        "path": "libs/swift-ssi-mapping/jest.config.ts",
+        "bytes": 455,
+        "sha256": "bcf999666f690a46ee25c4bad948d1a1f3208ec7c8b1b47c4f46ea784e407660"
+      },
+      {
+        "path": "libs/swift-ssi-mapping/project.json",
+        "bytes": 601,
+        "sha256": "b8c742357b5b6c011306ee736b4ca51d00f66cd2f107771e5bb88f00b7eb01fd"
+      },
+      {
+        "path": "libs/swift-ssi-mapping/src/index.ts",
+        "bytes": 31,
+        "sha256": "c8ec94421591b9371abd813c64963f84ff2e693ae23da1c7eb9871f1acee2b91"
+      },
+      {
+        "path": "libs/swift-ssi-mapping/src/lib/mapping.ts",
+        "bytes": 2402,
+        "sha256": "f3e9c287b4bfe60562f88a0e776210bc28ef27ff22a40fbad4bc19791d992c02"
+      },
+      {
+        "path": "libs/swift-ssi-mapping/src/lib/pseudo-parser.ts",
+        "bytes": 3162,
+        "sha256": "9421117dad467229f67fe1ab958378e5d985f81cfaa5877a1b3b3e03cdde954a"
+      },
+      {
+        "path": "libs/swift-ssi-mapping/src/lib/scalar-text.ts",
+        "bytes": 229,
+        "sha256": "f9aa5906bb7d132f458ff1dce34f5db9244a7996f075aee9f0cd2c245642078f"
+      },
+      {
+        "path": "libs/swift-ssi-mapping/tsconfig.lib.json",
+        "bytes": 191,
+        "sha256": "e93540d135f12ae861fbec5415357e401cc77c9eec046d48b48e0a353da56c9d"
+      },
+      {
+        "path": "libs/swift-ssi-mapping/tsconfig.spec.json",
+        "bytes": 137,
+        "sha256": "8caa55cba3ca3f953d96eb2822ddaea87fbbc8958e3eb519298f393f89b21610"
+      },
+      {
+        "path": "scripts/mt2-final-qa/__pycache__/update-referential-audit-workbooks.cpython-312.pyc",
+        "bytes": 8264,
+        "sha256": "eeb6478309b3787d1709b16b6e0ac8cc3ffa14a70bb58885aa9423864e03420f"
+      },
+      {
+        "path": "scripts/mt2-final-qa/aggregate-coverage.mjs",
+        "bytes": 1760,
+        "sha256": "55e4584b9f13df9f7df5d8ccde8f5959d035d7f842dd51208b6661bf22379b18"
+      },
+      {
+        "path": "scripts/mt2-final-qa/augment-canonical-ui-data.py",
+        "bytes": 13734,
+        "sha256": "4184d673ab1d69c90248ff915f00f44a90413a3e8298829c40b00b49aee020b6"
+      },
+      {
+        "path": "scripts/mt2-final-qa/case-result-gate.mjs",
+        "bytes": 1869,
+        "sha256": "15d4bf35a536bcc2dc5e27329855cd362961b977c446a952e9b7ef2d8159d31f"
+      },
+      {
+        "path": "scripts/mt2-final-qa/config-loader.mjs",
+        "bytes": 2325,
+        "sha256": "30bdb32ca2cd0ef4b09cc56d95361b36f06341b78f524b4304be608edcc97a52"
+      },
+      {
+        "path": "scripts/mt2-final-qa/evidence-reporter.mjs",
+        "bytes": 801,
+        "sha256": "ecbff993b68cc55a074364f1a8a02735deb5eda8ea824f0554ea3c0698e1ac8c"
+      },
+      {
+        "path": "scripts/mt2-final-qa/execute-cases.mjs",
+        "bytes": 3684,
+        "sha256": "aa930c253056503bb0bb2335c9ba682aa59bd73a1f3adeeb871b03810be2d809"
+      },
+      {
+        "path": "scripts/mt2-final-qa/execute-prepared-cases.mjs",
+        "bytes": 2136,
+        "sha256": "1b7a882f3735a80f5c2c144c01851a6dc40cebc6c9bfa09f77634862753c1dce"
+      },
+      {
+        "path": "scripts/mt2-final-qa/expected-output-validator.mjs",
+        "bytes": 2085,
+        "sha256": "68e17ddb0b72484953a680b29a07064b81c270a02014bb3d7b996f7d9cd43a42"
+      },
+      {
+        "path": "scripts/mt2-final-qa/generate-mt2-139-word.mjs",
+        "bytes": 18953,
+        "sha256": "601d7b541950abc1ef0c0739a0028a7e2ce64cd0fd56f4906752604c7fd81657"
+      },
+      {
+        "path": "scripts/mt2-final-qa/generate-v151-qa-charts.py",
+        "bytes": 3238,
+        "sha256": "cee258ea200f41c33bf3d006fb91d55f26c2d28ca308b8c30a72aed650fd5cce"
+      },
+      {
+        "path": "scripts/mt2-final-qa/generate-v151-qa-report.mjs",
+        "bytes": 11835,
+        "sha256": "cdd367c03d4413c8e05166419d328965ca56e2530587516c198de7d473b2e25b"
+      },
+      {
+        "path": "scripts/mt2-final-qa/metric-gate.mjs",
+        "bytes": 1034,
+        "sha256": "e8bbdf10edc86934eaa79740b7a04e32f7331fb98b871dae0608488aedd116f1"
+      },
+      {
+        "path": "scripts/mt2-final-qa/mt2-pacs009-rework-gate.mjs",
+        "bytes": 3316,
+        "sha256": "32bb7ea9ec709e34db1753b0be0a12d2fdee6a3a253fa60854804f60454b8b1e"
+      },
+      {
+        "path": "scripts/mt2-final-qa/oas-contract-verifier.mjs",
+        "bytes": 4397,
+        "sha256": "0a3a6bd1878159b8200928e7d130b2154515774b2372f48e9196b830dd51002a"
+      },
+      {
+        "path": "scripts/mt2-final-qa/orchestrator.mjs",
+        "bytes": 568,
+        "sha256": "9365619e777b7fc267ca65582b2437e25ba6d77faf72283ec085cedf4d6e3db2"
+      },
+      {
+        "path": "scripts/mt2-final-qa/prepare-v151-uat-workbook.py",
+        "bytes": 16208,
+        "sha256": "feb23f45c23eb4c6cb9a1059a1495b67fcf35edf88109081bcf43ddab4ff74a4"
+      },
+      {
+        "path": "scripts/mt2-final-qa/process-gate.mjs",
+        "bytes": 1988,
+        "sha256": "50562c10c793c548df89bdbc2530d95b49f5a3dff2b72196f8cea065bde4effa"
+      },
+      {
+        "path": "scripts/mt2-final-qa/quality-gate.mjs",
+        "bytes": 490,
+        "sha256": "72200e45b38aab28dccee3a9d7d8a18df303bcb62d0aec3be277e0cc0a30f9fa"
+      },
+      {
+        "path": "scripts/mt2-final-qa/run.mjs",
+        "bytes": 2026,
+        "sha256": "53051912665cdd4322f1e9c6d1ed3bff21fef64d19d07eff21c90d94e0c90c96"
+      },
+      {
+        "path": "scripts/mt2-final-qa/sonar-analysis-identity.mjs",
+        "bytes": 5298,
+        "sha256": "7b1cc6309b653be71eba6ff87c38efb3fcb5bd1f266e65f327cab116903f7af1"
+      },
+      {
+        "path": "scripts/mt2-final-qa/sonar-current-analysis.mjs",
+        "bytes": 21272,
+        "sha256": "20abbfc978f6a619ef5d77cc56efb1762dd977dce96f5e9991a13a3577f35262"
+      },
+      {
+        "path": "scripts/mt2-final-qa/test_augment_canonical_ui_data.py",
+        "bytes": 896,
+        "sha256": "24ab0cd0c5f720f8b84e8fe07576543d6a07c434315ae7cf04dc8c9de049c339"
+      },
+      {
+        "path": "scripts/mt2-final-qa/update-referential-audit-workbooks.py",
+        "bytes": 6095,
+        "sha256": "465aeaec63b8707963d9f88b6cb3fdc4b4ac6c7af184c1b26b5fae5a1699382d"
+      },
+      {
+        "path": "scripts/mt2-final-qa/update-v151-ssi-workbooks.py",
+        "bytes": 5655,
+        "sha256": "5483fb9acbadb33a4903766bb1fc57e90c54feef8da1102aeca1a79cb316fc62"
+      },
+      {
+        "path": "scripts/mt2-final-qa/verify-mt2-oas.mjs",
+        "bytes": 888,
+        "sha256": "2c9e0418959f3443168d86098d2e7be9d13240a45f300766eb2c6b6147c85068"
+      },
+      {
+        "path": "scripts/mt2-final-qa/workbook-gate.mjs",
+        "bytes": 2046,
+        "sha256": "be9c6b1375e779dfb9e84ffa1007c26f70a2ae9f5c6f7c8d951143a23b95df3b"
+      },
+      {
+        "path": "scripts/mt2-final-qa/xlsx-table-reader.mjs",
+        "bytes": 1451,
+        "sha256": "d765b8bc4eb22669fbeb0d4179eac6a421d00fa02599cc62ebb188bb0bed69b7"
+      },
+      {
+        "path": "scripts/mt347-final-qa/__pycache__/build-controlled-fixtures.cpython-312.pyc",
+        "bytes": 40177,
+        "sha256": "df5bd418141293a87d1356c28de380245d7af235effed9dc130f65444df23de7"
+      },
+      {
+        "path": "scripts/mt347-final-qa/__pycache__/expand-positive-counterparties.cpython-312.pyc",
+        "bytes": 21148,
+        "sha256": "c95c8a904ac3cc226e99a87eb4eaeb0b6328df60705050b96a0eea8ece3a5ec8"
+      },
+      {
+        "path": "scripts/mt347-final-qa/build-controlled-fixtures.py",
+        "bytes": 34265,
+        "sha256": "7642a4a2779b7c4157e6746c00ebf01005776ba91a1b431a68ebe86f62892095"
+      },
+      {
+        "path": "scripts/mt347-final-qa/expand-positive-counterparties.py",
+        "bytes": 16762,
+        "sha256": "d6d1e20fdc7164bedb5b32a6ea5df1cc82d36d4a9dccaf616434958f55163c9d"
+      },
+      {
+        "path": "scripts/mt347-final-qa/govern-negative-execution-context.mjs",
+        "bytes": 984,
+        "sha256": "23058d9e500e0f9be4192a37d590014ea946cae9601815b423e623dd292b7993"
+      },
+      {
+        "path": "scripts/mt347-final-qa/run-controlled-positive-uat.mjs",
+        "bytes": 3232,
+        "sha256": "e0fd3cedbac3a45cd836695784952645aae7a6b46e89ceb38c79cbea665c2f71"
+      },
+      {
+        "path": "scripts/mt347-final-qa/run-executable-lookup-matrix.mjs",
+        "bytes": 2179,
+        "sha256": "74ebff84040941ee944bd6ca2c6e19dec40f77c9be43056f9719baecef44d5ee"
+      },
+      {
+        "path": "scripts/mt347-final-qa/run-generic-ssi-browser-matrix.mjs",
+        "bytes": 37277,
+        "sha256": "c8102e8e1266fee3497905cf7196813ce2705ec2a517b8bfeb4771c5c12fc2d5"
+      }
+    ]
+  },
+  "analysisId": "2cdadcdf-50c8-4886-910e-a3e1a2ad24b3",
+  "ceTaskId": "e9179832-56b5-4a1e-ae99-f0f45eaa6e1a",
+  "analysisPurpose": "DUPLICATION_MEASUREMENT",
+  "analysisMode": "scan",
+  "dashboardUrl": "http://host.docker.internal:9000/dashboard?id=lc-ssi-wc",
+  "discoveredTypeScriptConfigs": [
+    "apps/mock-reference-services/tsconfig.app.json",
+    "apps/ssi-bff/tsconfig.app.json",
+    "apps/ssi-portal/tsconfig.app.json",
+    "apps/ssi-service/tsconfig.app.json",
+    "apps/ssi-web-components/tsconfig.app.json",
+    "libs/domain/tsconfig.lib.json",
+    "libs/parameter-engine/tsconfig.lib.json",
+    "libs/swift-ssi-mapping/tsconfig.lib.json"
+  ],
+  "analyzerTypeScriptManifest": {
+    "algorithm": "sha256",
+    "digest": "31a459f7f2e5ce4e84a11e4962885f551e81f90242f3381957191637684cef41",
+    "files": [
+      {
+        "path": "apps/mock-reference-services/jest.config.ts",
+        "bytes": 328,
+        "sha256": "5b81fca4928e67255652eb9a7f28b9e2f17ef4ab5218281a52ab6c1b9dcc4e7f"
+      },
+      {
+        "path": "apps/mock-reference-services/src/main.spec.ts",
+        "bytes": 7994,
+        "sha256": "a7718b3cc13050fae473d8b5aebe1b68caf339508533a3df0f1b2a2ee1078964"
+      },
+      {
+        "path": "apps/mock-reference-services/src/main.ts",
+        "bytes": 12454,
+        "sha256": "b9a57107bf9143e1164c946298b53a8c8391aacdfaf193c6a6f120ec2b7ff7de"
+      },
+      {
+        "path": "apps/ssi-bff/jest.config.ts",
+        "bytes": 296,
+        "sha256": "e75d79a581377bbe7a2e2da447d94c65d7c46d809331950a9754742c7d61feb5"
+      },
+      {
+        "path": "apps/ssi-bff/src/main.spec.ts",
+        "bytes": 19626,
+        "sha256": "31718292ae3b2db63283d99c323bba540625057b9eaeb2765c354dd3b9622db3"
+      },
+      {
+        "path": "apps/ssi-bff/src/main.ts",
+        "bytes": 21483,
+        "sha256": "ac8f611af47969496c6bd101c213c5f1f697ada04a273ecddbd60caa42f5e975"
+      },
+      {
+        "path": "apps/ssi-bff/src/upstream-api.interceptor.spec.ts",
+        "bytes": 10160,
+        "sha256": "f27eb951950857899288c566ddb7e27064ce98cc43b919a6ec954d2e1d6e95c6"
+      },
+      {
+        "path": "apps/ssi-bff/src/upstream-api.interceptor.ts",
+        "bytes": 7910,
+        "sha256": "4f5778aa656ce141c33856013fcc5624a93d67c259570123cd11a20679e4063a"
+      },
+      {
+        "path": "apps/ssi-portal/jest.config.ts",
+        "bytes": 783,
+        "sha256": "9d12d89c08cd4cb147448c09558902e5133f59da595680a10fa9bc4b73ba761b"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/alert.component.spec.ts",
+        "bytes": 1578,
+        "sha256": "6be6da2aaddb92225e66c3bf1037a68c7729f6d3068f403cf43be082e84bf3ef"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/alert.component.ts",
+        "bytes": 1744,
+        "sha256": "7104be0613462ffbeb0fa83b00513e59f706253d24ccd41e7722f702d8f35991"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/alert.model.ts",
+        "bytes": 571,
+        "sha256": "c89b5acc2805cfb9b8718079ac35734589f962b49054f1fce2d6688586092889"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/app.component.ts",
+        "bytes": 127093,
+        "sha256": "de1676afe3ce5fa15a4a7b9b5af42385e113e7fa94db81e43caa6cd8484bf94a"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/audit-presentation.spec.ts",
+        "bytes": 1806,
+        "sha256": "ca97b8ae63e0e0c4496c557e91f0b88edd7d5a9aa9ecbd7d7d1684aebcffce4d"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/audit-presentation.ts",
+        "bytes": 3665,
+        "sha256": "3bb7f406948c60fb3038a1868291125662c1b2a0c9d6ab6c121cb2e488001741"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/bank-service-picker-dialog.component.ts",
+        "bytes": 2488,
+        "sha256": "99e75934a8f9a81488ea300af06551164a78ab403fb2f9e1a31f909f37da7d79"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/bank-service-picker-dialog.spec.ts",
+        "bytes": 2155,
+        "sha256": "338afabf0e27f7ecc02ae102ea7253bf4e75053ccebb40181ce5bd41ee240edc"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/component-behavior.spec.ts",
+        "bytes": 70494,
+        "sha256": "e5b5e4b5c1be710e4bde7843da4826a85eafbcf26f60bf8e377afad35a9d312d"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/demo-suggestion-candidates.spec.ts",
+        "bytes": 4120,
+        "sha256": "24bad72a452533eee9385ce55c5ab9817f6011e5bb040102ff4eca015712d387"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/demo-suggestion-candidates.ts",
+        "bytes": 8453,
+        "sha256": "2bec42a617b8887a3177280f1af55e0934f8442d4de31a4ec74d48d13a6e49c5"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/fin-5x-route-analysis.spec.ts",
+        "bytes": 7804,
+        "sha256": "eb599e9b599e8e7b5849d51a26eaba07ee8cb7e047d489647c1399cf0068a2f5"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/fin-5x-route-analysis.ts",
+        "bytes": 6603,
+        "sha256": "4f1b7601afa39b9fdca7cc0b54864c9da573d40c28854f604ef99abd0f3cef22"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/formly-types.ts",
+        "bytes": 2654,
+        "sha256": "5e24d2bf25d04629369bb047fb4d50be410b5fb9e968c06c20942250fb9ec340"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/mt2-resolution-presentation.spec.ts",
+        "bytes": 3382,
+        "sha256": "c596c33134c8a0a1b569e1b07a804f0b498023a9b4e06a24392a1f49a1e17d64"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/mt2-resolution-presentation.ts",
+        "bytes": 4243,
+        "sha256": "2ac646baa9708375c006e66dd4c54a8d25a096fbcb9b0a852b69e5523d8ee664"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/official-field-name.spec.ts",
+        "bytes": 559,
+        "sha256": "63bbab3bf642abdd8b21b50df750504b4a3dd96c90865cb46765ca146b88fbfa"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/official-field-name.ts",
+        "bytes": 338,
+        "sha256": "1ae2e30e4d2fb64d8ae0fb7634554dc88f90857c23fb52eca52a175be1685d2b"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/operational-issue.component.ts",
+        "bytes": 985,
+        "sha256": "80d5caf8e4deec278307e150f9e3f208a30f4b6f9549e69954490d18e5f3c7c9"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/operational-issue.spec.ts",
+        "bytes": 2120,
+        "sha256": "d9a7bdf5804521833a519ecb65b714f1dbbc8ba2baebaf02a8fc4ec8be3008bb"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/operational-issue.ts",
+        "bytes": 4270,
+        "sha256": "99e88c36f9070eeaa01d1b1a7dde055a0abbac42fe0eb37e7f9b304f8c99b1f1"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/payment-message-index.spec.ts",
+        "bytes": 2919,
+        "sha256": "cdf95f335cb562e36809e469a6171ca3b29f41cccd3e90ce1d952967c670c24a"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/payment-message-index.ts",
+        "bytes": 2185,
+        "sha256": "5bfa801ae817804be7fadee01dae611db45c82da73b088a119685f6baa44e6d2"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/payment-message-scenarios.spec.ts",
+        "bytes": 2779,
+        "sha256": "cc0db88cf72d19d2658d08d662af457520d14de1d15f41dceed40872b9a74b2c"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/payment-message-scenarios.ts",
+        "bytes": 5626,
+        "sha256": "b550cbb9ff16e883dadb3c0e71388467c1d8487f4b51b9d00771836e77ec44cc"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-route-selection.spec.ts",
+        "bytes": 1037,
+        "sha256": "d613b402f997094991344c046fe78e6df24d96d18274e89680e0876243f68725"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-route-selection.ts",
+        "bytes": 513,
+        "sha256": "fb1b16daaf83fec61d5891cdb1954f594a75b516ef261b9549d52fdad4488a1d"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/bank-service-lookup.component.spec.ts",
+        "bytes": 5008,
+        "sha256": "faf5129dbe79a30c35b33d71d7d880a2ad313b2671ee547f6b48343f824a50da"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/bank-service-lookup.component.ts",
+        "bytes": 8133,
+        "sha256": "60076a17a59f1fe571eacef9d740d73e7ae7b1eb17fa0330b69935f3e025161b"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/bank-service-presentation.ts",
+        "bytes": 307,
+        "sha256": "4b07c7a7c72d0d79af69af377d8b1a208570757e4df2f5d57e52e0b3eeb1f4d8"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/generic-parameter-form.component.ts",
+        "bytes": 5841,
+        "sha256": "5e9d08e9030a097891a87845794edc178a38e1e4f70a7dfdd913f8de688160ad"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/generic-ui.acceptance.spec.ts",
+        "bytes": 17892,
+        "sha256": "98523edf9168b39468fc1007336e4c1835522c0df2ffdcfa79efca62c7541907"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/index.ts",
+        "bytes": 237,
+        "sha256": "0bcd0628f9e6c972210a931c49ad529e24af8e63a787dc5ec0418ec3e9174ad1"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/lookup-resolution-key.ts",
+        "bytes": 1095,
+        "sha256": "c5e527cd9925de40169323f0fa57caa69251739e3c8d18f2c3b0f799e46cb28e"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/new-code-components.spec.ts",
+        "bytes": 18064,
+        "sha256": "1af91b8b231c03d848702fb3b17786790074ae152f0a98a0ec904f1648f4976c"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/page-definition-index-interaction.spec.ts",
+        "bytes": 5027,
+        "sha256": "7538cebb3c841ab49f148c55f0db8c80d16195d2d44f4f1730ee62e2475d22ab"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/page-definition-index-workspace.component.spec.ts",
+        "bytes": 10141,
+        "sha256": "9fe5b7e3de70ef3fc4f52dcb6b53383af74bcedb90f50fa9f312d7add2df3a84"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/page-definition-index-workspace.component.ts",
+        "bytes": 11346,
+        "sha256": "a2b4787f179ae3fc88e68a0d05f4453140258e85923b56d6e536c983a9d2b66e"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/page-definition-index.spec.ts",
+        "bytes": 7626,
+        "sha256": "0d6e41e4ca5fbc3e84d2a19fe305743df7c8057fc26bc78bcd1cf4f7fe05d000"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/page-definition-index.ts",
+        "bytes": 7052,
+        "sha256": "83aa9a39649a934093bb786bc98156bbc8042670d3bbc74d2ee5a0f4d60c6caf"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/page-parameter.client.ts",
+        "bytes": 6020,
+        "sha256": "1502b0f03fb0d3d8ed9c653711bce78be5e7e984285f3681bafc0f02f1787efd"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/page-parameter.contract.ts",
+        "bytes": 454,
+        "sha256": "15235d1905ba90cafd1e88474c831749daade5143b5e6abd62bbe160b0538481"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/pagination.spec.ts",
+        "bytes": 1446,
+        "sha256": "c05f88c170ccbc644a620395b671cbdc352292ce4346f77d3ddb6f525c8469ac"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/pagination.ts",
+        "bytes": 1782,
+        "sha256": "0c07809c5e5c6fec3ec739e628a50e58c8ad0e1ab3b61d574c9ff9fcd6848920"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/parameter-dependencies.spec.ts",
+        "bytes": 2733,
+        "sha256": "5e53aa7b3e2b17bceb53ce6e878709869ad3c73c78ef06c0c6b1e2e262873d28"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/parameter-dependencies.ts",
+        "bytes": 1782,
+        "sha256": "010d6d9d68e3f4269985d8b5e75f62c1ad7b0751026969db47354f1e5a25415d"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/parameter-form-values.spec.ts",
+        "bytes": 1580,
+        "sha256": "6edd41c716f113eb5b8e06ef4e19ecb61a4a5e22aa9b927f1b105673763d37a0"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/parameter-form-values.ts",
+        "bytes": 1861,
+        "sha256": "3a8289c41e4e14746a8f58e347834996ca726fd6fdce4dcfa4bfe778471a43de"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/parameter-lookup.facade.spec.ts",
+        "bytes": 13183,
+        "sha256": "235ba33df00d083108648d6b19265b89ca2b549a1a5760db5e01a7bffed6638f"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/parameter-lookup.facade.ts",
+        "bytes": 7105,
+        "sha256": "4a0cdbf4f7c77f078aad89e22c646450014b35e9659a87ab7aa4f8a6eeecdcb4"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/parameter-model.mapper.spec.ts",
+        "bytes": 14448,
+        "sha256": "543a74fe293d0f393008876c05b348e7bb4979a5787ac6edefb20aec9124b159"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/parameter-model.mapper.ts",
+        "bytes": 10789,
+        "sha256": "3dc7bc1d9c9300262ec5ce4109f3cd91bfe9b76f92e013931268b4bbd71e0234"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/parameter-ui-architecture.spec.ts",
+        "bytes": 839,
+        "sha256": "4eeba0859a0c9e4fb6a19c82019b47488bc59b48deffbd638d6926a0947241f8"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/resolution-evidence-layout.spec.ts",
+        "bytes": 1758,
+        "sha256": "55c1e5a045e13c76901c926bf9f9e1377c87a82ad905ca71f26b1ba0c67fdd71"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/resolution-evidence.component.ts",
+        "bytes": 3800,
+        "sha256": "c09bc40db5544bcb7be6a9f7badd42efe7aec21dcbd8a86633d179628f10e56e"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/resolution-failure.component.ts",
+        "bytes": 935,
+        "sha256": "cea98e45c555104bf4760c8373ecdfbebff2a75d8dff3f701ef102264d051f98"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/resolution-generated-outputs.component.spec.ts",
+        "bytes": 1834,
+        "sha256": "fcf7da16220c37053cf7010d8379935a9cc2687bca9d65b6959f843d5a6e9d64"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/resolution-generated-outputs.component.ts",
+        "bytes": 1687,
+        "sha256": "d89d3b787b8de1581995b7ec9d26d8247a4ce8a1ac57404cd22e63abb39e1e8c"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/resolution-result-dialog.component.ts",
+        "bytes": 1986,
+        "sha256": "5bd3dc0ce0048f571c76862e21eb05fa69b87a553412dd024f90be04c48d419a"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/resolution-result-dialog.spec.ts",
+        "bytes": 1404,
+        "sha256": "212a8d8d5d0660c0f68268a75c111f51298981f12cc53af0a4fbf438f194bc19"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/resolution-result-table.component.ts",
+        "bytes": 786,
+        "sha256": "e59b48ce37604b0e0f07af42329e2fd6ffd394c79c5323e876e5c10ce87ead5c"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/resolution-result.presenter.spec.ts",
+        "bytes": 2703,
+        "sha256": "c9a7c989cf764ed8cbca2006df6266d0626e083e589de7764f810b91a41d9641"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/resolution-result.presenter.ts",
+        "bytes": 2587,
+        "sha256": "08d25c90cfb4397c58c4b4d7926da6b345976a2b438158fd6b5d52ec89526178"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/resolution-workbench.component.ts",
+        "bytes": 2667,
+        "sha256": "74293839c302de98820692a68b3c5d805e74a63d7e965c01fbdfbe2f66e23c3b"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/resolution-workbench.facade.spec.ts",
+        "bytes": 8810,
+        "sha256": "bcc12b43f2cd3ad6ac4411ed0aa28decfe321f31b18d0ff20c180ec88465101a"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/resolution-workbench.facade.ts",
+        "bytes": 5757,
+        "sha256": "e97e040245a50c620dfb2334b8900d1b981185ef5824f82a6dbc1adfe6344988"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/scenario-display-order.spec.ts",
+        "bytes": 958,
+        "sha256": "cf7c56f3fe7712740aed219e230864620a0ad99160e832565643fdef65845891"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/scenario-display-order.ts",
+        "bytes": 802,
+        "sha256": "bd693e8001db2d3f962291baaf23a18e746e1ea6d93f6cc0abb43b03dd0246b0"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/resolution-workbench/workbench-density.spec.ts",
+        "bytes": 717,
+        "sha256": "47a260e8cf47d22dbb836f9437f6e0597911f75d34d57bf0e202e85f418f2604"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/runtime-settings.service.spec.ts",
+        "bytes": 1432,
+        "sha256": "2b8b97309d98f624269390bfe8aa389c8f835e86c0b40a73930bb148ad1f8960"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/runtime-settings.service.ts",
+        "bytes": 1236,
+        "sha256": "7156fbabbd98d745186c7f2ae76885d18454c16c33190f10fac766ea0632f11e"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/scalar-text.spec.ts",
+        "bytes": 370,
+        "sha256": "886b34bd9d84a56bc672477bf380e44a902751bc68efe0e7bd99042da040a3f4"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/scalar-text.ts",
+        "bytes": 229,
+        "sha256": "f9aa5906bb7d132f458ff1dce34f5db9244a7996f075aee9f0cd2c245642078f"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/settings-page.component.spec.ts",
+        "bytes": 6059,
+        "sha256": "c79f13f7b6b4ce1c0cf27027295ffed98941a967421a0288e6d58c4294a4dda9"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/settings-page.component.ts",
+        "bytes": 9989,
+        "sha256": "925eb181fe538950b59d1353afbf2686488252331c218b331f0ea78e3c9f9ed8"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/ssi-account-reference-copy.spec.ts",
+        "bytes": 893,
+        "sha256": "f781474d00f45a532752e47b9c5f6039d6733e97af3fe808c1d2114b2657d93a"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/ssi-account-reference-copy.ts",
+        "bytes": 1281,
+        "sha256": "eb73f9b3d33e9845c7e37955ed19de0b9b22e2ae380805ff3202fd2d224264da"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/ssi-maintenance-index.spec.ts",
+        "bytes": 5081,
+        "sha256": "a13f4f0476cf307a5920fe6dc5398b68f67bff9897e148880db7b07a4740a0d0"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/ssi-maintenance-index.ts",
+        "bytes": 7141,
+        "sha256": "b7b5f73528947e1b214ef28a92e72b9178c12ac35562dda9c5c0d47182dc2c9e"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/swift-data-crud.component.spec.ts",
+        "bytes": 269,
+        "sha256": "f0da80fe58d219f490dfe070b9a2e4603836de49244087379b495b7c2b588225"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/swift-data-crud.component.ts",
+        "bytes": 26591,
+        "sha256": "5a82df87742989a5022459aa9aee4d095b48d1be401113f84bf6b94c1c646f6a"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/tag-support-state.spec.ts",
+        "bytes": 3406,
+        "sha256": "3104d52824e1aaf44d58f2dad7013106b2170be5661056bab306bc3b79382dbe"
+      },
+      {
+        "path": "apps/ssi-portal/src/app/tag-support-state.ts",
+        "bytes": 4485,
+        "sha256": "5e42e3d15b20b0be50c60620a53b5874918aa604765265525d6378edb1ce7074"
+      },
+      {
+        "path": "apps/ssi-portal/src/main.ts",
+        "bytes": 686,
+        "sha256": "fc4679ece22bd4e3948d7979a31a5e8b19c666673c4e7c41a8f1c4f392b33264"
+      },
+      {
+        "path": "apps/ssi-service/jest.config.ts",
+        "bytes": 607,
+        "sha256": "79b34f760a955547c9746a2935ebc00a5fd23dc27a8ad42e361e816abc19ef02"
+      },
+      {
+        "path": "apps/ssi-service/src/app/app.module.ts",
+        "bytes": 8182,
+        "sha256": "f7cad8840596ae17d0de69b66a9d2487af574e170d403e847894ecc765ba4fe7"
+      },
+      {
+        "path": "apps/ssi-service/src/app/audit-retention/audit-retention.controller.spec.ts",
+        "bytes": 669,
+        "sha256": "1b95ba953698a7f1a2f06ad6f9ff7fc285623d6841390e4425e45441f47489e1"
+      },
+      {
+        "path": "apps/ssi-service/src/app/audit-retention/audit-retention.controller.ts",
+        "bytes": 375,
+        "sha256": "d35689450d8cf6a02f758876504dd551512a77fac9ab0b9f3812647e7470e9ce"
+      },
+      {
+        "path": "apps/ssi-service/src/app/audit-retention/audit-retention.policy.spec.ts",
+        "bytes": 3007,
+        "sha256": "28d9f8e725a7c9267d3488b64d718fcb065766ab85235c2cef0b6c698b79f7c7"
+      },
+      {
+        "path": "apps/ssi-service/src/app/audit-retention/audit-retention.policy.ts",
+        "bytes": 2386,
+        "sha256": "a3c327583e550fdf103e7593a24ecd6b3941f64b0c37030d38cec9d2e157c160"
+      },
+      {
+        "path": "apps/ssi-service/src/app/audit-retention/audit-retention.repository.spec.ts",
+        "bytes": 3492,
+        "sha256": "d8fcd6713f19448a0ef18fd579c0f323725896ae8d6999007eec6c567a507ab8"
+      },
+      {
+        "path": "apps/ssi-service/src/app/audit-retention/audit-retention.repository.ts",
+        "bytes": 6013,
+        "sha256": "23eadaba001db126ccfd15c4110e5de0e778c59594cf4d61f4606b3ebec0450d"
+      },
+      {
+        "path": "apps/ssi-service/src/app/audit-retention/audit-retention.service.spec.ts",
+        "bytes": 1876,
+        "sha256": "0d99c098dd15f219858c61df874bfbf7435d898ff0d993af4f35d7c5b004440c"
+      },
+      {
+        "path": "apps/ssi-service/src/app/audit-retention/audit-retention.service.ts",
+        "bytes": 2988,
+        "sha256": "83a5a4af6c884007eecfce3bfd093ba4a27027d06b5d07c69d9b0a50bf824ba3"
+      },
+      {
+        "path": "apps/ssi-service/src/app/bank-service-directory.spec.ts",
+        "bytes": 1789,
+        "sha256": "b8d7c14d6cca12a1a55b4778d4cdfc7b17412e94e23379a2697f5a738dcaadae"
+      },
+      {
+        "path": "apps/ssi-service/src/app/bank-service-directory.ts",
+        "bytes": 1117,
+        "sha256": "bcf5e51e5c75114f211bab2ea467c98671f9c85f7265788b50d35fa5b245170b"
+      },
+      {
+        "path": "apps/ssi-service/src/app/batch-resolution.service.spec.ts",
+        "bytes": 7829,
+        "sha256": "1281656b1be596d6ae2d5e1d290a300c772f4b6f16a4b93c7eb785d9f74333c3"
+      },
+      {
+        "path": "apps/ssi-service/src/app/batch-resolution.service.ts",
+        "bytes": 5632,
+        "sha256": "e3e00c51c6d81c91496f28ce7e5c78403ab9ff4773379a9bac6fbb8bf4f3b48e"
+      },
+      {
+        "path": "apps/ssi-service/src/app/canonical-json.spec.ts",
+        "bytes": 919,
+        "sha256": "b574ac98ed8e095e082ecd84c8e8f48112b23b68017d9c624df0059a43779532"
+      },
+      {
+        "path": "apps/ssi-service/src/app/canonical-json.ts",
+        "bytes": 1336,
+        "sha256": "38bae395e611374c2c367fe9cfe97c0d39d9a639a605bd16b671769ca35b3ac6"
+      },
+      {
+        "path": "apps/ssi-service/src/app/clearing-systems.reference.ts",
+        "bytes": 886,
+        "sha256": "d34e969878ea33ad887209fc206835f5af0ff9841779f9ec29425795b2ed94d7"
+      },
+      {
+        "path": "apps/ssi-service/src/app/counterparty-ssi-resolution.service.spec.ts",
+        "bytes": 8193,
+        "sha256": "b078b407c2701144df8584783518d13f3566a57f7cf78b29d482543a6ee57270"
+      },
+      {
+        "path": "apps/ssi-service/src/app/counterparty-ssi-resolution.service.ts",
+        "bytes": 34412,
+        "sha256": "aa7e753b3984b53d09dda4afbda3ae53892f7949ea02048e33d0e7eb8e8abd56"
+      },
+      {
+        "path": "apps/ssi-service/src/app/database-snapshot-identity.service.spec.ts",
+        "bytes": 2808,
+        "sha256": "e61589d0e8c626f98365d299bff99ba8734bde7d6acbf9cab95ebbd26770a618"
+      },
+      {
+        "path": "apps/ssi-service/src/app/database-snapshot-identity.service.ts",
+        "bytes": 3972,
+        "sha256": "17db2311637b0fd7003837f202317e481fa7cbfeb1d877dd76fe48f64d8e43a6"
+      },
+      {
+        "path": "apps/ssi-service/src/app/development-data-reload.service.spec.ts",
+        "bytes": 7491,
+        "sha256": "6ac86f291eaceb2c79a81d91cc169ba170a953165eda32c9f6089a65f1f2dea7"
+      },
+      {
+        "path": "apps/ssi-service/src/app/development-data-reload.service.ts",
+        "bytes": 8897,
+        "sha256": "b3dd7fdaf0c0880621d436cb50a09decfa2596d30b400dc72b7df7825bf39aa8"
+      },
+      {
+        "path": "apps/ssi-service/src/app/entity/entity-application.service.spec.ts",
+        "bytes": 6665,
+        "sha256": "52ab336d73bb426679c52acab3f7dbb1950eca6dd2437196f5de2ff7868135b1"
+      },
+      {
+        "path": "apps/ssi-service/src/app/entity/entity-application.service.ts",
+        "bytes": 4702,
+        "sha256": "43891bd9c25d6f88cf69279d9a718073e6eea33dede7df0851d81c2902aee31d"
+      },
+      {
+        "path": "apps/ssi-service/src/app/entity/entity.controller.spec.ts",
+        "bytes": 2310,
+        "sha256": "fe3c98b0bfa28ecf3080b719f8989e142624c6b4da35e1b9755550e3a3884c4f"
+      },
+      {
+        "path": "apps/ssi-service/src/app/entity/entity.controller.ts",
+        "bytes": 1437,
+        "sha256": "58d2998797c1d5519c8504e9a5c2004a6ce146a91e787eb8cf044ac8f24cdd15"
+      },
+      {
+        "path": "apps/ssi-service/src/app/entity/entity.repository.ts",
+        "bytes": 575,
+        "sha256": "69673a640831b6ef210a042d9973e4af5a339a17213203d023a9f0629778bfe7"
+      },
+      {
+        "path": "apps/ssi-service/src/app/fin-5x-support-contract.ts",
+        "bytes": 1812,
+        "sha256": "82dae1f76c64d3fc97132702ae63dbdd92d3d074a07990b7160679adbdf4985e"
+      },
+      {
+        "path": "apps/ssi-service/src/app/fin-controlled-fixture.service.spec.ts",
+        "bytes": 4677,
+        "sha256": "4f944b84b8585002e529aef45893a2158157c7dd866de4a84fd4bf8d35da73e4"
+      },
+      {
+        "path": "apps/ssi-service/src/app/fin-controlled-fixture.service.ts",
+        "bytes": 9854,
+        "sha256": "e020e3bbbfd0c639712c195897f2e4b11b87bd8b5b7ce21986f52aa57fd53337"
+      },
+      {
+        "path": "apps/ssi-service/src/app/fin-controlled-resolution.service.spec.ts",
+        "bytes": 5027,
+        "sha256": "72078157db477555a8b9b3f449a3c92e44713d4f0343b65e3fce515ef72b3cd4"
+      },
+      {
+        "path": "apps/ssi-service/src/app/fin-controlled-resolution.service.ts",
+        "bytes": 4848,
+        "sha256": "dda56584ada6fe4a083333e50157811710cb67ffbcc5e75267ea762b84f2f3f6"
+      },
+      {
+        "path": "apps/ssi-service/src/app/fin-field-resolution.controller.spec.ts",
+        "bytes": 3032,
+        "sha256": "2358cc30627d6f2c5512285743b6e5d4ad732f8c769dc8519aeded3a1c8b0f2a"
+      },
+      {
+        "path": "apps/ssi-service/src/app/fin-field-resolution.controller.ts",
+        "bytes": 2425,
+        "sha256": "d9bf52aa0181960f2af3a18fe98941e212367a745aa952c34bac1fb0c5374cf8"
+      },
+      {
+        "path": "apps/ssi-service/src/app/fin-field-resolution.fail-closed.spec.ts",
+        "bytes": 4832,
+        "sha256": "5da10a1ae5898326410d688fd1d5cd6edd7cf7ab50c682baea3135a166338de7"
+      },
+      {
+        "path": "apps/ssi-service/src/app/fin-field-resolution.policy.spec.ts",
+        "bytes": 6800,
+        "sha256": "a65c719119db021e4f786f2333d676ccd52097b06ff53e5c89ac71aa1b31e122"
+      },
+      {
+        "path": "apps/ssi-service/src/app/fin-field-resolution.policy.ts",
+        "bytes": 5824,
+        "sha256": "a7dd9a6e366f3d9e90b987912df97d6d5ea0e46d02fb659f1691d18fb9b1564c"
+      },
+      {
+        "path": "apps/ssi-service/src/app/fin-field-resolution.service.spec.ts",
+        "bytes": 36906,
+        "sha256": "530c4bb3039d3430b2879faf6ca1a89cc8f66d178722624e64d88034e9da89f4"
+      },
+      {
+        "path": "apps/ssi-service/src/app/fin-field-resolution.service.ts",
+        "bytes": 22134,
+        "sha256": "aad99c272b79fbd2846feb27699afeca7722b21d0358681010a3cc966bf85c1b"
+      },
+      {
+        "path": "apps/ssi-service/src/app/gate-g2-evidence.spec.ts",
+        "bytes": 4471,
+        "sha256": "c4c164ebfeb27a47a02cdc1c5dc1cba3c5c01857d831be8943e6833776364a6d"
+      },
+      {
+        "path": "apps/ssi-service/src/app/governed-controllers.spec.ts",
+        "bytes": 5099,
+        "sha256": "2553e5dc31f6337c8381106ecd53ce63b76ffce1398c0871670baf78803b9ed6"
+      },
+      {
+        "path": "apps/ssi-service/src/app/imports/swift-data-import.controller.ts",
+        "bytes": 350,
+        "sha256": "5db4f958b64db18908229045b551752ef800d049d77efe88a1cef8186b00bed2"
+      },
+      {
+        "path": "apps/ssi-service/src/app/imports/swift-data-import.service.spec.ts",
+        "bytes": 4867,
+        "sha256": "5f462911f2add9a8a5203bc91883336edcdfcc743a70880463203c7d96fdb84c"
+      },
+      {
+        "path": "apps/ssi-service/src/app/imports/swift-data-import.service.ts",
+        "bytes": 3709,
+        "sha256": "dcb05cb63273b9ad7e0127dff0c99509ebbfcc65245202703fed325b3a9847f7"
+      },
+      {
+        "path": "apps/ssi-service/src/app/index-pagination.policy.spec.ts",
+        "bytes": 1107,
+        "sha256": "e7ed548efd87df6c1a7e506b6d0f91f1fc130063b0f621be7eca970a05bc2126"
+      },
+      {
+        "path": "apps/ssi-service/src/app/index-pagination.policy.ts",
+        "bytes": 1216,
+        "sha256": "16325f4a80a7f063130b41ff6c585e2f5c74e356d58b8ca98394e6c3b8b81d9c"
+      },
+      {
+        "path": "apps/ssi-service/src/app/mapping-catalogue.service.spec.ts",
+        "bytes": 2833,
+        "sha256": "e1e1809870af2014b49f33465a103f12ee3be1f09dced77e9bd5e4de29eda016"
+      },
+      {
+        "path": "apps/ssi-service/src/app/mapping-catalogue.service.ts",
+        "bytes": 6373,
+        "sha256": "bd02d56d7b68359a3c5a6e59b01cc359291aceca078ec01e20fc00d1c4fdc9bd"
+      },
+      {
+        "path": "apps/ssi-service/src/app/message-domain-resolution.controller.spec.ts",
+        "bytes": 755,
+        "sha256": "cebd58d963ca35976b3499cfedd1c18184d0a8d59011160ad7598ecbad149cd0"
+      },
+      {
+        "path": "apps/ssi-service/src/app/message-domain-resolution.controller.ts",
+        "bytes": 1180,
+        "sha256": "61cbfc91cb4ef7b47a317aef5915a8b6f184ad3e5ba3f7af1bd32a58f0c86359"
+      },
+      {
+        "path": "apps/ssi-service/src/app/message-domain-resolution.service.spec.ts",
+        "bytes": 19611,
+        "sha256": "fad3d16cc7b55eeb29439015bec5fac6ad5d7551e4ba0a8b6dabfaab1fca6714"
+      },
+      {
+        "path": "apps/ssi-service/src/app/message-domain-resolution.service.ts",
+        "bytes": 29756,
+        "sha256": "56bd79fd3d33a9e294c45bb14f9bc76636a46bf7b6bfb83526a7c6a965efbf4a"
+      },
+      {
+        "path": "apps/ssi-service/src/app/message-mapping.service.spec.ts",
+        "bytes": 31513,
+        "sha256": "9a16d5e8cbe6bef6aca25c6e5ab7baf531d85612ba97c19cb6d3bc6d0fcbbb13"
+      },
+      {
+        "path": "apps/ssi-service/src/app/message-mapping.service.ts",
+        "bytes": 36716,
+        "sha256": "435692b3c98c4b3720bb8382290c411a681c1fcdeca1537918d9096b889360f8"
+      },
+      {
+        "path": "apps/ssi-service/src/app/message.controller.ts",
+        "bytes": 677,
+        "sha256": "f881de13b544e927ce91553d3e382568f22bce47412e29cbcbfb2a51229f1aa8"
+      },
+      {
+        "path": "apps/ssi-service/src/app/mt2-settlement-request.policy.spec.ts",
+        "bytes": 3081,
+        "sha256": "54b76dd4ebb69f86de7f53052c4db9754cd82cbb335ec0432fee2e360159e41c"
+      },
+      {
+        "path": "apps/ssi-service/src/app/mt2-settlement-request.policy.ts",
+        "bytes": 3721,
+        "sha256": "9afe0d4b2785a716dd9817333c40f055322560b75871cadfd390f659f09f6c23"
+      },
+      {
+        "path": "apps/ssi-service/src/app/nostro/nostro-application.service.spec.ts",
+        "bytes": 14011,
+        "sha256": "da3c6c706c96167eb3031e6b27ff505e329c6cdf55b9f41ed2ca7be3de9d2808"
+      },
+      {
+        "path": "apps/ssi-service/src/app/nostro/nostro-application.service.ts",
+        "bytes": 8914,
+        "sha256": "09face8a439e34f6fcc6ea11db5d66779f30e95fb9a2bcb30caa73d98b4351a4"
+      },
+      {
+        "path": "apps/ssi-service/src/app/nostro/nostro.controller.ts",
+        "bytes": 1773,
+        "sha256": "f1d64390e0ac1f0c1e0908c9ffef58e16f201e490da76658968aceaeee93088f"
+      },
+      {
+        "path": "apps/ssi-service/src/app/nostro/nostro.repository.ts",
+        "bytes": 4416,
+        "sha256": "7f821c1894fffe3cdeec22ae9004c71bbb5e43cd2eb70398d39935292f07e3ff"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/composite-resolution-page-definition.source.spec.ts",
+        "bytes": 1920,
+        "sha256": "643b226370cc1a02ae4589fd75f734639755f67a84c4b9fd67a9bbd649dbe628"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/composite-resolution-page-definition.source.ts",
+        "bytes": 1125,
+        "sha256": "fe9a46de058527242e1c447e676208eecd21cb3e8a58e13908310449cb0b067b"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/mapping-resolution-page-definition.source.spec.ts",
+        "bytes": 31568,
+        "sha256": "585817063b583744a2d389e64c7f715ffa92fb9017e6f4e00d7a57753c6bb327"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/mapping-resolution-page-definition.source.ts",
+        "bytes": 48801,
+        "sha256": "58345f280cdf4e318f62a813147972046ff816c9bdee4d982d1b297bfc6e4190"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/page-parameter-business-date.di.spec.ts",
+        "bytes": 5086,
+        "sha256": "f5ded7236b6df72ee974928ff09f7951b7ca688b9ffd13042defeb6aeaa12afe"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/page-parameter-business-date.policy.spec.ts",
+        "bytes": 5950,
+        "sha256": "4599fdce03c60ec4e5f825897e6dcb9a6a54553fbc3eb8680ac2766005c5a7aa"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/page-parameter-business-date.policy.ts",
+        "bytes": 6809,
+        "sha256": "2f8a9a381bc42002271894b415a1c37dc63490dbf2c1a442f0e79b7c8dec6778"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/page-parameter-environment.policy.ts",
+        "bytes": 742,
+        "sha256": "6c44b8fc1efb9e4be465b3f5204d1e2a50914e9cd553126f63043e8fc071cba2"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/page-parameter-lookup-defaults.service.spec.ts",
+        "bytes": 1149,
+        "sha256": "d8378e165356dcc55c835e60e187894b616c419e2e871ac3da126da57057143c"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/page-parameter-lookup-defaults.service.ts",
+        "bytes": 3314,
+        "sha256": "a731d0a414cff0bed77140fecc823406ab1d88944cfaebd0679ab9d4b1d13191"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/page-parameter-lookup.service.spec.ts",
+        "bytes": 26254,
+        "sha256": "677429d5735f4613b404ecfbc8b0a9f98690769d5965901869bb5be5cb61403f"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/page-parameter-lookup.service.ts",
+        "bytes": 19083,
+        "sha256": "6dfe3d98e8bafa7e9a1e3dbbad644bf511291e567879d59f3baf0bd46e5e63cc"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/page-parameter-validation-disposition.ts",
+        "bytes": 1099,
+        "sha256": "ed91b75cbac7bd3c45cf1d0d28747e59a5c7becd224d214bcd9833da03f38381"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/payment-governed-applicability.service.spec.ts",
+        "bytes": 7929,
+        "sha256": "1daf1f302db8fecc7aa7b565ebbeec78685c8e5076e38ebc918786cfa68017cd"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/payment-governed-applicability.service.ts",
+        "bytes": 8964,
+        "sha256": "f78fe11c812ae8efeadb252f29df0d440dcae66eec0afa0576e84d66e26bc927"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/payment-own-account-eligibility.policy.spec.ts",
+        "bytes": 1461,
+        "sha256": "874b5158386ef8a6141c9abe1949649e2f2f15049823979e5f6378c6ed9cb860"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/payment-own-account-eligibility.policy.ts",
+        "bytes": 2528,
+        "sha256": "2b43772c2e7670c0b556397ac7076ef12791ad6c7f35b29575823b76bc5feb39"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/payment-own-account.oas.spec.ts",
+        "bytes": 2275,
+        "sha256": "6238c973cbbac0aa777b3ec91bed8afe9c8c41b3a408dc544df29694900e5bd7"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/payment-resolution-page-definition.source.spec.ts",
+        "bytes": 29348,
+        "sha256": "2c63392783204652ee1d229cde798c014ace4ffbdd27893bbb60959d7f9ceed6"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/payment-resolution-page-definition.source.ts",
+        "bytes": 32167,
+        "sha256": "b86c54443ac8448bd2061e19accb5449d949b0fb95acf743ef4510f3dda6292b"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/payment-resolution-page-submission.adapter.spec.ts",
+        "bytes": 25278,
+        "sha256": "9ff753495869de754a3dae2d421759bc2d5d216cb58a27fc7dd8f0423797eb8e"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/payment-resolution-page-submission.adapter.ts",
+        "bytes": 20130,
+        "sha256": "b49d76c64e39b4d628bdf7e301347cebfc1a8208aa8f163ee546e02cd8a35355"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/payment-resolution-page-submission.mt205cov-provenance.spec.ts",
+        "bytes": 6326,
+        "sha256": "dccfbaffe8d73162c61df50fbebc701af03d13b028a161bb176ef638d3c4364e"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/payment-ssi-minimal-scope.acceptance.spec.ts",
+        "bytes": 6765,
+        "sha256": "709cd1e40cbec0518ca2a540315c64f0ddcabb32d941b1ff8fe9992226b29290"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/payment-ssi-route-ui.acceptance.spec.ts",
+        "bytes": 10590,
+        "sha256": "aa671aca874eee4559ba14a346c777b7215a52e8572f122d70666c1b5a60cd6b"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/resolution-page-action.registry.ts",
+        "bytes": 783,
+        "sha256": "05f80af5004d93a2d0bae935a1d44e2e48a621f077d15205cc23d7b2bda8d182"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/resolution-page-aggregation.service.spec.ts",
+        "bytes": 34650,
+        "sha256": "4152158c55d3e16c16617507d57819032467e61425ea96200d789f02f6baf024"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/resolution-page-aggregation.service.ts",
+        "bytes": 16719,
+        "sha256": "aeb0a14dfa6f32746bd2a569a3273fddb3fb9c7c9c5a972556c0dadbcdc2a974"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/resolution-page-cross-tag.validator.spec.ts",
+        "bytes": 5994,
+        "sha256": "a6f7f7ebff73e451e21661d3594190b6a0de57bb9346d56578f9bf805024d3c1"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/resolution-page-cross-tag.validator.ts",
+        "bytes": 3374,
+        "sha256": "d26c89408f65c5d0193cd7f4137dc83b17b019adffea38db13b5e624480f5131"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/resolution-page-definition.controller.spec.ts",
+        "bytes": 7805,
+        "sha256": "ed8c0520e23707b07f91a3d80b3513fcfb17e16bbebf1a03eb985f17249d13e4"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/resolution-page-definition.controller.ts",
+        "bytes": 4452,
+        "sha256": "2a55d063bff71aacf1ea7e2c2242e2bb8c3164b8c9b1698c73af6b4daa98a4ad"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/resolution-page-definition.source.ts",
+        "bytes": 571,
+        "sha256": "1e0224fabbf310f70110c1f7fe8c5299a4e759681df5fdbbb539c7f1efa950f8"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/resolution-page-definition.validator.ts",
+        "bytes": 15315,
+        "sha256": "ce616ff9061c94ee54dcf4ed6cec4d01cca36411b7c1494c790ac0dd11a2af1c"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/resolution-page-environment-isolation.spec.ts",
+        "bytes": 3846,
+        "sha256": "d523f7ad61bd8f435054783f6deba07123e6eaa7be7a2e54ca54046929298f1f"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/resolution-page-fixture-manifest.service.spec.ts",
+        "bytes": 2346,
+        "sha256": "4d10702fb0891dbd46c5c6b5bd7d8c7194bb5fd7c9c4546069e355f552e6c082"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/resolution-page-fixture-manifest.service.ts",
+        "bytes": 3954,
+        "sha256": "05a95e03baa7d8e230291ef8c416ec508e17c8ffdad8d55a758e38dd21f6ee6d"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/resolution-page-oas-field-policy.service.spec.ts",
+        "bytes": 3507,
+        "sha256": "b5cd80d5850f56841fb319edda75ca61ea76fe6fd9d51ad2dc1d792bbe35b21a"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/resolution-page-oas-field-policy.service.ts",
+        "bytes": 8779,
+        "sha256": "959141a7501dc5a65227914f2aa381844bb91353d6606fcabdfd6f917ba4f144"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/resolution-page-scenario-catalogue.service.spec.ts",
+        "bytes": 6030,
+        "sha256": "2f5e7c0d0fec2eded9781d2c54e6f217c8ea75d6097150ee1d2e77d428ce7ba6"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/resolution-page-scenario-catalogue.service.ts",
+        "bytes": 33272,
+        "sha256": "0f165dd4f3a1e87cf35b44ba16b5eaacfbd0e25bcd473be1ecf7b358fe52e217"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/resolution-page-submission.adapter.spec.ts",
+        "bytes": 48140,
+        "sha256": "59c893dd9d0fd3ca80d938e56b77255ea18a59c2073b0bbd7e5bfa78019ae393"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/resolution-page-submission.adapter.ts",
+        "bytes": 34684,
+        "sha256": "40dd3bfb22c7a4fb227b9f3f10580af0fe9599ad9f864d073e0ae2d552a06733"
+      },
+      {
+        "path": "apps/ssi-service/src/app/page-parameters/validation-scope.contract.spec.ts",
+        "bytes": 5140,
+        "sha256": "4bb71c324409adc4e36e9631e6aa1aa0979d4a833ad91da8e2d66a7bc6f80b4c"
+      },
+      {
+        "path": "apps/ssi-service/src/app/payment-confirmation.service.spec.ts",
+        "bytes": 9468,
+        "sha256": "ff3bcb712fd41009ff1246778e7aab281ded68eb9a1c01fdf7caac1412019122"
+      },
+      {
+        "path": "apps/ssi-service/src/app/payment-message-index.service.spec.ts",
+        "bytes": 13572,
+        "sha256": "00702cd8c70c07d36750302d2979d385370851750d56b21073989bb3c57e0aff"
+      },
+      {
+        "path": "apps/ssi-service/src/app/payment-message-index.service.ts",
+        "bytes": 6622,
+        "sha256": "07516bd9558655237a02aa74ae0bf4d91d35c550cd71efa583fe929c96bbe677"
+      },
+      {
+        "path": "apps/ssi-service/src/app/payment-settlement-profile.spec.ts",
+        "bytes": 1039,
+        "sha256": "e34f87229531542e2eb3be06fe5f4f42ffb213408dc4dc85a18bffcf24fb6f33"
+      },
+      {
+        "path": "apps/ssi-service/src/app/payment-settlement-profile.ts",
+        "bytes": 1843,
+        "sha256": "71e13e75b8cbcdba53cdea38a464798a198b346881bbf88537c247c709551641"
+      },
+      {
+        "path": "apps/ssi-service/src/app/reference-suggestion.controller.ts",
+        "bytes": 2084,
+        "sha256": "661469032d4201c59254f90cbdc88008fa2bde4a3dc6d934e6c857d77322ef56"
+      },
+      {
+        "path": "apps/ssi-service/src/app/rma/rma-application.service.spec.ts",
+        "bytes": 10803,
+        "sha256": "077f682c9ca0e6f6a10b8154545a1da0aba294d64b97433c8e0ab745effa3855"
+      },
+      {
+        "path": "apps/ssi-service/src/app/rma/rma-application.service.ts",
+        "bytes": 9003,
+        "sha256": "12d5d02819acca345eea0d18a3420710ac171244e69c39147b7f88014549b8ea"
+      },
+      {
+        "path": "apps/ssi-service/src/app/rma/rma.controller.ts",
+        "bytes": 1809,
+        "sha256": "3c68c041ce5fe01751c36576fe2958d4ecd36f2654dda5e6e0f57ef314d0e359"
+      },
+      {
+        "path": "apps/ssi-service/src/app/rma/rma.repository.ts",
+        "bytes": 4459,
+        "sha256": "2cd1aaf01839b8cad016328bc35d4430069ced8c23d6c860443ddc0f9aa2e399"
+      },
+      {
+        "path": "apps/ssi-service/src/app/route-resolution.policy.spec.ts",
+        "bytes": 13812,
+        "sha256": "d1dfaa887617a4577fffef0b9057232b66440f5941f758fb84ce1ecdee913c4a"
+      },
+      {
+        "path": "apps/ssi-service/src/app/route-resolution.policy.ts",
+        "bytes": 21873,
+        "sha256": "6cdb863f5f5faaf4674d9667c93d5ffd7c05915ba9f20d2566d808c3fdf65b1d"
+      },
+      {
+        "path": "apps/ssi-service/src/app/runtime-environment.policy.spec.ts",
+        "bytes": 1179,
+        "sha256": "307ae03727d3a84d2addb507347570dff07abd33e7b781a073742bd2076c9a63"
+      },
+      {
+        "path": "apps/ssi-service/src/app/runtime-environment.policy.ts",
+        "bytes": 668,
+        "sha256": "16f49d238314e00f474d6e2ac101a57c79c41ebbbdb22eb75249aa1f26d38685"
+      },
+      {
+        "path": "apps/ssi-service/src/app/runtime-settings.controller.spec.ts",
+        "bytes": 1538,
+        "sha256": "f3af247efde374eadb0e84ba2d91f1159390d1d46c482af78f7bd31744b6b0f3"
+      },
+      {
+        "path": "apps/ssi-service/src/app/runtime-settings.controller.ts",
+        "bytes": 826,
+        "sha256": "97e814d2846f44680a2b74789ace5041d066634c14e5f9d86544b7d3c3e411f8"
+      },
+      {
+        "path": "apps/ssi-service/src/app/sample-import.service.ts",
+        "bytes": 3121,
+        "sha256": "69f9e99f94c573cadc703aba3a50011d84bc59678d27e628e6c31dd0022cc0a0"
+      },
+      {
+        "path": "apps/ssi-service/src/app/sample.controller.ts",
+        "bytes": 506,
+        "sha256": "f12dcbdd0e62dcbda411cf3d155574832548a78b8a663ed4c403e06a13c3f08c"
+      },
+      {
+        "path": "apps/ssi-service/src/app/scalar-text.spec.ts",
+        "bytes": 370,
+        "sha256": "886b34bd9d84a56bc672477bf380e44a902751bc68efe0e7bd99042da040a3f4"
+      },
+      {
+        "path": "apps/ssi-service/src/app/scalar-text.ts",
+        "bytes": 229,
+        "sha256": "f9aa5906bb7d132f458ff1dce34f5db9244a7996f075aee9f0cd2c245642078f"
+      },
+      {
+        "path": "apps/ssi-service/src/app/settlement.controller.spec.ts",
+        "bytes": 36008,
+        "sha256": "4b5177057c74d46b903218760149835f86a4addc6eec259b1462b7e65f652a45"
+      },
+      {
+        "path": "apps/ssi-service/src/app/settlement.controller.ts",
+        "bytes": 36127,
+        "sha256": "0054f15344b4b22dac42a19b06d523403d197bf34d933746a0c9402bea5eaa0a"
+      },
+      {
+        "path": "apps/ssi-service/src/app/shared/governed-lifecycle-controller.delegate.ts",
+        "bytes": 1617,
+        "sha256": "3ca7932be5ffc95e75b8cce2a3585f41ee5500489b393857880569b23059dd2f"
+      },
+      {
+        "path": "apps/ssi-service/src/app/shared/sqlite-governed.repository.ts",
+        "bytes": 4387,
+        "sha256": "fc858efa546a4bfe9e754fa5f579a5f32b034ded0b12184bd988290bb7bba06f"
+      },
+      {
+        "path": "apps/ssi-service/src/app/sqlite-repositories.spec.ts",
+        "bytes": 12046,
+        "sha256": "8f869de667b5237e1808c2720b0a7f991acd1eef7e470bea47c1d6f18e253c70"
+      },
+      {
+        "path": "apps/ssi-service/src/app/sqlite-ssi.repository.ts",
+        "bytes": 14373,
+        "sha256": "aec678d78a788198e831eb4ad2b3d412f5b00d1a0b520f81efa79c6b68e8ae6f"
+      },
+      {
+        "path": "apps/ssi-service/src/app/ssi-application.service.spec.ts",
+        "bytes": 24168,
+        "sha256": "0cdf91e6e986902c38ac4664cdac3e0e747e9bcc18cbfdb83497cce50d432d46"
+      },
+      {
+        "path": "apps/ssi-service/src/app/ssi-application.service.ts",
+        "bytes": 32526,
+        "sha256": "22acbcdcba3cb5241bcc35d2e6bc722701ce4796fcc9d4fed78fec00e5f0b9ec"
+      },
+      {
+        "path": "apps/ssi-service/src/app/ssi-data-quality.service.spec.ts",
+        "bytes": 5877,
+        "sha256": "8a530e7aa0fc56700fd311b7ee70f2cd1f3dff8e87e3d08d9eabaaa82c7ce0e1"
+      },
+      {
+        "path": "apps/ssi-service/src/app/ssi-data-quality.service.ts",
+        "bytes": 5880,
+        "sha256": "637fe4d538aa75116876d763620b0c96448384410a609c384f41fa4ca346f7e7"
+      },
+      {
+        "path": "apps/ssi-service/src/app/ssi-ownership-index.spec.ts",
+        "bytes": 2034,
+        "sha256": "07c7447f23d46126c4300e88b4ec8b77666179fb86edd5bec2b478e1247561b7"
+      },
+      {
+        "path": "apps/ssi-service/src/app/ssi.controller.ts",
+        "bytes": 2245,
+        "sha256": "20f387c32ed052d353b2fdcbf4c8b4aa62b6cf97ef6c0624f84c746416c28368"
+      },
+      {
+        "path": "apps/ssi-service/src/app/value-date.spec.ts",
+        "bytes": 487,
+        "sha256": "d153253a7af7a5090e9695dfeb71878c98a00b74b47dfb897cd30afadf50ddfd"
+      },
+      {
+        "path": "apps/ssi-service/src/app/value-date.ts",
+        "bytes": 603,
+        "sha256": "e8d164bf223b6f930a343559d6c35def8f1dd3d348b44229127d5a3e495dc29a"
+      },
+      {
+        "path": "apps/ssi-service/src/main.ts",
+        "bytes": 505,
+        "sha256": "13a7f33a2cef6d276ff6dda0a7f00b1b8a9c4f8b5b7bbba710171b7ef83b089c"
+      },
+      {
+        "path": "apps/ssi-web-components/jest.config.ts",
+        "bytes": 314,
+        "sha256": "9b7582d249210c8e506a6df5b347a38261260734b25c2b3b69d7a6069f483a31"
+      },
+      {
+        "path": "apps/ssi-web-components/src/main.ts",
+        "bytes": 538,
+        "sha256": "9ec59da506b366da9ce614f8fa37d951c1a796a3cac8042ca6c42c67a93a0bb7"
+      },
+      {
+        "path": "apps/ssi-web-components/src/resolution-widget.component.spec.ts",
+        "bytes": 1756,
+        "sha256": "465de62a541f3309704ecbc2f597600f6264ada8299df1f617b41d706bdbf88a"
+      },
+      {
+        "path": "apps/ssi-web-components/src/resolution-widget.component.ts",
+        "bytes": 1616,
+        "sha256": "889172312a5319168e49272af9f3fc1f55b94c29805aee9bae3d4a67f7aaa934"
+      },
+      {
+        "path": "libs/contracts/src/index.ts",
+        "bytes": 1029,
+        "sha256": "0302d5dd086ea65a85a1d60a9413e7e9e155affda269ceb8ec34611f87dad646"
+      },
+      {
+        "path": "libs/contracts/src/page-parameters.ts",
+        "bytes": 20324,
+        "sha256": "abb678d34f4bcd800dd1bedeb7b1609485dc2dd4f0f79bbb300fb0eb3016bb06"
+      },
+      {
+        "path": "libs/domain/jest.config.ts",
+        "bytes": 433,
+        "sha256": "e2f4ab955afd889421c9a0fefc073567a9a21e3eae6883e9dd09961815eaf88b"
+      },
+      {
+        "path": "libs/domain/src/index.ts",
+        "bytes": 99,
+        "sha256": "415ea2c6d6541d4c35f43133cd2d18a86eeadecb88d2283b879bf8fc0b3e2a46"
+      },
+      {
+        "path": "libs/domain/src/lib/domain-coverage.test.ts",
+        "bytes": 2959,
+        "sha256": "9bb97ff985e69682d7f7b9ff2f0e331c5b4089f4e7cd4c7203dfa270e28cf926"
+      },
+      {
+        "path": "libs/domain/src/lib/fin-5x-support.spec.ts",
+        "bytes": 1436,
+        "sha256": "465f7b55108aa0bbca265f086b2688a558de4e8f3ef231ee297786c56b7b9b36"
+      },
+      {
+        "path": "libs/domain/src/lib/fin-5x-support.ts",
+        "bytes": 1783,
+        "sha256": "29132f5d4101f42a8f9d6d3b8bed11630688fb6a52941497eab7bf22851c6eed"
+      },
+      {
+        "path": "libs/domain/src/lib/payment-settlement-profile.test.ts",
+        "bytes": 7457,
+        "sha256": "ae015d32b3f01b821a99a8fbd94840da62da941b182993eea1a60a23be42d66a"
+      },
+      {
+        "path": "libs/domain/src/lib/payment-settlement-profile.ts",
+        "bytes": 7593,
+        "sha256": "776b74a4d5afc8db672fcbcfb68ccdd061f43d35501c2ec3d7ce4ea51e95a9d4"
+      },
+      {
+        "path": "libs/domain/src/lib/resolution.spec.ts",
+        "bytes": 1320,
+        "sha256": "5f52ce3e56b7fa9dee2e1112946c1281d1ea28d3dbf3e60470d6ada30c790f7d"
+      },
+      {
+        "path": "libs/domain/src/lib/resolution.ts",
+        "bytes": 1813,
+        "sha256": "859d948024a5ba0fa090aa58d712281e5fff1d65056e4b14f97168e85ff9832e"
+      },
+      {
+        "path": "libs/domain/src/lib/ssi.spec.ts",
+        "bytes": 1606,
+        "sha256": "104d1549842f6a5a66b914f6af4895e2a26bf9c02999c827fabfcebbb738d527"
+      },
+      {
+        "path": "libs/domain/src/lib/ssi.test.ts",
+        "bytes": 589,
+        "sha256": "4c994173b37f0e36fe238191629530f919188156fce80f5db9f0c87e3d39f56f"
+      },
+      {
+        "path": "libs/domain/src/lib/ssi.ts",
+        "bytes": 3875,
+        "sha256": "43abbd5a0b98c72cba5d368b21b24e0eba754c959463f7908f455f4ee37f2cdb"
+      },
+      {
+        "path": "libs/parameter-engine/jest.config.ts",
+        "bytes": 453,
+        "sha256": "fcbe79dd164d6c3d6cc15a384b349042ee404bfa779aa1cc743933cd244bff7b"
+      },
+      {
+        "path": "libs/parameter-engine/src/index.ts",
+        "bytes": 75,
+        "sha256": "f226fbdfbdf9a937a0bd486184b086baf54b7288e2229a1d8caf0629aa39ba46"
+      },
+      {
+        "path": "libs/parameter-engine/src/lib/bank-service-catalogue.spec.ts",
+        "bytes": 4278,
+        "sha256": "9f717bc7897991aa26bc592a079ff341b091e0411e83314f637b596b473121e4"
+      },
+      {
+        "path": "libs/parameter-engine/src/lib/bank-service-catalogue.ts",
+        "bytes": 3830,
+        "sha256": "7d4fa6e580f0dde821f972e4b3b23add269210484902671808d2fffce7572a92"
+      },
+      {
+        "path": "libs/parameter-engine/src/lib/rules-coverage.test.ts",
+        "bytes": 1421,
+        "sha256": "4333a17f9e500d73d11994354e5cedc48a4ec0f115dec32049d97909e46565e9"
+      },
+      {
+        "path": "libs/parameter-engine/src/lib/rules-safe.test.ts",
+        "bytes": 516,
+        "sha256": "ee9aeefbe3c980a31c44e8da812801f44b1bcbe431d76bcd7ea59b52c648d8da"
+      },
+      {
+        "path": "libs/parameter-engine/src/lib/rules.spec.ts",
+        "bytes": 1005,
+        "sha256": "99a3a0db577744c06915a04f12ee10a169d329502ef8269fbddffcfd5ed22019"
+      },
+      {
+        "path": "libs/parameter-engine/src/lib/rules.ts",
+        "bytes": 1619,
+        "sha256": "bc2ab0cf09bdd30965f8afad7423bfb3e7eacbf7a9c9aa84c0874b3b79eafd55"
+      },
+      {
+        "path": "libs/parameter-engine/src/lib/scalar-text.spec.ts",
+        "bytes": 370,
+        "sha256": "886b34bd9d84a56bc672477bf380e44a902751bc68efe0e7bd99042da040a3f4"
+      },
+      {
+        "path": "libs/parameter-engine/src/lib/scalar-text.ts",
+        "bytes": 229,
+        "sha256": "f9aa5906bb7d132f458ff1dce34f5db9244a7996f075aee9f0cd2c245642078f"
+      },
+      {
+        "path": "libs/swift-ssi-mapping/jest.config.ts",
+        "bytes": 455,
+        "sha256": "bcf999666f690a46ee25c4bad948d1a1f3208ec7c8b1b47c4f46ea784e407660"
+      },
+      {
+        "path": "libs/swift-ssi-mapping/src/index.ts",
+        "bytes": 31,
+        "sha256": "c8ec94421591b9371abd813c64963f84ff2e693ae23da1c7eb9871f1acee2b91"
+      },
+      {
+        "path": "libs/swift-ssi-mapping/src/lib/mapping-branches.test.ts",
+        "bytes": 1415,
+        "sha256": "b0892dfec94bd06da22dda021b88240cd1f34dd5d426d4372b27c3e826e83828"
+      },
+      {
+        "path": "libs/swift-ssi-mapping/src/lib/mapping-coverage.test.ts",
+        "bytes": 2206,
+        "sha256": "09bbc44df64fc22889ffee20b082d8f77dda1523e45d61438a8131da02c9081e"
+      },
+      {
+        "path": "libs/swift-ssi-mapping/src/lib/mapping.spec.ts",
+        "bytes": 1749,
+        "sha256": "20602f3d6d8bf4beaecba5065289cb17ff3556789cd2c611e65691c8dc385051"
+      },
+      {
+        "path": "libs/swift-ssi-mapping/src/lib/mapping.ts",
+        "bytes": 2402,
+        "sha256": "f3e9c287b4bfe60562f88a0e776210bc28ef27ff22a40fbad4bc19791d992c02"
+      },
+      {
+        "path": "libs/swift-ssi-mapping/src/lib/pseudo-parser.test.ts",
+        "bytes": 600,
+        "sha256": "c58c5f8d7567197af6777b5bcff6efce3a6782117f999e7642f3de7cc10d6ee2"
+      },
+      {
+        "path": "libs/swift-ssi-mapping/src/lib/pseudo-parser.ts",
+        "bytes": 3162,
+        "sha256": "9421117dad467229f67fe1ab958378e5d985f81cfaa5877a1b3b3e03cdde954a"
+      },
+      {
+        "path": "libs/swift-ssi-mapping/src/lib/scalar-text.spec.ts",
+        "bytes": 370,
+        "sha256": "886b34bd9d84a56bc672477bf380e44a902751bc68efe0e7bd99042da040a3f4"
+      },
+      {
+        "path": "libs/swift-ssi-mapping/src/lib/scalar-text.ts",
+        "bytes": 229,
+        "sha256": "f9aa5906bb7d132f458ff1dce34f5db9244a7996f075aee9f0cd2c245642078f"
+      }
+    ]
+  },
+  "analyzerPreflight": {
+    "expected": 272,
+    "parsed": 272
+  },
+  "aggregateLcovSources": [
+    "coverage/apps/mock-reference-services/lcov.info",
+    "coverage/apps/ssi-bff/lcov.info",
+    "coverage/apps/ssi-portal/lcov.info",
+    "coverage/apps/ssi-service/lcov.info",
+    "coverage/apps/ssi-web-components/lcov.info",
+    "coverage/libs/domain/lcov.info",
+    "coverage/libs/parameter-engine/lcov.info",
+    "coverage/libs/swift-ssi-mapping/lcov.info"
+  ],
+  "verifiedRevision": true
+}

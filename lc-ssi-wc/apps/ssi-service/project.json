@@ -1,0 +1,59 @@
+{
+  "name": "ssi-service",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/ssi-service/src",
+  "projectType": "application",
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "options": {
+        "outputPath": "dist/apps/ssi-service",
+        "main": "apps/ssi-service/src/main.ts",
+        "tsConfig": "apps/ssi-service/tsconfig.app.json",
+        "rootDir": ".",
+        "outputFileName": "apps/ssi-service/src/main.js",
+        "assets": [
+          {
+            "input": "parameters",
+            "glob": "*.json",
+            "output": "parameters"
+          },
+          {
+            "input": "openapi",
+            "glob": "swift-data-service.v1.json",
+            "output": "openapi"
+          }
+        ]
+      }
+    },
+    "serve": {
+      "executor": "@nx/js:node",
+      "continuous": true,
+      "dependsOn": ["build"],
+      "options": {
+        "buildTarget": "ssi-service:build",
+        "runBuildTargetDependencies": false,
+        "port": 0
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc -p apps/ssi-service/tsconfig.app.json --noEmit"
+      }
+    },
+    "test": {
+      "executor": "@nx/jest:jest",
+      "outputs": ["{workspaceRoot}/coverage/apps/ssi-service"],
+      "options": { "jestConfig": "apps/ssi-service/jest.config.ts" },
+      "configurations": {
+        "ci": {
+          "ci": true,
+          "codeCoverage": true,
+          "coverageReporters": ["json-summary", "lcov", "text-summary"]
+        }
+      }
+    }
+  },
+  "tags": ["type:app", "scope:backend"]
+}

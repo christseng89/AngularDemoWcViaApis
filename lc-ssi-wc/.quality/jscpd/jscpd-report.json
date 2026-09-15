@@ -1,0 +1,829 @@
+{
+  "duplicates": [
+    {
+      "firstFile": {
+        "end": 25,
+        "endLoc": {
+          "column": 9,
+          "line": 25,
+          "position": 658
+        },
+        "name": "mock-reference-services\\src\\main.ts",
+        "start": 15,
+        "startLoc": {
+          "column": 0,
+          "line": 15,
+          "position": 284
+        }
+      },
+      "format": "typescript",
+      "fragment": "interface ClearingSystemReference {\n  code: string;\n  name: string;\n  supportedCurrency: string;\n  settlementCountry: string;\n  marketScope: \"DOMESTIC\" | \"MARKET_SPECIFIC\" | \"PAN_REGIONAL\";\n  eligibleCountries: readonly string[];\n  settlementMarket: string;\n  paymentServiceLevel: \"HIGH_VALUE\" | \"RETAIL\" | \"INSTANT\";\n  schemeType: \"RTGS\" | \"LVPS\" | \"ACH\" | \"IPS\";\n  status: \"ACTIVE\" | \"INACTIVE\";",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 11,
+      "secondFile": {
+        "end": 100,
+        "endLoc": {
+          "column": 9,
+          "line": 100,
+          "position": 2489
+        },
+        "name": "ssi-portal\\src\\app\\app.component.ts",
+        "start": 90,
+        "startLoc": {
+          "column": 0,
+          "line": 90,
+          "position": 2115
+        }
+      },
+      "tokens": 58
+    },
+    {
+      "firstFile": {
+        "end": 420,
+        "endLoc": {
+          "column": 7,
+          "line": 420,
+          "position": 10374
+        },
+        "name": "mock-reference-services\\src\\main.ts",
+        "start": 407,
+        "startLoc": {
+          "column": 24,
+          "line": 407,
+          "position": 9966
+        }
+      },
+      "format": "typescript",
+      "fragment": "  @Get(\"banks\") bankPage(\n    @Query(\"page\") pageValue = \"1\",\n    @Query(\"pageSize\") pageSizeValue = \"5\",\n    @Query(\"query\") query = \"\",\n  ): unknown {\n    enforceFailureMode();\n    const page = Math.max(1, Number.parseInt(pageValue, 10) || 1);\n    const pageSize = Math.min(\n      20,\n      Math.max(1, Number.parseInt(pageSizeValue, 10) || 5),\n    );\n    const term = query.trim().toUpperCase();\n    const filtered = term\n      ? banks.filter((bank) =>",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 14,
+      "secondFile": {
+        "end": 466,
+        "endLoc": {
+          "column": 7,
+          "line": 466,
+          "position": 11808
+        },
+        "name": "mock-reference-services\\src\\main.ts",
+        "start": 453,
+        "startLoc": {
+          "column": 32,
+          "line": 453,
+          "position": 11400
+        }
+      },
+      "tokens": 104
+    },
+    {
+      "firstFile": {
+        "end": 430,
+        "endLoc": {
+          "column": 61,
+          "line": 430,
+          "position": 10769
+        },
+        "name": "mock-reference-services\\src\\main.ts",
+        "start": 425,
+        "startLoc": {
+          "column": 13,
+          "line": 425,
+          "position": 10543
+        }
+      },
+      "format": "typescript",
+      "fragment": "      : banks;\n    const totalPages = Math.ceil(filtered.length / pageSize);\n    const safePage = totalPages ? Math.min(page, totalPages) : 1;\n    return {\n      items: filtered\n        .slice((safePage - 1) * pageSize, safePage * pageSize)",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 6,
+      "secondFile": {
+        "end": 477,
+        "endLoc": {
+          "column": 27,
+          "line": 477,
+          "position": 12229
+        },
+        "name": "mock-reference-services\\src\\main.ts",
+        "start": 471,
+        "startLoc": {
+          "column": 17,
+          "line": 471,
+          "position": 11995
+        }
+      },
+      "tokens": 50
+    },
+    {
+      "firstFile": {
+        "end": 65,
+        "endLoc": {
+          "column": 16,
+          "line": 65,
+          "position": 1777
+        },
+        "name": "ssi-portal\\public\\openapi\\swift-data-service.v1.json",
+        "start": 46,
+        "startLoc": {
+          "column": 8,
+          "line": 46,
+          "position": 1397
+        }
+      },
+      "format": "json",
+      "fragment": "        },\n        {\n          \"path\": \"status\",\n          \"label\": \"Status\"\n        },\n        {\n          \"path\": \"version\",\n          \"label\": \"Version\"\n        }\n      ],\n      \"fields\": [\n        {\n          \"key\": \"maker\",\n          \"label\": \"Maker\",\n          \"required\": true,\n          \"type\": \"input\",\n          \"defaultValue\": \"maker.demo\"\n        },\n        {\n          \"key\": \"ownBic\",",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 20,
+      "secondFile": {
+        "end": 255,
+        "endLoc": {
+          "column": 16,
+          "line": 255,
+          "position": 6765
+        },
+        "name": "ssi-portal\\public\\openapi\\swift-data-service.v1.json",
+        "start": 236,
+        "startLoc": {
+          "column": 8,
+          "line": 236,
+          "position": 6385
+        }
+      },
+      "tokens": 51
+    },
+    {
+      "firstFile": {
+        "end": 65,
+        "endLoc": {
+          "column": 16,
+          "line": 65,
+          "position": 1777
+        },
+        "name": "ssi-portal\\public\\openapi\\swift-data-service.v1.json",
+        "start": 46,
+        "startLoc": {
+          "column": 8,
+          "line": 46,
+          "position": 1397
+        }
+      },
+      "format": "json",
+      "fragment": "        },\n        {\n          \"path\": \"status\",\n          \"label\": \"Status\"\n        },\n        {\n          \"path\": \"version\",\n          \"label\": \"Version\"\n        }\n      ],\n      \"fields\": [\n        {\n          \"key\": \"maker\",\n          \"label\": \"Maker\",\n          \"required\": true,\n          \"type\": \"input\",\n          \"defaultValue\": \"maker.demo\"\n        },\n        {\n          \"key\": \"ownBic\",",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 20,
+      "secondFile": {
+        "end": 623,
+        "endLoc": {
+          "column": 16,
+          "line": 623,
+          "position": 17107
+        },
+        "name": "ssi-portal\\public\\openapi\\swift-data-service.v1.json",
+        "start": 604,
+        "startLoc": {
+          "column": 8,
+          "line": 604,
+          "position": 16727
+        }
+      },
+      "tokens": 51
+    },
+    {
+      "firstFile": {
+        "end": 135,
+        "endLoc": {
+          "column": 5,
+          "line": 135,
+          "position": 3693
+        },
+        "name": "ssi-portal\\public\\openapi\\swift-data-service.v1.json",
+        "start": 116,
+        "startLoc": {
+          "column": 8,
+          "line": 116,
+          "position": 3188
+        }
+      },
+      "format": "json",
+      "fragment": "        },\n        {\n          \"key\": \"validFrom\",\n          \"label\": \"Valid From\",\n          \"required\": true,\n          \"type\": \"input\",\n          \"inputType\": \"date\",\n          \"defaultValue\": \"2026-01-01\"\n        },\n        {\n          \"key\": \"validTo\",\n          \"label\": \"Valid To\",\n          \"required\": true,\n          \"type\": \"input\",\n          \"inputType\": \"date\",\n          \"defaultValue\": \"2027-12-31\"\n        }\n      ],\n      \"x-lifecycle\": [\"submit\", \"approve\", \"activate\", \"revise\", \"revoke\"]\n    },",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 20,
+      "secondFile": {
+        "end": 694,
+        "endLoc": {
+          "column": 5,
+          "line": 694,
+          "position": 19091
+        },
+        "name": "ssi-portal\\public\\openapi\\swift-data-service.v1.json",
+        "start": 675,
+        "startLoc": {
+          "column": 8,
+          "line": 675,
+          "position": 18586
+        }
+      },
+      "tokens": 69
+    },
+    {
+      "firstFile": {
+        "end": 479,
+        "endLoc": {
+          "column": 25,
+          "line": 479,
+          "position": 17735
+        },
+        "name": "ssi-portal\\src\\app\\app.component.html",
+        "start": 467,
+        "startLoc": {
+          "column": 26,
+          "line": 467,
+          "position": 17221
+        }
+      },
+      "format": "markup",
+      "fragment": "                  } @else {\n                    <th [attr.aria-sort]=\"ownershipAriaSort('CURRENCY')\">\n                      <button\n                        class=\"sort-header\"\n                        type=\"button\"\n                        (click)=\"sortOwnershipIndex('CURRENCY')\"\n                      >\n                        Currency\n                        <span aria-hidden=\"true\">{{\n                          ownershipSortIndicator(\"CURRENCY\")\n                        }}</span>\n                      </button>\n                    </th>",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 13,
+      "secondFile": {
+        "end": 519,
+        "endLoc": {
+          "column": 25,
+          "line": 519,
+          "position": 19420
+        },
+        "name": "ssi-portal\\src\\app\\app.component.html",
+        "start": 507,
+        "startLoc": {
+          "column": 49,
+          "line": 507,
+          "position": 18906
+        }
+      },
+      "tokens": 56
+    },
+    {
+      "firstFile": {
+        "end": 885,
+        "endLoc": {
+          "column": 15,
+          "line": 885,
+          "position": 33822
+        },
+        "name": "ssi-portal\\src\\app\\app.component.html",
+        "start": 876,
+        "startLoc": {
+          "column": 47,
+          "line": 876,
+          "position": 33457
+        }
+      },
+      "format": "markup",
+      "fragment": "                  @for (bank of resolutionBanks(); track bank.bic) {\n                    <option\n                      [value]=\"bank.bic\"\n                      [selected]=\"bank.bic === resolutionCounterpartyBic()\"\n                    >\n                      {{ bank.bic }} · {{ bank.name }} · {{ bank.country }}\n                    </option>\n                  }\n                </select></label\n              >",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 10,
+      "secondFile": {
+        "end": 1485,
+        "endLoc": {
+          "column": 17,
+          "line": 1485,
+          "position": 58088
+        },
+        "name": "ssi-portal\\src\\app\\app.component.html",
+        "start": 1476,
+        "startLoc": {
+          "column": 57,
+          "line": 1476,
+          "position": 57705
+        }
+      },
+      "tokens": 58
+    },
+    {
+      "firstFile": {
+        "end": 946,
+        "endLoc": {
+          "column": 11,
+          "line": 946,
+          "position": 36324
+        },
+        "name": "ssi-portal\\src\\app\\app.component.html",
+        "start": 938,
+        "startLoc": {
+          "column": 14,
+          "line": 938,
+          "position": 36016
+        }
+      },
+      "format": "markup",
+      "fragment": "              >\n                @for (branch of bookingBranches(); track branch.branchCode) {\n                  <option [value]=\"branch.branchCode\">\n                    {{ branch.branchCode }} · {{ branch.branchName }}\n                  </option>\n                }\n              </select></label\n            >\n          </div>",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 9,
+      "secondFile": {
+        "end": 1539,
+        "endLoc": {
+          "column": 15,
+          "line": 1539,
+          "position": 60404
+        },
+        "name": "ssi-portal\\src\\app\\app.component.html",
+        "start": 1531,
+        "startLoc": {
+          "column": 16,
+          "line": 1531,
+          "position": 60078
+        }
+      },
+      "tokens": 53
+    },
+    {
+      "firstFile": {
+        "end": 1807,
+        "endLoc": {
+          "column": 30,
+          "line": 1807,
+          "position": 72008
+        },
+        "name": "ssi-portal\\src\\app\\app.component.html",
+        "start": 1800,
+        "startLoc": {
+          "column": 18,
+          "line": 1800,
+          "position": 71658
+        }
+      },
+      "format": "markup",
+      "fragment": "                  <div class=\"generated-fields tag-support-list\">\n                    <table class=\"compact\" aria-label=\"5x SSI support list\">\n                      <thead>\n                        <tr>\n                          <th>Tag</th>\n                          <th>Option</th>\n                          <th>Official Field Name</th>\n                          <th>Scope / Resolution</th>",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 8,
+      "secondFile": {
+        "end": 1923,
+        "endLoc": {
+          "column": 28,
+          "line": 1923,
+          "position": 77168
+        },
+        "name": "ssi-portal\\src\\app\\app.component.html",
+        "start": 1916,
+        "startLoc": {
+          "column": 16,
+          "line": 1916,
+          "position": 76832
+        }
+      },
+      "tokens": 52
+    },
+    {
+      "firstFile": {
+        "end": 1833,
+        "endLoc": {
+          "column": 55,
+          "line": 1833,
+          "position": 73154
+        },
+        "name": "ssi-portal\\src\\app\\app.component.html",
+        "start": 1808,
+        "startLoc": {
+          "column": 36,
+          "line": 1808,
+          "position": 72068
+        }
+      },
+      "format": "markup",
+      "fragment": "                          <th>Reason</th>\n                        </tr>\n                      </thead>\n                      <tbody>\n                        @for (\n                          row of visibleTagSupportRows();\n                          track row.messageType +\n                            row.sequence +\n                            row.tag +\n                            row.option\n                        ) {\n                          <tr\n                            [attr.data-scope-status]=\"row.scopeStatus\"\n                            [attr.data-resolution-status]=\"row.resolutionStatus\"\n                          >\n                            <td>\n                              <code>{{ row.tag }}</code>\n                            </td>\n                            <td>\n                              <code>{{ row.option }}</code>\n                            </td>\n                            <td class=\"official-field-name\">\n                              {{ row.officialFieldName }}\n                            </td>\n                            <td>\n                              <span class=\"status-pill\"",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 26,
+      "secondFile": {
+        "end": 1951,
+        "endLoc": {
+          "column": 49,
+          "line": 1951,
+          "position": 78354
+        },
+        "name": "ssi-portal\\src\\app\\app.component.html",
+        "start": 1925,
+        "startLoc": {
+          "column": 53,
+          "line": 1925,
+          "position": 77288
+        }
+      },
+      "tokens": 134
+    },
+    {
+      "firstFile": {
+        "end": 2374,
+        "endLoc": {
+          "column": 20,
+          "line": 2374,
+          "position": 71239
+        },
+        "name": "ssi-portal\\src\\app\\app.component.ts",
+        "start": 2362,
+        "startLoc": {
+          "column": 43,
+          "line": 2362,
+          "position": 70598
+        }
+      },
+      "format": "typescript",
+      "fragment": "            product: this.resolutionProduct(),\n            counterpartyType: this.resolutionCounterpartyType(),\n            counterpartyId: this.resolutionCounterpartyId(),\n            ...(this.resolutionCounterpartyType() === \"BANK\"\n              ? { counterpartyBic: this.resolutionCounterpartyBic() }\n              : {}),\n            counterpartyCountry: this.resolutionCounterpartyCountry(),\n            ...(this.resolutionSettlementCountry()\n              ? { settlementCountry: this.resolutionSettlementCountry() }\n              : {}),\n            ...(this.resolutionSettlementMarket()\n              ? { settlementMarket: this.resolutionSettlementMarket() }\n              : {}),",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 13,
+      "secondFile": {
+        "end": 2421,
+        "endLoc": {
+          "column": 18,
+          "line": 2421,
+          "position": 73266
+        },
+        "name": "ssi-portal\\src\\app\\app.component.ts",
+        "start": 2409,
+        "startLoc": {
+          "column": 43,
+          "line": 2409,
+          "position": 72649
+        }
+      },
+      "tokens": 95
+    },
+    {
+      "firstFile": {
+        "end": 2387,
+        "endLoc": {
+          "column": 11,
+          "line": 2387,
+          "position": 71876
+        },
+        "name": "ssi-portal\\src\\app\\app.component.ts",
+        "start": 2375,
+        "startLoc": {
+          "column": 45,
+          "line": 2375,
+          "position": 71285
+        }
+      },
+      "format": "typescript",
+      "fragment": "            currency: this.resolutionCurrency(),\n            businessFunction: this.resolutionFunction(),\n            paymentLeg: this.resolutionPaymentLeg(),\n            direction: this.resolutionDirection(),\n            bookingEntity: this.resolutionBookingEntity(),\n            valueDate: this.resolutionValueDate(),\n            amount: this.resolutionAmount(),\n            ...(this.resolutionMessagingService()\n              ? { messagingService: this.resolutionMessagingService() }\n              : {}),\n            messageType: this.resolutionMessageType(),\n            transactionReference: this.resolutionReference(),\n          },",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 13,
+      "secondFile": {
+        "end": 2438,
+        "endLoc": {
+          "column": 9,
+          "line": 2438,
+          "position": 74053
+        },
+        "name": "ssi-portal\\src\\app\\app.component.ts",
+        "start": 2426,
+        "startLoc": {
+          "column": 41,
+          "line": 2426,
+          "position": 73486
+        }
+      },
+      "tokens": 90
+    },
+    {
+      "firstFile": {
+        "end": 187,
+        "endLoc": {
+          "column": 14,
+          "line": 187,
+          "position": 6130
+        },
+        "name": "ssi-portal\\src\\app\\fin-5x-route-analysis.ts",
+        "start": 180,
+        "startLoc": {
+          "column": 38,
+          "line": 180,
+          "position": 5848
+        }
+      },
+      "format": "typescript",
+      "fragment": "      suggestedValue: suggestion.value,\n      source: suggestion.provenance.source,\n      ...(suggestion.provenance.ownerSide\n        ? { ownerSide: suggestion.provenance.ownerSide }\n        : {}),\n      ...(suggestion.provenance.sourceRecordId\n        ? { evidence: suggestion.provenance.sourceRecordId }\n        : {}),",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 8,
+      "secondFile": {
+        "end": 379,
+        "endLoc": {
+          "column": 16,
+          "line": 379,
+          "position": 13706
+        },
+        "name": "ssi-service\\src\\app\\message-mapping.service.ts",
+        "start": 372,
+        "startLoc": {
+          "column": 22,
+          "line": 372,
+          "position": 13410
+        }
+      },
+      "tokens": 53
+    },
+    {
+      "firstFile": {
+        "end": 264,
+        "endLoc": {
+          "column": 9,
+          "line": 264,
+          "position": 8917
+        },
+        "name": "ssi-portal\\src\\app\\swift-data-crud.component.html",
+        "start": 258,
+        "startLoc": {
+          "column": 33,
+          "line": 258,
+          "position": 8747
+        }
+      },
+      "format": "markup",
+      "fragment": "        @for (field of coreFields(current); track field.key) {\n          <div>\n            <dt>{{ field.label }}</dt>\n            <dd>{{ value(row, field.key) }}</dd>\n          </div>\n        }\n        <div>",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 7,
+      "secondFile": {
+        "end": 282,
+        "endLoc": {
+          "column": 9,
+          "line": 282,
+          "position": 9464
+        },
+        "name": "ssi-portal\\src\\app\\swift-data-crud.component.html",
+        "start": 276,
+        "startLoc": {
+          "column": 37,
+          "line": 276,
+          "position": 9284
+        }
+      },
+      "tokens": 52
+    },
+    {
+      "firstFile": {
+        "end": 25,
+        "endLoc": {
+          "column": 1,
+          "line": 25,
+          "position": 742
+        },
+        "name": "ssi-service\\src\\app\\fin-5x-support-contract.ts",
+        "start": 1,
+        "startLoc": {
+          "column": 0,
+          "line": 1,
+          "position": 0
+        }
+      },
+      "format": "typescript",
+      "fragment": "export type Fin5xScopeStatus = \"SSI_SUPPORTED\" | \"OUT_OF_SSI_SCOPE\";\nexport type Fin5xResolutionStatus =\n  \"RESOLVED\" | \"NOT_REQUIRED\" | \"NO_ELIGIBLE_SSI\" | \"N_A\";\nexport type Fin5xReasonCode =\n  | \"ROUTE_COMPLETE\"\n  | \"DIRECT_ACCOUNT_RELATIONSHIP\"\n  | \"MISSING_SSI\"\n  | \"EXPIRED_SSI\"\n  | \"CONFLICTING_SSI\"\n  | \"INACTIVE_SSI\"\n  | \"NO_MATCHING_BOOKING_ENTITY\"\n  | \"TRADE_ROUTING_ROLE\"\n  | \"TRANSACTION_CONTEXT_PROVIDED\"\n  | \"CONFIRMATION_PARTY\"\n  | \"MESSAGE_PROFILE_EXCLUDED\"\n  | \"EXACT_ELIGIBLE_SSI\"\n  | \"RESOLVED_FROM_OWN_SSI\"\n  | \"RESOLVED_FROM_COUNTERPARTY_SSI\";\n\nexport interface Fin5xSupportContract {\n  scopeStatus: Fin5xScopeStatus;\n  resolutionStatus: Fin5xResolutionStatus;\n  reasonCode: Fin5xReasonCode;\n  suggestedValue?: string;\n}",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 25,
+      "secondFile": {
+        "end": 16,
+        "endLoc": {
+          "column": 1,
+          "line": 16,
+          "position": 724
+        },
+        "name": "domain\\src\\lib\\fin-5x-support.ts",
+        "start": 1,
+        "startLoc": {
+          "column": 0,
+          "line": 1,
+          "position": 0
+        }
+      },
+      "tokens": 75
+    },
+    {
+      "firstFile": {
+        "end": 64,
+        "endLoc": {
+          "column": 1,
+          "line": 64,
+          "position": 1811
+        },
+        "name": "ssi-service\\src\\app\\fin-5x-support-contract.ts",
+        "start": 56,
+        "startLoc": {
+          "column": 17,
+          "line": 56,
+          "position": 1521
+        }
+      },
+      "format": "typescript",
+      "fragment": "    LEGAL_REASONS[`${value.scopeStatus}|${value.resolutionStatus}`];\n  const hasValue = !!value.suggestedValue?.trim();\n  if (\n    !legalReasons?.includes(value.reasonCode) ||\n    (value.resolutionStatus === \"RESOLVED\") !== hasValue\n  )\n    throw new Error(\"INVALID_FIN_5X_SUPPORT_STATE\");\n  return value;\n}",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 9,
+      "secondFile": {
+        "end": 31,
+        "endLoc": {
+          "column": 1,
+          "line": 31,
+          "position": 1729
+        },
+        "name": "domain\\src\\lib\\fin-5x-support.ts",
+        "start": 26,
+        "startLoc": {
+          "column": 49,
+          "line": 26,
+          "position": 1451
+        }
+      },
+      "tokens": 58
+    },
+    {
+      "firstFile": {
+        "end": 396,
+        "endLoc": {
+          "column": 16,
+          "line": 396,
+          "position": 14224
+        },
+        "name": "ssi-service\\src\\app\\message-mapping.service.ts",
+        "start": 381,
+        "startLoc": {
+          "column": 6,
+          "line": 381,
+          "position": 13723
+        }
+      },
+      "format": "typescript",
+      "fragment": "    });\n    return {\n      useCase: \"OUTWARD_REFERENCE_SUGGESTION\",\n      usage: \"REFERENCE_ONLY\",\n      paymentExecutable: false,\n      preSettlement: true,\n      reconciliationSupported: false,\n      watermark: \"NOT FOR PAYMENT RELEASE\",\n      messageContext: {\n        service: request.service,\n        standardsRelease: request.standardsRelease,\n        messageType: request.messageType,\n        direction: request.direction,\n        businessFunction: request.businessFunction,\n      },\n      catalogue: {",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 16,
+      "secondFile": {
+        "end": 506,
+        "endLoc": {
+          "column": 16,
+          "line": 506,
+          "position": 17678
+        },
+        "name": "ssi-service\\src\\app\\message-mapping.service.ts",
+        "start": 490,
+        "startLoc": {
+          "column": 9,
+          "line": 490,
+          "position": 17176
+        }
+      },
+      "tokens": 64
+    },
+    {
+      "firstFile": {
+        "end": 796,
+        "endLoc": {
+          "column": 79,
+          "line": 796,
+          "position": 29208
+        },
+        "name": "ssi-service\\src\\app\\message-mapping.service.ts",
+        "start": 783,
+        "startLoc": {
+          "column": 6,
+          "line": 783,
+          "position": 28669
+        }
+      },
+      "format": "typescript",
+      "fragment": "      if (\n        evidence.demoData !== true ||\n        !evidence.sourceRecordId ||\n        evidence.status !== \"ACTIVE\" ||\n        evidence.approvalStatus !== \"APPROVED\" ||\n        !evidence.effectiveFrom ||\n        !evidence.version\n      )\n        this.reject(`${role}_DEMO_EVIDENCE_INVALID`, \"EVIDENCE_MISSING\");\n      if (\n        evidence.effectiveFrom > request.valueDate ||\n        (evidence.effectiveTo && evidence.effectiveTo < request.valueDate)\n      )\n        this.reject(`${role}_DEMO_EVIDENCE_NOT_EFFECTIVE`, \"EVIDENCE_MISSING\");",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 14,
+      "secondFile": {
+        "end": 828,
+        "endLoc": {
+          "column": 79,
+          "line": 828,
+          "position": 30310
+        },
+        "name": "ssi-service\\src\\app\\message-mapping.service.ts",
+        "start": 815,
+        "startLoc": {
+          "column": 6,
+          "line": 815,
+          "position": 29771
+        }
+      },
+      "tokens": 81
+    },
+    {
+      "firstFile": {
+        "end": 69,
+        "endLoc": {
+          "column": 1,
+          "line": 69,
+          "position": 1713
+        },
+        "name": "ssi-service\\src\\app\\nostro\\nostro.controller.ts",
+        "start": 37,
+        "startLoc": {
+          "column": 31,
+          "line": 37,
+          "position": 811
+        }
+      },
+      "format": "typescript",
+      "fragment": "    @Body() body: NostroCommand,\n  ): unknown {\n    return this.service.update(id, body);\n  }\n  @Post(\":id/revise\") revise(\n    @Param(\"id\") id: string,\n    @Body() body: { maker: string },\n  ): unknown {\n    return this.service.revise(id, body.maker);\n  }\n  @Post(\":id/:action\") transition(\n    @Param(\"id\") id: string,\n    @Param(\"action\") action: string,\n    @Body() body: { actor: string },\n  ): unknown {\n    if (![\"submit\", \"approve\", \"activate\"].includes(action))\n      throw new BadRequestException(\"INVALID_ACTION\");\n    return this.service.transition(\n      id,\n      action.toUpperCase() as \"SUBMIT\" | \"APPROVE\" | \"ACTIVATE\",\n      body.actor,\n    );\n  }\n  @Delete(\":id\") revoke(\n    @Param(\"id\") id: string,\n    @Body() body: { actor: string; reason: string },\n  ): unknown {\n    return this.service.revoke(id, body.actor, body.reason);\n  }\n  @Get(\"audit/events\") audit(): unknown {\n    return this.service.audit();\n  }\n}",
+      "isNew": false,
+      "kind": "exact",
+      "lines": 33,
+      "secondFile": {
+        "end": 71,
+        "endLoc": {
+          "column": 1,
+          "line": 71,
+          "position": 1752
+        },
+        "name": "ssi-service\\src\\app\\rma\\rma.controller.ts",
+        "start": 39,
+        "startLoc": {
+          "column": 28,
+          "line": 39,
+          "position": 850
+        }
+      },
+      "tokens": 234
+    }
+  ],
+  "statistics": {
+    "detectionDate": "2026-09-09T10:27:29.361Z",
+    "formats": {
+      "css": {
+        "clones": 0,
+        "duplicatedLines": 0,
+        "duplicatedTokens": 0,
+        "lines": 1743,
+        "newClones": 0,
+        "newDuplicatedLines": 0,
+        "percentage": 0.0,
+        "percentageTokens": 0.0,
+        "sources": 2,
+        "tokens": 11568
+      },
+      "json": {
+        "clones": 3,
+        "duplicatedLines": 57,
+        "duplicatedTokens": 171,
+        "lines": 1572,
+        "newClones": 0,
+        "newDuplicatedLines": 0,
+        "percentage": 3.6259541984732824,
+        "percentageTokens": 3.7665198237885464,
+        "sources": 2,
+        "tokens": 4540
+      },
+      "markup": {
+        "clones": 6,
+        "duplicatedLines": 67,
+        "duplicatedTokens": 405,
+        "lines": 2742,
+        "newClones": 0,
+        "newDuplicatedLines": 0,
+        "percentage": 2.4434719183078046,
+        "percentageTokens": 2.555688773900423,
+        "sources": 2,
+        "tokens": 15847
+      },
+      "typescript": {
+        "clones": 11,
+        "duplicatedLines": 151,
+        "duplicatedTokens": 962,
+        "lines": 9508,
+        "newClones": 0,
+        "newDuplicatedLines": 0,
+        "percentage": 1.5881363062684055,
+        "percentageTokens": 1.648954405210833,
+        "sources": 47,
+        "tokens": 58340
+      }
+    },
+    "total": {
+      "clones": 20,
+      "duplicatedLines": 275,
+      "duplicatedTokens": 1538,
+      "lines": 15565,
+      "newClones": 0,
+      "newDuplicatedLines": 0,
+      "percentage": 1.76678445229682,
+      "percentageTokens": 1.7033058308876459,
+      "sources": 53,
+      "tokens": 90295
+    }
+  }
+}
