@@ -14,6 +14,16 @@ describe("JsonRepairReportWriter", () => {
     const report = new GovernedDataRepairReport({
       generatedAt: "2026-09-17T00:00:00.000Z",
       parameterSnapshotId: "PARAMETERS-1",
+      acquisition: {
+        databaseBefore: {
+          sha256: "A".repeat(64),
+          method: "SQLITE_WAL_AWARE_LOGICAL_SNAPSHOT_V1",
+        },
+        databaseAfter: {
+          sha256: "A".repeat(64),
+          method: "SQLITE_WAL_AWARE_LOGICAL_SNAPSHOT_V1",
+        },
+      },
       domains: {
         ENTITY: new DomainRepairReport({
           domain: "ENTITY",
@@ -44,8 +54,10 @@ describe("JsonRepairReportWriter", () => {
     const written = JSON.parse(await readFile(output, "utf8")) as {
       mode: string;
       metrics: { databaseWrites: number };
+      evidence: { databaseUnchanged: boolean };
     };
     assert.equal(written.mode, "DRY_RUN_ZERO_WRITES");
     assert.equal(written.metrics.databaseWrites, 0);
+    assert.equal(written.evidence.databaseUnchanged, true);
   });
 });

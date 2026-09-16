@@ -8,6 +8,16 @@ import {
 import type { GovernedDataSnapshot } from "./repair-contracts.ts";
 
 const snapshot: GovernedDataSnapshot = {
+  acquisition: {
+    databaseBefore: {
+      sha256: "A".repeat(64),
+      method: "SQLITE_WAL_AWARE_LOGICAL_SNAPSHOT_V1",
+    },
+    databaseAfter: {
+      sha256: "A".repeat(64),
+      method: "SQLITE_WAL_AWARE_LOGICAL_SNAPSHOT_V1",
+    },
+  },
   entities: [
     {
       id: "ENTITY-1",
@@ -87,6 +97,18 @@ const snapshot: GovernedDataSnapshot = {
         reason: "test parameter",
       },
     ],
+    developmentReferenceGapSkips: [
+      {
+        canonicalKey: "DEMOHKHHXXX|PCBCCNBJXXX|INBOUND",
+        requiredSource: "SYNTHETIC_DEMO",
+        reason: "Approved development-only reference gap.",
+      },
+      {
+        canonicalKey: "DEMOHKHHXXX|PCBCCNBJXXX|OUTBOUND",
+        requiredSource: "SYNTHETIC_DEMO",
+        reason: "Approved development-only reference gap.",
+      },
+    ],
     parameterSnapshotId: "PARAMETERS-1",
   },
 };
@@ -101,6 +123,7 @@ describe("GovernedDataRepairPlanner", () => {
 
     assert.equal(report.mode, "DRY_RUN_ZERO_WRITES");
     assert.equal(report.metrics.databaseWrites, 0);
+    assert.equal(report.evidence.databaseUnchanged, true);
     assert.equal(report.domains.ENTITY.recordCount, 1);
     assert.equal(report.domains.NOSTRO.recordCount, 1);
     assert.equal(report.domains.SSI.recordCount, 1);
@@ -142,6 +165,83 @@ describe("GovernedDataRepairPlanner", () => {
     assert.equal(group?.conversions[0]?.from, "pacs.008.001.12");
     assert.equal(group?.conversions[0]?.to, "pacs.008.001.08");
     assert.equal(group?.conversions[0]?.occurrences, 1);
+  });
+
+  it("skips only the configured four synthetic Unknown-BIC records without conversion", async () => {
+    const directions = ["INBOUND", "OUTBOUND"] as const;
+    const unknownSnapshot: GovernedDataSnapshot = {
+      ...snapshot,
+      rmas: directions.flatMap((direction) => [
+        {
+          id: `PCB-${direction}-FIN`,
+          status: "ACTIVE",
+          ownBic: "DEMOHKHH",
+          counterpartyBic: "PCBCCNBJ",
+          direction,
+          service: "FIN",
+          messageTypes: ["MT103"],
+          source: "SYNTHETIC_DEMO" as const,
+        },
+        {
+          id: `PCB-${direction}-FINPLUS`,
+          status: "ACTIVE",
+          ownBic: "DEMOHKHH",
+          counterpartyBic: "PCBCCNBJ",
+          direction,
+          service: "FINPLUS",
+          messageTypes: ["pacs.008.001.12"],
+          source: "SYNTHETIC_DEMO" as const,
+        },
+      ]),
+    };
+    const report = await GovernedDataRepairPlanner.standard(
+      new InMemoryGovernedDataRepository(unknownSnapshot),
+      new InMemoryRepairReportWriter(),
+      4,
+    ).execute();
+
+    assert.equal(report.domains.RMA.groups.length, 2);
+    for (const group of report.domains.RMA.groups) {
+      assert.equal(group.disposition, "SKIP_DEVELOPMENT_REFERENCE_GAP");
+      assert.equal(group.sourceRecordIds.length, 2);
+      assert.deepEqual(group.conversions, []);
+      assert.deepEqual(group.retainedMessageTypes, []);
+      assert.equal(
+        group.manualReviewEvidence?.code,
+        "DEVELOPMENT_REFERENCE_GAP",
+      );
+      assert.deepEqual(group.manualReviewEvidence?.unknownBics, [
+        "PCBCCNBJXXX",
+      ]);
+    }
+  });
+
+  it("fails closed for an unconfigured Unknown BIC", async () => {
+    const unknownSnapshot: GovernedDataSnapshot = {
+      ...snapshot,
+      rmas: [
+        {
+          id: "UNKNOWN-PRODUCTION",
+          status: "ACTIVE",
+          ownBic: "DEMOHKHH",
+          counterpartyBic: "UNKNOWN1",
+          direction: "OUTBOUND",
+          service: "FINPLUS",
+          messageTypes: ["pacs.008.001.12"],
+          source: "LICENSED_IMPORT",
+        },
+      ],
+    };
+    const report = await GovernedDataRepairPlanner.standard(
+      new InMemoryGovernedDataRepository(unknownSnapshot),
+      new InMemoryRepairReportWriter(),
+      4,
+    ).execute();
+    const group = report.domains.RMA.groups[0];
+
+    assert.equal(group?.disposition, "SKIP_UNKNOWN_REFERENCE");
+    assert.deepEqual(group?.conversions, []);
+    assert.equal(group?.manualReviewEvidence?.code, "UNKNOWN_BANK_REFERENCE");
   });
 
   it("infers ANY_BANK for legacy SSI records whose BIC is ANY", async () => {

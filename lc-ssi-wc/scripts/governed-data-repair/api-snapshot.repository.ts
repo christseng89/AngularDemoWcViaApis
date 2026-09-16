@@ -70,6 +70,11 @@ class ReferenceProjectionPolicy {
       readonly scope: string;
       readonly reason: string;
     }[];
+    readonly developmentReferenceGapSkips: readonly {
+      readonly canonicalKey: string;
+      readonly requiredSource: "SYNTHETIC_DEMO";
+      readonly reason: string;
+    }[];
   } {
     if (!response || typeof response !== "object") {
       throw new Error("RMA_MESSAGE_TYPE_POLICY_INVALID");
@@ -77,13 +82,15 @@ class ReferenceProjectionPolicy {
     const policy = response as {
       supportedMessageTypes?: unknown;
       legacyConversions?: unknown;
+      developmentReferenceGapSkips?: unknown;
     };
     if (
       !Array.isArray(policy.supportedMessageTypes) ||
       !policy.supportedMessageTypes.every(
         (value) => typeof value === "string",
       ) ||
-      !Array.isArray(policy.legacyConversions)
+      !Array.isArray(policy.legacyConversions) ||
+      !Array.isArray(policy.developmentReferenceGapSkips)
     ) {
       throw new Error("RMA_MESSAGE_TYPE_POLICY_INVALID");
     }
@@ -95,7 +102,38 @@ class ReferenceProjectionPolicy {
         readonly scope: string;
         readonly reason: string;
       }[];
+      readonly developmentReferenceGapSkips: readonly {
+        readonly canonicalKey: string;
+        readonly requiredSource: "SYNTHETIC_DEMO";
+        readonly reason: string;
+      }[];
     };
+  }
+
+  databaseSnapshot(response: unknown): {
+    readonly sha256: string;
+    readonly method: string;
+  } {
+    const current =
+      response && typeof response === "object"
+        ? (response as { currentSnapshot?: unknown }).currentSnapshot
+        : undefined;
+    if (!current || typeof current !== "object") {
+      throw new Error("DATABASE_SNAPSHOT_IDENTITY_INVALID");
+    }
+    const { sha256, method } = current as {
+      sha256?: unknown;
+      method?: unknown;
+    };
+    if (
+      typeof sha256 !== "string" ||
+      !/^[A-Fa-f0-9]{64}$/.test(sha256) ||
+      typeof method !== "string" ||
+      method.trim().length === 0
+    ) {
+      throw new Error("DATABASE_SNAPSHOT_IDENTITY_INVALID");
+    }
+    return { sha256: sha256.toUpperCase(), method };
   }
 
   field(
@@ -165,6 +203,9 @@ export class ApiGovernedDataRepository implements GovernedDataRepository {
   }
 
   async loadSnapshot(): Promise<GovernedDataSnapshot> {
+    const databaseBefore = this.projection.databaseSnapshot(
+      await this.http.get("settings/runtime"),
+    );
     const bankReader = new PagedBankReferenceReader(this.http, this.projection);
     const [
       ssis,
@@ -197,6 +238,12 @@ export class ApiGovernedDataRepository implements GovernedDataRepository {
     const bankBics = this.projection.field(banks, "bic");
     const rmaPolicy = this.projection.rmaMessageTypePolicy(messageTypePolicy);
     const supportedRmaMessageTypes = rmaPolicy.supportedMessageTypes;
+    const databaseAfter = this.projection.databaseSnapshot(
+      await this.http.get("settings/runtime"),
+    );
+    if (databaseBefore.sha256 !== databaseAfter.sha256) {
+      throw new Error("DATABASE_CHANGED_DURING_SNAPSHOT");
+    }
 
     return {
       ssis: this.rawPolicy.requireArray<SsiRecord>("SSI", ssis),
@@ -209,6 +256,7 @@ export class ApiGovernedDataRepository implements GovernedDataRepository {
         bankBics,
         supportedRmaMessageTypes,
         legacyRmaMessageTypeConversions: rmaPolicy.legacyConversions,
+        developmentReferenceGapSkips: rmaPolicy.developmentReferenceGapSkips,
         parameterSnapshotId: this.snapshotIdentity.create({
           currencies: currencyCodes,
           countries: countryCodes,
@@ -217,8 +265,14 @@ export class ApiGovernedDataRepository implements GovernedDataRepository {
           legacyRmaMessageTypeConversions: rmaPolicy.legacyConversions.map(
             ({ from, to, scope }) => `${from}|${to}|${scope}`,
           ),
+          developmentReferenceGapSkips:
+            rmaPolicy.developmentReferenceGapSkips.map(
+              ({ canonicalKey, requiredSource, reason }) =>
+                `${canonicalKey}|${requiredSource}|${reason}`,
+            ),
         }),
       },
+      acquisition: { databaseBefore, databaseAfter },
     };
   }
 }

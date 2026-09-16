@@ -542,6 +542,78 @@ class ConfiguredMessageTypeConversionPolicy {
   }
 }
 
+class RmaReferenceEligibilityPolicy {
+  private readonly configuredSkips: ReadonlyMap<
+    string,
+    GovernedDataSnapshot["reference"]["developmentReferenceGapSkips"][number]
+  >;
+
+  constructor(
+    configuredSkips: GovernedDataSnapshot["reference"]["developmentReferenceGapSkips"],
+  ) {
+    this.configuredSkips = new Map(
+      configuredSkips.map((item) => [item.canonicalKey, item]),
+    );
+  }
+
+  classify(
+    identity: RmaCanonicalKey,
+    records: readonly RmaRecord[],
+    knownBanks: ReadonlySet<string>,
+    parameterSnapshotId: string,
+  ):
+    | { readonly eligible: true }
+    | {
+        readonly eligible: false;
+        readonly disposition:
+          "SKIP_DEVELOPMENT_REFERENCE_GAP" | "SKIP_UNKNOWN_REFERENCE";
+        readonly evidence: {
+          code: string;
+          reason: string;
+          parameterSnapshotId: string;
+          unknownBics: readonly string[];
+          requiredSource?: string;
+        };
+      } {
+    const [ownBic, counterpartyBic] = identity.value.split("|");
+    const unknownBics = [ownBic, counterpartyBic].filter(
+      (bic): bic is string => Boolean(bic) && !knownBanks.has(bic!),
+    );
+    if (unknownBics.length === 0) return { eligible: true };
+
+    const configured = this.configuredSkips.get(identity.value);
+    if (
+      configured &&
+      records.length > 0 &&
+      records.every((record) => record.source === configured.requiredSource)
+    ) {
+      return {
+        eligible: false,
+        disposition: "SKIP_DEVELOPMENT_REFERENCE_GAP",
+        evidence: {
+          code: "DEVELOPMENT_REFERENCE_GAP",
+          reason: configured.reason,
+          parameterSnapshotId,
+          unknownBics,
+          requiredSource: configured.requiredSource,
+        },
+      };
+    }
+
+    return {
+      eligible: false,
+      disposition: "SKIP_UNKNOWN_REFERENCE",
+      evidence: {
+        code: "UNKNOWN_BANK_REFERENCE",
+        reason:
+          "Canonical RMA group references a BIC absent from the governed Bank Service snapshot.",
+        parameterSnapshotId,
+        unknownBics,
+      },
+    };
+  }
+}
+
 class RmaRepairPolicy extends DomainRepairPolicy<
   RmaRecord,
   RmaGroupRepairPlan
@@ -572,6 +644,9 @@ class RmaRepairPolicy extends DomainRepairPolicy<
     );
     const conversions = new ConfiguredMessageTypeConversionPolicy(
       snapshot.reference.legacyRmaMessageTypeConversions,
+    );
+    const referenceEligibility = new RmaReferenceEligibilityPolicy(
+      snapshot.reference.developmentReferenceGapSkips,
     );
     const banks = new Set(
       snapshot.reference.bankBics.map(
@@ -626,7 +701,15 @@ class RmaRepairPolicy extends DomainRepairPolicy<
 
     const plans = [...grouped.values()]
       .map((group) =>
-        this.planGroup(group.identity, group.records, supported, conversions),
+        this.planGroup(
+          group.identity,
+          group.records,
+          supported,
+          conversions,
+          banks,
+          referenceEligibility,
+          snapshot.reference.parameterSnapshotId,
+        ),
       )
       .sort((left, right) =>
         left.canonicalKey.localeCompare(right.canonicalKey),
@@ -645,10 +728,31 @@ class RmaRepairPolicy extends DomainRepairPolicy<
     records: readonly RmaRecord[],
     supported: ReadonlySet<string>,
     conversions: ConfiguredMessageTypeConversionPolicy,
+    knownBanks: ReadonlySet<string>,
+    referenceEligibility: RmaReferenceEligibilityPolicy,
+    parameterSnapshotId: string,
   ): RmaGroupRepairPlan {
     const operational = records.filter((record) =>
       this.lifecycle.isOperational(record),
     );
+    const reference = referenceEligibility.classify(
+      identity,
+      operational,
+      knownBanks,
+      parameterSnapshotId,
+    );
+    if (!reference.eligible) {
+      return new RmaGroupRepairPlan({
+        canonicalKey: identity.value,
+        segmentId: this.segmentation.segmentOf(identity),
+        disposition: reference.disposition,
+        sourceRecordIds: operational.map((record) => record.id),
+        retainedMessageTypes: [],
+        removedMessageTypes: [],
+        conversions: [],
+        manualReviewEvidence: reference.evidence,
+      });
+    }
     const openWorkflow = operational.filter((record) =>
       this.lifecycle.isOpenWorkflow(record),
     );
@@ -750,6 +854,7 @@ export class GovernedDataRepairPlanner {
     const report = new GovernedDataRepairReport({
       generatedAt: new Date().toISOString(),
       parameterSnapshotId: snapshot.reference.parameterSnapshotId,
+      acquisition: snapshot.acquisition,
       domains: {
         ENTITY: this.entityPolicy.evaluate(snapshot.entities, snapshot),
         NOSTRO: this.nostroPolicy.evaluate(snapshot.nostros, snapshot),

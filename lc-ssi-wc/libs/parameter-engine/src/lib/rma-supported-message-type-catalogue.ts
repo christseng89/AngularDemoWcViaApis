@@ -12,6 +12,7 @@ interface RmaScopeDocument {
     readonly evidenceStatus: GovernedStatus;
   }[];
   readonly legacyConversions: readonly LegacyMessageTypeConversion[];
+  readonly developmentReferenceGapSkips: readonly DevelopmentReferenceGapSkip[];
 }
 
 interface PaymentMessageIndex {
@@ -51,19 +52,32 @@ export interface LegacyMessageTypeConversion {
   readonly reason: string;
 }
 
+export interface DevelopmentReferenceGapSkip {
+  readonly canonicalKey: string;
+  readonly requiredSource: "SYNTHETIC_DEMO";
+  readonly reason: string;
+}
+
 export class RmaMessageScopePolicy {
   public readonly supportedMessageTypes: readonly string[];
   public readonly legacyConversions: readonly LegacyMessageTypeConversion[];
+  public readonly developmentReferenceGapSkips: readonly DevelopmentReferenceGapSkip[];
 
   constructor(input: {
     supportedMessageTypes: Iterable<string>;
     legacyConversions: readonly LegacyMessageTypeConversion[];
+    developmentReferenceGapSkips: readonly DevelopmentReferenceGapSkip[];
   }) {
     this.supportedMessageTypes = Object.freeze(
       [...new Set(input.supportedMessageTypes)].sort(),
     );
     this.legacyConversions = Object.freeze(
       input.legacyConversions.map((item) => Object.freeze({ ...item })),
+    );
+    this.developmentReferenceGapSkips = Object.freeze(
+      input.developmentReferenceGapSkips.map((item) =>
+        Object.freeze({ ...item }),
+      ),
     );
     Object.freeze(this);
   }
@@ -106,6 +120,7 @@ export class RmaSupportedMessageTypeCatalogue {
     return new RmaMessageScopePolicy({
       supportedMessageTypes: supported,
       legacyConversions: scope.legacyConversions,
+      developmentReferenceGapSkips: scope.developmentReferenceGapSkips,
     });
   }
 
@@ -118,7 +133,16 @@ export class RmaSupportedMessageTypeCatalogue {
       scope.schemaVersion !== 1 ||
       scope.standardsRelease !== "SR2026" ||
       !Array.isArray(scope.baseProfiles) ||
-      !Array.isArray(scope.legacyConversions)
+      !Array.isArray(scope.legacyConversions) ||
+      !Array.isArray(scope.developmentReferenceGapSkips) ||
+      !scope.developmentReferenceGapSkips.every(
+        (item) =>
+          /^([A-Z0-9]{11})\|([A-Z0-9]{11})\|(INBOUND|OUTBOUND)$/.test(
+            item.canonicalKey,
+          ) &&
+          item.requiredSource === "SYNTHETIC_DEMO" &&
+          item.reason.trim().length > 0,
+      )
     ) {
       throw new Error("INVALID_RMA_MESSAGE_SCOPE_PARAMETER");
     }

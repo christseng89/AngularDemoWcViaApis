@@ -24,6 +24,12 @@ describe("ApiGovernedDataRepository", () => {
   it("loads four raw domains and governed references using GET only", async () => {
     const repository = new ApiGovernedDataRepository(
       new StubHttpClient({
+        "settings/runtime": {
+          currentSnapshot: {
+            sha256: "A".repeat(64),
+            method: "SQLITE_WAL_AWARE_LOGICAL_SNAPSHOT_V1",
+          },
+        },
         ssis: [],
         "rma-authorisations": [],
         "nostro-accounts": [],
@@ -45,6 +51,7 @@ describe("ApiGovernedDataRepository", () => {
                 "Legacy generic ISO 20022 value is replaced by the governed CBPR+ SSI profile.",
             },
           ],
+          developmentReferenceGapSkips: [],
         },
       }),
     );
@@ -68,11 +75,19 @@ describe("ApiGovernedDataRepository", () => {
       },
     ]);
     assert.match(snapshot.reference.parameterSnapshotId, /^[A-F0-9]{64}$/);
+    assert.equal(snapshot.acquisition.databaseBefore.sha256, "A".repeat(64));
+    assert.equal(snapshot.acquisition.databaseAfter.sha256, "A".repeat(64));
   });
 
   it("fails closed when a governed domain returns a grouped page", async () => {
     const repository = new ApiGovernedDataRepository(
       new StubHttpClient({
+        "settings/runtime": {
+          currentSnapshot: {
+            sha256: "B".repeat(64),
+            method: "SQLITE_WAL_AWARE_LOGICAL_SNAPSHOT_V1",
+          },
+        },
         ssis: { items: [] },
         "rma-authorisations": [],
         "nostro-accounts": [],
@@ -86,6 +101,7 @@ describe("ApiGovernedDataRepository", () => {
         "rma-authorisations/message-type-policy": {
           supportedMessageTypes: [],
           legacyConversions: [],
+          developmentReferenceGapSkips: [],
         },
       }),
     );

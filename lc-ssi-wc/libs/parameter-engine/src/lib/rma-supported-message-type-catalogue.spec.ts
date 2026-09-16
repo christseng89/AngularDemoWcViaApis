@@ -61,6 +61,19 @@ describe("RMA supported message-type catalogue", () => {
     ]);
   });
 
+  it("exposes only the approved development reference-gap groups", () => {
+    expect(policy.developmentReferenceGapSkips).toEqual([
+      expect.objectContaining({
+        canonicalKey: "DEMOHKHHXXX|PCBCCNBJXXX|INBOUND",
+        requiredSource: "SYNTHETIC_DEMO",
+      }),
+      expect.objectContaining({
+        canonicalKey: "DEMOHKHHXXX|PCBCCNBJXXX|OUTBOUND",
+        requiredSource: "SYNTHETIC_DEMO",
+      }),
+    ]);
+  });
+
   it("keeps the convenience loader on the same governed catalogue", async () => {
     const { loadRmaSupportedMessageTypes } =
       await import("./rma-supported-message-type-catalogue");
@@ -74,6 +87,7 @@ describe("RMA supported message-type catalogue", () => {
     ["standardsRelease", "SR2025"],
     ["baseProfiles", null],
     ["legacyConversions", null],
+    ["developmentReferenceGapSkips", null],
   ])("fails closed for invalid %s", (field, invalid) => {
     const directory = parameterDirectory();
     mutateJson(directory, "rma-message-scope.sr2026.json", (value) => {

@@ -55,6 +55,17 @@ export interface RmaRecord extends GovernedRecord {
   readonly direction: string;
   readonly service: string;
   readonly messageTypes: readonly string[];
+  readonly source?: "SYNTHETIC_DEMO" | "LICENSED_IMPORT";
+}
+
+export interface DatabaseSnapshotIdentity {
+  readonly sha256: string;
+  readonly method: string;
+}
+
+export interface SnapshotAcquisitionEvidence {
+  readonly databaseBefore: DatabaseSnapshotIdentity;
+  readonly databaseAfter: DatabaseSnapshotIdentity;
 }
 
 export interface GovernedReferenceSnapshot {
@@ -68,6 +79,11 @@ export interface GovernedReferenceSnapshot {
     readonly scope: string;
     readonly reason: string;
   }[];
+  readonly developmentReferenceGapSkips: readonly {
+    readonly canonicalKey: string;
+    readonly requiredSource: "SYNTHETIC_DEMO";
+    readonly reason: string;
+  }[];
   readonly parameterSnapshotId: string;
 }
 
@@ -77,6 +93,7 @@ export interface GovernedDataSnapshot {
   readonly ssis: readonly SsiRecord[];
   readonly rmas: readonly RmaRecord[];
   readonly reference: GovernedReferenceSnapshot;
+  readonly acquisition: SnapshotAcquisitionEvidence;
 }
 
 export class RepairIssue {
@@ -130,6 +147,13 @@ export class RmaGroupRepairPlan {
   public readonly removedMessageTypes: readonly string[];
   public readonly conversions: readonly MessageTypeConversion[];
   public readonly targetService?: string;
+  public readonly manualReviewEvidence?: Readonly<{
+    code: string;
+    reason: string;
+    parameterSnapshotId: string;
+    unknownBics: readonly string[];
+    requiredSource?: string;
+  }>;
 
   constructor(input: {
     canonicalKey: string;
@@ -140,6 +164,13 @@ export class RmaGroupRepairPlan {
     removedMessageTypes: readonly string[];
     conversions?: readonly MessageTypeConversion[];
     targetService?: string;
+    manualReviewEvidence?: {
+      code: string;
+      reason: string;
+      parameterSnapshotId: string;
+      unknownBics: readonly string[];
+      requiredSource?: string;
+    };
   }) {
     this.canonicalKey = input.canonicalKey;
     this.segmentId = input.segmentId;
@@ -149,6 +180,14 @@ export class RmaGroupRepairPlan {
     this.removedMessageTypes = Object.freeze([...input.removedMessageTypes]);
     this.conversions = Object.freeze([...(input.conversions ?? [])]);
     this.targetService = input.targetService;
+    this.manualReviewEvidence = input.manualReviewEvidence
+      ? Object.freeze({
+          ...input.manualReviewEvidence,
+          unknownBics: Object.freeze([
+            ...input.manualReviewEvidence.unknownBics,
+          ]),
+        })
+      : undefined;
     Object.freeze(this);
   }
 }
@@ -185,16 +224,29 @@ export class GovernedDataRepairReport {
   public readonly generatedAt: string;
   public readonly parameterSnapshotId: string;
   public readonly domains: GovernedDomainReports;
+  public readonly evidence: Readonly<{
+    databaseBefore: DatabaseSnapshotIdentity;
+    databaseAfter: DatabaseSnapshotIdentity;
+    databaseUnchanged: boolean;
+  }>;
   public readonly metrics = Object.freeze({ databaseWrites: 0 as const });
 
   constructor(input: {
     generatedAt: string;
     parameterSnapshotId: string;
     domains: GovernedDomainReports;
+    acquisition: SnapshotAcquisitionEvidence;
   }) {
     this.generatedAt = input.generatedAt;
     this.parameterSnapshotId = input.parameterSnapshotId;
     this.domains = Object.freeze(input.domains);
+    this.evidence = Object.freeze({
+      databaseBefore: Object.freeze({ ...input.acquisition.databaseBefore }),
+      databaseAfter: Object.freeze({ ...input.acquisition.databaseAfter }),
+      databaseUnchanged:
+        input.acquisition.databaseBefore.sha256 ===
+        input.acquisition.databaseAfter.sha256,
+    });
     Object.freeze(this);
   }
 }

@@ -20,5 +20,17 @@
       "scope": "OPERATIONAL_OR_DRAFT_POSITIVE_DATA",
       "reason": "Legacy generic ISO 20022 value is replaced by the governed CBPR+ SSI profile."
     }
+  ],
+  "developmentReferenceGapSkips": [
+    {
+      "canonicalKey": "DEMOHKHHXXX|PCBCCNBJXXX|INBOUND",
+      "requiredSource": "SYNTHETIC_DEMO",
+      "reason": "Development-only synthetic RMA data references a bank absent from the current Bank Service snapshot."
+    },
+    {
+      "canonicalKey": "DEMOHKHHXXX|PCBCCNBJXXX|OUTBOUND",
+      "requiredSource": "SYNTHETIC_DEMO",
+      "reason": "Development-only synthetic RMA data references a bank absent from the current Bank Service snapshot."
+    }
   ]
 }
