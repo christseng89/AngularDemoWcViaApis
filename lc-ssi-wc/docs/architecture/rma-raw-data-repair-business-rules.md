@@ -188,8 +188,8 @@ For each canonical key at the chosen `asOf` timestamp:
 4. Intersect each row with the supported catalogue.
    - Retain `MT103` when its governed Message Type entry is effective; profile eligibility remains transaction-context validation and is not inferred from an RMA row.
    - Retain `pacs.008.001.08` when its governed Message Type entry is effective.
-   - Convert known positive operational `pacs.008.001.12` occurrences to `pacs.008.001.08`, recording the conversion count and provenance; do not silently rewrite immutable history or negative fixtures.
-   - Never translate or infer `.001.08` from `.001.12`; correction requires existing governed `.001.08` evidence or a separate Maker decision.
+   - Convert known positive operational／Draft `pacs.008.001.12` occurrences to `pacs.008.001.08` according to the governed legacy-conversion parameter, recording the conversion count and provenance.
+   - Do not apply that conversion to immutable history or isolated negative／legacy fixtures. Unknown fixture eligibility, source, lifecycle, or conversion scope fails closed and requires manual review.
 5. Partition siblings by exact effective period and compatible governed metadata (`source`, fixture policy, parameter snapshot and usage group). Only siblings with identical periods and compatible metadata may be automatically consolidated.
 6. Union the retained values across eligible siblings within one compatible partition. Different periods or incompatible metadata produce `MANUAL_CONSOLIDATION_REVIEW_REQUIRED` and no mutation.
 7. If the union is empty, create no EDIT Draft; emit `MANUAL_SUPPRESSION_REVIEW_REQUIRED`.
@@ -317,9 +317,9 @@ The primary audit display uses the governed RMA View screen; raw JSON remains do
 27. Given `pacs.008.001.08`, profile tests prove plain `swift.cbprplus.04` and STP `swift.cbprplus.stp.04` with `NbOfTxs=1` and `INDA`／`INGA`／`COVE` are accepted; wrong or missing `BizSvc`, `NbOfTxs != 1`, and `CLRG` return `UNSUPPORTED_PROFILE`.
 28. Given UI, API validation, Load Data, QA fixtures, Audit, and Repair resolve MT103／pacs.008 scope using the same `standardsRelease`, `asOf`, and profile-decision context, then all consumers expose or evidence the same catalogue version, SHA-256, Message Type set, and profile metadata; any version, hash, release, context, set, or metadata mismatch fails closed before display, validation, load, fixture generation, audit classification, or mutation.
 29. Given the frozen Scope but an absent, invalidated, or unapproved exact-SHA bundle, when candidate generation or read-only Dry Run executes, then review evidence may be produced but no runtime catalogue is published and no MT1／pacs.008-dependent implementation, TDD, OAS, Page Parameter, API, DB, repair mutation, or release action proceeds.
-30. Given a legacy RMA row containing `.001.12` and other supported values, when Dry Run plans repair, then it removes `.001.12`, retains the supported values, recalculates service, and never invents `.001.08`.
-31. Given a legacy RMA row containing both `.001.12` and governed `.001.08`, when Dry Run plans repair, then it retains the existing `.001.08` and removes `.001.12`; evidence records removal rather than conversion.
-32. Given a legacy RMA row whose only value is `.001.12`, when Dry Run plans repair, then it creates no replacement Message Type or EDIT Draft and emits `MANUAL_SUPPRESSION_REVIEW_REQUIRED`.
+30. Given eligible positive operational／Draft data containing `.001.12` and other supported values, when Dry Run plans repair, then it converts `.001.12` to governed `.001.08`, retains the other supported values, recalculates service, and records conversion provenance.
+31. Given eligible positive operational／Draft data containing both `.001.12` and governed `.001.08`, when Dry Run plans repair, then the target contains one deduplicated `.001.08`; evidence records the `.12 → .08` conversion and deduplication.
+32. Given eligible positive operational／Draft data whose only value is `.001.12`, when Dry Run plans repair, then the target contains governed `.001.08` with explicit conversion evidence. Given immutable history, isolated negative／legacy fixture, or unknown eligibility, no conversion or mutation is planned.
 33. Given any controlled fixture in `QA_POSITIVE`, `QA_NEGATIVE`, or `QA_BOUNDARY`, when `operationalEligible=false`, then Operational UI, API, Load Data, index, authorised counts and repair sources fail closed: the fixture is absent and cannot create, revise or authorize an operational record. A missing or non-`false` `operationalEligible` value is invalid fixture metadata and is also rejected from every Operational consumer.
 
 ## 16. Success metrics

@@ -1,7 +1,7 @@
 # RMA Index and Supported Message Scope — Persistent Decision Record
 
 **Status:** Normative project memory  
-**Latest confirmation:** 2026-09-16  
+**Latest confirmation:** 2026-09-17
 **Read before:** answering RMA questions or changing RMA UI, API, OAS/page parameters, load-data processing, repositories, SQL, indexes, fixtures, audit, or tests.
 
 ## RMA business index
@@ -26,17 +26,19 @@
 - The supported list is exposed through `GET /api/rma-authorisations/message-types`; the BFF, service, UI selector, Load Data, and repair audit must resolve the same set.
 - Load Data filters out-of-scope values before creating or revising an RMA record. It records them as `IGNORED_OUT_OF_SSI_SCOPE`; it must not write them into the RMA Message Types collection.
 - The standard repair path is `npm run demo:audit:governed-data` followed, only after review and explicit authorization, by `npm run demo:repair:governed-data`. Repair may create or update Drafts, but must not Submit or Approve them.
-- The current governed SSI scope is assembled from `parameters/payment-message-index.json`, `parameters/ssi-mappings.sr2026.manifest.json`, plus the approved MT103／pacs.008 Phase-1 profile. MT101 is explicitly out of SSI scope and must not be offered or loaded.
-- The supported list is exposed through `GET /api/rma-authorisations/message-types`; the BFF, service, UI selector, Load Data, and repair audit must resolve the same set.
-- Load Data filters out-of-scope values before creating or revising an RMA record. It records them as `IGNORED_OUT_OF_SSI_SCOPE`; it must not write them into the RMA Message Types collection.
-- The standard repair path is `npm run demo:audit:governed-data` followed, only after review and explicit authorization, by `npm run demo:repair:governed-data`. Repair may create or update Drafts, but must not Submit or Approve them.
 
 ## Message Type selector
 
+- Preserve the current RMA ADD／EDIT／VIEW page and workflow. The approved visual reference changes only the Message Types selection Popup; it is not an instruction to redesign the complete page.
 - Use one searchable, categorized, multi-select Popup rather than free-text syntax.
-- Present governed categories such as SWIFT FIN and ISO 20022, with group navigation／quick selection where useful.
-- ADD and EDIT use the same selector. View uses the same Popup in read-only mode, showing checked and unchecked options without permitting mutation.
+- The Popup has exactly three parameter-driven tabs: `Security`, `Trade Finance`, and `Payment`.
+- Within every tab, show a two-column checkbox matrix: `INBOUND` on the left and `OUTBOUND` on the right. Do not replace it with a direction dropdown and do not stack the directions vertically.
+- Every option displays governed Message Type and official Description. Category, Description, direction applicability, ordering, and selectable status come from the same governed policy metadata as API validation, Load Data, Audit, and Repair; the UI must not hard-code them.
+- The visual reference's sample MT5xx values are layout examples only. They must not be introduced unless a future governed SSI parameter snapshot explicitly makes them eligible.
+- ADD and EDIT use the same selector. ADD may check multiple values in both directions. EDIT pre-checks the original approved values and produces `ADDED`／`SUPPRESSED` deltas separately for each canonical bank-direction record.
+- VIEW uses the same Popup in read-only mode, showing checked and unchecked options without permitting mutation.
 - Display the selected set compactly in the index; open the Popup for the complete governed selection.
+- Implement this Popup only after data repair has passed BA／QA review and its authorized remediation phase is complete. UI work must not broaden or delay the data-repair safety gates.
 
 ## ADD／EDIT／SUPPRESSED set semantics
 
