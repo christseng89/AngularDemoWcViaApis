@@ -1,0 +1,46 @@
+{
+  "bundleId": "MT1XX-PACS008-V0.6-FINAL-PO-APPROVAL-CANDIDATE",
+  "createdAt": "2026-09-16",
+  "status": "BA_INDEPENDENT_BA_QA_PASS_PO_APPROVAL_PENDING",
+  "implementationAuthorized": false,
+  "localUiEndpoint": "http://localhost:4600",
+  "artifacts": [
+    {
+      "role": "proposal",
+      "path": "memory/mt1/MT1XX_PACS008_CUSTOMER_PAYMENT_INSTRUCTIONS_PROPOSAL_v0.6_DRAFT.md",
+      "sha256": "3FD37199BAAB210B17BEED96DDD1143995454308C73D218B1DBA798EE84D88A5"
+    },
+    {
+      "role": "open01Matrix",
+      "path": "memory/mt1/MT1XX_PACS008_CREDITOR_DESTINATION_AUTHORITY_REPAIR_MATRIX_v0.1_DRAFT.md",
+      "sha256": "F18FEC54B2A61B2DFF9607543294D447BB323F31A95F75A572A49FDED68998D2"
+    },
+    {
+      "role": "open02Matrix",
+      "path": "memory/mt1/MT1XX_PACS008_SCENARIO_CONTEXT_SSI_ROLE_MATRIX_v0.1_DRAFT.md",
+      "sha256": "E409BE0882A1D3FB9873AE3D5C835A097D4D9CFE8DB13D4E81A048824F760C0F"
+    },
+    {
+      "role": "matrixReview",
+      "path": "memory/mt1/MT1XX_PACS008_v0.6_MATRIX_REVIEW.md",
+      "sha256": "23F87D36C696F6C5D4B70B76A36E9CA2BD85E88A27ECF9E82A6AF2D764A80092"
+    },
+    {
+      "role": "governedMemory",
+      "path": "memory/swift-mt1xx-pacs008-v2.md",
+      "sha256": "A3DA4D790F4E2F7A18E7865A37E59EB169C4288C6D6C53A527AECDF4538FECF4"
+    },
+    {
+      "role": "memoryReview",
+      "path": "qa/mt1/reports/latest/MT1XX_PACS008_MEMORY_V2_REVIEW.md",
+      "sha256": "89760231E4FBB071EC0AC9F4B9E0948CF291581B1373D3F0CFCF69A2A7B304B4"
+    }
+  ],
+  "reviews": {
+    "baMaker": "PASS",
+    "independentBaChecker": "PASS",
+    "qaReaderTestOracle": "PASS",
+    "productOwner": "PENDING"
+  },
+  "invalidationRule": "Any artifact SHA change invalidates this bundle and requires same-SHA re-review."
+}

@@ -55,6 +55,14 @@ const forwardSsi = (path: string, init?: RequestInit) =>
 const forwardReference = (path: string) =>
   forward(`${referenceUrl()}/mock`, path);
 
+function listQuery(parameters: Record<string, string | undefined>): string {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(parameters))
+    if (value !== undefined && value !== "") query.set(key, value);
+  const encoded = query.toString();
+  return encoded ? `?${encoded}` : "";
+}
+
 @Controller("api")
 class BffController {
   @Get("settings/runtime") runtimeSettings(): Promise<unknown> {
@@ -79,8 +87,33 @@ class BffController {
       recent: ssis.slice(0, 8),
     };
   }
-  @Get("ssis") list(): Promise<unknown> {
-    return forwardSsi("ssis");
+  @Get("ssis") list(
+    @Query("status") status = "",
+    @Query("ownershipType") ownershipType = "",
+    @Query("counterpartyId") counterpartyId = "",
+    @Query("page") page = "",
+    @Query("pageSize") pageSize = "",
+    @Query("search") search = "",
+    @Query("sortBy") sortBy = "",
+    @Query("sortDirection") sortDirection = "",
+  ): Promise<unknown> {
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries({
+      status,
+      ownershipType,
+      counterpartyId,
+      page,
+      pageSize,
+      search,
+      sortBy,
+      sortDirection,
+    })) {
+      if (value) query.set(key, value);
+    }
+    return forwardSsi(`ssis${query.size ? `?${query.toString()}` : ""}`);
+  }
+  @Get("ssis/summary") ssiSummary(): Promise<unknown> {
+    return forwardSsi("ssis/summary");
   }
   @Get("ssi-applicability") applicability(
     @Query("ssiId") ssiId = "",
@@ -426,8 +459,18 @@ class BffController {
   importDirectory(): Promise<unknown> {
     return forwardSsi("messages/samples/import-directory", { method: "POST" });
   }
-  @Get("rma-authorisations") listRma(): Promise<unknown> {
-    return forwardSsi("rma-authorisations");
+  @Get("rma-authorisations") listRma(
+    @Query("status") status?: string,
+    @Query("page") page?: string,
+    @Query("pageSize") pageSize?: string,
+    @Query("search") search?: string,
+  ): Promise<unknown> {
+    return forwardSsi(
+      `rma-authorisations${listQuery({ status, page, pageSize, search })}`,
+    );
+  }
+  @Get("rma-authorisations/message-types") rmaMessageTypes(): Promise<unknown> {
+    return forwardSsi("rma-authorisations/message-types");
   }
   @Post("rma-authorisations/check") checkRma(
     @Body() body: unknown,
@@ -482,11 +525,35 @@ class BffController {
       body: JSON.stringify(body),
     });
   }
-  @Get("nostro-accounts") listNostro(): Promise<unknown> {
-    return forwardSsi("nostro-accounts");
+  @Get("rma-authorisations/audit/events") auditRma(): Promise<unknown> {
+    return forwardSsi("rma-authorisations/audit/events");
   }
-  @Get("booking-branch-entities") listEntities(): Promise<unknown> {
-    return forwardSsi("booking-branch-entities");
+  @Get("nostro-accounts") listNostro(
+    @Query("status") status?: string,
+    @Query("page") page?: string,
+    @Query("pageSize") pageSize?: string,
+    @Query("search") search?: string,
+  ): Promise<unknown> {
+    return forwardSsi(
+      `nostro-accounts${listQuery({ status, page, pageSize, search })}`,
+    );
+  }
+  @Get("nostro-accounts/audit/events") auditNostro(): Promise<unknown> {
+    return forwardSsi("nostro-accounts/audit/events");
+  }
+  @Get("booking-branch-entities") listEntities(
+    @Query("status") status?: string,
+    @Query("page") page?: string,
+    @Query("pageSize") pageSize?: string,
+    @Query("search") search?: string,
+  ): Promise<unknown> {
+    return forwardSsi(
+      `booking-branch-entities${listQuery({ status, page, pageSize, search })}`,
+    );
+  }
+  @Get("booking-branch-entities/audit/events")
+  auditEntities(): Promise<unknown> {
+    return forwardSsi("booking-branch-entities/audit/events");
   }
   @Post("booking-branch-entities") createEntity(
     @Body() body: unknown,

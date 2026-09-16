@@ -21,6 +21,8 @@
     "demo:seed:bank-services": "node scripts/sync-bank-service-baseline.mjs",
     "demo:seed:swift-data": "node scripts/seed-swift-data.mjs",
     "demo:verify-matrix": "node scripts/verify-supported-routing-matrix.mjs",
+    "demo:audit:governed-data": "node --experimental-strip-types scripts/audit-governed-data.ts",
+    "demo:repair:governed-data": "node --experimental-strip-types scripts/audit-governed-data.ts --apply-safe-drafts",
     "demo:e2e:clearing": "node scripts/e2e-clearing-ui.mjs",
     "demo:e2e:split": "node scripts/e2e-suggestion-resolution-split.mjs",
     "demo:api-tour": "node scripts/exercise-all-apis.mjs",

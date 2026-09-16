@@ -1,0 +1,3633 @@
+{
+  "generatedAt": "2026-09-16T14:12:59.236Z",
+  "mode": "DRY_RUN_GET_ONLY",
+  "apiBase": "http://localhost:3100/api",
+  "referenceCounts": {
+    "banks": 20,
+    "currencies": 10,
+    "countries": 15,
+    "supportedRmaMessageTypes": 39
+  },
+  "records": {
+    "SSI": {
+      "total": 5728,
+      "operational": 5480
+    },
+    "RMA": {
+      "total": 94,
+      "operational": 43
+    },
+    "NOSTRO": {
+      "total": 2123,
+      "operational": 2043
+    },
+    "ENTITY": {
+      "total": 29,
+      "operational": 10
+    }
+  },
+  "issueSummary": {
+    "total": 321,
+    "byDomain": {
+      "SSI": 108,
+      "RMA": 213
+    },
+    "byCode": {
+      "INVALID_EFFECTIVE_DATE": 67,
+      "COUNTERPARTY_BIC_MISSING": 41,
+      "IGNORED_OUT_OF_SSI_SCOPE": 209,
+      "SERVICE_DOES_NOT_MATCH_MESSAGE_TYPES": 4
+    },
+    "byDisposition": {
+      "REPORT_ONLY": 108,
+      "IGNORE_ON_LOAD": 209,
+      "REVISION_REQUIRED": 4
+    }
+  },
+  "repairPlan": {
+    "rmaDrafts": 42,
+    "items": [
+      {
+        "recordId": "c51b22f3-73b7-42e3-9f06-fff9ab9d1dc4",
+        "action": "CREATE_REVISION_DRAFT",
+        "removedMessageTypes": [
+          "MT767"
+        ],
+        "messageTypes": [
+          "MT760",
+          "MT765",
+          "pacs.009.001.08"
+        ],
+        "service": "FIN / FINPLUS"
+      },
+      {
+        "recordId": "bc635a92-e928-42ab-93b8-f2d2978b1ef5",
+        "action": "CREATE_REVISION_DRAFT",
+        "removedMessageTypes": [
+          "MT744",
+          "MT747"
+        ],
+        "messageTypes": [
+          "MT740",
+          "MT742",
+          "MT756",
+          "pacs.009.001.08"
+        ],
+        "service": "FIN / FINPLUS"
+      },
+      {
+        "recordId": "257964eb-fdef-4cfd-939a-dac776234dd6",
+        "action": "CREATE_REVISION_DRAFT",
+        "removedMessageTypes": [
+          "MT767"
+        ],
+        "messageTypes": [
+          "MT760",
+          "MT765",
+          "MT700",
+          "MT710",
+          "MT720",
+          "MT730",
+          "MT754",
+          "MT756",
+          "pacs.009.001.08"
+        ],
+        "service": "FIN / FINPLUS"
+      },
+      {
+        "recordId": "a0014a88-6c04-5c32-aab0-ce10e60a9a0f",
+        "action": "CREATE_REVISION_DRAFT",
+        "removedMessageTypes": [
+          "pacs.009.001.12"
+        ],
+        "messageTypes": [
+          "pacs.008.001.12",
+          "pacs.009.001.08",
+          "MT320",
+          "MT330",
+          "MT340",
+          "MT350"
+        ],
+        "service": "FIN / FINPLUS"
+      },
+      {
+        "recordId": "41d8ec2f-b96d-5ad5-9c49-a2a58242689b",
+        "action": "CREATE_REVISION_DRAFT",
+        "removedMessageTypes": [
+          "pacs.009.001.12",
+          "MT767"
+        ],
+        "messageTypes": [
+          "pacs.009.001.08",
+          "pacs.008.001.12",
+          "MT760",
+          "MT765"
+        ],
+        "service": "FIN / FINPLUS"
+      },
+      {
+        "recordId": "9ec36cbc-fb4f-5fe6-8185-00970584877b",
+        "action": "CREATE_REVISION_DRAFT",
+        "removedMessageTypes": [
+          "pacs.009.001.12",
+          "MT767"
+        ],
+        "messageTypes": [
+          "pacs.008.001.12",
+          "pacs.009.001.08",
+          "MT320",
+          "MT330",
+          "MT340",
+          "MT350",
+          "MT760",
+          "MT765",
+          "MT700",
+          "MT710",
+          "MT720",
+          "MT730",
+          "MT754",
+          "MT756"
+        ],
+        "service": "FIN / FINPLUS"
+      },
+      {
+        "recordId": "ab830e06-f26f-5576-a39f-d09431804c2a",
+        "action": "CREATE_REVISION_DRAFT",
+        "removedMessageTypes": [
+          "MT410",
+          "MT412",
+          "MT420",
+          "MT422",
+          "pacs.009.001.12"
+        ],
+        "messageTypes": [
+          "pacs.009.001.08",
+          "MT400",
+          "pacs.008.001.12"
+        ],
+        "service": "FIN / FINPLUS"
+      },
+      {
+        "recordId": "b0f662d3-b773-5e6f-a66a-cd138a2d7795",
+        "action": "CREATE_REVISION_DRAFT",
+        "removedMessageTypes": [
+          "pacs.009.001.12",
+          "MT767",
+          "MT410",
+          "MT412",
+          "MT420",
+          "MT422"
+        ],
+        "messageTypes": [
+          "pacs.009.001.08",
+          "pacs.008.001.12",
+          "MT760",
+          "MT765",
+          "MT400"
+        ],
+        "service": "FIN / FINPLUS"
+      },
+      {
+        "recordId": "ccb45a35-e8ed-5534-b921-9fc72c55c63b",
+        "action": "CREATE_REVISION_DRAFT",
+        "removedMessageTypes": [
+          "pacs.009.001.12",
+          "pacs.009.001.12.cov",
+          "MT410",
+          "MT412",
+          "MT420",
+          "MT422"
+        ],
+        "messageTypes": [
+          "MT360",
+          "MT742",
+          "MT365",
+          "MT361",
+          "MT750",
+          "MT400",
+          "MT304",
+          "MT730",
+          "MT306",
+          "MT340",
+          "MT364",
+          "MT769",
+          "MT305",
+          "MT320",
+          "MT756",
+          "MT362",
+          "MT330",
+          "MT754",
+          "MT350",
+          "MT300",
+          "MT734",
+          "MT768",
+          "MT341",
+          "MT765",
+          "MT752",
+          "pacs.008.001.12",
+          "pacs.009.001.08",
+          "MT103",
+          "MT202",
+          "MT202COV"
+        ],
+        "service": "FIN / FINPLUS"
+      },
+      {
+        "recordId": "ab03658f-6695-59b8-bd45-ec604953ece8",
+        "action": "CREATE_REVISION_DRAFT",
+        "removedMessageTypes": [
+          "pacs.009.001.12",
+          "MT410",
+          "MT412",
+          "MT420",
+          "MT422"
+        ],
+        "messageTypes": [
+          "pacs.008.001.12",
+          "pacs.009.001.08",
+          "MT400",
+          "MT700",
+          "MT740",
+          "MT742"
+        ],
+        "service": "FIN / FINPLUS"
+      },
+      {
+        "recordId": "b501e394-8e02-5cdf-bb28-9b1a5c10ed78",
+        "action": "CREATE_REVISION_DRAFT",
+        "removedMessageTypes": [
+          "pacs.009.001.12",
+          "MT744",
+          "MT747"
+        ],
+        "messageTypes": [
+          "pacs.008.001.12",
+          "pacs.009.001.08",
+          "MT740",
+          "MT742",
+          "MT756"
+        ],
+        "service": "FIN / FINPLUS"
+      },
+      {
+        "recordId": "0a2a2322-4c34-5057-bb1e-56cca65dfd25",
+        "action": "CREATE_REVISION_DRAFT",
+        "removedMessageTypes": [
+          "pacs.009.001.12"
+        ],
+        "messageTypes": [
+          "pacs.009.001.08",
+          "MT320",
+          "MT330",
+          "MT340",
+          "MT350"
+        ],
+        "service": "FIN / FINPLUS"
+      },
+      {
+        "recordId": "415cf7dc-86eb-540d-a4cb-43c18eaa5830",
+        "action": "CREATE_REVISION_DRAFT",
+        "removedMessageTypes": [
+          "pacs.009.001.12",
+          "MT410"
+        ],
+        "messageTypes": [
+          "pacs.009.001.08",
+          "pacs.008.001.12",
+          "MT700",
+          "MT740",
+          "MT742",
+          "MT400",
+          "MT202",
+          "MT300",
+          "MT304",
+          "MT305",
+          "MT306"
+        ],
+        "service": "FIN / FINPLUS"
+      },
+      {
+        "recordId": "92d20f57-ecaf-5c5c-acae-19dd8517c1e7",
+        "action": "CREATE_REVISION_DRAFT",
+        "removedMessageTypes": [
+          "pacs.009.001.12",
+          "MT767",
+          "MT410"
+        ],
+        "messageTypes": [
+          "MT300",
+          "MT350",
+          "MT742",
+          "MT360",
+          "MT365",
+          "MT361",
+          "MT306",
+          "MT752",
+          "MT756",
+          "MT400",
+          "MT320",
+          "MT750",
+          "MT304",
+          "MT362",
+          "MT364",
+          "MT730",
+          "MT734",
+          "MT340",
+          "MT754",
+          "MT330",
+          "MT341",
+          "MT768",
+          "MT769",
+          "MT305",
+          "MT765",
+          "pacs.008.001.12",
+          "MT760",
+          "MT202",
+          "MT700",
+          "MT740",
+          "pacs.009.001.08"
+        ],
+        "service": "FIN / FINPLUS"
+      },
+      {
+        "recordId": "e0b2b69d-c143-54d5-8a1d-ad1a208c70e0",
+        "action": "CREATE_REVISION_DRAFT",
+        "removedMessageTypes": [
+          "pacs.009.001.12"
+        ],
+        "messageTypes": [
+          "MT300",
+          "MT304",
+          "MT305",
+          "MT306",
+          "pacs.009.001.08"
+        ],
+        "service": "FIN / FINPLUS"
+      },
+      {
+        "recordId": "a5b2ec80-d3be-5814-9cd8-43833396d8ab",
+        "action": "CREATE_REVISION_DRAFT",
+        "removedMessageTypes": [
+          "pacs.009.001.12",
+          "pacs.009.001.12.cov"
+        ],
+        "messageTypes": [
+          "pacs.008.001.12",
+          "pacs.009.001.08",
+          "MT103",
+          "MT202",
+          "MT202COV"
+        ],
+        "service": "FIN / FINPLUS"
+      },
+      {
+        "recordId": "7be511dc-a819-5f08-ae47-5baf56405399",
+        "action": "CREATE_REVISION_DRAFT",
+        "removedMessageTypes": [
+          "MT410",
+          "pacs.009.001.12"
+        ],
+        "messageTypes": [
+          "MT700",
+          "MT710",
+          "MT720",
+          "MT730",
+          "MT754",
+          "MT756",
+          "MT320",
+          "MT330",
+          "MT340",
+          "MT350",
+          "MT400",
+          "MT202",
+          "pacs.008.001.12",
+          "pacs.009.001.08"
+        ],
+        "service": "FIN / FINPLUS"
+      },
+      {
+        "recordId": "ffe5093c-ec1d-57fc-82f3-a691b2b383cb",
+        "action": "CREATE_REVISION_DRAFT",
+        "removedMessageTypes": [
+          "MT744",
+          "MT747",
+          "MT410",
+          "MT412",
+          "MT420",
+          "MT422",
+          "pacs.009.001.12"
+        ],
+        "messageTypes": [
+          "MT361",
+          "MT364",
+          "MT754",
+          "MT400",
+          "MT360",
+          "MT305",
+          "MT365",
+          "MT742",
+          "MT304",
+          "MT320",
+          "MT340",
+          "MT330",
+          "MT350",
+          "MT768",
+          "MT730",
+          "MT306",
+          "MT362",
+          "MT300",
+          "MT756",
+          "MT765",
+          "MT769",
+          "MT752",
+          "MT734",
+          "MT341",
+          "MT750",
+          "MT740"
+        ],
+        "service": "FIN"
+      },
+      {
+        "recordId": "f6dcf873-3c4e-5760-bd94-95e0db879cc0",
+        "action": "CREATE_REVISION_DRAFT",
+        "removedMessageTypes": [
+          "pacs.009.001.12"
+        ],
+        "messageTypes": [
+          "pacs.009.001.08"
+        ],
+        "service": "FINPLUS"
+      },
+      {
+        "recordId": "03c033b8-0207-43d5-92d9-5daad3965b46",
+        "action": "CREATE_REVISION_DRAFT",
+        "removedMessageTypes": [
+          "pacs.009.001.12",
+          "MT767"
+        ],
+        "messageTypes": [
+          "pacs.008.001.12",
+          "pacs.009.001.08",
+          "MT320",
+          "MT330",
+          "MT340",
+          "MT350",
+          "MT760",
+          "MT765",
+          "MT700",
+          "MT710",
+          "MT720",
+          "MT730",
+          "MT754",
+          "MT756"
+        ],
+        "service": "FIN / FINPLUS"
+      },
+      {
+        "recordId": "20237a39-3fea-4515-bbd2-ab567f9a3e82",
+        "action": "CREATE_REVISION_DRAFT",
+        "removedMessageTypes": [
+          "MT410",
+          "MT412",
+          "MT420",
+          "MT422",
+          "pacs.009.001.12"
+        ],
+        "messageTypes": [
+          "MT400",
+          "MT700",
+          "MT740",
+          "MT742",
+          "pacs.008.001.12",
+          "pacs.009.001.08"
+        ],
+        "service": "FIN / FINPLUS"
+      },
+      {
+        "recordId": "512916c4-aade-4eb0-a9e5-a9c587d6970f",
+        "action": "CREATE_REVISION_DRAFT",
+        "removedMessageTypes": [
+          "MT410",
+          "MT412",
+          "MT420",
+          "MT422",
+          "pacs.009.001.12"
+        ],
+        "messageTypes": [
+          "MT400",
+          "pacs.008.001.12",
+          "pacs.009.001.08"
+        ],
+        "service": "FIN / FINPLUS"
+      },
+      {
+        "recordId": "5c978c47-c273-4b0e-a049-5cee9f7b907d",
+        "action": "CREATE_REVISION_DRAFT",
+        "removedMessageTypes": [
+          "pacs.009.001.12",
+          "MT767"
+        ],
+        "messageTypes": [
+          "pacs.008.001.12",
+          "pacs.009.001.08",
+          "MT760",
+          "MT765",
+          "MT700",
+          "MT710",
+          "MT720",
+          "MT730",
+          "MT754",
+          "MT756"
+        ],
+        "service": "FIN / FINPLUS"
+      },
+      {
+        "recordId": "96fe3c41-3b5e-4fde-b264-1dd45f1cedc7",
+        "action": "CREATE_REVISION_DRAFT",
+        "removedMessageTypes": [
+          "pacs.009.001.12",
+          "MT767"
+        ],
+        "messageTypes": [
+          "pacs.008.001.12",
+          "pacs.009.001.08",
+          "MT760",
+          "MT765"
+        ],
+        "service": "FIN / FINPLUS"
+      },
+      {
+        "recordId": "35406b3d-8be8-4482-af70-c60b7c8cea98",
+        "action": "CREATE_REVISION_DRAFT",
+        "removedMessageTypes": [
+          "pacs.009.001.12",
+          "MT767"
+        ],
+        "messageTypes": [
+          "pacs.009.001.08",
+          "MT760",
+          "MT765"
+        ],
+        "service": "FIN / FINPLUS"
+      },
+      {
+        "recordId": "ebda13e4-1fca-4e3c-a06d-db80bc0bf3a7",
+        "action": "CREATE_REVISION_DRAFT",
+        "removedMessageTypes": [
+          "MT744",
+          "MT747",
+          "pacs.009.001.12"
+        ],
+        "messageTypes": [
+          "MT740",
+          "MT742",
+          "MT756",
+          "pacs.008.001.12",
+          "pacs.009.001.08"
+        ],
+        "service": "FIN / FINPLUS"
+      },
+      {
+        "recordId": "7bb260df-9c6e-4e40-83fd-3441c7ff93e5",
+        "action": "CREATE_REVISION_DRAFT",
+        "removedMessageTypes": [
+          "pacs.009.001.12",
+          "MT744",
+          "MT747"
+        ],
+        "messageTypes": [
+          "pacs.009.001.08",
+          "MT740",
+          "MT742",
+          "MT756"
+        ],
+        "service": "FIN / FINPLUS"
+      },
+      {
+        "recordId": "f7d7c36f-9147-4fee-af7f-ee1b04a8aa11",
+        "action": "CREATE_REVISION_DRAFT",
+        "removedMessageTypes": [
+          "pacs.009.001.12"
+        ],
+        "messageTypes": [
+          "MT300",
+          "MT304",
+          "MT305",
+          "MT306",
+          "pacs.008.001.12",
+          "pacs.009.001.08"
+        ],
+        "service": "FIN / FINPLUS"
+      },
+      {
+        "recordId": "9bc38a38-51ee-4c5f-8117-7f4e8648467f",
+        "action": "CREATE_REVISION_DRAFT",
+        "removedMessageTypes": [
+          "pacs.009.001.12"
+        ],
+        "messageTypes": [
+          "MT300",
+          "MT304",
+          "MT305",
+          "MT306",
+          "pacs.009.001.08"
+        ],
+        "service": "FIN / FINPLUS"
+      },
+      {
+        "recordId": "f6e715f2-c826-444d-bcaa-7c010a15cfa8",
+        "action": "CREATE_REVISION_DRAFT",
+        "removedMessageTypes": [
+          "pacs.009.001.12"
+        ],
+        "messageTypes": [
+          "MT320",
+          "MT330",
+          "MT340",
+          "MT350",
+          "pacs.008.001.12",
+          "pacs.009.001.08"
+        ],
+        "service": "FIN / FINPLUS"
+      },
+      {
+        "recordId": "f9038404-bf76-492b-9a74-af43e7d30cc8",
+        "action": "CREATE_REVISION_DRAFT",
+        "removedMessageTypes": [
+          "pacs.009.001.12"
+        ],
+        "messageTypes": [
+          "MT320",
+          "MT330",
+          "MT340",
+          "MT350",
+          "pacs.009.001.08"
+        ],
+        "service": "FIN / FINPLUS"
+      },
+      {
+        "recordId": "db9fa2b6-a119-4849-bbeb-edb99d669d63",
+        "action": "CREATE_REVISION_DRAFT",
+        "removedMessageTypes": [
+          "pacs.009.001.12",
+          "pacs.009.001.12.cov"
+        ],
+        "messageTypes": [
+          "MT103",
+          "MT202",
+          "MT202COV",
+          "pacs.008.001.12",
+          "pacs.009.001.08"
+        ],
+        "service": "FIN / FINPLUS"
+      },
+      {
+        "recordId": "d655dbed-5c9e-46e7-9913-e1c84bb4d7dc",
+        "action": "CREATE_REVISION_DRAFT",
+        "removedMessageTypes": [
+          "MT767",
+          "MT410",
+          "MT412",
+          "MT420",
+          "MT422",
+          "pacs.009.001.12"
+        ],
+        "messageTypes": [
+          "MT760",
+          "MT765",
+          "MT400",
+          "pacs.008.001.12",
+          "pacs.009.001.08"
+        ],
+        "service": "FIN / FINPLUS"
+      },
+      {
+        "recordId": "86c29a49-72de-4149-96e4-3af4d2c493a1",
+        "action": "CREATE_REVISION_DRAFT",
+        "removedMessageTypes": [
+          "pacs.009.001.12",
+          "pacs.009.001.12.cov",
+          "MT410",
+          "MT412",
+          "MT420",
+          "MT422"
+        ],
+        "messageTypes": [
+          "pacs.008.001.12",
+          "pacs.009.001.08",
+          "MT400",
+          "MT103",
+          "MT202",
+          "MT202COV"
+        ],
+        "service": "FIN / FINPLUS"
+      },
+      {
+        "recordId": "71d06ef8-49eb-4c01-a717-c2500b6d8dec",
+        "action": "CREATE_REVISION_DRAFT",
+        "removedMessageTypes": [
+          "pacs.009.001.12",
+          "MT410"
+        ],
+        "messageTypes": [
+          "pacs.008.001.12",
+          "pacs.009.001.08",
+          "MT700",
+          "MT740",
+          "MT742",
+          "MT400",
+          "MT202",
+          "MT300",
+          "MT304",
+          "MT305",
+          "MT306"
+        ],
+        "service": "FIN / FINPLUS"
+      },
+      {
+        "recordId": "b356c5ab-18e0-4fd9-b046-484255818288",
+        "action": "CREATE_REVISION_DRAFT",
+        "removedMessageTypes": [
+          "pacs.009.001.12",
+          "MT410"
+        ],
+        "messageTypes": [
+          "pacs.008.001.12",
+          "pacs.009.001.08",
+          "MT700",
+          "MT710",
+          "MT720",
+          "MT730",
+          "MT754",
+          "MT756",
+          "MT320",
+          "MT330",
+          "MT340",
+          "MT350",
+          "MT400",
+          "MT202"
+        ],
+        "service": "FIN / FINPLUS"
+      },
+      {
+        "recordId": "44c187ba-e22f-48f3-b0eb-31892055032f",
+        "action": "CREATE_REVISION_DRAFT",
+        "removedMessageTypes": [
+          "MT767",
+          "MT410",
+          "pacs.009.001.12"
+        ],
+        "messageTypes": [
+          "MT300",
+          "MT304",
+          "MT305",
+          "MT306",
+          "MT760",
+          "MT765",
+          "MT400",
+          "MT202",
+          "MT700",
+          "MT740",
+          "MT742",
+          "pacs.008.001.12"
+        ],
+        "service": "FIN / FINPLUS"
+      },
+      {
+        "recordId": "15e53516-68e6-4599-8597-1ef5d4986fad",
+        "action": "CREATE_REVISION_DRAFT",
+        "removedMessageTypes": [
+          "MT744",
+          "MT747",
+          "MT410",
+          "MT412",
+          "MT420",
+          "MT422",
+          "pacs.009.001.12",
+          "pacs.009.001.12.cov"
+        ],
+        "messageTypes": [
+          "MT103",
+          "MT202",
+          "MT202COV",
+          "MT740",
+          "MT742",
+          "MT756",
+          "MT400",
+          "pacs.008.001.12"
+        ],
+        "service": "FIN / FINPLUS"
+      },
+      {
+        "recordId": "a47622d3-c367-416c-819a-a491739e157a",
+        "action": "CREATE_REVISION_DRAFT",
+        "removedMessageTypes": [
+          "pacs.009.001.12",
+          "pacs.009.001.12.cov",
+          "MT744",
+          "MT747",
+          "MT410",
+          "MT412",
+          "MT420",
+          "MT422"
+        ],
+        "messageTypes": [
+          "pacs.008.001.12",
+          "MT103",
+          "MT202",
+          "MT202COV",
+          "MT740",
+          "MT742",
+          "MT756",
+          "MT400"
+        ],
+        "service": "FIN / FINPLUS"
+      },
+      {
+        "recordId": "2bcd8ead-1e74-49b3-929e-4ce70f4cb89d",
+        "action": "CREATE_REVISION_DRAFT",
+        "removedMessageTypes": [
+          "pacs.009.001.12",
+          "pacs.009.001.12.cov"
+        ],
+        "messageTypes": [
+          "pacs.008.001.12",
+          "MT103",
+          "MT202",
+          "MT202COV"
+        ],
+        "service": "FIN / FINPLUS"
+      },
+      {
+        "recordId": "35dee6be-1751-4fbc-b227-553622908553",
+        "action": "CREATE_REVISION_DRAFT",
+        "removedMessageTypes": [
+          "pacs.009.001.12",
+          "pacs.009.001.12.cov"
+        ],
+        "messageTypes": [
+          "pacs.008.001.12",
+          "MT103",
+          "MT202",
+          "MT202COV"
+        ],
+        "service": "FIN / FINPLUS"
+      },
+      {
+        "recordId": "b487b622-a7c2-486c-9ba5-249ae7f97cd2",
+        "action": "CREATE_REVISION_DRAFT",
+        "removedMessageTypes": [
+          "pacs.009.001.12",
+          "MT744",
+          "MT747",
+          "MT410",
+          "MT412",
+          "MT420",
+          "MT422"
+        ],
+        "messageTypes": [
+          "MT740",
+          "MT742",
+          "MT756",
+          "MT400"
+        ],
+        "service": "FIN"
+      }
+    ]
+  },
+  "repairResults": [],
+  "issues": [
+    {
+      "domain": "SSI",
+      "recordId": "4672d022-ef84-49b6-ac81-f1b746b29ced",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "4672d022-ef84-49b6-ac81-f1b746b29ced",
+      "severity": "ERROR",
+      "code": "COUNTERPARTY_BIC_MISSING",
+      "disposition": "REPORT_ONLY"
+    },
+    {
+      "domain": "SSI",
+      "recordId": "d633c924-9254-40cd-ab86-9e732b0be70b",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "9e18b747-8fe8-4013-9013-7683dcd2ab0e",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "b8cf986b-2b60-4c04-bf26-0a2610d6b68d",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "73e7451e-c644-44d2-aef8-9501af6dc086",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "67711286-9309-49ee-bb1d-949ff493d510",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "8f98984f-9b23-46d4-8f62-bfa842be9c02",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "6d2dec1a-64d9-4dea-95a2-2a04f86ba549",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "e4d5ec3f-d41e-452b-8dd4-53b2687eb010",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "4f886c6f-ce30-48dd-bb57-ed03a66bdbdf",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "c2728833-a2f7-4ce2-9ef5-ec9c7a57b95f",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "1370fdba-a9f7-426a-ad76-9d03a7ea3028",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "c05ef06d-e0d4-4415-8f78-8f47a58b1c86",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "41448881-cb3c-47c1-bfe8-4a82bc4c47ba",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "73985e24-3600-4c2d-b4ee-f2052a2d95a9",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "dcfcf03b-8d05-4425-b432-a1e0fbe2ed4e",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "aee0ea40-d5c0-4734-83d2-80c14e5e6031",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "01deb95b-ccff-42b3-9125-32122102fd33",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "3a8d5d12-546c-4367-b120-ac5d4982ef5d",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "82beb688-dd07-4914-8bbe-2a9c38a80f7c",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "87ea5488-3a7d-42cc-8b29-e4250ebadb91",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "7908c31d-a555-4c40-ba46-6bad6e9bdf4f",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "141ae0e6-2296-4c84-90f5-ebeb70d7fde0",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "3ce0d981-41a7-4826-8756-64b3a679a853",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "e60a1ec0-c0d6-489b-97fd-fb188c3c34d1",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "32df856e-52e8-4a3d-ab51-3fac02b02b10",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "f080c630-5f50-4249-a632-b42ec3f63064",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "5a73eca5-c63f-4a12-9c10-f48a7c81ff66",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "5a73eca5-c63f-4a12-9c10-f48a7c81ff66",
+      "severity": "ERROR",
+      "code": "COUNTERPARTY_BIC_MISSING",
+      "disposition": "REPORT_ONLY"
+    },
+    {
+      "domain": "SSI",
+      "recordId": "efa043bf-24f0-4cf4-83fa-2e915f329ce7",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "efa043bf-24f0-4cf4-83fa-2e915f329ce7",
+      "severity": "ERROR",
+      "code": "COUNTERPARTY_BIC_MISSING",
+      "disposition": "REPORT_ONLY"
+    },
+    {
+      "domain": "SSI",
+      "recordId": "8e171f8a-483c-454b-8b08-d17edf0388c1",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "8e171f8a-483c-454b-8b08-d17edf0388c1",
+      "severity": "ERROR",
+      "code": "COUNTERPARTY_BIC_MISSING",
+      "disposition": "REPORT_ONLY"
+    },
+    {
+      "domain": "SSI",
+      "recordId": "2dbc9ea7-3b4b-4397-a076-e1c5122a2955",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "2dbc9ea7-3b4b-4397-a076-e1c5122a2955",
+      "severity": "ERROR",
+      "code": "COUNTERPARTY_BIC_MISSING",
+      "disposition": "REPORT_ONLY"
+    },
+    {
+      "domain": "SSI",
+      "recordId": "c19d7733-bea8-4d94-a1c1-751d3f3e519d",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "c19d7733-bea8-4d94-a1c1-751d3f3e519d",
+      "severity": "ERROR",
+      "code": "COUNTERPARTY_BIC_MISSING",
+      "disposition": "REPORT_ONLY"
+    },
+    {
+      "domain": "SSI",
+      "recordId": "d9a260b8-345e-4a3f-9900-9fca515ba1d3",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "d9a260b8-345e-4a3f-9900-9fca515ba1d3",
+      "severity": "ERROR",
+      "code": "COUNTERPARTY_BIC_MISSING",
+      "disposition": "REPORT_ONLY"
+    },
+    {
+      "domain": "SSI",
+      "recordId": "1eb03155-9d10-438b-83c7-44bf28d94abd",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "1eb03155-9d10-438b-83c7-44bf28d94abd",
+      "severity": "ERROR",
+      "code": "COUNTERPARTY_BIC_MISSING",
+      "disposition": "REPORT_ONLY"
+    },
+    {
+      "domain": "SSI",
+      "recordId": "1cd5fe90-964b-4309-b288-3e59abba90e8",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "1cd5fe90-964b-4309-b288-3e59abba90e8",
+      "severity": "ERROR",
+      "code": "COUNTERPARTY_BIC_MISSING",
+      "disposition": "REPORT_ONLY"
+    },
+    {
+      "domain": "SSI",
+      "recordId": "71ffd8af-3697-4b81-9325-65d9bb33bef0",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "71ffd8af-3697-4b81-9325-65d9bb33bef0",
+      "severity": "ERROR",
+      "code": "COUNTERPARTY_BIC_MISSING",
+      "disposition": "REPORT_ONLY"
+    },
+    {
+      "domain": "SSI",
+      "recordId": "87754264-ec4a-4ae6-99da-e4ca931d34c8",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "87754264-ec4a-4ae6-99da-e4ca931d34c8",
+      "severity": "ERROR",
+      "code": "COUNTERPARTY_BIC_MISSING",
+      "disposition": "REPORT_ONLY"
+    },
+    {
+      "domain": "SSI",
+      "recordId": "b3937066-a0e0-431d-a626-a1ee93a4a607",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "b3937066-a0e0-431d-a626-a1ee93a4a607",
+      "severity": "ERROR",
+      "code": "COUNTERPARTY_BIC_MISSING",
+      "disposition": "REPORT_ONLY"
+    },
+    {
+      "domain": "SSI",
+      "recordId": "5b11bd1c-ff48-4827-a658-a0bc573279bc",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "5b11bd1c-ff48-4827-a658-a0bc573279bc",
+      "severity": "ERROR",
+      "code": "COUNTERPARTY_BIC_MISSING",
+      "disposition": "REPORT_ONLY"
+    },
+    {
+      "domain": "SSI",
+      "recordId": "c28f3397-3941-4b5b-b5c2-6fc574215a00",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "c28f3397-3941-4b5b-b5c2-6fc574215a00",
+      "severity": "ERROR",
+      "code": "COUNTERPARTY_BIC_MISSING",
+      "disposition": "REPORT_ONLY"
+    },
+    {
+      "domain": "SSI",
+      "recordId": "da012b04-8aa4-4232-be18-5a7c1834fb5e",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "da012b04-8aa4-4232-be18-5a7c1834fb5e",
+      "severity": "ERROR",
+      "code": "COUNTERPARTY_BIC_MISSING",
+      "disposition": "REPORT_ONLY"
+    },
+    {
+      "domain": "SSI",
+      "recordId": "1ea6c922-d793-41eb-aab1-10df56b751c2",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "1ea6c922-d793-41eb-aab1-10df56b751c2",
+      "severity": "ERROR",
+      "code": "COUNTERPARTY_BIC_MISSING",
+      "disposition": "REPORT_ONLY"
+    },
+    {
+      "domain": "SSI",
+      "recordId": "025c267b-fc98-4095-98d8-28d71346ee18",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "025c267b-fc98-4095-98d8-28d71346ee18",
+      "severity": "ERROR",
+      "code": "COUNTERPARTY_BIC_MISSING",
+      "disposition": "REPORT_ONLY"
+    },
+    {
+      "domain": "SSI",
+      "recordId": "69d659a8-e70b-40e3-8b08-c47d1f29a5e0",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "69d659a8-e70b-40e3-8b08-c47d1f29a5e0",
+      "severity": "ERROR",
+      "code": "COUNTERPARTY_BIC_MISSING",
+      "disposition": "REPORT_ONLY"
+    },
+    {
+      "domain": "SSI",
+      "recordId": "dad58040-aecf-4846-851d-6e6bebe589e8",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "dad58040-aecf-4846-851d-6e6bebe589e8",
+      "severity": "ERROR",
+      "code": "COUNTERPARTY_BIC_MISSING",
+      "disposition": "REPORT_ONLY"
+    },
+    {
+      "domain": "SSI",
+      "recordId": "6964f052-032f-47b9-94d5-a9f93a6d2415",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "6964f052-032f-47b9-94d5-a9f93a6d2415",
+      "severity": "ERROR",
+      "code": "COUNTERPARTY_BIC_MISSING",
+      "disposition": "REPORT_ONLY"
+    },
+    {
+      "domain": "SSI",
+      "recordId": "3be38d3e-f2fe-41d0-9735-5d4db03ed4b7",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "3be38d3e-f2fe-41d0-9735-5d4db03ed4b7",
+      "severity": "ERROR",
+      "code": "COUNTERPARTY_BIC_MISSING",
+      "disposition": "REPORT_ONLY"
+    },
+    {
+      "domain": "SSI",
+      "recordId": "11da3aab-a153-466c-8a61-01cc04c5672b",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "11da3aab-a153-466c-8a61-01cc04c5672b",
+      "severity": "ERROR",
+      "code": "COUNTERPARTY_BIC_MISSING",
+      "disposition": "REPORT_ONLY"
+    },
+    {
+      "domain": "SSI",
+      "recordId": "b5b0a01c-f3ed-42b2-8dba-921773c1d7c5",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "b5b0a01c-f3ed-42b2-8dba-921773c1d7c5",
+      "severity": "ERROR",
+      "code": "COUNTERPARTY_BIC_MISSING",
+      "disposition": "REPORT_ONLY"
+    },
+    {
+      "domain": "SSI",
+      "recordId": "f144ded5-9a8c-4e66-a239-9809b951b364",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "f144ded5-9a8c-4e66-a239-9809b951b364",
+      "severity": "ERROR",
+      "code": "COUNTERPARTY_BIC_MISSING",
+      "disposition": "REPORT_ONLY"
+    },
+    {
+      "domain": "SSI",
+      "recordId": "0add55ec-de38-4427-8c37-ea00e963f361",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "0add55ec-de38-4427-8c37-ea00e963f361",
+      "severity": "ERROR",
+      "code": "COUNTERPARTY_BIC_MISSING",
+      "disposition": "REPORT_ONLY"
+    },
+    {
+      "domain": "SSI",
+      "recordId": "78fe48cb-6990-4be7-88f8-a8b588cb22ee",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "78fe48cb-6990-4be7-88f8-a8b588cb22ee",
+      "severity": "ERROR",
+      "code": "COUNTERPARTY_BIC_MISSING",
+      "disposition": "REPORT_ONLY"
+    },
+    {
+      "domain": "SSI",
+      "recordId": "069a0a01-1c7c-415c-8891-c31151999b6f",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "069a0a01-1c7c-415c-8891-c31151999b6f",
+      "severity": "ERROR",
+      "code": "COUNTERPARTY_BIC_MISSING",
+      "disposition": "REPORT_ONLY"
+    },
+    {
+      "domain": "SSI",
+      "recordId": "899fa334-d550-4233-a38e-e78e2bc7a4e2",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "899fa334-d550-4233-a38e-e78e2bc7a4e2",
+      "severity": "ERROR",
+      "code": "COUNTERPARTY_BIC_MISSING",
+      "disposition": "REPORT_ONLY"
+    },
+    {
+      "domain": "SSI",
+      "recordId": "96cf0ebf-0b97-4f28-860c-663437266b84",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "96cf0ebf-0b97-4f28-860c-663437266b84",
+      "severity": "ERROR",
+      "code": "COUNTERPARTY_BIC_MISSING",
+      "disposition": "REPORT_ONLY"
+    },
+    {
+      "domain": "SSI",
+      "recordId": "b47c4ea0-b11c-435a-b920-67b5d0f658c6",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "b47c4ea0-b11c-435a-b920-67b5d0f658c6",
+      "severity": "ERROR",
+      "code": "COUNTERPARTY_BIC_MISSING",
+      "disposition": "REPORT_ONLY"
+    },
+    {
+      "domain": "SSI",
+      "recordId": "f23941f8-f58d-40a3-84d1-d297e5e70d83",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "f23941f8-f58d-40a3-84d1-d297e5e70d83",
+      "severity": "ERROR",
+      "code": "COUNTERPARTY_BIC_MISSING",
+      "disposition": "REPORT_ONLY"
+    },
+    {
+      "domain": "SSI",
+      "recordId": "e294bf10-2a1c-4514-933b-3e1a483a5a95",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "e294bf10-2a1c-4514-933b-3e1a483a5a95",
+      "severity": "ERROR",
+      "code": "COUNTERPARTY_BIC_MISSING",
+      "disposition": "REPORT_ONLY"
+    },
+    {
+      "domain": "SSI",
+      "recordId": "5d372d20-4342-40bc-871e-c8484ba4b13c",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "5d372d20-4342-40bc-871e-c8484ba4b13c",
+      "severity": "ERROR",
+      "code": "COUNTERPARTY_BIC_MISSING",
+      "disposition": "REPORT_ONLY"
+    },
+    {
+      "domain": "SSI",
+      "recordId": "85e86039-8a86-4f2e-8fc7-bf09daa551a4",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "85e86039-8a86-4f2e-8fc7-bf09daa551a4",
+      "severity": "ERROR",
+      "code": "COUNTERPARTY_BIC_MISSING",
+      "disposition": "REPORT_ONLY"
+    },
+    {
+      "domain": "SSI",
+      "recordId": "3c9ab8e4-0a37-4a9f-b695-6f5f55c5656f",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "3c9ab8e4-0a37-4a9f-b695-6f5f55c5656f",
+      "severity": "ERROR",
+      "code": "COUNTERPARTY_BIC_MISSING",
+      "disposition": "REPORT_ONLY"
+    },
+    {
+      "domain": "SSI",
+      "recordId": "f67f8496-c22c-4aee-8ff9-1b8c8e57bed5",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "f67f8496-c22c-4aee-8ff9-1b8c8e57bed5",
+      "severity": "ERROR",
+      "code": "COUNTERPARTY_BIC_MISSING",
+      "disposition": "REPORT_ONLY"
+    },
+    {
+      "domain": "SSI",
+      "recordId": "fc1983dc-2f70-49fc-8b5d-4582998cfaf4",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "fc1983dc-2f70-49fc-8b5d-4582998cfaf4",
+      "severity": "ERROR",
+      "code": "COUNTERPARTY_BIC_MISSING",
+      "disposition": "REPORT_ONLY"
+    },
+    {
+      "domain": "SSI",
+      "recordId": "a6042a93-12fb-435a-a708-951021b7198f",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "a6042a93-12fb-435a-a708-951021b7198f",
+      "severity": "ERROR",
+      "code": "COUNTERPARTY_BIC_MISSING",
+      "disposition": "REPORT_ONLY"
+    },
+    {
+      "domain": "SSI",
+      "recordId": "057c14cd-cee8-4639-95a3-d59aa81038d2",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "057c14cd-cee8-4639-95a3-d59aa81038d2",
+      "severity": "ERROR",
+      "code": "COUNTERPARTY_BIC_MISSING",
+      "disposition": "REPORT_ONLY"
+    },
+    {
+      "domain": "SSI",
+      "recordId": "e3cefd82-5399-4471-843f-e96527dfd445",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "e3cefd82-5399-4471-843f-e96527dfd445",
+      "severity": "ERROR",
+      "code": "COUNTERPARTY_BIC_MISSING",
+      "disposition": "REPORT_ONLY"
+    },
+    {
+      "domain": "SSI",
+      "recordId": "91b533e1-0941-42bb-989d-fa1df42386b6",
+      "severity": "ERROR",
+      "code": "INVALID_EFFECTIVE_DATE",
+      "disposition": "REPORT_ONLY",
+      "current": {
+        "from": "",
+        "to": ""
+      }
+    },
+    {
+      "domain": "SSI",
+      "recordId": "91b533e1-0941-42bb-989d-fa1df42386b6",
+      "severity": "ERROR",
+      "code": "COUNTERPARTY_BIC_MISSING",
+      "disposition": "REPORT_ONLY"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "5ac0aa48-e476-412e-a000-e7a7b5fd6b2a",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT410"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "c51b22f3-73b7-42e3-9f06-fff9ab9d1dc4",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT767"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "cd120a01-f2cd-4b4d-bb6c-9e73972e583b",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "198eed20-e1a2-481b-a3ac-61bfa60c60bc",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "bc635a92-e928-42ab-93b8-f2d2978b1ef5",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT744"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "bc635a92-e928-42ab-93b8-f2d2978b1ef5",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT747"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "b15dec44-7842-434b-8420-df9efdb780bb",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "257964eb-fdef-4cfd-939a-dac776234dd6",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT767"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "1fe614a5-e796-4eb2-91c3-f694e5478c9f",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "1fe614a5-e796-4eb2-91c3-f694e5478c9f",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT767"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "7fdfbbf8-6d59-469c-b7bc-f421b9f448b0",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "ef217343-dbdf-44b2-ac0f-1da795282681",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "1e9fb004-3ba5-4d9b-9c31-b745c6e19b10",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "a0014a88-6c04-5c32-aab0-ce10e60a9a0f",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "41d8ec2f-b96d-5ad5-9c49-a2a58242689b",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "41d8ec2f-b96d-5ad5-9c49-a2a58242689b",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT767"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "9ec36cbc-fb4f-5fe6-8185-00970584877b",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "9ec36cbc-fb4f-5fe6-8185-00970584877b",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT767"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "ab830e06-f26f-5576-a39f-d09431804c2a",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT410"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "ab830e06-f26f-5576-a39f-d09431804c2a",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT412"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "ab830e06-f26f-5576-a39f-d09431804c2a",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT420"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "ab830e06-f26f-5576-a39f-d09431804c2a",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT422"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "ab830e06-f26f-5576-a39f-d09431804c2a",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "b0f662d3-b773-5e6f-a66a-cd138a2d7795",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "b0f662d3-b773-5e6f-a66a-cd138a2d7795",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT767"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "b0f662d3-b773-5e6f-a66a-cd138a2d7795",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT410"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "b0f662d3-b773-5e6f-a66a-cd138a2d7795",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT412"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "b0f662d3-b773-5e6f-a66a-cd138a2d7795",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT420"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "b0f662d3-b773-5e6f-a66a-cd138a2d7795",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT422"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "ccb45a35-e8ed-5534-b921-9fc72c55c63b",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "ccb45a35-e8ed-5534-b921-9fc72c55c63b",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12.cov"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "ccb45a35-e8ed-5534-b921-9fc72c55c63b",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT410"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "ccb45a35-e8ed-5534-b921-9fc72c55c63b",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT412"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "ccb45a35-e8ed-5534-b921-9fc72c55c63b",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT420"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "ccb45a35-e8ed-5534-b921-9fc72c55c63b",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT422"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "ab03658f-6695-59b8-bd45-ec604953ece8",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "ab03658f-6695-59b8-bd45-ec604953ece8",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT410"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "ab03658f-6695-59b8-bd45-ec604953ece8",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT412"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "ab03658f-6695-59b8-bd45-ec604953ece8",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT420"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "ab03658f-6695-59b8-bd45-ec604953ece8",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT422"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "b501e394-8e02-5cdf-bb28-9b1a5c10ed78",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "b501e394-8e02-5cdf-bb28-9b1a5c10ed78",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT744"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "b501e394-8e02-5cdf-bb28-9b1a5c10ed78",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT747"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "0a2a2322-4c34-5057-bb1e-56cca65dfd25",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "415cf7dc-86eb-540d-a4cb-43c18eaa5830",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "415cf7dc-86eb-540d-a4cb-43c18eaa5830",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT410"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "92d20f57-ecaf-5c5c-acae-19dd8517c1e7",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "92d20f57-ecaf-5c5c-acae-19dd8517c1e7",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT767"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "92d20f57-ecaf-5c5c-acae-19dd8517c1e7",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT410"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "e0b2b69d-c143-54d5-8a1d-ad1a208c70e0",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "a5b2ec80-d3be-5814-9cd8-43833396d8ab",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "a5b2ec80-d3be-5814-9cd8-43833396d8ab",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12.cov"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "7be511dc-a819-5f08-ae47-5baf56405399",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT410"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "7be511dc-a819-5f08-ae47-5baf56405399",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "ffe5093c-ec1d-57fc-82f3-a691b2b383cb",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT744"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "ffe5093c-ec1d-57fc-82f3-a691b2b383cb",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT747"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "ffe5093c-ec1d-57fc-82f3-a691b2b383cb",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT410"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "ffe5093c-ec1d-57fc-82f3-a691b2b383cb",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT412"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "ffe5093c-ec1d-57fc-82f3-a691b2b383cb",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT420"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "ffe5093c-ec1d-57fc-82f3-a691b2b383cb",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT422"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "ffe5093c-ec1d-57fc-82f3-a691b2b383cb",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "ffe5093c-ec1d-57fc-82f3-a691b2b383cb",
+      "severity": "ERROR",
+      "code": "SERVICE_DOES_NOT_MATCH_MESSAGE_TYPES",
+      "disposition": "REVISION_REQUIRED",
+      "current": "FIN / FINPLUS",
+      "proposed": "FIN"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "f6dcf873-3c4e-5760-bd94-95e0db879cc0",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "351def36-32a2-4e46-bd65-4113e88f29d8",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "351def36-32a2-4e46-bd65-4113e88f29d8",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT767"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "03c033b8-0207-43d5-92d9-5daad3965b46",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "03c033b8-0207-43d5-92d9-5daad3965b46",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT767"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "4bd9e9ac-227b-4d57-ab71-1f917f109d18",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "4bd9e9ac-227b-4d57-ab71-1f917f109d18",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT767"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "1742ea30-c0e7-44ab-a17d-83b633f58811",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "1742ea30-c0e7-44ab-a17d-83b633f58811",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT410"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "1742ea30-c0e7-44ab-a17d-83b633f58811",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT412"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "1742ea30-c0e7-44ab-a17d-83b633f58811",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT420"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "1742ea30-c0e7-44ab-a17d-83b633f58811",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT422"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "20237a39-3fea-4515-bbd2-ab567f9a3e82",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT410"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "20237a39-3fea-4515-bbd2-ab567f9a3e82",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT412"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "20237a39-3fea-4515-bbd2-ab567f9a3e82",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT420"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "20237a39-3fea-4515-bbd2-ab567f9a3e82",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT422"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "20237a39-3fea-4515-bbd2-ab567f9a3e82",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "4a9afe8a-d326-4fbd-a1a1-010faab0dac1",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "4a9afe8a-d326-4fbd-a1a1-010faab0dac1",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT410"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "4a9afe8a-d326-4fbd-a1a1-010faab0dac1",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT412"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "4a9afe8a-d326-4fbd-a1a1-010faab0dac1",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT420"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "4a9afe8a-d326-4fbd-a1a1-010faab0dac1",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT422"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "98ebb222-aa1a-440c-b1ca-39f0f4f992d0",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "512916c4-aade-4eb0-a9e5-a9c587d6970f",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT410"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "512916c4-aade-4eb0-a9e5-a9c587d6970f",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT412"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "512916c4-aade-4eb0-a9e5-a9c587d6970f",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT420"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "512916c4-aade-4eb0-a9e5-a9c587d6970f",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT422"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "512916c4-aade-4eb0-a9e5-a9c587d6970f",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "45116a57-6eee-491e-a967-94370add95a8",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "5c978c47-c273-4b0e-a049-5cee9f7b907d",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "5c978c47-c273-4b0e-a049-5cee9f7b907d",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT767"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "126dcb80-e0b1-49b0-b16c-2b7a969fa1eb",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "126dcb80-e0b1-49b0-b16c-2b7a969fa1eb",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT767"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "3449bb51-1785-45fa-9c59-ba41b6f4065b",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "96fe3c41-3b5e-4fde-b264-1dd45f1cedc7",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "96fe3c41-3b5e-4fde-b264-1dd45f1cedc7",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT767"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "4efa2086-afed-4a73-bb1d-9d7fd8d124a3",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "35406b3d-8be8-4482-af70-c60b7c8cea98",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "35406b3d-8be8-4482-af70-c60b7c8cea98",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT767"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "1e8a7193-089d-463d-ac90-5442abc62010",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "d9b5534f-1cda-4f76-b053-51ffb97d826b",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "ebda13e4-1fca-4e3c-a06d-db80bc0bf3a7",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT744"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "ebda13e4-1fca-4e3c-a06d-db80bc0bf3a7",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT747"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "ebda13e4-1fca-4e3c-a06d-db80bc0bf3a7",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "7be4935c-8a50-487c-9523-db086f2467fd",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "7bb260df-9c6e-4e40-83fd-3441c7ff93e5",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "7bb260df-9c6e-4e40-83fd-3441c7ff93e5",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT744"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "7bb260df-9c6e-4e40-83fd-3441c7ff93e5",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT747"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "bd3d293b-a498-4d5c-bdc9-afbae84bd4c2",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "f7d7c36f-9147-4fee-af7f-ee1b04a8aa11",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "2e8f440c-542c-45c6-b99e-bc3deb37d867",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "39db621a-7bc3-4404-b224-e2646eb38936",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "9bc38a38-51ee-4c5f-8117-7f4e8648467f",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "69807492-7024-4083-9951-b591d7588515",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "af7e8867-0234-46b0-b112-5d41b43002a5",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "f6e715f2-c826-444d-bcaa-7c010a15cfa8",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "0434f0ab-adb9-406d-ae6c-bd579aeef19c",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "eee62afa-c6d4-4e99-9ae8-170fb1220db4",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "f9038404-bf76-492b-9a74-af43e7d30cc8",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "41c99864-4b14-41ca-b8f9-b775e6f52fc8",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "71cfd65d-2f6c-4085-84d1-9c1a930df380",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "71cfd65d-2f6c-4085-84d1-9c1a930df380",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12.cov"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "db9fa2b6-a119-4849-bbeb-edb99d669d63",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "db9fa2b6-a119-4849-bbeb-edb99d669d63",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12.cov"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "3168b219-1e48-4d9b-b395-57850a4ca388",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "3168b219-1e48-4d9b-b395-57850a4ca388",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12.cov"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "df3c8d2e-2fe6-41cf-91ab-be0dc7338f72",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT767"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "df3c8d2e-2fe6-41cf-91ab-be0dc7338f72",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "d655dbed-5c9e-46e7-9913-e1c84bb4d7dc",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT767"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "d655dbed-5c9e-46e7-9913-e1c84bb4d7dc",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT410"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "d655dbed-5c9e-46e7-9913-e1c84bb4d7dc",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT412"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "d655dbed-5c9e-46e7-9913-e1c84bb4d7dc",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT420"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "d655dbed-5c9e-46e7-9913-e1c84bb4d7dc",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT422"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "d655dbed-5c9e-46e7-9913-e1c84bb4d7dc",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "947ae805-715a-414b-b8da-060563252b4c",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT767"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "947ae805-715a-414b-b8da-060563252b4c",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "4bc98842-f26d-474f-87e4-d83d2d468d58",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "4bc98842-f26d-474f-87e4-d83d2d468d58",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12.cov"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "4bc98842-f26d-474f-87e4-d83d2d468d58",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT410"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "4bc98842-f26d-474f-87e4-d83d2d468d58",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT412"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "4bc98842-f26d-474f-87e4-d83d2d468d58",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT420"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "4bc98842-f26d-474f-87e4-d83d2d468d58",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT422"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "86c29a49-72de-4149-96e4-3af4d2c493a1",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "86c29a49-72de-4149-96e4-3af4d2c493a1",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12.cov"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "86c29a49-72de-4149-96e4-3af4d2c493a1",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT410"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "86c29a49-72de-4149-96e4-3af4d2c493a1",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT412"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "86c29a49-72de-4149-96e4-3af4d2c493a1",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT420"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "86c29a49-72de-4149-96e4-3af4d2c493a1",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT422"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "fe16d7c7-6522-4d96-ab3b-41416423b8e9",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "fe16d7c7-6522-4d96-ab3b-41416423b8e9",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT410"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "fe16d7c7-6522-4d96-ab3b-41416423b8e9",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT412"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "fe16d7c7-6522-4d96-ab3b-41416423b8e9",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT420"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "fe16d7c7-6522-4d96-ab3b-41416423b8e9",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT422"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "fe16d7c7-6522-4d96-ab3b-41416423b8e9",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12.cov"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "f2c763e3-dfc9-4e81-94e3-b5f5e8843136",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "f2c763e3-dfc9-4e81-94e3-b5f5e8843136",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT410"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "71d06ef8-49eb-4c01-a717-c2500b6d8dec",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "71d06ef8-49eb-4c01-a717-c2500b6d8dec",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT410"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "69c7d51d-b1e5-4678-b50a-3347ceda8b4d",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "69c7d51d-b1e5-4678-b50a-3347ceda8b4d",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT410"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "72e91554-7faa-42c8-8c4a-8c51f0c25fe0",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "b356c5ab-18e0-4fd9-b046-484255818288",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "b356c5ab-18e0-4fd9-b046-484255818288",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT410"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "906983cf-6f31-4ac8-926c-9ff4c254b782",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "d1f61299-a287-4973-8ab9-dfffca39a0d3",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "d1f61299-a287-4973-8ab9-dfffca39a0d3",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT767"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "d1f61299-a287-4973-8ab9-dfffca39a0d3",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT410"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "d1f61299-a287-4973-8ab9-dfffca39a0d3",
+      "severity": "ERROR",
+      "code": "SERVICE_DOES_NOT_MATCH_MESSAGE_TYPES",
+      "disposition": "REVISION_REQUIRED",
+      "current": "FIN / FINPLUS",
+      "proposed": "FIN"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "44c187ba-e22f-48f3-b0eb-31892055032f",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT767"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "44c187ba-e22f-48f3-b0eb-31892055032f",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT410"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "44c187ba-e22f-48f3-b0eb-31892055032f",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "3ccc8f48-ad7b-4dad-97b1-4d5f0d28cb8b",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT767"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "3ccc8f48-ad7b-4dad-97b1-4d5f0d28cb8b",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT410"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "3ccc8f48-ad7b-4dad-97b1-4d5f0d28cb8b",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "3ccc8f48-ad7b-4dad-97b1-4d5f0d28cb8b",
+      "severity": "ERROR",
+      "code": "SERVICE_DOES_NOT_MATCH_MESSAGE_TYPES",
+      "disposition": "REVISION_REQUIRED",
+      "current": "FIN / FINPLUS",
+      "proposed": "FIN"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "15e53516-68e6-4599-8597-1ef5d4986fad",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT744"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "15e53516-68e6-4599-8597-1ef5d4986fad",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT747"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "15e53516-68e6-4599-8597-1ef5d4986fad",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT410"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "15e53516-68e6-4599-8597-1ef5d4986fad",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT412"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "15e53516-68e6-4599-8597-1ef5d4986fad",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT420"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "15e53516-68e6-4599-8597-1ef5d4986fad",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT422"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "15e53516-68e6-4599-8597-1ef5d4986fad",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "15e53516-68e6-4599-8597-1ef5d4986fad",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12.cov"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "f9bb14db-0284-4cba-8adc-e19204144c23",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT744"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "f9bb14db-0284-4cba-8adc-e19204144c23",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT747"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "a47622d3-c367-416c-819a-a491739e157a",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "a47622d3-c367-416c-819a-a491739e157a",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12.cov"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "a47622d3-c367-416c-819a-a491739e157a",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT744"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "a47622d3-c367-416c-819a-a491739e157a",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT747"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "a47622d3-c367-416c-819a-a491739e157a",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT410"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "a47622d3-c367-416c-819a-a491739e157a",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT412"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "a47622d3-c367-416c-819a-a491739e157a",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT420"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "a47622d3-c367-416c-819a-a491739e157a",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT422"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "c2fedf6e-7b5c-4b08-9269-466b6dacdaab",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT744"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "c2fedf6e-7b5c-4b08-9269-466b6dacdaab",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT747"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "2bcd8ead-1e74-49b3-929e-4ce70f4cb89d",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "2bcd8ead-1e74-49b3-929e-4ce70f4cb89d",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12.cov"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "35dee6be-1751-4fbc-b227-553622908553",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "35dee6be-1751-4fbc-b227-553622908553",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12.cov"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "da6893ac-9c68-4f6a-8042-a3ae2c643333",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT744"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "da6893ac-9c68-4f6a-8042-a3ae2c643333",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT747"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "b487b622-a7c2-486c-9ba5-249ae7f97cd2",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "pacs.009.001.12"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "b487b622-a7c2-486c-9ba5-249ae7f97cd2",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT744"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "b487b622-a7c2-486c-9ba5-249ae7f97cd2",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT747"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "b487b622-a7c2-486c-9ba5-249ae7f97cd2",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT410"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "b487b622-a7c2-486c-9ba5-249ae7f97cd2",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT412"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "b487b622-a7c2-486c-9ba5-249ae7f97cd2",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT420"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "b487b622-a7c2-486c-9ba5-249ae7f97cd2",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT422"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "b487b622-a7c2-486c-9ba5-249ae7f97cd2",
+      "severity": "ERROR",
+      "code": "SERVICE_DOES_NOT_MATCH_MESSAGE_TYPES",
+      "disposition": "REVISION_REQUIRED",
+      "current": "FIN / FINPLUS",
+      "proposed": "FIN"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "631493c2-8977-4e7a-b18a-df17ae814ea2",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT744"
+    },
+    {
+      "domain": "RMA",
+      "recordId": "631493c2-8977-4e7a-b18a-df17ae814ea2",
+      "severity": "WARNING",
+      "code": "IGNORED_OUT_OF_SSI_SCOPE",
+      "disposition": "IGNORE_ON_LOAD",
+      "current": "MT747"
+    }
+  ]
+}
