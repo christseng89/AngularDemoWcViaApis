@@ -68,10 +68,10 @@ test("RMA is distinct by own BIC, counterparty BIC and direction", () => {
         ...common,
         id: "RMA-2",
         service: "FINPLUS",
-        messageTypes: ["pacs.008.001.12"],
+        messageTypes: ["pacs.008.001.08"],
       },
     ],
-    new Set(["MT103", "pacs.008.001.12"]),
+    new Set(["MT103", "pacs.008.001.08"]),
   );
   assert.equal(
     issues.some((issue) => issue.code === "DUPLICATE_OPERATIONAL_INDEX"),
@@ -140,7 +140,7 @@ test("RMA supported parameter catalogue includes MT1/2/3/4/7 and MX", () => {
     "MT300",
     "MT400",
     "MT734",
-    "pacs.008.001.12",
+    "pacs.008.001.08",
     "pacs.009.001.08",
   ]) {
     assert.equal(supported.has(messageType), true, messageType);

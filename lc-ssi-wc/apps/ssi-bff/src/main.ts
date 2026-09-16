@@ -472,6 +472,10 @@ class BffController {
   @Get("rma-authorisations/message-types") rmaMessageTypes(): Promise<unknown> {
     return forwardSsi("rma-authorisations/message-types");
   }
+  @Get("rma-authorisations/message-type-policy")
+  rmaMessageTypePolicy(): Promise<unknown> {
+    return forwardSsi("rma-authorisations/message-type-policy");
+  }
   @Post("rma-authorisations/check") checkRma(
     @Body() body: unknown,
   ): Promise<unknown> {

@@ -47,6 +47,9 @@ export class RmaController {
   @Get("message-types") messageTypes(): string[] {
     return this.service.supportedMessageTypes();
   }
+  @Get("message-type-policy") messageTypePolicy(): unknown {
+    return this.service.messageTypePolicy();
+  }
   @Post() create(@Body() body: RmaCommand): unknown {
     return this.lifecycle.create(body);
   }

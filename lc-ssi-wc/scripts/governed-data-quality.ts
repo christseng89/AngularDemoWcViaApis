@@ -1,5 +1,4 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { RmaSupportedMessageTypeCatalogue } from "../libs/parameter-engine/src/lib/rma-supported-message-type-catalogue.ts";
 
 export type DataDomain = "SSI" | "RMA" | "NOSTRO" | "ENTITY";
 export type IssueDisposition =
@@ -340,36 +339,7 @@ export function auditEntityRecords(
 export function loadSupportedRmaMessageTypes(
   workspace = process.cwd(),
 ): Set<string> {
-  const paymentIndex = JSON.parse(
-    readFileSync(
-      join(workspace, "parameters", "payment-message-index.json"),
-      "utf8",
-    ),
-  ) as {
-    items?: {
-      messageType?: string;
-      targetMessage?: string;
-      selectable?: boolean;
-    }[];
-  };
-  const mappingManifest = JSON.parse(
-    readFileSync(
-      join(workspace, "parameters", "ssi-mappings.sr2026.manifest.json"),
-      "utf8",
-    ),
-  ) as { messageEvidence?: { messageType?: string; status?: string }[] };
-  const supported = new Set<string>(["MT103", "pacs.008.001.12"]);
-  for (const item of paymentIndex.items ?? []) {
-    if (!item.selectable) continue;
-    if (item.messageType) supported.add(normalizeMessageType(item.messageType));
-    if (item.targetMessage)
-      supported.add(normalizeMessageType(item.targetMessage));
-  }
-  for (const item of mappingManifest.messageEvidence ?? []) {
-    const messageType = normalizeMessageType(item.messageType);
-    if (/^MT[2347]\d{2}(?:COV)?$/.test(messageType) && text(item.status)) {
-      supported.add(messageType);
-    }
-  }
-  return supported;
+  return new Set(
+    RmaSupportedMessageTypeCatalogue.fromWorkspace(workspace).load(),
+  );
 }

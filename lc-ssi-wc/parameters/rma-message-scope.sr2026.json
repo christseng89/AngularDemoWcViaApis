@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "standardsRelease": "SR2026",
+  "baseProfiles": [
+    {
+      "messageType": "MT103",
+      "scopeStatus": "SSI_SUPPORTED",
+      "evidenceStatus": "FIELD_PROFILE_PROVEN"
+    },
+    {
+      "messageType": "pacs.008.001.08",
+      "scopeStatus": "SSI_SUPPORTED",
+      "evidenceStatus": "FIELD_PROFILE_PROVEN"
+    }
+  ],
+  "legacyConversions": [
+    {
+      "from": "pacs.008.001.12",
+      "to": "pacs.008.001.08",
+      "scope": "OPERATIONAL_OR_DRAFT_POSITIVE_DATA",
+      "reason": "Legacy generic ISO 20022 value is replaced by the governed CBPR+ SSI profile."
+    }
+  ]
+}

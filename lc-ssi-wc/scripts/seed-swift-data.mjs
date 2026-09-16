@@ -3,44 +3,26 @@ import { createHash } from "node:crypto";
 import { URL } from "node:url";
 
 const api = process.env.SSI_BFF_URL ?? "http://localhost:3100/api";
+const get = async (path) => {
+  const response = await fetch(`${api}/${path}`);
+  if (!response.ok) throw new Error(`GET ${path}: ${response.status}`);
+  return response.json();
+};
 const catalogue = JSON.parse(
   await readFile(
     new URL("../fixtures/ten-bank-ssi.seed.json", import.meta.url),
     "utf8",
   ),
 );
-const paymentMessageIndexRaw = await readFile(
-  new URL("../parameters/payment-message-index.json", import.meta.url),
-  "utf8",
+const rmaMessageTypePolicy = await get(
+  "rma-authorisations/message-type-policy",
 );
-const paymentMessageIndex = JSON.parse(paymentMessageIndexRaw);
-const ssiMappingManifest = JSON.parse(
-  await readFile(
-    new URL("../parameters/ssi-mappings.sr2026.manifest.json", import.meta.url),
-    "utf8",
-  ),
+const supportedRmaMessageTypes = new Set(
+  rmaMessageTypePolicy.supportedMessageTypes,
 );
-const paymentMessageIndexSha256 = createHash("sha256")
-  .update(paymentMessageIndexRaw)
+const rmaParameterSha256 = createHash("sha256")
+  .update(JSON.stringify(rmaMessageTypePolicy))
   .digest("hex");
-const supportedRmaMessageTypes = new Set([
-  "MT103",
-  "pacs.008.001.12",
-  ...paymentMessageIndex.items
-    .filter((item) => item.selectable)
-    .flatMap((item) => [item.messageType, item.targetMessage])
-    .filter(Boolean),
-  ...ssiMappingManifest.messageEvidence
-    .filter(
-      (item) => item.status && /^MT[2347]\d{2}(?:COV)?$/.test(item.messageType),
-    )
-    .map((item) => item.messageType),
-]);
-const get = async (path) => {
-  const response = await fetch(`${api}/${path}`);
-  if (!response.ok) throw new Error(`GET ${path}: ${response.status}`);
-  return response.json();
-};
 const send = async (path, method, body) => {
   const response = await fetch(`${api}/${path}`, {
     method,
@@ -323,7 +305,7 @@ console.log(
       activeEntities: entities.filter((record) => record.status === "ACTIVE")
         .length,
       coveredActiveSsis: activeSsis.length,
-      rmaParameterSha256: paymentMessageIndexSha256,
+      rmaParameterSha256,
       ignoredRmaMessageTypeCount,
       ignoredRmaMessageTypes: [...ignoredRmaMessageTypes].sort(),
     },

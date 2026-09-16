@@ -12,7 +12,10 @@ import {
   type RmaMessageTypeChanges,
 } from "./rma.repository";
 import { revisionWipExpiresAt } from "../shared/sqlite-governed.repository";
-import { loadRmaSupportedMessageTypes } from "./rma-supported-message-types";
+import {
+  RmaSupportedMessageTypeCatalogue,
+  loadRmaSupportedMessageTypes,
+} from "./rma-supported-message-types";
 
 export interface RmaCommand {
   ownBic: string;
@@ -98,6 +101,9 @@ export class RmaApplicationService {
   }
   supportedMessageTypes(): string[] {
     return loadRmaSupportedMessageTypes();
+  }
+  messageTypePolicy() {
+    return RmaSupportedMessageTypeCatalogue.fromWorkspace().loadPolicy();
   }
   validateCommand(command: RmaCommand): void {
     this.validate(command);
