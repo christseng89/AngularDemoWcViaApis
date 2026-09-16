@@ -27,7 +27,7 @@ describe("resolution result modal flow", () => {
     expect(dialog?.getAttribute("aria-modal")).toBe("true");
     expect(dialog?.querySelector("ssi-resolution-evidence")).not.toBeNull();
     expect(
-      dialog?.querySelectorAll('[aria-label="Close resolution result"]'),
+      dialog?.querySelectorAll('[aria-label="Cancel resolution result"]'),
     ).toHaveLength(1);
     expect(workbench).toContain("<ssi-resolution-result-dialog");
     expect(workbench).not.toContain("<ssi-resolution-evidence");

@@ -497,6 +497,9 @@ code {
   padding-inline: 0.75rem;
   font-size: 1.4rem;
 }
+.workbench-cancel {
+  justify-self: end;
+}
 .scenario-table {
   min-width: 72rem;
 }
@@ -544,9 +547,7 @@ code {
   border: 0;
 }
 .back-button {
-  justify-self: start;
-  border-color: transparent;
-  color: var(--muted, #a9c2c0);
+  justify-self: end;
 }
 .scenario-selector {
   display: grid;

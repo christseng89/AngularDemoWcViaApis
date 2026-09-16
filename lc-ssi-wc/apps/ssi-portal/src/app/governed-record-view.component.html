@@ -1,0 +1,22 @@
+<section class="panel readonly-page" aria-labelledby="governed-view-title">
+  <div class="panel-title">
+    <div>
+      <p class="kicker">{{ kicker() }}</p>
+      <h2 id="governed-view-title">{{ label() }}</h2>
+      <p class="subtitle">{{ recordId() }} · v{{ version() }}</p>
+    </div>
+    <div class="readonly-page-actions">
+      <span class="status">{{ displayStatus() }}</span>
+      <button
+        type="button"
+        class="icon-button"
+        aria-label="Cancel"
+        (click)="closed.emit()"
+      >
+        ×
+      </button>
+    </div>
+  </div>
+  <formly-form [form]="form" [fields]="readonlyFields()" [model]="model()" />
+  <ng-content />
+</section>

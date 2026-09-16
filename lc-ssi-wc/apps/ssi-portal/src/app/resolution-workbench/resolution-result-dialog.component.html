@@ -21,8 +21,8 @@
       <button
         #closeButton
         type="button"
-        class="result-dialog__close"
-        aria-label="Close resolution result"
+        class="drawer-close result-dialog__close"
+        aria-label="Cancel resolution result"
         (click)="close()"
       >
         ×
@@ -30,9 +30,5 @@
     </header>
 
     <ssi-resolution-evidence [result]="result()" [page]="page()" />
-
-    <footer class="result-dialog__footer">
-      <button type="button" (click)="close()">Close</button>
-    </footer>
   </dialog>
 </div>

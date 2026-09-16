@@ -24,11 +24,64 @@ describe("shared Bank Service picker contract", () => {
     join(process.cwd(), "apps/ssi-portal/src/app/app.component.ts"),
     "utf8",
   );
+  const swiftDataTemplate = readFileSync(
+    join(
+      process.cwd(),
+      "apps/ssi-portal/src/app/swift-data-crud.component.html",
+    ),
+    "utf8",
+  );
+  const swiftDataContract = JSON.parse(
+    readFileSync(
+      join(
+        process.cwd(),
+        "apps/ssi-portal/public/openapi/swift-data-service.v1.json",
+      ),
+      "utf8",
+    ),
+  ) as {
+    "x-ui-resources": Array<{
+      id: string;
+      fields: Array<Record<string, unknown>>;
+    }>;
+  };
 
   it("is reused by both SSI maintenance and parameter-driven scenarios", () => {
     expect(scenarioTemplate).toContain("<ssi-bank-service-picker-dialog");
     expect(appTemplate).toContain("<ssi-bank-service-picker-dialog");
     expect(appTemplate).not.toContain("bankPage().items; track bank.bic");
+  });
+
+  it("drives RMA and Nostro BIC fields from Bank Service parameters", () => {
+    expect(swiftDataTemplate).toContain("<ssi-bank-service-picker-dialog");
+    const fields = swiftDataContract["x-ui-resources"]
+      .filter(({ id }) => id === "rma" || id === "nostro")
+      .flatMap(({ fields: resourceFields }) => resourceFields)
+      .filter(({ key }) =>
+        ["ownBic", "counterpartyBic", "accountServicerBic"].includes(
+          String(key),
+        ),
+      );
+    expect(fields).toHaveLength(3);
+    expect(fields).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: "ownBic",
+          type: "bic-input",
+          referenceSource: "reference/banks",
+        }),
+        expect.objectContaining({
+          key: "counterpartyBic",
+          type: "bic-input",
+          referenceSource: "reference/banks",
+        }),
+        expect.objectContaining({
+          key: "accountServicerBic",
+          type: "bic-input",
+          referenceSource: "reference/banks",
+        }),
+      ]),
+    );
   });
 
   it("supports search, select, cancel, paging, loading, errors and empty results", () => {

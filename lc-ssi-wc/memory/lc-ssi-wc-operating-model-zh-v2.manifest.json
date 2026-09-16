@@ -1,15 +1,15 @@
 {
   "schemaVersion": "1.0",
   "artifact": "memory/lc-ssi-wc-operating-model-zh-v2.md",
-  "version": "v2.8.19",
+  "version": "v2.8.21",
   "effectiveDate": "2026-09-16",
-  "sha256": "78A6DFF2E7DF49979072824830B36357392A6EA74478096B346D09B559A63D88",
-  "changeReason": "Revoke authorization for all D: workspaces and make C:/Users/samfi/Downloads/outputs/lc-ssi-wc the sole project root; keep local controlled deliverables off Git remotes; add mandatory MT1/pacs.008 Customer Payment Instructions versus Bank SSI domain boundaries and fail-closed BA evidence gates.",
+  "sha256": "EA77F1C77441928E02AFB18221C9AB71CAE266B4FB384AE73B8C1D0404EB6626",
+  "changeReason": "Require accessible ASC/DESC sorting for every Index title; pass sort, page, filter, and search through UI and BFF to a backend/DB whitelist ORDER BY with unique-key stable ordering; require Checker and Audit to reuse the transaction Index title/order/search/sort and append only Maker/Checker Datetime.",
   "scope": "All current and future SSI Resolution Message Families and their Generic UI consumers.",
   "maker": "/root",
-  "independentChecker": "/root/ba_mt1_pacs008_boundary; /root/qa_payment_all_scenarios",
-  "checkerStatus": "PENDING_REVIEW",
-  "checkedAt": null,
+  "independentChecker": "/root/governance_v2821_checker",
+  "checkerStatus": "PASS",
+  "checkedAt": "2026-09-16T16:46:03+08:00",
   "referencedArtifacts": [
     {
       "artifact": "memory/mt347-oas-page-parameters-ui-standard-v1.md",

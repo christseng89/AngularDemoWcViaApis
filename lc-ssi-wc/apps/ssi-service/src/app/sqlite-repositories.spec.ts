@@ -1,7 +1,11 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { SqliteGovernedRepository } from "./shared/sqlite-governed.repository";
+import {
+  revisionWipCutoffAt,
+  revisionWipExpiresAt,
+  SqliteGovernedRepository,
+} from "./shared/sqlite-governed.repository";
 import {
   SqliteSsiRepository,
   type SsiApplicabilityInput,
@@ -37,6 +41,20 @@ describe("SQLite governed repositories", () => {
     process.env["SSI_DATABASE_PATH"] = join(temporaryDirectory, "test.sqlite");
   });
 
+  it("uses the environment-configured WIP TTL for new and existing reservations", () => {
+    const originalTtl = process.env["REVISION_WIP_TTL_MINUTES"];
+    process.env["REVISION_WIP_TTL_MINUTES"] = "5";
+    try {
+      const now = new Date("2026-09-16T12:00:00.000Z");
+      expect(revisionWipExpiresAt(now)).toBe("2026-09-16T12:05:00.000Z");
+      expect(revisionWipCutoffAt(now)).toBe("2026-09-16T11:55:00.000Z");
+    } finally {
+      if (originalTtl === undefined)
+        delete process.env["REVISION_WIP_TTL_MINUTES"];
+      else process.env["REVISION_WIP_TTL_MINUTES"] = originalTtl;
+    }
+  });
+
   afterEach(() => {
     if (originalDatabasePath === undefined)
       delete process.env["SSI_DATABASE_PATH"];
@@ -60,6 +78,16 @@ describe("SQLite governed repositories", () => {
     expect(repository.find(record.id)).toEqual(record);
     expect(repository.find("MISSING")).toBeUndefined();
     expect(repository.list()).toEqual([record]);
+    expect(repository.list("ACTIVE")).toEqual([record]);
+    expect(repository.explainList().join(" ")).toContain(
+      "idx_test_record_updated_at",
+    );
+    expect(repository.explainList("PENDING_APPROVAL").join(" ")).toContain(
+      "idx_test_record_status_updated_at",
+    );
+    const pagePlan = repository.explainListPage("ACTIVE").join(" ");
+    expect(pagePlan).toContain("idx_test_record_status_updated_id_v2");
+    expect(pagePlan).not.toContain("TEMP B-TREE FOR LAST TERM OF ORDER BY");
     expect(repository.audit()).toEqual([
       expect.objectContaining({
         record_id: record.id,
@@ -110,6 +138,67 @@ describe("SQLite governed repositories", () => {
     expect(repository.find(record.id)).toEqual(record);
     expect(repository.find("MISSING")).toBeUndefined();
     expect(repository.list()).toEqual([record]);
+    expect(repository.list("ACTIVE")).toEqual([record]);
+    expect(
+      repository.listPage({
+        status: "ACTIVE",
+        ownershipType: "COUNTERPARTY",
+        page: 1,
+        pageSize: 10,
+        search: "GBP",
+        sortBy: "CURRENCY",
+        sortDirection: "ASC",
+      }),
+    ).toEqual({
+      items: [record],
+      page: 1,
+      pageSize: 10,
+      totalItems: 1,
+      totalPages: 1,
+      hasPrevious: false,
+      hasNext: false,
+    });
+    expect(repository.summary()).toEqual({
+      currentOwn: 0,
+      pendingApproval: 0,
+      active: 1,
+      archived: 0,
+    });
+    repository.save(
+      {
+        ...record,
+        id: "SSI-1-DRAFT",
+        status: "DRAFT",
+        version: 2,
+        amendmentOfId: record.id,
+      },
+      "UPDATED",
+      "maker.test",
+    );
+    expect(
+      repository.listPage({
+        status: "ACTIVE",
+        page: 1,
+        pageSize: 10,
+      }).items,
+    ).toEqual([
+      expect.objectContaining({
+        id: record.id,
+        hasOpenRevision: true,
+        openRevisionId: "SSI-1-DRAFT",
+        openRevisionStatus: "DRAFT",
+      }),
+    ]);
+    expect(repository.indexNames()).toEqual(
+      expect.arrayContaining([
+        "idx_ssi_updated_at",
+        "idx_ssi_status_updated_at",
+      ]),
+    );
+    expect(repository.explainList().join(" ")).toContain("idx_ssi_updated_at");
+    expect(repository.explainList("PENDING_APPROVAL").join(" ")).toContain(
+      "idx_ssi_status_updated_at",
+    );
     expect(first).toEqual([
       expect.objectContaining({ id: "SSI-1:APPL:1", version: 1 }),
     ]);
@@ -122,7 +211,7 @@ describe("SQLite governed repositories", () => {
     ]);
     expect(repository.listApplicability(record.id)).toEqual(second);
     expect(repository.listApplicability()).toEqual(second);
-    expect(repository.audit()).toHaveLength(3);
+    expect(repository.audit()).toHaveLength(4);
     repository.onModuleDestroy();
   });
 
@@ -373,11 +462,59 @@ describe("SQLite governed repositories", () => {
     };
     expect(repository.findAuthorised(query)).toEqual([operational]);
     expect(repository.indexNames()).toEqual(
-      expect.arrayContaining(["idx_rma_authorisation_scope_v2"]),
+      expect.arrayContaining(["idx_rma_authorisation_logical_scope_v3"]),
     );
     expect(repository.explainFindAuthorised(query).join(" ")).toContain(
-      "idx_rma_authorisation_scope_v2",
+      "idx_rma_authorisation_status_updated_id_v2",
     );
+    repository.onModuleDestroy();
+  });
+
+  it("projects one RMA index per BIC pair and direction across FIN and FINPLUS", () => {
+    const repository = new RmaRepository();
+    const base: Omit<RmaRecord, "id" | "service" | "messageTypes"> = {
+      ownBic: "DEMOHKHH",
+      counterpartyBic: "CITIUS33",
+      direction: "OUTBOUND",
+      validFrom: "2026-01-01",
+      validTo: "2027-12-31",
+      maker: "maker.test",
+      source: "SYNTHETIC_DEMO",
+      status: "ACTIVE",
+      version: 1,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    };
+    repository.save(
+      { ...base, id: "RMA-FIN", service: "FIN", messageTypes: ["MT202"] },
+      "CREATED",
+      "maker.test",
+      "RMA",
+    );
+    repository.save(
+      {
+        ...base,
+        id: "RMA-FINPLUS",
+        service: "FINPLUS",
+        messageTypes: ["pacs.009.001.08"],
+      },
+      "CREATED",
+      "maker.test",
+      "RMA",
+    );
+
+    expect(repository.listIndexPage({ status: "ACTIVE" })).toMatchObject({
+      totalItems: 1,
+      items: [
+        {
+          counterpartyBic: "CITIUS33",
+          direction: "OUTBOUND",
+          service: "FIN / FINPLUS",
+          services: ["FIN", "FINPLUS"],
+          messageTypes: ["MT202", "pacs.009.001.08"],
+        },
+      ],
+    });
     repository.onModuleDestroy();
   });
 });

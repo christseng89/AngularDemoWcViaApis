@@ -17,6 +17,17 @@ export interface AuditPresentation {
   readonly rawPayload: unknown;
 }
 
+export interface AuditSsiSnapshot {
+  readonly id: string;
+  readonly counterpartyId: string;
+  readonly scope: string;
+  readonly status: string;
+  readonly maker: string;
+  readonly route: Readonly<Record<string, string>>;
+  readonly version: number;
+  readonly [key: string]: unknown;
+}
+
 const ACTION_TITLES: Readonly<Record<string, string>> = {
   ACTIVATE: "啟用 SSI 版本",
   APPROVE: "核准 SSI 版本",
@@ -53,14 +64,50 @@ function objectOf(value: unknown): Readonly<Record<string, unknown>> | null {
     : null;
 }
 
-function recordLabel(payload: unknown): string {
-  const record = objectOf(payload);
-  if (!record) return "";
-  const route = objectOf(record["route"]);
-  return text(
-    record["ssiCode"] ?? route?.["ssiCode"] ?? record["counterpartyId"],
-    "",
+function isAuditSsiSnapshot(value: unknown): value is AuditSsiSnapshot {
+  const record = objectOf(value);
+  return (
+    record !== null &&
+    typeof record["id"] === "string" &&
+    typeof record["counterpartyId"] === "string" &&
+    typeof record["scope"] === "string" &&
+    typeof record["status"] === "string" &&
+    typeof record["maker"] === "string" &&
+    typeof record["version"] === "number" &&
+    objectOf(record["route"]) !== null
   );
+}
+
+export function auditSsiSnapshot(
+  event: AuditPresentation,
+): AuditSsiSnapshot | null {
+  if (isAuditSsiSnapshot(event.after)) return event.after;
+  const payload = objectOf(event.rawPayload);
+  if (isAuditSsiSnapshot(payload?.["after"])) return payload["after"];
+  return isAuditSsiSnapshot(event.rawPayload) ? event.rawPayload : null;
+}
+
+export function auditGovernedSnapshot(event: AuditPresentation): unknown {
+  if (event.after !== null && event.after !== undefined) return event.after;
+  const payload = objectOf(event.rawPayload);
+  if (payload?.["after"] !== null && payload?.["after"] !== undefined)
+    return payload["after"];
+  return event.rawPayload;
+}
+
+function recordLabel(payload: unknown): string {
+  const payloadRecord = objectOf(payload);
+  const records = [payloadRecord, objectOf(payloadRecord?.["after"])];
+  for (const record of records) {
+    if (!record) continue;
+    const route = objectOf(record["route"]);
+    const label = text(
+      record["ssiCode"] ?? route?.["ssiCode"] ?? record["counterpartyId"],
+      "",
+    );
+    if (label) return label;
+  }
+  return "";
 }
 
 export function presentAuditEvent(row: AuditRow): AuditPresentation {

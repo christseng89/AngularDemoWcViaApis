@@ -1,0 +1,39 @@
+<section class="panel audit-console">
+  <div class="audit-toolbar">
+    <div><span class="kicker">{{ kicker() }}</span><b>{{ instruction() }}</b></div>
+    <span class="audit-page-indicator">Page {{ currentPage() }} / {{ totalPages() }}</span>
+  </div>
+  <div class="table-scroll audit-table">
+    <table [attr.aria-label]="ariaLabel()">
+      <thead><tr>
+        @for (column of columns(); track column.path) {
+          <th [attr.aria-sort]="sortPath() === column.path ? (sortDirection() === 'asc' ? 'ascending' : 'descending') : 'none'">
+            <button class="sort-heading" type="button" (click)="sortRequested.emit(column.path)">
+              {{ column.label }}
+              @if (sortPath() === column.path) { <span aria-hidden="true">{{ sortDirection() === 'asc' ? '↑' : '↓' }}</span> }
+            </button>
+          </th>
+        }
+        @for (column of trailingColumns(); track column) { <th>{{ column }}</th> }
+      </tr></thead>
+      <tbody>
+        @for (row of rows(); track row.id) {
+          <tr tabindex="0" [attr.aria-label]="'View ' + row.id" (click)="rowOpened.emit(row.source)" (keydown.enter)="rowOpened.emit(row.source)">
+            @for (cell of row.cells; track $index) { <td>{{ cell }}</td> }
+            @for (cell of row.trailing; track $index) { <td>{{ cell || '—' }}</td> }
+          </tr>
+        } @empty {
+          <tr><td [attr.colspan]="columns().length + trailingColumns().length" class="empty">{{ emptyText() }}</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  <nav class="pager audit-pager" [attr.aria-label]="ariaLabel() + ' pagination'">
+    <span>{{ totalRecords() }} {{ recordLabel() }} · 每頁 {{ pageSize() }} 筆</span>
+    <div>
+      <button class="ghost" type="button" [disabled]="currentPage() === 1" (click)="pageRequested.emit(-1)">Previous</button>
+      <strong aria-current="page">{{ currentPage() }}</strong>
+      <button class="ghost" type="button" [disabled]="currentPage() === totalPages()" (click)="pageRequested.emit(1)">Next</button>
+    </div>
+  </nav>
+</section>

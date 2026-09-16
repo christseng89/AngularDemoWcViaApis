@@ -1,7 +1,12 @@
 <section class="definition-index-workspace">
   @if (selected(); as item) {
-    <button class="back-button" type="button" (click)="close()">
-      <span aria-hidden="true">←</span> Back to scenarios
+    <button
+      class="drawer-close back-button"
+      type="button"
+      aria-label="Cancel"
+      (click)="close()"
+    >
+      ×
     </button>
     <ssi-resolution-workbench
       [query]="scopedQuery(item)"

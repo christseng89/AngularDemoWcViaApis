@@ -1,5 +1,7 @@
 import {
+  auditGovernedSnapshot,
   auditPage,
+  auditSsiSnapshot,
   presentAuditEvent,
   sortAuditRows,
 } from "./audit-presentation";
@@ -61,5 +63,48 @@ describe("audit presentation", () => {
     );
     expect(auditPage(sorted, 2, 1)).toEqual([sorted[1]]);
     expect(rows[0].id).toBe(2);
+  });
+
+  it("returns the governed SSI snapshot for the shared readonly form", () => {
+    const snapshot = {
+      id: "ssi-2",
+      counterpartyId: "ANY",
+      scope: "STANDING",
+      status: "ACTIVE",
+      maker: "maker.revision",
+      route: { currency: "JPY", accountWithBic: "BOTKJPJT" },
+      version: 5,
+    };
+
+    expect(
+      auditSsiSnapshot({ ...presentAuditEvent(rows[0]), rawPayload: snapshot }),
+    ).toEqual(snapshot);
+    expect(
+      auditSsiSnapshot({
+        ...presentAuditEvent(rows[0]),
+        rawPayload: { before: null, after: snapshot },
+      }),
+    ).toEqual(snapshot);
+    expect(auditSsiSnapshot(presentAuditEvent(rows[1]))).toBeNull();
+  });
+
+  it("keeps a non-SSI governed snapshot available for immutable detail", () => {
+    const snapshot = {
+      id: "RMA-1",
+      ownBic: "DEMOHKHH",
+      counterpartyBic: "BOTKJPJT",
+      status: "ACTIVE",
+      version: 10,
+    };
+    const event = presentAuditEvent({
+      id: 3,
+      record_id: "RMA-1",
+      action: "UPDATED",
+      actor: "maker.rma",
+      occurred_at: "2026-09-16T10:00:00.000Z",
+      payload: JSON.stringify(snapshot),
+    });
+
+    expect(auditGovernedSnapshot(event)).toEqual(snapshot);
   });
 });

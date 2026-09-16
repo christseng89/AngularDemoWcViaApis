@@ -48,7 +48,12 @@ describe("EntityController", () => {
     ["activate", "ACTIVATE"],
   ])("normalizes the %s transition", (input, expected) => {
     expect(controller.transition("E1", input, { actor: "actor" })).toEqual({ id: "transitioned" });
-    expect(service.transition).toHaveBeenCalledWith("E1", expected, "actor");
+    expect(service.transition).toHaveBeenCalledWith(
+      "E1",
+      expected,
+      "actor",
+      undefined,
+    );
   });
 
   it("rejects an unsupported lifecycle action", () => {

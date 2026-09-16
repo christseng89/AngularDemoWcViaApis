@@ -145,7 +145,10 @@ describe("SsiApplicationService route standing-data validation", () => {
     [{ routePreference: "UNKNOWN" }, "INVALID_ROUTE_CLASS_OR_PRIORITY"],
     [{ priority: "high" }, "INVALID_ROUTE_CLASS_OR_PRIORITY"],
     [{ validFrom: "" }, "INVALID_SSI_EFFECTIVE_DATES"],
-    [{ validFrom: "2028-01-01", validTo: "2027-01-01" }, "INVALID_SSI_EFFECTIVE_DATES"],
+    [
+      { validFrom: "2028-01-01", validTo: "2027-01-01" },
+      "INVALID_SSI_EFFECTIVE_DATES",
+    ],
     [{ settlementMarket: "" }, "SETTLEMENT_MARKET_REQUIRED"],
     [{ clearingSystem: "ANY" }, "ACTIVE_CLEARING_SYSTEM_REQUIRED"],
     [{ clearingSystem: "UNKNOWN" }, "ACTIVE_CLEARING_SYSTEM_REQUIRED"],
@@ -159,7 +162,9 @@ describe("SsiApplicationService route standing-data validation", () => {
     [{ schemeType: "ACH" }, "CLEARING_SCHEME_TYPE_MISMATCH"],
     [{ bic: "not-a-bic" }, "INVALID_ISO_9362_BIC:bic"],
   ])("rejects invalid controlled route property %#", (change, message) => {
-    expect(() => validateRoute({ ...completeRoute, ...change })).toThrow(message);
+    expect(() => validateRoute({ ...completeRoute, ...change })).toThrow(
+      message,
+    );
   });
 
   it("accepts a pan-regional clearing system with settlement country ANY", () => {
@@ -172,6 +177,25 @@ describe("SsiApplicationService route standing-data validation", () => {
         settlementCountry: "ANY",
       }),
     ).not.toThrow();
+  });
+
+  it("requires Beneficiary BIC only when the governed source is SSI", () => {
+    expect(() =>
+      validateRoute({ ...completeRoute, beneficiarySource: "SSI" }),
+    ).toThrow("BENEFICIARY_BIC_REQUIRED");
+    expect(() =>
+      validateRoute({ ...completeRoute, beneficiarySource: "TRANSACTION" }),
+    ).not.toThrow();
+  });
+
+  it("does not allow transaction-sourced Beneficiary BIC to be stored in SSI", () => {
+    expect(() =>
+      validateRoute({
+        ...completeRoute,
+        beneficiarySource: "TRANSACTION",
+        beneficiaryBic: "BOTKJPJT",
+      }),
+    ).toThrow("TRANSACTION_BENEFICIARY_MUST_NOT_BE_STORED_IN_SSI");
   });
 });
 
@@ -276,9 +300,9 @@ describe("SsiApplicationService governed lifecycle", () => {
       "INVALID_SSI_APPLICABILITY",
     ],
   ])("rejects invalid applicability replacement %#", (body, message) => {
-    expect(() => harness().service.replaceApplicability("SSI-1", body as never)).toThrow(
-      message,
-    );
+    expect(() =>
+      harness().service.replaceApplicability("SSI-1", body as never),
+    ).toThrow(message);
   });
 
   it("replaces a complete applicability matrix through the repository", () => {
@@ -318,7 +342,12 @@ describe("SsiApplicationService governed lifecycle", () => {
   it.each([
     [{ ...command, counterpartyId: "" }, "SSI_REQUIRED_FIELDS_MISSING"],
     [
-      { ...command, ownershipType: "OWN", ownerParty: "", publisherParty: "ops" },
+      {
+        ...command,
+        ownershipType: "OWN",
+        ownerParty: "",
+        publisherParty: "ops",
+      },
       "SSI_OWNERSHIP_FIELDS_REQUIRED",
     ],
   ])("rejects an invalid create command %#", (input, message) => {
@@ -327,7 +356,15 @@ describe("SsiApplicationService governed lifecycle", () => {
 
   it("updates only the original maker's draft", () => {
     expect(() =>
-      harness([{ ...record, status: "ACTIVE" }]).service.update("SSI-1", command),
+      harness([
+        { ...record, changeType: "SUPPRESSION" as const },
+      ]).service.update("SSI-1", command),
+    ).toThrow("SUPPRESSION_DRAFT_CANNOT_BE_EDITED");
+    expect(() =>
+      harness([{ ...record, status: "ACTIVE" }]).service.update(
+        "SSI-1",
+        command,
+      ),
     ).toThrow("Only DRAFT SSI can be updated");
     expect(() =>
       harness().service.update("SSI-1", { ...command, maker: "other" }),
@@ -343,10 +380,17 @@ describe("SsiApplicationService governed lifecycle", () => {
   });
 
   it("enforces revision state and creates an independent draft revision", () => {
-    expect(() => harness().service.revise("SSI-1", "")).toThrow("MAKER_REQUIRED");
-    expect(harness().service.revise("SSI-1", "maker")).toEqual(record);
+    expect(() => harness().service.revise("SSI-1", "")).toThrow(
+      "MAKER_REQUIRED",
+    );
+    expect(() => harness().service.revise("SSI-1", "maker")).toThrow(
+      "INVALID_REVISION_STATUS",
+    );
     expect(() =>
-      harness([{ ...record, status: "REVOKED" }]).service.revise("SSI-1", "maker2"),
+      harness([{ ...record, status: "REVOKED" }]).service.revise(
+        "SSI-1",
+        "maker2",
+      ),
     ).toThrow("Revoked or superseded SSI cannot be revised");
 
     const { service: current, repository } = harness([
@@ -356,13 +400,91 @@ describe("SsiApplicationService governed lifecycle", () => {
     expect(revision).toMatchObject({
       amendmentOfId: "SSI-1",
       maker: "maker2",
-      status: "DRAFT",
+      status: "WIP",
       version: 5,
     });
     expect(repository.save).toHaveBeenCalledWith(
       revision,
-      "REVISION_CREATED",
+      "WIP_RESERVED",
       "maker2",
+    );
+    expect(repository.replaceApplicability).toHaveBeenCalledWith(
+      revision.id,
+      [
+        expect.objectContaining({
+          consumer: "TREASURY",
+          product: "PAYMENT",
+          status: "ACTIVE",
+        }),
+      ],
+      "maker2",
+    );
+  });
+
+  it("lets only the WIP maker cancel a revision reservation", () => {
+    const wip = {
+      ...record,
+      id: "SSI-WIP",
+      status: "WIP" as const,
+      maker: "maker2",
+      amendmentOfId: "SSI-1",
+      revisionWipExpiresAt: "2026-09-16T12:05:00.000Z",
+    };
+    expect(() => harness([wip]).service.cancelRevision(wip.id, "")).toThrow(
+      "ACTOR_REQUIRED",
+    );
+    expect(() =>
+      harness([wip]).service.cancelRevision(wip.id, "other-maker"),
+    ).toThrow("ONLY_REVISION_MAKER_CAN_CANCEL");
+    expect(() =>
+      harness([{ ...wip, status: "DRAFT" }]).service.cancelRevision(
+        wip.id,
+        "maker2",
+      ),
+    ).toThrow("CANCELLATION_REQUIRES_WIP");
+
+    const { service, repository } = harness([wip]);
+    const cancelled = service.cancelRevision(wip.id, "maker2");
+    expect(cancelled).toMatchObject({
+      status: "REVOKED",
+      revokeReason: "Revision WIP cancelled by maker",
+      version: 2,
+    });
+    expect(cancelled.revisionWipExpiresAt).toBeUndefined();
+    expect(repository.save).toHaveBeenCalledWith(
+      cancelled,
+      "WIP_CANCELLED",
+      "maker2",
+    );
+  });
+
+  it("restores inherited applicability before approving a legacy revision", () => {
+    const pending = {
+      ...record,
+      id: "SSI-REVISION",
+      status: "PENDING_APPROVAL",
+      amendmentOfId: "SSI-1",
+      maker: "maker2",
+    };
+    const { service: current, repository } = harness([
+      { ...record, status: "ACTIVE" },
+      pending,
+    ]);
+    repository.listApplicability.mockImplementation((id?: string) =>
+      id === pending.id ? [] : [applicability],
+    );
+    repository.replaceApplicability.mockReturnValue([
+      { ...applicability, id: `${pending.id}:APPL:1`, ssiId: pending.id },
+    ]);
+
+    expect(current.transition(pending.id, "APPROVE", "checker")).toMatchObject({
+      status: "ACTIVE",
+      checker: "checker",
+    });
+    expect(repository.replaceApplicability).toHaveBeenCalledWith(
+      pending.id,
+      [expect.objectContaining({ status: "ACTIVE" })],
+      "checker",
     );
   });
 
@@ -386,7 +508,7 @@ describe("SsiApplicationService governed lifecycle", () => {
         "maker",
         "retired",
       ),
-    ).toThrow("Maker cannot revoke an approved SSI");
+    ).toThrow("ACTIVE_REQUIRES_SUPPRESSION");
 
     const { service: current, repository } = harness();
     const revoked = current.revoke("SSI-1", "ops", "  retired route  ");
@@ -406,23 +528,62 @@ describe("SsiApplicationService governed lifecycle", () => {
         "maker",
       ),
     ).toThrow("Expected DRAFT, found ACTIVE");
-    expect(() => harness().service.transition("SSI-1", "SUBMIT", "other")).toThrow(
-      "Only the maker can submit",
-    );
+    expect(() =>
+      harness().service.transition("SSI-1", "SUBMIT", "other"),
+    ).toThrow("Only the maker can submit");
     expect(() =>
       harness([{ ...record, status: "PENDING_APPROVAL" }]).service.transition(
         "SSI-1",
         "APPROVE",
         "maker",
       ),
-    ).toThrow("Maker cannot approve their own SSI");
+    ).toThrow("Maker cannot check their own SSI");
 
     const submitted = harness().service.transition("SSI-1", "SUBMIT", "maker");
     expect(submitted).toMatchObject({ status: "PENDING_APPROVAL", version: 2 });
     const approved = harness([
       { ...record, status: "PENDING_APPROVAL" },
     ]).service.transition("SSI-1", "APPROVE", "checker");
-    expect(approved).toMatchObject({ status: "APPROVED", checker: "checker" });
+    expect(approved).toMatchObject({ status: "ACTIVE", checker: "checker" });
+
+    expect(() =>
+      harness([{ ...record, status: "PENDING_APPROVAL" }]).service.transition(
+        "SSI-1",
+        "REJECT",
+        "checker",
+        "bad",
+      ),
+    ).toThrow("REJECTION_REASON_REQUIRED");
+    const rejected = harness([
+      { ...record, status: "PENDING_APPROVAL" },
+    ]).service.transition(
+      "SSI-1",
+      "REJECT",
+      "checker",
+      "Account reference is not supported",
+    );
+    expect(rejected).toMatchObject({
+      status: "DRAFT",
+      checker: "checker",
+      rejectionReason: "Account reference is not supported",
+    });
+    expect(
+      harness([{ ...rejected }]).service.revoke(
+        rejected.id,
+        rejected.maker,
+        "Maker abandoned rejected draft",
+      ),
+    ).toMatchObject({
+      status: "REVOKED",
+      revokeReason: "Maker abandoned rejected draft",
+    });
+    expect(() =>
+      harness([{ ...record, status: "PENDING_APPROVAL" }]).service.revoke(
+        "SSI-1",
+        "maker",
+        "Cannot bypass Checker while submitted",
+      ),
+    ).toThrow("REVOCATION_REQUIRES_DRAFT");
   });
 
   it("requires transaction binding and active applicability before activation", () => {
@@ -456,7 +617,11 @@ describe("SsiApplicationService governed lifecycle", () => {
     const activated = current.transition("SSI-1", "ACTIVATE", "checker");
     expect(activated).toMatchObject({ status: "ACTIVE", version: 2 });
     expect(repository.save).toHaveBeenCalledWith(
-      expect.objectContaining({ id: "SSI-OLD", status: "SUPERSEDED", version: 8 }),
+      expect.objectContaining({
+        id: "SSI-OLD",
+        status: "SUPERSEDED",
+        version: 8,
+      }),
       "SUPERSEDED",
       "checker",
     );
@@ -534,7 +699,10 @@ describe("SsiApplicationService resolution failure boundaries", () => {
       ssiId: alternative.id,
     };
     const repository = {
-      list: () => [record, ...(options?.includeAlternative ? [alternative] : [])],
+      list: () => [
+        record,
+        ...(options?.includeAlternative ? [alternative] : []),
+      ],
       listApplicability: () => [
         applicability,
         ...(options?.includeAlternative ? [alternativeApplicability] : []),
@@ -588,12 +756,15 @@ describe("SsiApplicationService resolution failure boundaries", () => {
     ],
     [{ currency: "US" }, "INVALID_ISO_4217_CURRENCY"],
     [{ sourceMessageType: "MT103" }, "MESSAGE_TYPE_NOT_SUPPORTED"],
-  ])("rejects an invalid executable-resolution request %#", (change, message) => {
-    const { service: current, request: validRequest } = paymentHarness();
-    expect(() => current.resolve({ ...validRequest, ...change } as never)).toThrow(
-      message,
-    );
-  });
+  ])(
+    "rejects an invalid executable-resolution request %#",
+    (change, message) => {
+      const { service: current, request: validRequest } = paymentHarness();
+      expect(() =>
+        current.resolve({ ...validRequest, ...change } as never),
+      ).toThrow(message);
+    },
+  );
 
   it("rejects a selectable source profile whose MX target does not match", () => {
     const { request: validRequest } = paymentHarness();
@@ -643,7 +814,11 @@ describe("SsiApplicationService resolution failure boundaries", () => {
   it("rejects stale, unauthenticated and ineligible confirmation attempts", () => {
     const { service: current, request: validRequest } = paymentHarness();
     expect(() =>
-      current.confirm({ attemptId: "missing", selectedSsiId: "SSI-PAY-1", actor: "ops" }),
+      current.confirm({
+        attemptId: "missing",
+        selectedSsiId: "SSI-PAY-1",
+        actor: "ops",
+      }),
     ).toThrow("STALE_PREVIEW");
     const preview = current.resolve(validRequest) as {
       attemptId: string;
@@ -725,11 +900,16 @@ describe("SsiApplicationService resolution failure boundaries", () => {
       recommendedRoute: { ssiId: string };
     };
     const attempts = (
-      previewService.service as unknown as { resolutionAttempts: Map<string, unknown> }
+      previewService.service as unknown as {
+        resolutionAttempts: Map<string, unknown>;
+      }
     ).resolutionAttempts;
     (
       current as unknown as { resolutionAttempts: Map<string, unknown> }
-    ).resolutionAttempts.set(preview.attemptId, attempts.get(preview.attemptId)!);
+    ).resolutionAttempts.set(
+      preview.attemptId,
+      attempts.get(preview.attemptId)!,
+    );
     expect(() =>
       current.confirm({
         attemptId: preview.attemptId,

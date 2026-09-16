@@ -36,6 +36,9 @@ export interface ResolutionWorkbenchSelection {
   ],
   templateUrl: "./resolution-workbench.component.html",
   styleUrl: "./resolution-workbench.css",
+  host: {
+    "(document:keydown.escape)": "cancelOnEscape()",
+  },
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ResolutionWorkbenchComponent {
@@ -45,6 +48,7 @@ export class ResolutionWorkbenchComponent {
   readonly selection = input.required<ResolutionWorkbenchSelection>();
   readonly pageSize = input.required<number>();
   readonly cancelled = output<void>();
+  readonly dismissed = output<void>();
   readonly model = this.facade.model;
   readonly loading = this.facade.loading;
   readonly submitting = this.facade.submitting;
@@ -81,5 +85,10 @@ export class ResolutionWorkbenchComponent {
 
   cancel(): void {
     if (!this.submitting()) this.cancelled.emit();
+  }
+
+  cancelOnEscape(): void {
+    if (this.result()) return;
+    if (!this.submitting()) this.dismissed.emit();
   }
 }

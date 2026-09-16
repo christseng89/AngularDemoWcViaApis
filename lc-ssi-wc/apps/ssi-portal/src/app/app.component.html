@@ -21,7 +21,7 @@
         (click)="navigate('checker')"
         [class.active]="view() === 'checker'"
       >
-        Checker 審批 <em>{{ pending().length }}</em>
+        Checker <em>{{ checkerCount() }}</em>
       </button>
       <button
         (click)="navigate('treasury')"
@@ -42,7 +42,7 @@
         Payment SSI Resolution
       </button>
       <button (click)="navigate('audit')" [class.active]="view() === 'audit'">
-        稽核與事件
+        Audit
       </button>
       <button
         (click)="navigate('settings')"
@@ -62,1279 +62,1901 @@
       <div>
         <p class="eyebrow">ENTERPRISE SETTLEMENT DATA</p>
         <h1>
-          @switch (view()) {
-            @case ("dashboard") {
-              SSI 維護總覽
-            }
-            @case ("maker") {
-              新增／修訂 SSI
-            }
-            @case ("checker") {
-              四眼審批
-            }
-            @case ("resolver") {
-              SSI Resolution
-            }
-            @case ("treasury") {
-              Treasury SSI Resolution
-            }
-            @case ("tradefinance") {
-              Trade Finance SSI Resolution
-            }
-            @case ("swiftdata") {
-              SWIFT Data Service
-            }
-            @case ("audit") {
-              稽核軌跡
-            }
-            @case ("settings") {
-              Settings
+          @if (detailTarget()) {
+            SSI 唯讀檢視
+          } @else {
+            @switch (view()) {
+              @case ("dashboard") {
+                SSI 維護總覽
+              }
+              @case ("maker") {
+                新增／修訂 SSI
+              }
+              @case ("checker") {
+                四眼審批
+              }
+              @case ("resolver") {
+                SSI Resolution
+              }
+              @case ("treasury") {
+                Treasury SSI Resolution
+              }
+              @case ("tradefinance") {
+                Trade Finance SSI Resolution
+              }
+              @case ("swiftdata") {
+                SWIFT Data Service
+              }
+              @case ("audit") {
+                稽核軌跡
+              }
+              @case ("settings") {
+                Settings
+              }
             }
           }
         </h1>
       </div>
       <div class="header-actions">
-        <button class="ghost" (click)="refresh()">重新整理</button>
+        @if (!detailTarget() && !auditDetail() && view() !== "swiftdata") {
+          <button class="ghost" (click)="refresh()">Refresh</button>
+        }
       </div>
     </header>
     @if (noticeAlert(); as n) {
       <ssi-alert
         [model]="n"
-        variant="banner"
+        variant="inline"
         [dismissible]="true"
         (dismiss)="notice.set(null)"
       />
     }
 
-    @if (view() === "dashboard") {
-      <section class="metrics">
-        <article>
-          <small>目前 SSI</small><strong>{{ visibleRows().length }}</strong>
-        </article>
-        <article>
-          <small>等待 Checker</small><strong>{{ pending().length }}</strong>
-        </article>
-        <article>
-          <small>Active</small><strong>{{ activeCount() }}</strong>
-        </article>
-        <article>
-          <small>歷史／已撤銷</small><strong>{{ archivedCount() }}</strong>
-        </article>
-      </section>
-      <section class="guidance">
-        <span>1</span>
-        <div><b>新增</b><small>使用右方「＋新增 SSI」建立 DRAFT。</small></div>
-        <span>2</span>
-        <div>
-          <b>編輯／修訂</b
-          ><small>DRAFT 直接編輯；Active 使用「建立修訂」保留舊版本。</small>
-        </div>
-        <span>3</span>
-        <div>
-          <b>四眼控制</b><small>Submit → Checker Approve → Activate。</small>
-        </div>
-      </section>
-      <section class="panel">
-        <div class="panel-title">
+    @if (auditDetail(); as detail) {
+      <ssi-governed-record-view
+        [label]="auditResourceLabel()"
+        [recordId]="detail.ssiId"
+        [version]="auditDetailVersion()"
+        [status]="auditDetailStatus()"
+        [fields]="auditDetailFields()"
+        [model]="auditDetailModel()"
+        (closed)="auditDetail.set(null)"
+      >
+        <dl class="audit-detail-meta inline-audit-meta">
           <div>
-            <p class="kicker">CURRENT OPERATING RECORDS</p>
-            <h2>Settlement Instructions</h2>
-            <p class="subtitle">
-              預設隱藏 REVOKED／SUPERSEDED；完整歷史可在「稽核與事件」查看。
-            </p>
+            <dt>Event ID</dt>
+            <dd>{{ detail.eventId }}</dd>
           </div>
-          <button class="primary" (click)="startNew()">＋ 新增 SSI</button>
-        </div>
-        <div class="catalog-tabs" aria-label="SSI ownership indexes">
-          <button
-            type="button"
-            [class.active]="ownershipTab() === 'OWN'"
-            (click)="selectOwnershipTab('OWN')"
-          >
-            Own SSI／本行 SSI
-          </button>
-          <button
-            type="button"
-            [class.active]="ownershipTab() === 'COUNTERPARTY'"
-            (click)="selectOwnershipTab('COUNTERPARTY')"
-          >
-            Counterparty SSI／對手行 SSI
-          </button>
-        </div>
-        @if (ownershipTab() === "COUNTERPARTY" && !selectedCounterparty()) {
-          <section
-            class="counterparty-inbox"
-            aria-labelledby="counterparty-inbox-title"
-          >
-            <div class="inbox-heading">
-              <div>
-                <p class="kicker">COUNTERPARTY DIRECTORY × SSI COVERAGE</p>
-                <h3 id="counterparty-inbox-title">Counterparty Inbox</h3>
-                <p class="subtitle">
-                  每個對手行只顯示一次；選擇後才載入該對手行的 SSI。
-                </p>
-              </div>
-              <span class="status"
-                >{{ filteredCounterpartyInbox().length }} counterparties</span
-              >
+          <div>
+            <dt>Action</dt>
+            <dd>{{ detail.action }}</dd>
+          </div>
+          <div>
+            <dt>Actor</dt>
+            <dd>{{ detail.actor }}</dd>
+          </div>
+          <div>
+            <dt>Occurred At</dt>
+            <dd>{{ detail.occurredAt }}</dd>
+          </div>
+        </dl>
+        @if (auditMessageTypeChanges(detail); as changes) {
+          <section class="audit-message-type-delta">
+            <div>
+              <span>UNCHANGED</span>
+              <p>
+                @for (value of changes.unchanged; track value) {
+                  <b>{{ value }}</b>
+                } @empty {
+                  <em>None</em>
+                }
+              </p>
             </div>
-            <fieldset class="catalog-tabs status-tabs">
-              <legend class="visually-hidden">Counterparty Type</legend>
-              <button
-                type="button"
-                [class.active]="counterpartyPartyType() === 'BANK_SSI'"
-                (click)="selectCounterpartyPartyType('BANK_SSI')"
-              >
-                銀行 / Bank (SSI)
-              </button>
-              <button
-                type="button"
-                [class.active]="counterpartyPartyType() === 'BANK_NO_SSI'"
-                (click)="selectCounterpartyPartyType('BANK_NO_SSI')"
-              >
-                銀行 / Bank (NO SSI)
-              </button>
-              <button
-                type="button"
-                [class.active]="counterpartyPartyType() === 'CUSTOMER'"
-                (click)="selectCounterpartyPartyType('CUSTOMER')"
-              >
-                客戶 / Customer
-              </button>
-            </fieldset>
-            <div class="index-controls inbox-controls single-control">
-              <label class="control index-search"
-                ><span>Search Counterparty ID, BIC, name or country</span
-                ><input
-                  aria-label="Search Counterparty Inbox"
-                  [value]="counterpartyInboxSearch()"
-                  (input)="searchCounterpartyInbox($any($event.target).value)"
-              /></label>
+            <div class="added-types">
+              <span>ADDED</span>
+              <p>
+                @for (value of changes.added; track value) {
+                  <b>{{ value }}</b>
+                } @empty {
+                  <em>None</em>
+                }
+              </p>
             </div>
-            <div class="table-scroll counterparty-inbox-table">
-              <table>
-                <caption class="visually-hidden">
-                  Counterparty SSI inbox
-                </caption>
-                <thead>
-                  <tr>
-                    <th [attr.aria-sort]="counterpartyAriaSort('BIC_NAME')">
-                      <button
-                        class="sort-header"
-                        type="button"
-                        (click)="sortCounterpartyInbox('BIC_NAME')"
-                      >
-                        BIC／Name
-                        <span aria-hidden="true">{{
-                          counterpartySortIndicator("BIC_NAME")
-                        }}</span>
-                      </button>
-                    </th>
-                    <th [attr.aria-sort]="counterpartyAriaSort('COUNTRY')">
-                      <button
-                        class="sort-header"
-                        type="button"
-                        (click)="sortCounterpartyInbox('COUNTRY')"
-                      >
-                        Country
-                        <span aria-hidden="true">{{
-                          counterpartySortIndicator("COUNTRY")
-                        }}</span>
-                      </button>
-                    </th>
-                    <th [attr.aria-sort]="counterpartyAriaSort('SSI_COUNT')">
-                      <button
-                        class="sort-header"
-                        type="button"
-                        (click)="sortCounterpartyInbox('SSI_COUNT')"
-                      >
-                        SSI Count
-                        <span aria-hidden="true">{{
-                          counterpartySortIndicator("SSI_COUNT")
-                        }}</span>
-                      </button>
-                    </th>
-                    <th
-                      [attr.aria-sort]="counterpartyAriaSort('CURRENCY_COUNT')"
-                    >
-                      <button
-                        class="sort-header"
-                        type="button"
-                        (click)="sortCounterpartyInbox('CURRENCY_COUNT')"
-                      >
-                        Currencies
-                        <span aria-hidden="true">{{
-                          counterpartySortIndicator("CURRENCY_COUNT")
-                        }}</span>
-                      </button>
-                    </th>
-                    <th
-                      [attr.aria-sort]="counterpartyAriaSort('STATUS_EVIDENCE')"
-                    >
-                      <button
-                        class="sort-header"
-                        type="button"
-                        (click)="sortCounterpartyInbox('STATUS_EVIDENCE')"
-                      >
-                        Status／Evidence
-                        <span aria-hidden="true">{{
-                          counterpartySortIndicator("STATUS_EVIDENCE")
-                        }}</span>
-                      </button>
-                    </th>
-                    <th
-                      [attr.aria-sort]="counterpartyAriaSort('LAST_VERIFIED')"
-                    >
-                      <button
-                        class="sort-header"
-                        type="button"
-                        (click)="sortCounterpartyInbox('LAST_VERIFIED')"
-                      >
-                        Last Verified
-                        <span aria-hidden="true">{{
-                          counterpartySortIndicator("LAST_VERIFIED")
-                        }}</span>
-                      </button>
-                    </th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (
-                    party of pagedCounterpartyInbox();
-                    track party.counterpartyId
-                  ) {
-                    <tr
-                      class="data-row"
-                      tabindex="0"
-                      [attr.data-counterparty-id]="party.counterpartyId"
-                      (dblclick)="openCounterpartySsi(party.counterpartyId)"
-                      (keydown.enter)="
-                        openCounterpartySsi(party.counterpartyId)
-                      "
-                    >
-                      <td>
-                        <b>{{ party.counterpartyId }}</b>
-                        @if (party.bic && party.bic !== party.counterpartyId) {
-                          <small>SWIFT BIC: {{ party.bic }}</small>
-                        }
-                        <small>{{ party.name }}</small>
-                        <small>{{ party.partyType ?? "BANK" }}</small>
-                      </td>
-                      <td>{{ party.country }}</td>
-                      <td>
-                        <b>{{ party.ssiCount }}</b>
-                      </td>
-                      <td>{{ party.currencyCount }}</td>
-                      <td>
-                        <span
-                          class="status"
-                          [class.active-status]="party.ssiCount > 0"
-                          >{{ party.evidenceSummary }}</span
-                        >
-                      </td>
-                      <td>{{ party.lastVerified || "Never" }}</td>
-                      <td>
-                        @if (party.ssiCount > 0) {
-                          <button
-                            type="button"
-                            [attr.aria-label]="
-                              'Open ' + party.counterpartyId + ' SSI'
-                            "
-                            (click)="openCounterpartySsi(party.counterpartyId)"
-                          >
-                            Open
-                          </button>
-                        } @else {
-                          <span class="status">No SSI</span>
-                        }
-                      </td>
-                    </tr>
-                  } @empty {
-                    <tr>
-                      <td colspan="7" class="empty">
-                        No counterparties match this search.
-                      </td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            </div>
-            <div class="pager" aria-label="Counterparty Inbox pagination">
-              <span
-                >Page {{ counterpartyInboxPage() }} /
-                {{ counterpartyInboxTotalPages() }} ·
-                {{ filteredCounterpartyInbox().length }} counterparties</span
-              >
-              <div>
-                <button
-                  class="ghost"
-                  type="button"
-                  [disabled]="counterpartyInboxPage() === 1"
-                  (click)="moveCounterpartyInboxPage(-1)"
-                >
-                  上一頁</button
-                ><button
-                  class="ghost"
-                  type="button"
-                  [disabled]="
-                    counterpartyInboxPage() === counterpartyInboxTotalPages()
-                  "
-                  (click)="moveCounterpartyInboxPage(1)"
-                >
-                  下一頁
-                </button>
-              </div>
+            <div class="suppressed-types">
+              <span>SUPPRESSED</span>
+              <p>
+                @for (value of changes.suppressed; track value) {
+                  <b>{{ value }}</b>
+                } @empty {
+                  <em>None</em>
+                }
+              </p>
             </div>
           </section>
-        } @else {
-          @if (selectedCounterparty(); as party) {
-            <button
-              class="ghost strong index-back-button"
-              type="button"
-              (click)="closeCounterpartySsi()"
+        }
+      </ssi-governed-record-view>
+    }
+
+    @if (detailTarget(); as row) {
+      <section class="panel readonly-page" aria-labelledby="detail-title">
+        <div class="panel-title">
+          <div>
+            <p class="kicker">SSI RECORD · READ ONLY</p>
+            <h2 id="detail-title">
+              {{ row.counterpartyId }} · v{{ row.version }}
+            </h2>
+          </div>
+          <div class="readonly-page-actions">
+            <div
+              class="request-type-badge"
+              [class.edit-request]="row.changeType !== 'SUPPRESSION'"
+              [class.suppress-request]="row.changeType === 'SUPPRESSION'"
+              [attr.aria-label]="'Request Type ' + requestTypeLabel(row)"
             >
-              ← Back to Counterparty Index / 返回對手行索引
+              {{ requestTypeLabel(row) }}
+            </div>
+            <div
+              class="decision-pass"
+              [attr.aria-label]="'Record Status ' + displayStatus(row.status)"
+            >
+              {{ displayStatus(row.status) }}
+            </div>
+            <button
+              type="button"
+              class="icon-button"
+              aria-label="Cancel"
+              (click)="detailTarget.set(null)"
+            >
+              ×
             </button>
-            <section class="party-detail-header">
-              <p class="kicker">COUNTERPARTY SSI DETAIL</p>
-              <h3>{{ party.counterpartyId }} · {{ party.name }}</h3>
-              <p>
-                {{ party.country }} · {{ party.ssiCount }} SSI ·
-                {{ party.currencyCount }} currencies ·
-                {{ party.evidenceSummary }}
-              </p>
-            </section>
-          }
-          <div
-            class="catalog-tabs status-tabs"
-            aria-label="SSI lifecycle status filter"
-          >
-            @for (
-              status of ["CURRENT", "ACTIVE", "DRAFT", "SUPERSEDED"];
-              track status
-            ) {
+          </div>
+        </div>
+        <section class="readonly-editor" aria-label="SSI 唯讀檢視">
+          <formly-form
+            [form]="detailForm"
+            [fields]="readonlyFields()"
+            [model]="detailModel()"
+          />
+        </section>
+        @if (row.changeType === "SUPPRESSION") {
+          <section class="suppression-review" aria-label="Suppression request">
+            <b>SUPPRESSION</b>
+            <p>{{ row.suppressionReason }}</p>
+          </section>
+        }
+        <div class="actions checker-decision-actions">
+          @if (row.status === "PENDING_APPROVAL" && view() === "checker") {
+            <span
+              class="request-type-badge"
+              [class.edit-request]="row.changeType !== 'SUPPRESSION'"
+              [class.suppress-request]="row.changeType === 'SUPPRESSION'"
+              >{{
+                row.changeType === "SUPPRESSION" ? "SUPPRESSED" : "EDIT"
+              }}</span
+            >
+            <label class="checker-reject-reason">
+              Reject 原因
+              <input
+                type="text"
+                [value]="checkerRejectReason()"
+                (input)="checkerRejectReason.set($any($event.target).value)"
+                placeholder="退回 Maker 的具體原因（至少 5 字元）"
+              />
+            </label>
+            @if (checkerRejectReason().trim().length >= 5) {
               <button
                 type="button"
-                [class.active]="ownershipStatus() === status"
-                (click)="ownershipStatus.set($any(status)); indexPage.set(1)"
+                class="danger"
+                (click)="decideSsi(row, 'reject')"
               >
-                {{ status }}
+                Reject
+              </button>
+            } @else {
+              <button
+                type="button"
+                class="primary"
+                (click)="decideSsi(row, 'approve')"
+              >
+                Approve
               </button>
             }
-          </div>
-          <div class="index-controls single-control">
-            <label class="control"
-              ><span>Search current ownership index</span
-              ><input
-                aria-label="Search SSI ownership index"
-                [value]="ownershipSearch()"
-                (input)="
-                  ownershipSearch.set($any($event.target).value);
-                  indexPage.set(1)
-                "
-            /></label>
-          </div>
-          <div class="table-scroll">
-            <table>
-              <caption class="visually-hidden">
-                {{
-                  ownershipTab() === "OWN"
-                    ? "Own SSI and Nostro ownership index"
-                    : "Counterparty SSI ownership index"
-                }}
-              </caption>
-              <thead>
-                <tr>
-                  @if (ownershipTab() === "OWN") {
-                    <th [attr.aria-sort]="ownershipAriaSort('BOOKING_ENTITY')">
-                      <button
-                        class="sort-header"
-                        type="button"
-                        (click)="sortOwnershipIndex('BOOKING_ENTITY')"
-                      >
-                        Booking／Legal Entity
-                        <span aria-hidden="true">{{
-                          ownershipSortIndicator("BOOKING_ENTITY")
-                        }}</span>
-                      </button>
-                    </th>
-                    <th
-                      [attr.aria-sort]="ownershipAriaSort('ACCOUNT_SERVICER')"
-                    >
-                      <button
-                        class="sort-header"
-                        type="button"
-                        (click)="sortOwnershipIndex('ACCOUNT_SERVICER')"
-                      >
-                        Account Owner／Servicer
-                        <span aria-hidden="true">{{
-                          ownershipSortIndicator("ACCOUNT_SERVICER")
-                        }}</span>
-                      </button>
-                    </th>
-                    <th [attr.aria-sort]="ownershipAriaSort('ACCOUNT_REF')">
-                      <button
-                        class="sort-header"
-                        type="button"
-                        (click)="sortOwnershipIndex('ACCOUNT_REF')"
-                      >
-                        Account Ref
-                        <span aria-hidden="true">{{
-                          ownershipSortIndicator("ACCOUNT_REF")
-                        }}</span>
-                      </button>
-                    </th>
-                  } @else {
-                    <th [attr.aria-sort]="ownershipAriaSort('CURRENCY')">
-                      <button
-                        class="sort-header"
-                        type="button"
-                        (click)="sortOwnershipIndex('CURRENCY')"
-                      >
-                        Currency
-                        <span aria-hidden="true">{{
-                          ownershipSortIndicator("CURRENCY")
-                        }}</span>
-                      </button>
-                    </th>
-                    <th [attr.aria-sort]="ownershipAriaSort('USE_CASE')">
-                      <button
-                        class="sort-header"
-                        type="button"
-                        (click)="sortOwnershipIndex('USE_CASE')"
-                      >
-                        Use Case
-                        <span aria-hidden="true">{{
-                          ownershipSortIndicator("USE_CASE")
-                        }}</span>
-                      </button>
-                    </th>
-                    <th
-                      [attr.aria-sort]="ownershipAriaSort('INSTRUCTED_ROUTE')"
-                    >
-                      <button
-                        class="sort-header"
-                        type="button"
-                        (click)="sortOwnershipIndex('INSTRUCTED_ROUTE')"
-                      >
-                        Instructed Route
-                        <span aria-hidden="true">{{
-                          ownershipSortIndicator("INSTRUCTED_ROUTE")
-                        }}</span>
-                      </button>
-                    </th>
-                  }
-                  @if (ownershipTab() === "OWN") {
-                    <th [attr.aria-sort]="ownershipAriaSort('CURRENCY')">
-                      <button
-                        class="sort-header"
-                        type="button"
-                        (click)="sortOwnershipIndex('CURRENCY')"
-                      >
-                        Currency
-                        <span aria-hidden="true">{{
-                          ownershipSortIndicator("CURRENCY")
-                        }}</span>
-                      </button>
-                    </th>
-                  }
-                  <th [attr.aria-sort]="ownershipAriaSort('ROUTE_PRIORITY')">
-                    <button
-                      class="sort-header"
-                      type="button"
-                      (click)="sortOwnershipIndex('ROUTE_PRIORITY')"
-                    >
-                      Route Class／Priority
-                      <span aria-hidden="true">{{
-                        ownershipSortIndicator("ROUTE_PRIORITY")
-                      }}</span>
-                    </button>
-                  </th>
-                  <th [attr.aria-sort]="ownershipAriaSort('EFFECTIVE_PERIOD')">
-                    <button
-                      class="sort-header"
-                      type="button"
-                      (click)="sortOwnershipIndex('EFFECTIVE_PERIOD')"
-                    >
-                      Effective Period
-                      <span aria-hidden="true">{{
-                        ownershipSortIndicator("EFFECTIVE_PERIOD")
-                      }}</span>
-                    </button>
-                  </th>
-                  <th [attr.aria-sort]="ownershipAriaSort('STATUS')">
-                    <button
-                      class="sort-header"
-                      type="button"
-                      (click)="sortOwnershipIndex('STATUS')"
-                    >
-                      Status
-                      <span aria-hidden="true">{{
-                        ownershipSortIndicator("STATUS")
-                      }}</span>
-                    </button>
-                  </th>
-                  <th [attr.aria-sort]="ownershipAriaSort('VERSION')">
-                    <button
-                      class="sort-header"
-                      type="button"
-                      (click)="sortOwnershipIndex('VERSION')"
-                    >
-                      Version
-                      <span aria-hidden="true">{{
-                        ownershipSortIndicator("VERSION")
-                      }}</span>
-                    </button>
-                  </th>
-                  <th>可執行動作</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (row of pagedVisibleRows(); track row.id) {
-                  <tr
-                    [attr.data-ownership-type]="ownershipOf(row)"
-                    [attr.data-ssi-id]="row.id"
-                  >
-                    @if (ownershipTab() === "OWN") {
-                      <td>
-                        <b>{{ row.route["bookingEntity"] || row.ownerParty }}</b
-                        ><small>{{ row.ownerParty }}</small>
-                      </td>
-                      <td>
-                        <b>{{ row.route["accountOwner"] || row.ownerParty }}</b
-                        ><code>{{ row.route["accountWithBic"] }}</code>
-                      </td>
-                      <td>
-                        <code>{{ row.route["accountId"] || "—" }}</code>
-                      </td>
-                    } @else {
-                      <td>
-                        <b>{{ row.route["currency"] }}</b>
-                      </td>
-                      <td>
-                        <b>{{ row.route["businessFunction"] || row.scope }}</b
-                        ><small>{{
-                          row.route["instructionPurpose"] || "—"
-                        }}</small>
-                      </td>
-                      <td>
-                        <code>{{ row.route["accountWithBic"] || "—" }}</code
-                        ><small>{{
-                          row.route["sourceType"] || "SSI MASTER"
-                        }}</small>
-                      </td>
-                    }
-                    @if (ownershipTab() === "OWN") {
-                      <td>{{ row.route["currency"] }}</td>
-                    }
-                    <td>
-                      {{
-                        row.route["routePreference"] ||
-                          row.route["routeType"] ||
-                          "—"
-                      }}／{{ row.route["priority"] || "—" }}
-                    </td>
-                    <td>
-                      {{ row.route["validFrom"] || "—" }} →
-                      {{ row.route["validTo"] || "—" }}
-                    </td>
-                    <td>
-                      <span
-                        class="status"
-                        [class.active-status]="row.status === 'ACTIVE'"
-                        >{{ row.status }}</span
-                      >
-                    </td>
-                    <td>v{{ row.version }}</td>
-                    <td>
-                      <div class="row-actions">
-                        <button (click)="detailTarget.set(row)">檢視</button>
-                        @if (row.status === "DRAFT") {
-                          <button class="edit-action" (click)="edit(row)">
-                            編輯
-                          </button>
-                        }
-                        @if (row.status === "APPROVED") {
-                          <button
-                            class="primary-small"
-                            (click)="act(row, 'activate')"
-                          >
-                            啟用
-                          </button>
-                        }
-                        @if (
-                          row.status === "ACTIVE" || row.status === "APPROVED"
-                        ) {
-                          <button class="edit-action" (click)="revise(row)">
-                            修訂
-                          </button>
-                        }
-                        @if (row.status !== "REVOKED") {
-                          <button class="danger" (click)="requestDelete(row)">
-                            撤銷
-                          </button>
-                        }
-                        @if (row.status === "DRAFT") {
-                          <button
-                            class="primary-small"
-                            (click)="act(row, 'submit')"
-                          >
-                            提交
-                          </button>
-                        }
-                      </div>
-                    </td>
-                  </tr>
-                } @empty {
-                  <tr>
-                    <td colspan="9" class="empty">
-                      尚無目前有效資料。按「＋新增 SSI」建立第一筆。
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          </div>
-          <div class="pager" aria-label="SSI Index pagination">
-            <span
-              >Page {{ indexPage() }} / {{ indexTotalPages() }} ·
-              {{ visibleRows().length }} records</span
-            >
-            <div>
-              <button
-                class="ghost"
-                type="button"
-                [disabled]="indexPage() === 1"
-                (click)="moveIndexPage(-1)"
-              >
-                上一頁
-              </button>
-              <button
-                class="ghost"
-                type="button"
-                [disabled]="indexPage() === indexTotalPages()"
-                (click)="moveIndexPage(1)"
-              >
-                下一頁
-              </button>
-            </div>
-          </div>
-        }
-      </section>
-    }
-
-    @if (view() === "maker") {
-      <section class="panel form-panel">
-        <div class="form-heading">
-          <button
-            class="back-link"
-            type="button"
-            (click)="navigate('dashboard')"
-          >
-            ← 返回 SSI 清單
-          </button>
-          <p class="kicker">MAKER WORKSPACE · PARAMETER-DRIVEN FORMLY</p>
-          <h2>
-            {{ editingId() ? "編輯 SSI 草稿" : "新增 Settlement Instruction" }}
-          </h2>
-          <p>
-            {{
-              editingId()
-                ? "您正在修改 DRAFT。儲存後仍須提交獨立 Checker；原 Active 版本不受影響。"
-                : "建立新 DRAFT，完成後回到清單提交 Checker。"
-            }}
-          </p>
-        </div>
-        <form [formGroup]="form" (ngSubmit)="create()">
-          <formly-form [form]="form" [fields]="fields()" [model]="model" />
-          <p class="data-disclaimer compact-warning">
-            <b>資料界線：</b>BIC reference 可由欄位右側 Bank Service 選取；Demo
-            Account／SSI routing 為虛構資料，Production 必須經授權 Master 驗證。
-          </p>
-          <div class="actions">
-            <button type="button" class="ghost" (click)="navigate('dashboard')">
-              取消</button
-            ><button class="primary" type="submit">
-              {{ editingId() ? "儲存修訂草稿" : "建立 SSI 草稿" }}
-            </button>
-          </div>
-        </form>
-      </section>
-    }
-
-    @if (view() === "checker") {
-      <section class="intro-card">
-        <p class="kicker">FOUR-EYES CONTROL</p>
-        <h2>Checker 要做甚麼？</h2>
-        <p>
-          核對 Maker、Bank/BIC、Currency、Account With、Intermediary 與
-          Scope。Checker 不可與 Maker 相同；核准後仍需 Activate 才能被
-          Resolution 使用。
-        </p>
-      </section>
-      <section class="panel">
-        @for (row of pending(); track row.id) {
-          <article class="approval">
-            <div>
-              <b>{{ row.counterpartyId }} · {{ row.route["currency"] }}</b>
-              <p>
-                {{ row.route["bankName"] }} ·
-                {{ row.route["beneficiaryBic"] }} →
-                {{ row.route["accountWithBic"] }}
-              </p>
-              <small>Maker: {{ row.maker }} · v{{ row.version }}</small>
-            </div>
-            <div class="row-actions">
-              <button (click)="detailTarget.set(row)">檢視資料</button
-              ><button class="primary" (click)="act(row, 'approve')">
-                Checker Approve
-              </button>
-            </div>
-          </article>
-        } @empty {
-          <p class="empty">
-            沒有等待審批的項目。請從 SSI Maintenance 選擇 DRAFT 並按「提交」。
-          </p>
-        }
-      </section>
-    }
-
-    @if (view() === "resolver") {
-      <ssi-page-definition-index-workspace [businessDomain]="'PAYMENT'" />
-    }
-
-    @if (view() === "treasury" || view() === "tradefinance") {
-      <ssi-page-definition-index-workspace
-        [businessDomain]="view() === 'treasury' ? 'TREASURY' : 'TRADE_FINANCE'"
-      />
-    }
-
-    @if (false && (view() === "treasury" || view() === "tradefinance")) {
-      <section class="workspace-intro">
-        <div>
-          <p class="kicker">REFERENCE-ONLY · FIN MT</p>
-          <h2>
-            {{
-              view() === "treasury"
-                ? "Treasury SSI Resolution"
-                : "Trade Finance SSI Resolution"
-            }}
-          </h2>
-          <p>
-            依選定的 MT Message 與 Input Information 提供可由 SSI
-            或核准路徑資料推導的銀行 Tag、官方欄位名稱 與證據；50／51／52／59
-            等交易當事人欄位由上游交易主檔或 Bank Directory 提供。結果不可用於
-            Payment Release。
-          </p>
-        </div>
-        <div class="legend">
-          <span><b>REFERENCE ONLY</b> paymentExecutable = false</span
-          ><span><b>MT only</b> 不組裝或發送完整 FIN 訊息</span>
+          }
         </div>
       </section>
-      <section class="tag-layout" [class.index-only]="!tagTransactionOpen()">
-        <article class="panel task-panel">
-          @if (!tagTransactionOpen()) {
-            <h2>選擇 MT Message</h2>
-            <label class="control catalog-search"
-              ><span>Search SSI Resolution index</span
-              ><input
-                #tagSearch
-                type="search"
-                [value]="tagCatalogSearch()"
-                placeholder="MT code or message description"
-                (input)="searchTagCatalog(tagSearch.value)"
-            /></label>
-            <section class="tag-catalog" aria-label="SWIFT transaction catalog">
-              <div class="catalog-heading">
+    } @else {
+      @defer (
+        when view() === "dashboard" || view() === "maker";
+        prefetch on timer(1s)
+      ) {
+        <ssi-deferred-feature-shell>
+          @if (view() === "dashboard") {
+            @if (ssiIndexLoading() && rows().length === 0) {
+              <ssi-loading-state label="Loading SSI records…" />
+            } @else {
+              <section class="metrics">
+                <article>
+                  <small>目前 SSI</small
+                  ><strong>{{ ssiSummary().currentOwn }}</strong>
+                </article>
+                <article>
+                  <small>等待 Checker</small
+                  ><strong>{{ checkerCount() }}</strong>
+                </article>
+                <article>
+                  <small>Active</small><strong>{{ activeCount() }}</strong>
+                </article>
+                <article>
+                  <small>歷史／已撤銷</small
+                  ><strong>{{ archivedCount() }}</strong>
+                </article>
+              </section>
+              <section class="guidance">
+                <span>1</span>
                 <div>
-                  <p class="kicker">CATALOG INDEX</p>
-                  <h3>選擇交易</h3>
+                  <b>新增</b><small>使用右方「＋新增 SSI」建立 DRAFT。</small>
                 </div>
-                <span
-                  >{{ availableTagMessages().length }} SWIFT messages · Verified
-                  and Pending shown separately</span
-                >
-              </div>
-              @if (finResolutionCatalogueLoading()) {
-                <output class="empty-state">
-                  <b>Loading SSI Resolution scope…</b>
-                </output>
-              } @else if (finResolutionCatalogueError()) {
-                <div class="decision-fail" role="alert">
-                  {{ finResolutionCatalogueError() }}
-                  <button
-                    class="ghost"
-                    type="button"
-                    (click)="loadFinResolutionCatalogue()"
+                <span>2</span>
+                <div>
+                  <b>編輯／修訂</b
+                  ><small
+                    >DRAFT 直接編輯；Active 使用「建立修訂」保留舊版本。</small
                   >
-                    Retry
+                </div>
+                <span>3</span>
+                <div>
+                  <b>四眼控制</b
+                  ><small>Submit → Checker Approve → Active。</small>
+                </div>
+              </section>
+              <section class="panel">
+                <div class="panel-title">
+                  <div>
+                    <p class="kicker">CURRENT OPERATING RECORDS</p>
+                    <h2>Settlement Instructions</h2>
+                    <p class="subtitle">
+                      預設隱藏
+                      REVOKED／SUPERSEDED；完整歷史可在「稽核與事件」查看。
+                    </p>
+                  </div>
+                  <button class="primary" (click)="startNew()">Add SSI</button>
+                </div>
+                <div class="catalog-tabs" aria-label="SSI ownership indexes">
+                  <button
+                    type="button"
+                    [class.active]="ownershipTab() === 'OWN'"
+                    (click)="selectOwnershipTab('OWN')"
+                  >
+                    Own SSI
+                  </button>
+                  <button
+                    type="button"
+                    [class.active]="ownershipTab() === 'COUNTERPARTY'"
+                    (click)="selectOwnershipTab('COUNTERPARTY')"
+                  >
+                    Counterparty SSI
                   </button>
                 </div>
-              } @else {
-                <div class="table-scroll suggestion-grid">
-                  <table>
-                    <caption class="visually-hidden">
-                      FIN 5x mapping catalogue
-                    </caption>
-                    <thead>
-                      <tr>
-                        @for (column of tagCatalogColumns; track column.key) {
+                @if (
+                  ownershipTab() === "COUNTERPARTY" && !selectedCounterparty()
+                ) {
+                  <section
+                    class="counterparty-inbox"
+                    aria-labelledby="counterparty-inbox-title"
+                  >
+                    <div class="inbox-heading">
+                      <div>
+                        <p class="kicker">
+                          COUNTERPARTY DIRECTORY × SSI COVERAGE
+                        </p>
+                        <h3 id="counterparty-inbox-title">
+                          Counterparty Inbox
+                        </h3>
+                        <p class="subtitle">
+                          每個對手行只顯示一次；選擇後才載入該對手行的 SSI。
+                        </p>
+                      </div>
+                      <span class="status" aria-live="polite">
+                        @if (
+                          counterpartyDirectoryLoading() || ssiIndexLoading()
+                        ) {
+                          Loading counterparties…
+                        } @else {
+                          {{ filteredCounterpartyInbox().length }}
+                          counterparties
+                        }
+                      </span>
+                    </div>
+                    <fieldset class="catalog-tabs status-tabs">
+                      <legend class="visually-hidden">Counterparty Type</legend>
+                      <button
+                        type="button"
+                        [class.active]="counterpartyPartyType() === 'BANK_SSI'"
+                        (click)="selectCounterpartyPartyType('BANK_SSI')"
+                      >
+                        Bank (SSI)
+                      </button>
+                      <button
+                        type="button"
+                        [class.active]="
+                          counterpartyPartyType() === 'BANK_NO_SSI'
+                        "
+                        (click)="selectCounterpartyPartyType('BANK_NO_SSI')"
+                      >
+                        Bank (No SSI)
+                      </button>
+                      <button
+                        type="button"
+                        [class.active]="counterpartyPartyType() === 'CUSTOMER'"
+                        (click)="selectCounterpartyPartyType('CUSTOMER')"
+                      >
+                        Customer
+                      </button>
+                    </fieldset>
+                    <div class="index-controls inbox-controls single-control">
+                      <label class="control index-search"
+                        ><span
+                          >Search Counterparty ID, BIC, name or country</span
+                        ><input
+                          aria-label="Search Counterparty Inbox"
+                          [value]="counterpartyInboxSearch()"
+                          (input)="
+                            searchCounterpartyInbox($any($event.target).value)
+                          "
+                      /></label>
+                    </div>
+                    <div class="table-scroll counterparty-inbox-table">
+                      <table>
+                        <caption class="visually-hidden">
+                          Counterparty SSI inbox
+                        </caption>
+                        <thead>
+                          <tr>
+                            <th
+                              [attr.aria-sort]="
+                                counterpartyAriaSort('BIC_NAME')
+                              "
+                            >
+                              <button
+                                class="sort-header"
+                                type="button"
+                                (click)="sortCounterpartyInbox('BIC_NAME')"
+                              >
+                                BIC／Name
+                                <span aria-hidden="true">{{
+                                  counterpartySortIndicator("BIC_NAME")
+                                }}</span>
+                              </button>
+                            </th>
+                            <th
+                              [attr.aria-sort]="counterpartyAriaSort('COUNTRY')"
+                            >
+                              <button
+                                class="sort-header"
+                                type="button"
+                                (click)="sortCounterpartyInbox('COUNTRY')"
+                              >
+                                Country
+                                <span aria-hidden="true">{{
+                                  counterpartySortIndicator("COUNTRY")
+                                }}</span>
+                              </button>
+                            </th>
+                            <th
+                              [attr.aria-sort]="
+                                counterpartyAriaSort('SSI_COUNT')
+                              "
+                            >
+                              <button
+                                class="sort-header"
+                                type="button"
+                                (click)="sortCounterpartyInbox('SSI_COUNT')"
+                              >
+                                SSI Count
+                                <span aria-hidden="true">{{
+                                  counterpartySortIndicator("SSI_COUNT")
+                                }}</span>
+                              </button>
+                            </th>
+                            <th
+                              [attr.aria-sort]="
+                                counterpartyAriaSort('CURRENCY_COUNT')
+                              "
+                            >
+                              <button
+                                class="sort-header"
+                                type="button"
+                                (click)="
+                                  sortCounterpartyInbox('CURRENCY_COUNT')
+                                "
+                              >
+                                Currencies
+                                <span aria-hidden="true">{{
+                                  counterpartySortIndicator("CURRENCY_COUNT")
+                                }}</span>
+                              </button>
+                            </th>
+                            <th
+                              [attr.aria-sort]="
+                                counterpartyAriaSort('STATUS_EVIDENCE')
+                              "
+                            >
+                              <button
+                                class="sort-header"
+                                type="button"
+                                (click)="
+                                  sortCounterpartyInbox('STATUS_EVIDENCE')
+                                "
+                              >
+                                Status／Evidence
+                                <span aria-hidden="true">{{
+                                  counterpartySortIndicator("STATUS_EVIDENCE")
+                                }}</span>
+                              </button>
+                            </th>
+                            <th
+                              [attr.aria-sort]="
+                                counterpartyAriaSort('LAST_VERIFIED')
+                              "
+                            >
+                              <button
+                                class="sort-header"
+                                type="button"
+                                (click)="sortCounterpartyInbox('LAST_VERIFIED')"
+                              >
+                                Last Verified
+                                <span aria-hidden="true">{{
+                                  counterpartySortIndicator("LAST_VERIFIED")
+                                }}</span>
+                              </button>
+                            </th>
+                            <th>Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          @if (
+                            counterpartyDirectoryLoading() || ssiIndexLoading()
+                          ) {
+                            <tr>
+                              <td colspan="7" class="empty">
+                                <output aria-live="polite"
+                                  >Loading Counterparty Directory…</output
+                                >
+                              </td>
+                            </tr>
+                          } @else {
+                            @for (
+                              party of pagedCounterpartyInbox();
+                              track party.counterpartyId
+                            ) {
+                              <tr
+                                class="data-row"
+                                tabindex="0"
+                                [attr.data-counterparty-id]="
+                                  party.counterpartyId
+                                "
+                                (dblclick)="
+                                  openCounterpartySsi(party.counterpartyId)
+                                "
+                                (keydown.enter)="
+                                  openCounterpartySsi(party.counterpartyId)
+                                "
+                              >
+                                <td>
+                                  <b>{{ party.counterpartyId }}</b>
+                                  @if (
+                                    party.bic &&
+                                    party.bic !== party.counterpartyId
+                                  ) {
+                                    <small>SWIFT BIC: {{ party.bic }}</small>
+                                  }
+                                  <small>{{ party.name }}</small>
+                                  <small>{{ party.partyType ?? "BANK" }}</small>
+                                </td>
+                                <td>{{ party.country }}</td>
+                                <td>
+                                  <b>{{ party.ssiCount }}</b>
+                                </td>
+                                <td>{{ party.currencyCount }}</td>
+                                <td>
+                                  <span
+                                    class="status"
+                                    [class.active-status]="party.ssiCount > 0"
+                                    >{{ party.evidenceSummary }}</span
+                                  >
+                                </td>
+                                <td>{{ party.lastVerified || "Never" }}</td>
+                                <td>
+                                  @if (party.ssiCount > 0) {
+                                    <button
+                                      type="button"
+                                      class="ghost"
+                                      [attr.aria-label]="
+                                        'Open ' + party.counterpartyId + ' SSI'
+                                      "
+                                      (click)="
+                                        openCounterpartySsi(
+                                          party.counterpartyId
+                                        )
+                                      "
+                                    >
+                                      Open
+                                    </button>
+                                  } @else {
+                                    <span class="status">No SSI</span>
+                                  }
+                                </td>
+                              </tr>
+                            } @empty {
+                              <tr>
+                                <td colspan="7" class="empty">
+                                  No counterparties match this search.
+                                </td>
+                              </tr>
+                            }
+                          }
+                        </tbody>
+                      </table>
+                    </div>
+                    <div
+                      class="pager"
+                      aria-label="Counterparty Inbox pagination"
+                    >
+                      <span
+                        >Page {{ counterpartyInboxPage() }} /
+                        {{ counterpartyInboxTotalPages() }} ·
+                        {{ filteredCounterpartyInbox().length }}
+                        counterparties</span
+                      >
+                      <div>
+                        <button
+                          class="ghost"
+                          type="button"
+                          [disabled]="counterpartyInboxPage() === 1"
+                          (click)="moveCounterpartyInboxPage(-1)"
+                        >
+                          Previous</button
+                        ><button
+                          class="ghost"
+                          type="button"
+                          [disabled]="
+                            counterpartyInboxPage() ===
+                            counterpartyInboxTotalPages()
+                          "
+                          (click)="moveCounterpartyInboxPage(1)"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </div>
+                  </section>
+                } @else {
+                  @if (selectedCounterparty(); as party) {
+                    <button
+                      class="ghost strong index-back-button"
+                      type="button"
+                      (click)="closeCounterpartySsi()"
+                    >
+                      ← Back
+                    </button>
+                    <section class="party-detail-header">
+                      <p class="kicker">COUNTERPARTY SSI DETAIL</p>
+                      <h3>{{ party.counterpartyId }} · {{ party.name }}</h3>
+                      <p>
+                        {{ party.country }} · {{ party.ssiCount }} SSI ·
+                        {{ party.currencyCount }} currencies ·
+                        {{ party.evidenceSummary }}
+                      </p>
+                    </section>
+                  }
+                  <fieldset class="status-options">
+                    <legend>Record status</legend>
+                    @for (
+                      option of [
+                        { value: "ACTIVE", label: "Active" },
+                        { value: "DRAFT", label: "Draft" },
+                        { value: "SUPPRESSED", label: "Suppressed" },
+                        { value: "ALL", label: "All" },
+                      ];
+                      track option.value
+                    ) {
+                      <label
+                        [class.selected]="ownershipStatus() === option.value"
+                        ><input
+                          type="radio"
+                          name="ssi-status"
+                          [value]="option.value"
+                          [checked]="ownershipStatus() === option.value"
+                          (change)="selectOwnershipStatus($any(option.value))"
+                        /><span>{{ option.label }}</span></label
+                      >
+                    }
+                  </fieldset>
+                  <div class="index-controls single-control">
+                    <label class="control"
+                      ><span>Search current ownership index</span
+                      ><input
+                        aria-label="Search SSI ownership index"
+                        [value]="ownershipSearch()"
+                        (input)="
+                          searchOwnershipIndex($any($event.target).value)
+                        "
+                    /></label>
+                  </div>
+                  <div class="table-scroll">
+                    <table>
+                      <caption class="visually-hidden">
+                        {{
+                          ownershipTab() === "OWN"
+                            ? "Own SSI and Nostro ownership index"
+                            : "Counterparty SSI ownership index"
+                        }}
+                      </caption>
+                      <thead>
+                        <tr>
+                          @if (ownershipTab() === "OWN") {
+                            <th
+                              [attr.aria-sort]="
+                                ownershipAriaSort('BOOKING_ENTITY')
+                              "
+                            >
+                              <button
+                                class="sort-header"
+                                type="button"
+                                (click)="sortOwnershipIndex('BOOKING_ENTITY')"
+                              >
+                                Booking／Legal Entity
+                                <span aria-hidden="true">{{
+                                  ownershipSortIndicator("BOOKING_ENTITY")
+                                }}</span>
+                              </button>
+                            </th>
+                            <th
+                              [attr.aria-sort]="
+                                ownershipAriaSort('ACCOUNT_SERVICER')
+                              "
+                            >
+                              <button
+                                class="sort-header"
+                                type="button"
+                                (click)="sortOwnershipIndex('ACCOUNT_SERVICER')"
+                              >
+                                Account Owner／Servicer
+                                <span aria-hidden="true">{{
+                                  ownershipSortIndicator("ACCOUNT_SERVICER")
+                                }}</span>
+                              </button>
+                            </th>
+                            <th
+                              [attr.aria-sort]="
+                                ownershipAriaSort('ACCOUNT_REF')
+                              "
+                            >
+                              <button
+                                class="sort-header"
+                                type="button"
+                                (click)="sortOwnershipIndex('ACCOUNT_REF')"
+                              >
+                                Account Ref
+                                <span aria-hidden="true">{{
+                                  ownershipSortIndicator("ACCOUNT_REF")
+                                }}</span>
+                              </button>
+                            </th>
+                          } @else {
+                            <th
+                              [attr.aria-sort]="ownershipAriaSort('CURRENCY')"
+                            >
+                              <button
+                                class="sort-header"
+                                type="button"
+                                (click)="sortOwnershipIndex('CURRENCY')"
+                              >
+                                Currency
+                                <span aria-hidden="true">{{
+                                  ownershipSortIndicator("CURRENCY")
+                                }}</span>
+                              </button>
+                            </th>
+                            <th
+                              [attr.aria-sort]="ownershipAriaSort('USE_CASE')"
+                            >
+                              <button
+                                class="sort-header"
+                                type="button"
+                                (click)="sortOwnershipIndex('USE_CASE')"
+                              >
+                                Use Case
+                                <span aria-hidden="true">{{
+                                  ownershipSortIndicator("USE_CASE")
+                                }}</span>
+                              </button>
+                            </th>
+                            <th
+                              [attr.aria-sort]="
+                                ownershipAriaSort('INSTRUCTED_ROUTE')
+                              "
+                            >
+                              <button
+                                class="sort-header"
+                                type="button"
+                                (click)="sortOwnershipIndex('INSTRUCTED_ROUTE')"
+                              >
+                                Instructed Route
+                                <span aria-hidden="true">{{
+                                  ownershipSortIndicator("INSTRUCTED_ROUTE")
+                                }}</span>
+                              </button>
+                            </th>
+                          }
+                          @if (ownershipTab() === "OWN") {
+                            <th
+                              [attr.aria-sort]="ownershipAriaSort('CURRENCY')"
+                            >
+                              <button
+                                class="sort-header"
+                                type="button"
+                                (click)="sortOwnershipIndex('CURRENCY')"
+                              >
+                                Currency
+                                <span aria-hidden="true">{{
+                                  ownershipSortIndicator("CURRENCY")
+                                }}</span>
+                              </button>
+                            </th>
+                          }
                           <th
                             [attr.aria-sort]="
-                              tagCatalogSortKey() === column.key
-                                ? tagCatalogSortDirection() === 'asc'
-                                  ? 'ascending'
-                                  : 'descending'
-                                : 'none'
+                              ownershipAriaSort('ROUTE_PRIORITY')
                             "
                           >
                             <button
-                              class="sort-heading"
+                              class="sort-header"
                               type="button"
-                              (click)="sortTagCatalog(column.key)"
+                              (click)="sortOwnershipIndex('ROUTE_PRIORITY')"
                             >
-                              {{ column.label }}
-                              @if (tagCatalogSortKey() === column.key) {
-                                <span aria-hidden="true">{{
-                                  tagCatalogSortDirection() === "asc"
-                                    ? "↑"
-                                    : "↓"
-                                }}</span>
-                              }
+                              Route Class／Priority
+                              <span aria-hidden="true">{{
+                                ownershipSortIndicator("ROUTE_PRIORITY")
+                              }}</span>
                             </button>
                           </th>
-                        }
-                      </tr>
-                    </thead>
-                    <tbody>
-                      @for (
-                        item of pagedTagScenarios();
-                        track item.messageType
-                      ) {
-                        <tr
-                          tabindex="0"
-                          [attr.aria-label]="'Open ' + item.messageType"
-                          (dblclick)="openTagMessage(item.messageType)"
-                          (keydown.enter)="openTagMessage(item.messageType)"
-                          (keydown.space)="
-                            $event.preventDefault();
-                            openTagMessage(item.messageType)
-                          "
-                        >
-                          @for (column of tagCatalogColumns; track column.key) {
-                            <td [attr.data-label]="column.label">
-                              @if (column.key === "verified") {
-                                <span class="status">{{
-                                  item.verified
-                                    ? "VERIFIED REFERENCE"
-                                    : "NO VERIFIED MAPPING"
-                                }}</span>
-                              } @else {
-                                {{ $any(item)[column.key] }}
+                          <th
+                            [attr.aria-sort]="
+                              ownershipAriaSort('EFFECTIVE_PERIOD')
+                            "
+                          >
+                            <button
+                              class="sort-header"
+                              type="button"
+                              (click)="sortOwnershipIndex('EFFECTIVE_PERIOD')"
+                            >
+                              Effective Period
+                              <span aria-hidden="true">{{
+                                ownershipSortIndicator("EFFECTIVE_PERIOD")
+                              }}</span>
+                            </button>
+                          </th>
+                          <th [attr.aria-sort]="ownershipAriaSort('STATUS')">
+                            <button
+                              class="sort-header"
+                              type="button"
+                              (click)="sortOwnershipIndex('STATUS')"
+                            >
+                              Status
+                              <span aria-hidden="true">{{
+                                ownershipSortIndicator("STATUS")
+                              }}</span>
+                            </button>
+                          </th>
+                          <th [attr.aria-sort]="ownershipAriaSort('VERSION')">
+                            <button
+                              class="sort-header"
+                              type="button"
+                              (click)="sortOwnershipIndex('VERSION')"
+                            >
+                              Version
+                              <span aria-hidden="true">{{
+                                ownershipSortIndicator("VERSION")
+                              }}</span>
+                            </button>
+                          </th>
+                          <th
+                            [attr.aria-sort]="ownershipAriaSort('REQUEST_TYPE')"
+                          >
+                            <button
+                              class="sort-header"
+                              type="button"
+                              (click)="sortOwnershipIndex('REQUEST_TYPE')"
+                            >
+                              Request Type
+                              <span aria-hidden="true">{{
+                                ownershipSortIndicator("REQUEST_TYPE")
+                              }}</span>
+                            </button>
+                          </th>
+                          <th
+                            [attr.aria-sort]="
+                              ownershipAriaSort('REVISION_STATUS')
+                            "
+                          >
+                            <button
+                              class="sort-header"
+                              type="button"
+                              (click)="sortOwnershipIndex('REVISION_STATUS')"
+                            >
+                              Revision Status
+                              <span aria-hidden="true">{{
+                                ownershipSortIndicator("REVISION_STATUS")
+                              }}</span>
+                            </button>
+                          </th>
+                          <th [attr.aria-sort]="ownershipAriaSort('SUBMIT')">
+                            <button
+                              class="sort-header"
+                              type="button"
+                              (click)="sortOwnershipIndex('SUBMIT')"
+                            >
+                              Submit
+                              <span aria-hidden="true">{{
+                                ownershipSortIndicator("SUBMIT")
+                              }}</span>
+                            </button>
+                          </th>
+                          <th
+                            [attr.aria-sort]="ownershipAriaSort('EDIT_REVISE')"
+                          >
+                            <button
+                              class="sort-header"
+                              type="button"
+                              (click)="sortOwnershipIndex('EDIT_REVISE')"
+                            >
+                              Edit / Revise
+                              <span aria-hidden="true">{{
+                                ownershipSortIndicator("EDIT_REVISE")
+                              }}</span>
+                            </button>
+                          </th>
+                          <th [attr.aria-sort]="ownershipAriaSort('SUPPRESS')">
+                            <button
+                              class="sort-header"
+                              type="button"
+                              (click)="sortOwnershipIndex('SUPPRESS')"
+                            >
+                              Suppress
+                              <span aria-hidden="true">{{
+                                ownershipSortIndicator("SUPPRESS")
+                              }}</span>
+                            </button>
+                          </th>
+                          <th
+                            [attr.aria-sort]="ownershipAriaSort('REVOKE_DRAFT')"
+                          >
+                            <button
+                              class="sort-header"
+                              type="button"
+                              (click)="sortOwnershipIndex('REVOKE_DRAFT')"
+                            >
+                              Revoke Draft
+                              <span aria-hidden="true">{{
+                                ownershipSortIndicator("REVOKE_DRAFT")
+                              }}</span>
+                            </button>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (row of pagedVisibleRows(); track row.id) {
+                          <tr
+                            class="data-row"
+                            tabindex="0"
+                            [attr.aria-label]="'View SSI ' + row.id"
+                            [attr.data-ownership-type]="ownershipOf(row)"
+                            [attr.data-ssi-id]="row.id"
+                            (click)="reviewForChecker(row)"
+                            (keydown.enter)="reviewForChecker(row)"
+                            (keydown.space)="
+                              $event.preventDefault(); reviewForChecker(row)
+                            "
+                          >
+                            @if (ownershipTab() === "OWN") {
+                              <td>
+                                <b>{{
+                                  row.route["bookingEntity"] || row.ownerParty
+                                }}</b
+                                ><small>{{ row.ownerParty }}</small>
+                              </td>
+                              <td>
+                                <b>{{
+                                  row.route["accountOwner"] || row.ownerParty
+                                }}</b
+                                ><code>{{ row.route["accountWithBic"] }}</code>
+                              </td>
+                              <td>
+                                <code>{{ row.route["accountId"] || "—" }}</code>
+                              </td>
+                            } @else {
+                              <td>
+                                <b>{{ row.route["currency"] }}</b>
+                              </td>
+                              <td>
+                                <b>{{
+                                  row.route["businessFunction"] || row.scope
+                                }}</b
+                                ><small>{{
+                                  row.route["instructionPurpose"] || "—"
+                                }}</small>
+                              </td>
+                              <td>
+                                <code>{{
+                                  row.route["accountWithBic"] || "—"
+                                }}</code
+                                ><small>{{
+                                  row.route["sourceType"] || "SSI MASTER"
+                                }}</small>
+                              </td>
+                            }
+                            @if (ownershipTab() === "OWN") {
+                              <td>{{ row.route["currency"] }}</td>
+                            }
+                            <td>
+                              {{
+                                row.route["routePreference"] ||
+                                  row.route["routeType"] ||
+                                  "—"
+                              }}／{{ row.route["priority"] || "—" }}
+                            </td>
+                            <td>
+                              {{ row.route["validFrom"] || "—" }} →
+                              {{ row.route["validTo"] || "—" }}
+                            </td>
+                            <td>
+                              <span
+                                class="status"
+                                [class.active-status]="row.status === 'ACTIVE'"
+                                >{{ row.status }}</span
+                              >
+                            </td>
+                            <td>v{{ row.version }}</td>
+                            <td class="request-type-cell">
+                              <span class="revision-state">{{
+                                requestTypeLabel(row)
+                              }}</span>
+                            </td>
+                            <td class="revision-status-cell">
+                              @if (row.hasOpenRevision) {
+                                <span class="revision-state">
+                                  @switch (row.openRevisionStatus) {
+                                    @case ("WIP") {
+                                      In progress
+                                    }
+                                    @case ("PENDING_APPROVAL") {
+                                      Submitted
+                                    }
+                                    @case ("APPROVED") {
+                                      Approved (legacy)
+                                    }
+                                    @default {
+                                      Drafted
+                                    }
+                                  }
+                                </span>
                               }
                             </td>
-                          }
-                        </tr>
-                      } @empty {
-                        <tr>
-                          <td
-                            [attr.colspan]="tagCatalogColumns.length"
-                            class="empty"
-                          >
-                            No SSI-related 5x message matches this search.
-                          </td>
-                        </tr>
-                      }
-                    </tbody>
-                  </table>
-                </div>
-                <div class="pager">
-                  <span
-                    >Page {{ tagCatalogPage() }} /
-                    {{ tagCatalogTotalPages() }}</span
-                  >
-                  <div>
-                    <button
-                      class="ghost"
-                      type="button"
-                      [disabled]="tagCatalogPage() === 1"
-                      (click)="moveTagCatalogPage(-1)"
-                    >
-                      上一頁</button
-                    ><button
-                      class="ghost"
-                      type="button"
-                      [disabled]="tagCatalogPage() === tagCatalogTotalPages()"
-                      (click)="moveTagCatalogPage(1)"
-                    >
-                      下一頁
-                    </button>
+                            <td class="submit-action-cell">
+                              @if (
+                                row.status === "DRAFT" &&
+                                row.changeType !== "SUPPRESSION"
+                              ) {
+                                <button
+                                  class="primary"
+                                  (click)="
+                                    $event.stopPropagation(); act(row, 'submit')
+                                  "
+                                >
+                                  Submit
+                                </button>
+                              }
+                            </td>
+                            <td class="edit-action-cell">
+                              @if (row.status === "DRAFT") {
+                                <button
+                                  class="ghost"
+                                  (click)="$event.stopPropagation(); edit(row)"
+                                >
+                                  Edit
+                                </button>
+                              }
+                              @if (
+                                row.status === "ACTIVE" && !row.hasOpenRevision
+                              ) {
+                                <button
+                                  class="ghost"
+                                  (click)="
+                                    $event.stopPropagation(); revise(row)
+                                  "
+                                >
+                                  Revise
+                                </button>
+                              }
+                            </td>
+                            <td class="revoke-action-cell">
+                              @if (
+                                row.status === "ACTIVE" && !row.hasOpenRevision
+                              ) {
+                                <button
+                                  class="danger"
+                                  (click)="
+                                    $event.stopPropagation(); requestDelete(row)
+                                  "
+                                >
+                                  Suppress
+                                </button>
+                              }
+                            </td>
+                            <td class="revoke-action-cell">
+                              @if (row.status === "DRAFT") {
+                                <button
+                                  class="danger"
+                                  (click)="
+                                    $event.stopPropagation();
+                                    requestDraftRevoke(row)
+                                  "
+                                >
+                                  Revoke Draft
+                                </button>
+                              }
+                            </td>
+                          </tr>
+                        } @empty {
+                          <tr>
+                            <td colspan="14" class="empty">
+                              尚無目前有效資料。按「＋新增 SSI」建立第一筆。
+                            </td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
                   </div>
-                </div>
-              }
-            </section>
-          } @else {
-            <button
-              class="ghost tag-back"
-              type="button"
-              (click)="cancelTagTransaction()"
-            >
-              取消 / Cancel
-            </button>
-            <h2>{{ selectedTagScenario().label }}</h2>
-            <section class="tag-ssi-choice">
-              <div class="tag-ssi-heading">
-                <h3>Input Information</h3>
-                <small
-                  >Mock upstream transaction context · shared with
-                  Resolution</small
-                >
-              </div>
-              <p class="scope-note">
-                Message / Direction:
-                <b
-                  >{{ tagUpstreamContext().messageType }} ·
-                  {{ tagUpstreamContext().direction }}</b
-                >
-              </p>
-              <div class="two-columns">
-                <label class="control"
-                  ><span>Counterparty / Receiver BIC</span
-                  ><select
-                    #tagCounterparty
-                    [value]="resolutionCounterpartyBic()"
-                    (change)="selectTagCounterparty(tagCounterparty.value)"
-                  >
-                    @for (bank of eligibleSuggestionBanks(); track bank.bic) {
-                      <option
-                        [value]="bank.bic"
-                        [selected]="bank.bic === resolutionCounterpartyBic()"
-                      >
-                        {{ bank.bic }} · {{ bank.name }} · {{ bank.country }}
-                      </option>
-                    }
-                  </select></label
-                >
-                <label class="control"
-                  ><span>Currency</span
-                  ><select
-                    #tagCurrency
-                    [value]="resolutionCurrency()"
-                    (change)="selectTagCurrency(tagCurrency.value)"
-                  >
-                    @for (
-                      currency of suggestionCurrencies();
-                      track currency.code
-                    ) {
-                      <option
-                        [value]="currency.code"
-                        [selected]="currency.code === resolutionCurrency()"
-                      >
-                        {{ currency.code }} · {{ currency.decimals }} decimals ·
-                        {{
-                          tagCoveredCurrencies().has(currency.code)
-                            ? "SSI Covered"
-                            : "No SSI Coverage"
-                        }}
-                      </option>
-                    }
-                  </select></label
-                >
-              </div>
-              <output
-                class="currency-coverage"
-                [class.coverage-ok]="tagSelectedCurrencyCovered()"
-                [class.coverage-warning]="!tagSelectedCurrencyCovered()"
-              >
-                @if (tagSelectedCurrencyCovered()) {
-                  SSI Covered：目前 Counterparty、Currency、Entity 與 Value Date
-                  有可評估的 SSI route；最終仍以 API Resolution 為準。
-                } @else {
-                  No SSI Coverage：保留此交易幣別，送出後 API 應 fail-closed，
-                  不會自動改幣別或 Counterparty。
-                }
-              </output>
-              <label class="control"
-                ><span>Booking Branch / Entity</span
-                ><select
-                  #tagEntity
-                  [value]="resolutionBookingEntity()"
-                  (change)="
-                    resolutionBookingEntity.set(tagEntity.value);
-                    updateTagTransactionContext()
-                  "
-                >
-                  @for (branch of bookingBranches(); track branch.branchCode) {
-                    <option [value]="branch.branchCode">
-                      {{ branch.branchCode }} · {{ branch.branchName }}
-                    </option>
-                  }
-                </select></label
-              >
-              <div class="two-columns">
-                <label class="control"
-                  ><span>Value Date</span
-                  ><input
-                    #tagValueDate
-                    type="date"
-                    [value]="resolutionValueDate()"
-                    (change)="
-                      resolutionValueDate.set(tagValueDate.value);
-                      updateTagTransactionContext()
-                    " /></label
-                ><label class="control"
-                  ><span>Transaction Reference</span
-                  ><input
-                    #tagReference
-                    [value]="tagTransactionReference()"
-                    (input)="tagTransactionReference.set(tagReference.value)"
-                /></label>
-              </div>
-              @if (selectedTagScenario().descriptor.messageType === "MT700") {
-                <label class="control"
-                  ><span>Reimbursement Arrangement</span
-                  ><select
-                    #tagReimbursement
-                    [value]="tagReimbursementArrangement()"
-                    (change)="
-                      tagReimbursementArrangement.set(
-                        $any(tagReimbursement.value)
-                      );
-                      clearTagGeneration()
-                    "
-                  >
-                    <option value="REIMBURSING_BANK">
-                      Reimbursing Bank (53a)
-                    </option>
-                    <option value="DIRECT_ACCOUNT">
-                      Direct Account (omit 53a)
-                    </option>
-                  </select></label
-                >
-              }
-              @if (selectedTagScenario().descriptor.messageType === "MT700") {
-                <label class="control"
-                  ><span>49 Confirmation Instructions</span
-                  ><select
-                    #tagConfirmation
-                    [value]="tagConfirmationInstructions()"
-                    (change)="
-                      tagConfirmationInstructions.set(tagConfirmation.value);
-                      clearTagGeneration()
-                    "
-                  >
-                    <option value="WITHOUT">WITHOUT</option>
-                    <option value="MAY_ADD">MAY ADD</option>
-                    <option value="CONFIRM">CONFIRM</option>
-                  </select></label
-                >
-              }
-              @if (isMt400Suggestion()) {
-                <div class="semantic-warning">
-                  <b>MT400 SSI-derived route</b>
-                  <span
-                    >The selected Currency, Counterparty, Entity and Value Date
-                    determine eligible synthetic demo routes. Direct/indirect
-                    relationship and field omission come from candidate
-                    evidence.</span
-                  >
-                </div>
-                @if (mt400ValidationIssue()) {
-                  <p class="decision-fail">{{ mt400ValidationIssue() }}</p>
-                }
-              } @else if (isMt760Suggestion()) {
-                <div class="semantic-warning">
-                  <b>MT760 Party Context</b>
-                  <span
-                    >Party candidates are keyed by the Receiver relationship and
-                    remain independent of Currency／Nostro fallback.</span
-                  >
-                </div>
-                <label class="control"
-                  ><span>49 Confirmation Instructions</span
-                  ><select
-                    #mt760Confirmation
-                    [value]="mt760ConfirmationInstructions()"
-                    (change)="
-                      mt760ConfirmationInstructions.set(
-                        $any(mt760Confirmation.value)
-                      );
-                      clearTagGeneration()
-                    "
-                  >
-                    <option value="WITHOUT">WITHOUT</option>
-                    <option value="MAY_ADD">MAY ADD</option>
-                    <option value="CONFIRM">CONFIRM</option>
-                  </select></label
-                >
-                @if (mt760ValidationIssue()) {
-                  <p class="decision-fail">{{ mt760ValidationIssue() }}</p>
-                }
-              } @else if (tagScenarioUsesSettlementSsi() && !selectedTagSsi()) {
-                <div class="decision-fail">
-                  <b>NO_SSI_FOUND</b>
-                  <p>
-                    沒有符合此交易情境的 Active SSI reference
-                    candidate；不產生空白或猜測性的 5x 建議。
-                  </p>
-                </div>
-              }
-            </section>
-            <div class="scenario-purpose">
-              <div class="scenario-status">
-                <b
-                  >{{ selectedTagScenario().descriptor.direction }} ·
-                  {{ selectedTagScenario().descriptor.messageType }}</b
-                ><span
-                  [class.reference-only]="!selectedTagScenario().executable"
-                  >REFERENCE ONLY</span
-                >
-              </div>
-              <p>{{ selectedTagScenario().purpose }}</p>
-            </div>
-            @if (
-              selectedTagScenario().executable ||
-              (isMt400Suggestion() &&
-                mt400SettlementMode() === "DIRECT_ACCOUNT")
-            ) {
-              <div class="button-stack">
-                <button
-                  class="primary"
-                  [disabled]="tagLoading() || !!tagSuggestionValidationIssue()"
-                  (click)="generateTags()"
-                >
-                  {{
-                    isMt400Suggestion() &&
-                    mt400SettlementMode() === "DIRECT_ACCOUNT"
-                      ? "Resolve Direct-account Field Disposition"
-                      : "Resolve SSI Settlement Fields"
-                  }}
-                </button>
-              </div>
-              <p class="scope-note">
-                僅回傳建議值、Tag-role mapping 與 provenance；不建立 payment
-                token、不組裝或發送完整 FIN 訊息。
-              </p>
-            } @else {
-              <section class="reference-guidance" aria-live="polite">
-                <p class="eyebrow">NO EXECUTABLE MAPPING</p>
-                <h3>此情境只供 Reference／Case／Continuation</h3>
-                <p>
-                  目前沒有 licensed Mapping Catalogue 證據，因此不顯示 Extract
-                  或 Generate 按鈕，也不會產生空白或推測性的 Tag 結果。上方 SSI
-                  僅供案件關聯及人工比較。
-                </p>
-                @if (selectedTagScenario().descriptor.messageType === "MT700") {
-                  <div class="semantic-warning">
-                    <b>MT700 語意提醒</b
-                    ><span
-                      >57a 是 Second Advising Bank；58a 是 Requested
-                      Confirmation Party。兩者是信用狀業務角色，不可直接當作
-                      Account With Institution 或 Intermediary
-                      Institution。</span
+                  <div class="pager" aria-label="SSI Index pagination">
+                    <span
+                      >Page {{ indexPage() }} / {{ indexTotalPages() }} ·
+                      {{ ssiIndexTotalItems() }} records</span
                     >
+                    <div>
+                      <button
+                        class="ghost"
+                        type="button"
+                        [disabled]="indexPage() === 1"
+                        (click)="moveIndexPage(-1)"
+                      >
+                        Previous
+                      </button>
+                      <button
+                        class="ghost"
+                        type="button"
+                        [disabled]="indexPage() === indexTotalPages()"
+                        (click)="moveIndexPage(1)"
+                      >
+                        Next
+                      </button>
+                    </div>
                   </div>
                 }
               </section>
             }
           }
-        </article>
-        @if (tagTransactionOpen()) {
-          <article class="panel result-panel">
-            <h2>Resolved 5x Fields</h2>
-            @if (tagScenarioUsesSettlementSsi()) {
+
+          @if (view() === "maker") {
+            <section class="panel form-panel">
+              <div class="form-heading">
+                <div>
+                  <p class="kicker">
+                    MAKER WORKSPACE · PARAMETER-DRIVEN FORMLY
+                  </p>
+                  <h2>
+                    {{
+                      makerEditing()
+                        ? "編輯 SSI 草稿"
+                        : "新增 Settlement Instruction"
+                    }}
+                  </h2>
+                  <p>
+                    {{
+                      makerEditing()
+                        ? "您正在修改 DRAFT。儲存後仍須提交獨立 Checker；原 Active 版本不受影響。"
+                        : "建立新 DRAFT，完成後回到清單提交。"
+                    }}
+                  </p>
+                </div>
+                <button
+                  class="drawer-close"
+                  type="button"
+                  aria-label="Close SSI editor"
+                  (click)="closeMaker()"
+                >
+                  ×
+                </button>
+              </div>
+              <form [formGroup]="form" (ngSubmit)="create()">
+                <formly-form
+                  [form]="form"
+                  [fields]="fields()"
+                  [model]="model"
+                />
+                <p class="data-disclaimer compact-warning">
+                  <b>資料界線：</b>BIC reference 可由欄位右側 Bank Service
+                  選取；Demo Account／SSI routing 為虛構資料，Production
+                  必須經授權 Master 驗證。
+                </p>
+                <div class="actions">
+                  <button class="primary" type="submit">Save Draft</button>
+                </div>
+              </form>
+            </section>
+          }
+        </ssi-deferred-feature-shell>
+      } @loading (after 100ms; minimum 300ms) {
+        <ssi-loading-state label="Loading SSI Maintenance…" />
+      }
+
+      @defer (when view() === "checker"; prefetch on timer(2s)) {
+        @if (view() === "checker") {
+          <nav class="catalog-tabs" aria-label="Checker resource">
+            <button
+              type="button"
+              [class.active]="checkerTab() === 'rma'"
+              (click)="selectCheckerTab('rma')"
+            >
+              RMA
+            </button>
+            <button
+              type="button"
+              [class.active]="checkerTab() === 'entity'"
+              (click)="selectCheckerTab('entity')"
+            >
+              Entities
+            </button>
+            <button
+              type="button"
+              [class.active]="checkerTab() === 'nostro'"
+              (click)="selectCheckerTab('nostro')"
+            >
+              Nostro
+            </button>
+            <button
+              type="button"
+              [class.active]="checkerTab() === 'ssi'"
+              (click)="selectCheckerTab('ssi')"
+            >
+              SSI
+            </button>
+          </nav>
+          <section class="intro-card">
+            <p class="kicker">FOUR-EYES CONTROL</p>
+            <h2>Checker 要做甚麼？</h2>
+            <p>
+              核對 Maker、Bank/BIC、Currency、Account With、Intermediary 與
+              Scope。Checker 不可與 Maker 相同；核准後即成為 Active，供
+              Resolution 使用。
+            </p>
+          </section>
+          @if (checkerTab() !== "ssi") {
+            <ssi-swift-data-crud
+              [initialResourceId]="checkerTab()"
+              [checkerMode]="true"
+            />
+          } @else {
+            <ssi-governance-index-table
+              ariaLabel="SSI pending approval index"
+              kicker="PENDING APPROVAL INDEX"
+              instruction="單擊資料列或按 Enter 查看原輸入畫面"
+              emptyText="沒有等待審批的項目。請從 SSI Maintenance 選擇 DRAFT 並提交。"
+              [columns]="checkerIndexColumns()"
+              [trailingColumns]="['Maker', 'Maker Datetime']"
+              [rows]="checkerIndexRows()"
+              [sortPath]="checkerIndexSortPath()"
+              [sortDirection]="checkerSortDirection()"
+              [currentPage]="checkerCurrentPage()"
+              [totalPages]="checkerTotalPages()"
+              [totalRecords]="pending().length"
+              [pageSize]="checkerPageSize"
+              (sortRequested)="sortCheckerIndex($event)"
+              (rowOpened)="reviewForChecker($any($event))"
+              (pageRequested)="moveCheckerPage($event)"
+            />
+          }
+        }
+      } @loading (after 100ms; minimum 300ms) {
+        <ssi-loading-state label="Loading Checker…" />
+      }
+
+      @defer (
+        when view() === "resolver" ||
+          view() === "treasury" ||
+          view() === "tradefinance";
+        prefetch on timer(3s)
+      ) {
+        @if (view() === "resolver") {
+          <ssi-page-definition-index-workspace [businessDomain]="'PAYMENT'" />
+        } @else if (view() === "treasury" || view() === "tradefinance") {
+          <ssi-page-definition-index-workspace
+            [businessDomain]="
+              view() === 'treasury' ? 'TREASURY' : 'TRADE_FINANCE'
+            "
+          />
+        }
+      } @loading (after 100ms; minimum 300ms) {
+        <ssi-loading-state label="Loading SSI Resolution workspace…" />
+      }
+
+      @if (false && (view() === "treasury" || view() === "tradefinance")) {
+        <section class="workspace-intro">
+          <div>
+            <p class="kicker">REFERENCE-ONLY · FIN MT</p>
+            <h2>
+              {{
+                view() === "treasury"
+                  ? "Treasury SSI Resolution"
+                  : "Trade Finance SSI Resolution"
+              }}
+            </h2>
+            <p>
+              依選定的 MT Message 與 Input Information 提供可由 SSI
+              或核准路徑資料推導的銀行 Tag、官方欄位名稱 與證據；50／51／52／59
+              等交易當事人欄位由上游交易主檔或 Bank Directory 提供。結果不可用於
+              Payment Release。
+            </p>
+          </div>
+          <div class="legend">
+            <span><b>REFERENCE ONLY</b> paymentExecutable = false</span
+            ><span><b>MT only</b> 不組裝或發送完整 FIN 訊息</span>
+          </div>
+        </section>
+        <section class="tag-layout" [class.index-only]="!tagTransactionOpen()">
+          <article class="panel task-panel">
+            @if (!tagTransactionOpen()) {
+              <h2>選擇 MT Message</h2>
+              <label class="control catalog-search"
+                ><span>Search SSI Resolution index</span
+                ><input
+                  #tagSearch
+                  type="search"
+                  [value]="tagCatalogSearch()"
+                  placeholder="MT code or message description"
+                  (input)="searchTagCatalog(tagSearch.value)"
+              /></label>
               <section
-                class="result-candidate-control"
-                aria-label="Eligible SSI candidates"
+                class="tag-catalog"
+                aria-label="SWIFT transaction catalog"
               >
-                <label class="control demo-candidate-selector"
-                  ><span>Eligible SSI Routes</span
+                <div class="catalog-heading">
+                  <div>
+                    <p class="kicker">CATALOG INDEX</p>
+                    <h3>選擇交易</h3>
+                  </div>
+                  <span
+                    >{{ availableTagMessages().length }} SWIFT messages ·
+                    Verified and Pending shown separately</span
+                  >
+                </div>
+                @if (finResolutionCatalogueLoading()) {
+                  <output class="empty-state">
+                    <b>Loading SSI Resolution scope…</b>
+                  </output>
+                } @else if (finResolutionCatalogueError()) {
+                  <div class="decision-fail" role="alert">
+                    {{ finResolutionCatalogueError() }}
+                    <button
+                      class="ghost"
+                      type="button"
+                      (click)="loadFinResolutionCatalogue()"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                } @else {
+                  <div class="table-scroll suggestion-grid">
+                    <table>
+                      <caption class="visually-hidden">
+                        FIN 5x mapping catalogue
+                      </caption>
+                      <thead>
+                        <tr>
+                          @for (column of tagCatalogColumns; track column.key) {
+                            <th
+                              [attr.aria-sort]="
+                                tagCatalogSortKey() === column.key
+                                  ? tagCatalogSortDirection() === 'asc'
+                                    ? 'ascending'
+                                    : 'descending'
+                                  : 'none'
+                              "
+                            >
+                              <button
+                                class="sort-heading"
+                                type="button"
+                                (click)="sortTagCatalog(column.key)"
+                              >
+                                {{ column.label }}
+                                @if (tagCatalogSortKey() === column.key) {
+                                  <span aria-hidden="true">{{
+                                    tagCatalogSortDirection() === "asc"
+                                      ? "↑"
+                                      : "↓"
+                                  }}</span>
+                                }
+                              </button>
+                            </th>
+                          }
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (
+                          item of pagedTagScenarios();
+                          track item.messageType
+                        ) {
+                          <tr
+                            tabindex="0"
+                            [attr.aria-label]="'Open ' + item.messageType"
+                            (dblclick)="openTagMessage(item.messageType)"
+                            (keydown.enter)="openTagMessage(item.messageType)"
+                            (keydown.space)="
+                              $event.preventDefault();
+                              openTagMessage(item.messageType)
+                            "
+                          >
+                            @for (
+                              column of tagCatalogColumns;
+                              track column.key
+                            ) {
+                              <td [attr.data-label]="column.label">
+                                @if (column.key === "verified") {
+                                  <span class="status">{{
+                                    item.verified
+                                      ? "VERIFIED REFERENCE"
+                                      : "NO VERIFIED MAPPING"
+                                  }}</span>
+                                } @else {
+                                  {{ $any(item)[column.key] }}
+                                }
+                              </td>
+                            }
+                          </tr>
+                        } @empty {
+                          <tr>
+                            <td
+                              [attr.colspan]="tagCatalogColumns.length"
+                              class="empty"
+                            >
+                              No SSI-related 5x message matches this search.
+                            </td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                  <div class="pager">
+                    <span
+                      >Page {{ tagCatalogPage() }} /
+                      {{ tagCatalogTotalPages() }}</span
+                    >
+                    <div>
+                      <button
+                        class="ghost"
+                        type="button"
+                        [disabled]="tagCatalogPage() === 1"
+                        (click)="moveTagCatalogPage(-1)"
+                      >
+                        Previous</button
+                      ><button
+                        class="ghost"
+                        type="button"
+                        [disabled]="tagCatalogPage() === tagCatalogTotalPages()"
+                        (click)="moveTagCatalogPage(1)"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                }
+              </section>
+            } @else {
+              <button
+                class="drawer-close tag-back"
+                type="button"
+                aria-label="Cancel transaction"
+                (click)="cancelTagTransaction()"
+              >
+                ×
+              </button>
+              <h2>{{ selectedTagScenario().label }}</h2>
+              <section class="tag-ssi-choice">
+                <div class="tag-ssi-heading">
+                  <h3>Input Information</h3>
+                  <small
+                    >Mock upstream transaction context · shared with
+                    Resolution</small
+                  >
+                </div>
+                <p class="scope-note">
+                  Message / Direction:
+                  <b
+                    >{{ tagUpstreamContext().messageType }} ·
+                    {{ tagUpstreamContext().direction }}</b
+                  >
+                </p>
+                <div class="two-columns">
+                  <label class="control"
+                    ><span>Counterparty / Receiver BIC</span
+                    ><select
+                      #tagCounterparty
+                      [value]="resolutionCounterpartyBic()"
+                      (change)="selectTagCounterparty(tagCounterparty.value)"
+                    >
+                      @for (bank of eligibleSuggestionBanks(); track bank.bic) {
+                        <option
+                          [value]="bank.bic"
+                          [selected]="bank.bic === resolutionCounterpartyBic()"
+                        >
+                          {{ bank.bic }} · {{ bank.name }} · {{ bank.country }}
+                        </option>
+                      }
+                    </select></label
+                  >
+                  <label class="control"
+                    ><span>Currency</span
+                    ><select
+                      #tagCurrency
+                      [value]="resolutionCurrency()"
+                      (change)="selectTagCurrency(tagCurrency.value)"
+                    >
+                      @for (
+                        currency of suggestionCurrencies();
+                        track currency.code
+                      ) {
+                        <option
+                          [value]="currency.code"
+                          [selected]="currency.code === resolutionCurrency()"
+                        >
+                          {{ currency.code }} · {{ currency.decimals }} decimals
+                          ·
+                          {{
+                            tagCoveredCurrencies().has(currency.code)
+                              ? "SSI Covered"
+                              : "No SSI Coverage"
+                          }}
+                        </option>
+                      }
+                    </select></label
+                  >
+                </div>
+                <output
+                  class="currency-coverage"
+                  [class.coverage-ok]="tagSelectedCurrencyCovered()"
+                  [class.coverage-warning]="!tagSelectedCurrencyCovered()"
+                >
+                  @if (tagSelectedCurrencyCovered()) {
+                    SSI Covered：目前 Counterparty、Currency、Entity 與 Value
+                    Date 有可評估的 SSI route；最終仍以 API Resolution 為準。
+                  } @else {
+                    No SSI Coverage：保留此交易幣別，送出後 API 應 fail-closed，
+                    不會自動改幣別或 Counterparty。
+                  }
+                </output>
+                <label class="control"
+                  ><span>Booking Branch / Entity</span
                   ><select
-                    #demoCandidate
-                    [value]="selectedTagSsi()?.id ?? ''"
-                    (change)="chooseTagSsi(demoCandidate.value)"
+                    #tagEntity
+                    [value]="resolutionBookingEntity()"
+                    (change)="
+                      resolutionBookingEntity.set(tagEntity.value);
+                      updateTagTransactionContext()
+                    "
                   >
                     @for (
-                      candidate of relatedTagSsis();
-                      track candidate.id;
-                      let first = $first
+                      branch of bookingBranches();
+                      track branch.branchCode
                     ) {
-                      <option [value]="candidate.id">
-                        {{ first ? "Recommended · " : "" }}{{ candidate.id }} ·
-                        priority {{ candidate.priority }} ·
-                        {{ candidate.routeClass }}
+                      <option [value]="branch.branchCode">
+                        {{ branch.branchCode }} · {{ branch.branchName }}
                       </option>
                     }
                   </select></label
                 >
-                @if (selectedTagSsi(); as candidate) {
-                  <p class="decision-pass synthetic-demo-evidence">
-                    SYNTHETIC DEMO · {{ candidate.settlementMarket }} ·
-                    {{ candidate.accountRelationship }} ·
-                    {{ tagSsiDerivationReason() }} · sourceRecordId
-                    {{ candidate.id }} · v{{ candidate.version }}
-                  </p>
-                } @else {
-                  <p class="decision-fail">
-                    NO_ELIGIBLE_SYNTHETIC_DEMO_CANDIDATE
-                  </p>
+                <div class="two-columns">
+                  <label class="control"
+                    ><span>Value Date</span
+                    ><input
+                      #tagValueDate
+                      type="date"
+                      [value]="resolutionValueDate()"
+                      (change)="
+                        resolutionValueDate.set(tagValueDate.value);
+                        updateTagTransactionContext()
+                      " /></label
+                  ><label class="control"
+                    ><span>Transaction Reference</span
+                    ><input
+                      #tagReference
+                      [value]="tagTransactionReference()"
+                      (input)="tagTransactionReference.set(tagReference.value)"
+                  /></label>
+                </div>
+                @if (selectedTagScenario().descriptor.messageType === "MT700") {
+                  <label class="control"
+                    ><span>Reimbursement Arrangement</span
+                    ><select
+                      #tagReimbursement
+                      [value]="tagReimbursementArrangement()"
+                      (change)="
+                        tagReimbursementArrangement.set(
+                          $any(tagReimbursement.value)
+                        );
+                        clearTagGeneration()
+                      "
+                    >
+                      <option value="REIMBURSING_BANK">
+                        Reimbursing Bank (53a)
+                      </option>
+                      <option value="DIRECT_ACCOUNT">
+                        Direct Account (omit 53a)
+                      </option>
+                    </select></label
+                  >
+                }
+                @if (selectedTagScenario().descriptor.messageType === "MT700") {
+                  <label class="control"
+                    ><span>49 Confirmation Instructions</span
+                    ><select
+                      #tagConfirmation
+                      [value]="tagConfirmationInstructions()"
+                      (change)="
+                        tagConfirmationInstructions.set(tagConfirmation.value);
+                        clearTagGeneration()
+                      "
+                    >
+                      <option value="WITHOUT">WITHOUT</option>
+                      <option value="MAY_ADD">MAY ADD</option>
+                      <option value="CONFIRM">CONFIRM</option>
+                    </select></label
+                  >
+                }
+                @if (isMt400Suggestion()) {
+                  <div class="semantic-warning">
+                    <b>MT400 SSI-derived route</b>
+                    <span
+                      >The selected Currency, Counterparty, Entity and Value
+                      Date determine eligible synthetic demo routes.
+                      Direct/indirect relationship and field omission come from
+                      candidate evidence.</span
+                    >
+                  </div>
+                  @if (mt400ValidationIssue()) {
+                    <p class="decision-fail">{{ mt400ValidationIssue() }}</p>
+                  }
+                } @else if (isMt760Suggestion()) {
+                  <div class="semantic-warning">
+                    <b>MT760 Party Context</b>
+                    <span
+                      >Party candidates are keyed by the Receiver relationship
+                      and remain independent of Currency／Nostro fallback.</span
+                    >
+                  </div>
+                  <label class="control"
+                    ><span>49 Confirmation Instructions</span
+                    ><select
+                      #mt760Confirmation
+                      [value]="mt760ConfirmationInstructions()"
+                      (change)="
+                        mt760ConfirmationInstructions.set(
+                          $any(mt760Confirmation.value)
+                        );
+                        clearTagGeneration()
+                      "
+                    >
+                      <option value="WITHOUT">WITHOUT</option>
+                      <option value="MAY_ADD">MAY ADD</option>
+                      <option value="CONFIRM">CONFIRM</option>
+                    </select></label
+                  >
+                  @if (mt760ValidationIssue()) {
+                    <p class="decision-fail">{{ mt760ValidationIssue() }}</p>
+                  }
+                } @else if (
+                  tagScenarioUsesSettlementSsi() && !selectedTagSsi()
+                ) {
+                  <div class="decision-fail">
+                    <b>NO_SSI_FOUND</b>
+                    <p>
+                      沒有符合此交易情境的 Active SSI reference
+                      candidate；不產生空白或猜測性的 5x 建議。
+                    </p>
+                  </div>
                 }
               </section>
-            }
-            @if (
-              isMt400Suggestion() && mt400SettlementMode() === "DIRECT_ACCOUNT"
-            ) {
-              <div
-                class="state-panel direct-account-result"
-                data-state="direct-account"
-              >
-                <div class="state-heading">
-                  <span class="status-pill success"
-                    >FIELD PROFILE · VERIFIED</span
+              <div class="scenario-purpose">
+                <div class="scenario-status">
+                  <b
+                    >{{ selectedTagScenario().descriptor.direction }} ·
+                    {{ selectedTagScenario().descriptor.messageType }}</b
+                  ><span
+                    [class.reference-only]="!selectedTagScenario().executable"
+                    >REFERENCE ONLY</span
                   >
-                  @if (generationResult()?.routeDecision; as decision) {
-                    <span class="status-pill success"
-                      >DIRECT ACCOUNT · {{ decision.status }}</span
-                    >
-                  }
                 </div>
-                @if (generationResult(); as generation) {
-                  <h3>Direct-account field disposition</h3>
-                  <p>
-                    Route evidence
-                    <code>{{ generation.routeDecision?.evidenceId }}</code>
-                    supports omission under the verified MT400 field profile; it
-                    does not create a payment instruction.
-                  </p>
-                  <div
-                    class="field-disposition-grid"
-                    aria-label="MT400 direct-account field dispositions"
+                <p>{{ selectedTagScenario().purpose }}</p>
+              </div>
+              @if (
+                selectedTagScenario().executable ||
+                (isMt400Suggestion() &&
+                  mt400SettlementMode() === "DIRECT_ACCOUNT")
+              ) {
+                <div class="button-stack">
+                  <button
+                    class="primary"
+                    [disabled]="
+                      tagLoading() || !!tagSuggestionValidationIssue()
+                    "
+                    (click)="generateTags()"
                   >
-                    @for (
-                      field of generation.fieldDispositions ?? [];
-                      track field.tag
-                    ) {
-                      <article
-                        class="field-disposition"
-                        [class.omit]="field.disposition === 'OMIT'"
-                        [class.optional]="
-                          field.disposition === 'OPTIONAL_TRANSACTION_INPUT'
-                        "
-                        [class.value]="
-                          field.disposition === 'VALUE_FROM_TRANSACTION_INPUT'
-                        "
+                    {{
+                      isMt400Suggestion() &&
+                      mt400SettlementMode() === "DIRECT_ACCOUNT"
+                        ? "Resolve Direct-account Field Disposition"
+                        : "Resolve SSI Settlement Fields"
+                    }}
+                  </button>
+                </div>
+                <p class="scope-note">
+                  僅回傳建議值、Tag-role mapping 與 provenance；不建立 payment
+                  token、不組裝或發送完整 FIN 訊息。
+                </p>
+              } @else {
+                <section class="reference-guidance" aria-live="polite">
+                  <p class="eyebrow">NO EXECUTABLE MAPPING</p>
+                  <h3>此情境只供 Reference／Case／Continuation</h3>
+                  <p>
+                    目前沒有 licensed Mapping Catalogue 證據，因此不顯示 Extract
+                    或 Generate 按鈕，也不會產生空白或推測性的 Tag 結果。上方
+                    SSI 僅供案件關聯及人工比較。
+                  </p>
+                  @if (
+                    selectedTagScenario().descriptor.messageType === "MT700"
+                  ) {
+                    <div class="semantic-warning">
+                      <b>MT700 語意提醒</b
+                      ><span
+                        >57a 是 Second Advising Bank；58a 是 Requested
+                        Confirmation Party。兩者是信用狀業務角色，不可直接當作
+                        Account With Institution 或 Intermediary
+                        Institution。</span
                       >
-                        <span>{{ field.tag }}</span>
-                        <b>{{ field.disposition }}</b>
-                        @if (field.value) {
-                          <code>{{ field.value }}</code>
-                        }
-                        <small>{{ field.reason }}</small>
-                      </article>
+                    </div>
+                  }
+                </section>
+              }
+            }
+          </article>
+          @if (tagTransactionOpen()) {
+            <article class="panel result-panel">
+              <h2>Resolved 5x Fields</h2>
+              @if (tagScenarioUsesSettlementSsi()) {
+                <section
+                  class="result-candidate-control"
+                  aria-label="Eligible SSI candidates"
+                >
+                  <label class="control demo-candidate-selector"
+                    ><span>Eligible SSI Routes</span
+                    ><select
+                      #demoCandidate
+                      [value]="selectedTagSsi()?.id ?? ''"
+                      (change)="chooseTagSsi(demoCandidate.value)"
+                    >
+                      @for (
+                        candidate of relatedTagSsis();
+                        track candidate.id;
+                        let first = $first
+                      ) {
+                        <option [value]="candidate.id">
+                          {{ first ? "Recommended · " : ""
+                          }}{{ candidate.id }} · priority
+                          {{ candidate.priority }} ·
+                          {{ candidate.routeClass }}
+                        </option>
+                      }
+                    </select></label
+                  >
+                  @if (selectedTagSsi(); as candidate) {
+                    <p class="decision-pass synthetic-demo-evidence">
+                      SYNTHETIC DEMO · {{ candidate.settlementMarket }} ·
+                      {{ candidate.accountRelationship }} ·
+                      {{ tagSsiDerivationReason() }} · sourceRecordId
+                      {{ candidate.id }} · v{{ candidate.version }}
+                    </p>
+                  } @else {
+                    <p class="decision-fail">
+                      NO_ELIGIBLE_SYNTHETIC_DEMO_CANDIDATE
+                    </p>
+                  }
+                </section>
+              }
+              @if (
+                isMt400Suggestion() &&
+                mt400SettlementMode() === "DIRECT_ACCOUNT"
+              ) {
+                <div
+                  class="state-panel direct-account-result"
+                  data-state="direct-account"
+                >
+                  <div class="state-heading">
+                    <span class="status-pill success"
+                      >FIELD PROFILE · VERIFIED</span
+                    >
+                    @if (generationResult()?.routeDecision; as decision) {
+                      <span class="status-pill success"
+                        >DIRECT ACCOUNT · {{ decision.status }}</span
+                      >
                     }
                   </div>
+                  @if (generationResult(); as generation) {
+                    <h3>Direct-account field disposition</h3>
+                    <p>
+                      Route evidence
+                      <code>{{ generation.routeDecision?.evidenceId }}</code>
+                      supports omission under the verified MT400 field profile;
+                      it does not create a payment instruction.
+                    </p>
+                    <div
+                      class="field-disposition-grid"
+                      aria-label="MT400 direct-account field dispositions"
+                    >
+                      @for (
+                        field of generation.fieldDispositions ?? [];
+                        track field.tag
+                      ) {
+                        <article
+                          class="field-disposition"
+                          [class.omit]="field.disposition === 'OMIT'"
+                          [class.optional]="
+                            field.disposition === 'OPTIONAL_TRANSACTION_INPUT'
+                          "
+                          [class.value]="
+                            field.disposition === 'VALUE_FROM_TRANSACTION_INPUT'
+                          "
+                        >
+                          <span>{{ field.tag }}</span>
+                          <b>{{ field.disposition }}</b>
+                          @if (field.value) {
+                            <code>{{ field.value }}</code>
+                          }
+                          <small>{{ field.reason }}</small>
+                        </article>
+                      }
+                    </div>
+                    <div class="generated-fields tag-support-list">
+                      <table class="compact" aria-label="5x SSI support list">
+                        <thead>
+                          <tr>
+                            <th>Tag</th>
+                            <th>Option</th>
+                            <th>Official Field Name</th>
+                            <th>Scope / Resolution</th>
+                            <th>Reason</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          @for (
+                            row of visibleTagSupportRows();
+                            track row.messageType +
+                              row.sequence +
+                              row.tag +
+                              row.option
+                          ) {
+                            <tr
+                              [attr.data-scope-status]="row.scopeStatus"
+                              [attr.data-resolution-status]="
+                                row.resolutionStatus
+                              "
+                            >
+                              <td>
+                                <code>{{ row.tag }}</code>
+                              </td>
+                              <td>
+                                <code>{{ row.option }}</code>
+                              </td>
+                              <td class="official-field-name">
+                                {{ row.officialFieldName }}
+                              </td>
+                              <td>
+                                <span class="status-pill"
+                                  >{{ row.scopeStatus }} ·
+                                  {{ row.resolutionStatus }}</span
+                                >
+                              </td>
+                              <td>{{ row.reasonCode }}</td>
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
+                    </div>
+                  } @else if (mt400ValidationIssue(); as issue) {
+                    <div class="decision-fail" role="alert">{{ issue }}</div>
+                    <p>
+                      Provide governed bilateral relationship evidence before an
+                      omission decision is shown.
+                    </p>
+                  } @else {
+                    <p>
+                      Direct-account evidence is ready. Resolve to display
+                      explicit OMIT and optional-input states.
+                    </p>
+                  }
+                </div>
+              } @else if (!selectedTagScenario().executable) {
+                <div
+                  class="reference-result state-panel pending"
+                  data-state="mapping-pending"
+                >
+                  <span class="status-pill pending">MAPPING PENDING</span>
+                  <h3>欄位存在，Local Mapping 尚待驗證</h3>
+                  <p>
+                    {{ selectedTagScenario().descriptor.direction }} ·
+                    {{ selectedTagScenario().descriptor.messageType }} 的相關 5x
+                    欄位不因本地規則未完成而消失。以下列出欄位語義與預期來源；在
+                    Mapping Catalogue 獲授權及驗證前不輸出推測值。
+                  </p>
+                  <div class="generated-fields">
+                    <table class="compact">
+                      <caption class="visually-hidden">
+                        Pending mapping field expectations
+                      </caption>
+                      <thead>
+                        <tr>
+                          <th>Tag</th>
+                          <th>Official Field Name</th>
+                          <th>Expected Source</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (
+                          field of selectedTagFieldExpectations();
+                          track field.tag
+                        ) {
+                          <tr>
+                            <td>
+                              <code>{{ field.tag }}</code>
+                            </td>
+                            <td class="official-field-name">
+                              Official field name pending verification
+                            </td>
+                            <td>{{ field.expectedSource }}</td>
+                            <td>VALUE REQUIRED · MAPPING PENDING</td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              } @else if (generationResult(); as generation) {
+                @if (visibleTagSupportRows().length > 0) {
+                  <div class="decision-pass">✓ SSI Resolution completed</div>
+                } @else {
+                  <div
+                    class="empty-state no-ssi-resolvable-fields"
+                    aria-live="polite"
+                  >
+                    <b>No SSI-resolvable fields for this message profile</b>
+                    <p>
+                      此 MT 的相關 5x 欄位由 Trade Transaction／Message Context
+                      提供；OUT_OF_SSI_SCOPE 結果僅保留於 API 與 Audit Log。
+                    </p>
+                  </div>
+                }
+                <p class="semantic-warning">
+                  <b>{{ generation.watermark }}</b> · paymentExecutable = false
+                </p>
+                @if (visibleTagSupportRows().length > 0) {
                   <div class="generated-fields tag-support-list">
                     <table class="compact" aria-label="5x SSI support list">
                       <thead>
@@ -1342,8 +1964,9 @@
                           <th>Tag</th>
                           <th>Option</th>
                           <th>Official Field Name</th>
-                          <th>Scope / Resolution</th>
-                          <th>Reason</th>
+                          <th>Applicability</th>
+                          <th>Value / Reason</th>
+                          <th>Source / Owner / Evidence</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1368,537 +1991,195 @@
                               {{ row.officialFieldName }}
                             </td>
                             <td>
-                              <span class="status-pill"
+                              <span
+                                class="status-pill"
+                                [class.success]="
+                                  row.resolutionStatus === 'RESOLVED'
+                                "
+                                [class.pending]="
+                                  row.resolutionStatus === 'NO_ELIGIBLE_SSI'
+                                "
                                 >{{ row.scopeStatus }} ·
-                                {{ row.resolutionStatus }}</span
+                                {{ row.resolutionStatus || "N_A" }}</span
                               >
                             </td>
-                            <td>{{ row.reasonCode }}</td>
+                            <td>
+                              @if (row.suggestedValue) {
+                                <code>{{ row.suggestedValue }}</code>
+                              } @else {
+                                {{ row.reasonCode }}
+                              }
+                            </td>
+                            <td>
+                              {{ row.source || "—" }} ·
+                              {{ row.ownerSide || "—" }} ·
+                              {{ row.evidence || "—" }}
+                            </td>
                           </tr>
                         }
                       </tbody>
                     </table>
                   </div>
-                } @else if (mt400ValidationIssue(); as issue) {
-                  <div class="decision-fail" role="alert">{{ issue }}</div>
-                  <p>
-                    Provide governed bilateral relationship evidence before an
-                    omission decision is shown.
-                  </p>
-                } @else {
-                  <p>
-                    Direct-account evidence is ready. Resolve to display
-                    explicit OMIT and optional-input states.
-                  </p>
                 }
-              </div>
-            } @else if (!selectedTagScenario().executable) {
-              <div
-                class="reference-result state-panel pending"
-                data-state="mapping-pending"
-              >
-                <span class="status-pill pending">MAPPING PENDING</span>
-                <h3>欄位存在，Local Mapping 尚待驗證</h3>
-                <p>
-                  {{ selectedTagScenario().descriptor.direction }} ·
-                  {{ selectedTagScenario().descriptor.messageType }} 的相關 5x
-                  欄位不因本地規則未完成而消失。以下列出欄位語義與預期來源；在
-                  Mapping Catalogue 獲授權及驗證前不輸出推測值。
+                <p class="next-step">
+                  <b>邊界：</b>上游系統自行決定是否採納建議；本結果不是
+                  Settlement Instruction，也不觸發付款、會計或核銷。 SSI only
+                  resolves settlement-related fields that can be determined from
+                  eligible SSI data. It does not own Trade Finance rules, full
+                  SWIFT message validation, or payment processing. The local
+                  full SR2026 MRG governs the base profile; an applicable Usage
+                  Guideline or bilateral policy may only narrow it.
                 </p>
-                <div class="generated-fields">
-                  <table class="compact">
-                    <caption class="visually-hidden">
-                      Pending mapping field expectations
-                    </caption>
-                    <thead>
-                      <tr>
-                        <th>Tag</th>
-                        <th>Official Field Name</th>
-                        <th>Expected Source</th>
-                        <th>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      @for (
-                        field of selectedTagFieldExpectations();
-                        track field.tag
-                      ) {
-                        <tr>
-                          <td>
-                            <code>{{ field.tag }}</code>
-                          </td>
-                          <td class="official-field-name">
-                            Official field name pending verification
-                          </td>
-                          <td>{{ field.expectedSource }}</td>
-                          <td>VALUE REQUIRED · MAPPING PENDING</td>
-                        </tr>
-                      }
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            } @else if (generationResult(); as generation) {
-              @if (visibleTagSupportRows().length > 0) {
-                <div class="decision-pass">✓ SSI Resolution completed</div>
               } @else {
-                <div
-                  class="empty-state no-ssi-resolvable-fields"
-                  aria-live="polite"
-                >
-                  <b>No SSI-resolvable fields for this message profile</b>
+                <div class="empty-state">
+                  <b>完成左側 Input Information</b>
                   <p>
-                    此 MT 的相關 5x 欄位由 Trade Transaction／Message Context
-                    提供；OUT_OF_SSI_SCOPE 結果僅保留於 API 與 Audit Log。
+                    完成必要輸入後，按下 Resolve 按鈕以查看 Resolved 5x Fields
+                    與證據。
                   </p>
                 </div>
               }
-              <p class="semantic-warning">
-                <b>{{ generation.watermark }}</b> · paymentExecutable = false
-              </p>
-              @if (visibleTagSupportRows().length > 0) {
-                <div class="generated-fields tag-support-list">
-                  <table class="compact" aria-label="5x SSI support list">
-                    <thead>
-                      <tr>
-                        <th>Tag</th>
-                        <th>Option</th>
-                        <th>Official Field Name</th>
-                        <th>Applicability</th>
-                        <th>Value / Reason</th>
-                        <th>Source / Owner / Evidence</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      @for (
-                        row of visibleTagSupportRows();
-                        track row.messageType +
-                          row.sequence +
-                          row.tag +
-                          row.option
-                      ) {
-                        <tr
-                          [attr.data-scope-status]="row.scopeStatus"
-                          [attr.data-resolution-status]="row.resolutionStatus"
-                        >
-                          <td>
-                            <code>{{ row.tag }}</code>
-                          </td>
-                          <td>
-                            <code>{{ row.option }}</code>
-                          </td>
-                          <td class="official-field-name">
-                            {{ row.officialFieldName }}
-                          </td>
-                          <td>
-                            <span
-                              class="status-pill"
-                              [class.success]="
-                                row.resolutionStatus === 'RESOLVED'
-                              "
-                              [class.pending]="
-                                row.resolutionStatus === 'NO_ELIGIBLE_SSI'
-                              "
-                              >{{ row.scopeStatus }} ·
-                              {{ row.resolutionStatus || "N_A" }}</span
-                            >
-                          </td>
-                          <td>
-                            @if (row.suggestedValue) {
-                              <code>{{ row.suggestedValue }}</code>
-                            } @else {
-                              {{ row.reasonCode }}
-                            }
-                          </td>
-                          <td>
-                            {{ row.source || "—" }} ·
-                            {{ row.ownerSide || "—" }} ·
-                            {{ row.evidence || "—" }}
-                          </td>
-                        </tr>
-                      }
-                    </tbody>
-                  </table>
-                </div>
-              }
-              <p class="next-step">
-                <b>邊界：</b>上游系統自行決定是否採納建議；本結果不是 Settlement
-                Instruction，也不觸發付款、會計或核銷。 SSI only resolves
-                settlement-related fields that can be determined from eligible
-                SSI data. It does not own Trade Finance rules, full SWIFT
-                message validation, or payment processing. The local full SR2026
-                MRG governs the base profile; an applicable Usage Guideline or
-                bilateral policy may only narrow it.
-              </p>
-            } @else {
-              <div class="empty-state">
-                <b>完成左側 Input Information</b>
-                <p>
-                  完成必要輸入後，按下 Resolve 按鈕以查看 Resolved 5x Fields
-                  與證據。
-                </p>
-              </div>
-            }
-          </article>
-        }
-      </section>
-    }
+            </article>
+          }
+        </section>
+      }
 
-    @if (view() === "audit") {
-      <section class="workspace-intro audit-intro">
-        <div>
-          <p class="kicker">RETENTION-GOVERNED EVIDENCE</p>
-          <h2>SSI 稽核軌跡</h2>
-          <p>
-            逐頁檢視誰在何時做了什麼。事件不可變；線上查詢保留
-            {{ auditOnlineQueryDays() }} 天，滿
-            {{ auditArchiveAfterDays() }} 天轉入封存，封存後保留
-            {{ auditArchiveRetentionDays() }} 天再永久清除；系統每
-            {{ auditScheduleIntervalHours() }} 小時執行一次 lifecycle。
-          </p>
-        </div>
-        <dl class="audit-overview">
-          <div>
-            <dt>Events</dt>
-            <dd>{{ auditRows().length }}</dd>
-          </div>
-          <div>
-            <dt>Sort</dt>
-            <dd>Title</dd>
-          </div>
-          <div>
-            <dt>Lifecycle</dt>
-            <dd>
-              {{ auditOnlineQueryDays() }}d online ·
-              {{ auditArchiveAfterDays() }}d archive ·
-              {{ auditArchiveRetentionDays() }}d retain ·
-              {{ auditScheduleIntervalHours() }}h schedule
-            </dd>
-          </div>
-        </dl>
-      </section>
-      <section class="panel audit-console">
-        <div class="audit-toolbar">
-          <div>
-            <span class="kicker">EVENT REGISTER</span>
-            <b>雙擊資料列或按 Enter 查看完整明細</b>
-          </div>
-          <span class="audit-page-indicator">
-            Page {{ auditCurrentPage() }} / {{ auditTotalPages() }}
-          </span>
-        </div>
-        @if (auditLoading()) {
-          <div class="catalog-loading" aria-live="polite">
-            <span aria-hidden="true"></span>
-            <div>
-              <b>正在讀取稽核證據</b><small>原始事件不會被修改。</small>
-            </div>
-          </div>
-        } @else if (auditIssue(); as issue) {
-          <ssi-operational-issue
-            [issue]="issue"
-            [busy]="auditLoading()"
-            (retry)="loadAudit()"
-          />
-        } @else {
-          <div class="table-scroll audit-table">
-            <table aria-label="SSI audit event history">
-              <caption class="visually-hidden">
-                SSI audit event history
-              </caption>
-              <thead>
-                <tr>
-                  <th>Event</th>
-                  <th>SSI ID</th>
-                  <th [attr.aria-sort]="auditAriaSort('title')">
-                    <button
-                      class="sort-heading"
-                      type="button"
-                      (click)="sortAuditBy('title')"
-                    >
-                      Title / 做了甚麼
-                      @if (auditSortKey() === "title") {
-                        <span aria-hidden="true">{{
-                          auditSortDirection() === "asc" ? "↑" : "↓"
-                        }}</span>
-                      }
-                    </button>
-                  </th>
-                  <th [attr.aria-sort]="auditAriaSort('actor')">
-                    <button
-                      class="sort-heading"
-                      type="button"
-                      (click)="sortAuditBy('actor')"
-                    >
-                      Actor
-                    </button>
-                  </th>
-                  <th [attr.aria-sort]="auditAriaSort('occurredAt')">
-                    <button
-                      class="sort-heading"
-                      type="button"
-                      (click)="sortAuditBy('occurredAt')"
-                    >
-                      Occurred At
-                    </button>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (event of pagedAuditRows(); track event.eventId) {
-                  <tr
-                    tabindex="0"
-                    [attr.aria-label]="
-                      '查看稽核事件 ' + event.eventId + '：' + event.title
-                    "
-                    (dblclick)="openAuditDetail(event)"
-                    (keydown.enter)="openAuditDetail(event)"
-                  >
-                    <td data-label="Event">
-                      <code>#{{ event.eventId }}</code>
-                    </td>
-                    <td data-label="SSI ID">
-                      <code>{{ event.ssiId }}</code>
-                    </td>
-                    <td data-label="Title / 做了甚麼">
-                      <b>{{ event.title }}</b>
-                      <small>{{ event.summary }}</small>
-                    </td>
-                    <td data-label="Actor">{{ event.actor }}</td>
-                    <td data-label="Occurred At">
-                      <time>{{ event.occurredAt }}</time>
-                    </td>
-                  </tr>
-                } @empty {
-                  <tr>
-                    <td colspan="5" class="empty">
-                      尚無稽核事件。建立或核准 SSI 後，事件會依序顯示在這裡。
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          </div>
-          <nav class="pager audit-pager" aria-label="Audit pagination">
-            <span
-              >{{ auditRows().length }} events · 每頁
-              {{ auditPageSize }} 筆</span
+      @defer (when view() === "audit"; prefetch on timer(4s)) {
+        @if (view() === "audit" && !auditDetail()) {
+          <nav class="catalog-tabs" aria-label="Audit resource">
+            <button
+              type="button"
+              [class.active]="auditTab() === 'rma'"
+              (click)="selectAuditTab('rma')"
             >
-            <div>
-              <button
-                type="button"
-                [disabled]="auditCurrentPage() === 1"
-                (click)="moveAuditPage(-1)"
-              >
-                Previous
-              </button>
-              <strong aria-current="page">{{ auditCurrentPage() }}</strong>
-              <button
-                type="button"
-                [disabled]="auditCurrentPage() === auditTotalPages()"
-                (click)="moveAuditPage(1)"
-              >
-                Next
-              </button>
-            </div>
+              RMA
+            </button>
+            <button
+              type="button"
+              [class.active]="auditTab() === 'entity'"
+              (click)="selectAuditTab('entity')"
+            >
+              Entities
+            </button>
+            <button
+              type="button"
+              [class.active]="auditTab() === 'nostro'"
+              (click)="selectAuditTab('nostro')"
+            >
+              Nostro
+            </button>
+            <button
+              type="button"
+              [class.active]="auditTab() === 'ssi'"
+              (click)="selectAuditTab('ssi')"
+            >
+              SSI
+            </button>
           </nav>
+          <section class="workspace-intro audit-intro">
+            <div>
+              <p class="kicker">RETENTION-GOVERNED EVIDENCE</p>
+              <h2>{{ auditResourceLabel() }} 稽核軌跡</h2>
+              <p>
+                逐頁檢視誰在何時做了什麼。事件不可變；線上查詢保留
+                {{ auditOnlineQueryDays() }} 天，滿
+                {{ auditArchiveAfterDays() }} 天轉入封存，封存後保留
+                {{ auditArchiveRetentionDays() }} 天再永久清除；系統每
+                {{ auditScheduleIntervalHours() }} 小時執行一次 lifecycle。
+              </p>
+            </div>
+            <dl class="audit-overview">
+              <div>
+                <dt>Events</dt>
+                <dd>{{ auditRows().length }}</dd>
+              </div>
+              <div>
+                <dt>Sort</dt>
+                <dd>Title</dd>
+              </div>
+              <div>
+                <dt>Lifecycle</dt>
+                <dd>
+                  {{ auditOnlineQueryDays() }}d online ·
+                  {{ auditArchiveAfterDays() }}d archive ·
+                  {{ auditArchiveRetentionDays() }}d retain ·
+                  {{ auditScheduleIntervalHours() }}h schedule
+                </dd>
+              </div>
+            </dl>
+          </section>
+          @if (auditLoading()) {
+            <section class="panel audit-console">
+              <div class="catalog-loading" aria-live="polite">
+                <span aria-hidden="true"></span>
+                <div>
+                  <b>正在讀取稽核證據</b><small>原始事件不會被修改。</small>
+                </div>
+              </div>
+            </section>
+          } @else if (auditIssue(); as issue) {
+            <section class="panel audit-console">
+              <ssi-operational-issue
+                [issue]="issue"
+                [busy]="auditLoading()"
+                (retry)="loadAudit()"
+              />
+            </section>
+          } @else {
+            <ssi-governance-index-table
+              [ariaLabel]="auditResourceLabel() + ' audit event history'"
+              kicker="EVENT REGISTER"
+              instruction="單擊資料列或按 Enter 查看完整明細"
+              [emptyText]="
+                '尚無 ' +
+                auditResourceLabel() +
+                ' 稽核事件；建立或核准資料後，事件會依序顯示。'
+              "
+              recordLabel="events"
+              [columns]="auditIndexColumns()"
+              [trailingColumns]="[
+                'Maker',
+                'Maker Datetime',
+                'Checker',
+                'Checker Datetime',
+              ]"
+              [rows]="auditIndexRows()"
+              [sortPath]="auditIndexSortPath()"
+              [sortDirection]="auditSortDirection()"
+              [currentPage]="auditCurrentPage()"
+              [totalPages]="auditTotalPages()"
+              [totalRecords]="auditRows().length"
+              [pageSize]="auditPageSize"
+              (sortRequested)="sortAuditIndex($event)"
+              (rowOpened)="openAuditDetail($any($event))"
+              (pageRequested)="moveAuditPage($event)"
+            />
+          }
         }
-      </section>
-    }
-    @if (view() === "settings") {
-      <ssi-settings-page
-        [theme]="theme()"
-        (themeChange)="setTheme($event)"
-        (dataReloaded)="refreshAfterDevelopmentReload()"
-      />
-    }
-    @if (view() === "swiftdata") {
-      <ssi-swift-data-crud />
+      } @loading (after 100ms; minimum 300ms) {
+        <ssi-loading-state label="Loading Audit…" />
+      }
+      @defer (when view() === "settings"; prefetch on timer(6s)) {
+        @if (view() === "settings") {
+          <ssi-settings-page
+            [theme]="theme()"
+            (themeChange)="setTheme($event)"
+            (dataReloaded)="refreshAfterDevelopmentReload()"
+          />
+        }
+      } @loading (after 100ms; minimum 300ms) {
+        <ssi-loading-state label="Loading Settings…" />
+      }
+      @if (view() === "swiftdata") {
+        <ssi-swift-data-crud
+          [initialResourceId]="governedReviewResourceId()"
+          [initialRecordId]="governedReviewRecordId()"
+          [checkerMode]="governedReviewRecordId() !== null"
+        />
+      }
     }
   </main>
 </div>
-
-@if (selectedAuditDetail(); as detail) {
-  <div
-    class="modal-backdrop"
-    role="presentation"
-    (click)="closeAuditDetail()"
-    (keydown.escape)="closeAuditDetail()"
-  >
-    <dialog
-      class="detail-dialog audit-detail-dialog"
-      open
-      aria-modal="true"
-      aria-labelledby="audit-detail-title"
-      (click)="$event.stopPropagation()"
-      (keydown.escape)="closeAuditDetail()"
-    >
-      <div class="dialog-header">
-        <div>
-          <p class="kicker">AUDIT EVENT #{{ detail.eventId }}</p>
-          <h2 id="audit-detail-title">{{ detail.title }}</h2>
-          <p>{{ detail.summary }}</p>
-        </div>
-        <button
-          type="button"
-          class="icon-button"
-          aria-label="關閉稽核明細"
-          (click)="closeAuditDetail()"
-        >
-          ×
-        </button>
-      </div>
-      <dl class="audit-detail-meta">
-        <div>
-          <dt>Action</dt>
-          <dd>
-            <code>{{ detail.action }}</code>
-          </dd>
-        </div>
-        <div>
-          <dt>Actor</dt>
-          <dd>{{ detail.actor }}</dd>
-        </div>
-        <div>
-          <dt>Occurred At</dt>
-          <dd>{{ detail.occurredAt }}</dd>
-        </div>
-        <div>
-          <dt>SSI ID</dt>
-          <dd>
-            <code>{{ detail.ssiId }}</code>
-          </dd>
-        </div>
-      </dl>
-      <div class="audit-evidence-grid">
-        <section>
-          <h3>Changed fields</h3>
-          @if (detail.changedFields !== null) {
-            <pre>{{ detail.changedFields | json }}</pre>
-          } @else {
-            <p class="evidence-unavailable">事件未提供 changed fields。</p>
-          }
-        </section>
-        <section>
-          <h3>Provenance</h3>
-          @if (detail.provenance !== null) {
-            <pre>{{ detail.provenance | json }}</pre>
-          } @else {
-            <p class="evidence-unavailable">事件未提供 provenance。</p>
-          }
-        </section>
-        <section>
-          <h3>Before</h3>
-          @if (detail.before !== null) {
-            <pre>{{ detail.before | json }}</pre>
-          } @else {
-            <p class="evidence-unavailable">事件未提供 before snapshot。</p>
-          }
-        </section>
-        <section>
-          <h3>After</h3>
-          @if (detail.after !== null) {
-            <pre>{{ detail.after | json }}</pre>
-          } @else {
-            <p class="evidence-unavailable">事件未提供 after snapshot。</p>
-          }
-        </section>
-      </div>
-      <details class="raw-evidence">
-        <summary>Raw payload／原始事件內容</summary>
-        <pre>{{ detail.rawPayload | json }}</pre>
-      </details>
-    </dialog>
-  </div>
-}
-
-@if (detailTarget(); as row) {
-  <div
-    class="modal-backdrop"
-    role="presentation"
-    (click)="detailTarget.set(null)"
-    (keydown.escape)="detailTarget.set(null)"
-  >
-    <dialog
-      class="bic-dialog detail-dialog"
-      open
-      aria-modal="true"
-      aria-labelledby="detail-title"
-      (click)="$event.stopPropagation()"
-      (keydown.escape)="detailTarget.set(null)"
-    >
-      <div class="dialog-header">
-        <div>
-          <p class="kicker">SSI RECORD</p>
-          <h2 id="detail-title">
-            {{ row.counterpartyId }} · v{{ row.version }}
-          </h2>
-        </div>
-        <button
-          type="button"
-          class="icon-button"
-          aria-label="Close"
-          (click)="detailTarget.set(null)"
-        >
-          ×
-        </button>
-      </div>
-      <div class="decision-pass">{{ row.status }}</div>
-      <dl class="result-summary">
-        <div>
-          <dt>Bank</dt>
-          <dd>{{ row.route["bankName"] }}</dd>
-        </div>
-        <div>
-          <dt>Currency／Scope</dt>
-          <dd>{{ row.route["currency"] }}／{{ row.scope }}</dd>
-        </div>
-        <div>
-          <dt>Beneficiary BIC</dt>
-          <dd>
-            <code>{{ row.route["beneficiaryBic"] }}</code>
-          </dd>
-        </div>
-        <div>
-          <dt>Account With</dt>
-          <dd>
-            <code>{{ row.route["accountWithBic"] }}</code>
-          </dd>
-        </div>
-        <div>
-          <dt>Intermediary</dt>
-          <dd>
-            <code>{{ row.route["intermediaryBic"] || "—" }}</code>
-          </dd>
-        </div>
-        <div>
-          <dt>Account Ref</dt>
-          <dd>{{ row.route["accountId"] }}</dd>
-        </div>
-        <div>
-          <dt>Business Function</dt>
-          <dd>{{ row.route["businessFunction"] || "—" }}</dd>
-        </div>
-        <div>
-          <dt>Maker／Checker</dt>
-          <dd>{{ row.maker }}／{{ row.checker || "—" }}</dd>
-        </div>
-      </dl>
-      <div class="actions">
-        <button class="ghost" (click)="detailTarget.set(null)">關閉</button>
-        @if (row.status === "DRAFT") {
-          <button class="primary" (click)="detailTarget.set(null); edit(row)">
-            編輯草稿
-          </button>
-        } @else if (row.status === "ACTIVE" || row.status === "APPROVED") {
-          <button class="primary" (click)="detailTarget.set(null); revise(row)">
-            修訂
-          </button>
-        }
-      </div>
-    </dialog>
-  </div>
-}
 
 @if (deleteTarget(); as row) {
   <div
@@ -1917,21 +2198,35 @@
     >
       <div class="dialog-header">
         <div>
-          <p class="kicker danger-text">CONTROLLED SSI REVOCATION</p>
-          <h2 id="delete-title">撤銷 SSI</h2>
+          <p class="kicker danger-text">
+            {{
+              row.status === "DRAFT"
+                ? "DRAFT CONTROL"
+                : "FOUR-EYES SSI SUPPRESSION"
+            }}
+          </p>
+          <h2 id="delete-title">
+            {{ row.status === "DRAFT" ? "Revoke Draft SSI" : "Suppress SSI" }}
+          </h2>
         </div>
         <button
+          class="ghost"
           type="button"
           class="icon-button"
-          aria-label="Close"
+          aria-label="Cancel"
           (click)="closeDeleteDialog()"
         >
           ×
         </button>
       </div>
       <div class="delete-warning">
-        <b>這不是資料庫實體刪除。</b>
-        <p>SSI 將改為 REVOKED；歷史版本、audit 與 outbox 證據會永久保留。</p>
+        @if (row.status === "DRAFT") {
+          <b>這只會撤銷目前 Draft。</b>
+          <p>原 Active SSI 不變，並恢復 Revise／Suppress 操作。</p>
+        } @else {
+          <b>這不會立即停用 Active SSI。</b>
+          <p>建立 SUPPRESSION DRAFT，Submit 後必須由獨立 Checker 核准。</p>
+        }
       </div>
       <dl class="delete-summary">
         <div>
@@ -1952,7 +2247,9 @@
         </div>
       </dl>
       <label class="delete-reason"
-        ><span>撤銷原因 <b>*</b></span
+        ><span
+          >{{ row.status === "DRAFT" ? "Revoke reason" : "Suppression reason" }}
+          <b>*</b></span
         ><textarea
           #reasonInput
           rows="3"
@@ -1965,162 +2262,166 @@
         ></label
       >
       <div class="actions">
-        <button type="button" class="ghost" (click)="closeDeleteDialog()">
-          取消，保留 SSI</button
-        ><button
+        <button
           type="button"
           class="danger-action"
           [disabled]="!canConfirmDelete()"
           (click)="confirmDelete()"
         >
-          確認撤銷
+          {{
+            row.status === "DRAFT" ? "Revoke Draft" : "Create Suppression Draft"
+          }}
         </button>
       </div>
     </section>
   </div>
 }
 
-@if (bicPickerTarget()) {
-  @if (identityPickerSource() === "BANK") {
-    <ssi-bank-service-picker-dialog
-      [title]="bicPickerTitle()"
-      [items]="bankPickerItems()"
-      [loading]="banksLoading()"
-      [error]="bankPickerError()"
-      [query]="bankQuery()"
-      [page]="bankPage().page"
-      [total]="bankPage().total"
-      [totalPages]="bankPage().totalPages"
-      (searchRequested)="searchBanks($event)"
-      (pageRequested)="moveBankToPage($event)"
-      (selected)="selectBankPickerItem($event)"
-      (cancelled)="closeBicPicker()"
-    />
-  } @else {
-    <div
-      class="modal-backdrop"
-      role="presentation"
-      (click)="closeBicPicker()"
-      (keydown.escape)="closeBicPicker()"
-    >
-      <dialog
-        class="bic-dialog"
-        open
-        aria-modal="true"
-        [attr.aria-label]="bicPickerTitle()"
-        (click)="$event.stopPropagation()"
+@defer (when bicPickerTarget(); prefetch on timer(5s)) {
+  @if (bicPickerTarget()) {
+    @if (identityPickerSource() === "BANK") {
+      <ssi-bank-service-picker-dialog
+        [title]="bicPickerTitle()"
+        [items]="bankPickerItems()"
+        [loading]="banksLoading()"
+        [error]="bankPickerError()"
+        [query]="bankQuery()"
+        [page]="bankPage().page"
+        [total]="bankPage().total"
+        [totalPages]="bankPage().totalPages"
+        (searchRequested)="searchBanks($event)"
+        (pageRequested)="moveBankToPage($event)"
+        (selected)="selectBankPickerItem($event)"
+        (cancelled)="closeBicPicker()"
+      />
+    } @else {
+      <div
+        class="modal-backdrop"
+        role="presentation"
+        (click)="closeBicPicker()"
         (keydown.escape)="closeBicPicker()"
       >
-        <div class="dialog-header">
-          <div>
-            <p class="kicker">
-              {{
-                identityPickerSource() === "CUSTOMER"
-                  ? "PSEUDO CUSTOMER SERVICE"
-                  : "MOCK BANK REFERENCE SERVICE"
-              }}
-            </p>
-            <h2>{{ bicPickerTitle() }}</h2>
-          </div>
-          <button
-            type="button"
-            class="icon-button"
-            aria-label="Close"
-            (click)="closeBicPicker()"
-          >
-            ×
-          </button>
-        </div>
-        <div class="data-disclaimer">
-          <b>Reference boundary：</b>此為 Pseudo Customer Service
-          測試資料；Customer ID 不得當成銀行 BIC 或 settlement agent。
-        </div>
-        <label class="search"
-          ><span>搜尋 Customer ID、客戶名稱或國家</span
-          ><input
-            #customerSearch
-            type="search"
-            [value]="customerQuery()"
-            placeholder="例如 CUST-00001、HK"
-            (keyup.enter)="searchCustomers(customerSearch.value)"
-          /><button
-            type="button"
-            class="primary"
-            (click)="searchCustomers(customerSearch.value)"
-          >
-            搜尋
-          </button></label
+        <dialog
+          class="bic-dialog"
+          open
+          aria-modal="true"
+          [attr.aria-label]="bicPickerTitle()"
+          (click)="$event.stopPropagation()"
+          (keydown.escape)="closeBicPicker()"
         >
-        @if (customersLoading() && customerPage().items.length === 0) {
-          <p class="empty">正在載入 Customer Reference…</p>
-        } @else {
-          <div class="table-scroll">
-            <table>
-              <caption class="visually-hidden">
-                Customer reference search results
-              </caption>
-              <thead>
-                <tr>
-                  <th>Customer ID</th>
-                  <th>Customer Name</th>
-                  <th>Country</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (
-                  customer of customerPage().items;
-                  track customer.customerId
-                ) {
-                  <tr>
-                    <td>
-                      <b>{{ customer.customerId }}</b>
-                    </td>
-                    <td>{{ customer.name }}</td>
-                    <td>{{ customer.country }}</td>
-                    <td>
-                      <button
-                        type="button"
-                        class="primary-small"
-                        (click)="selectCustomer(customer)"
-                      >
-                        選取
-                      </button>
-                    </td>
-                  </tr>
-                } @empty {
-                  <tr>
-                    <td colspan="4" class="empty">沒有符合條件的客戶。</td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          </div>
-        }
-        <div class="pager">
-          <span
-            >共 {{ customerPage().total }} 筆 · 第 {{ customerPage().page }} /
-            {{ customerPage().totalPages || 1 }} 頁</span
-          >
-          <div>
+          <div class="dialog-header">
+            <div>
+              <p class="kicker">
+                {{
+                  identityPickerSource() === "CUSTOMER"
+                    ? "PSEUDO CUSTOMER SERVICE"
+                    : "MOCK BANK REFERENCE SERVICE"
+                }}
+              </p>
+              <h2>{{ bicPickerTitle() }}</h2>
+            </div>
             <button
               type="button"
-              class="ghost"
-              [disabled]="!hasPreviousCustomerPage() || customersLoading()"
-              (click)="moveCustomerPage(-1)"
+              class="icon-button"
+              aria-label="Cancel"
+              (click)="closeBicPicker()"
             >
-              上一頁</button
-            ><button
-              type="button"
-              class="ghost"
-              [disabled]="!hasNextCustomerPage() || customersLoading()"
-              (click)="moveCustomerPage(1)"
-            >
-              下一頁
+              ×
             </button>
           </div>
-        </div>
-      </dialog>
-    </div>
+          <div class="data-disclaimer">
+            <b>Reference boundary：</b>此為 Pseudo Customer Service
+            測試資料；Customer ID 不得當成銀行 BIC 或 settlement agent。
+          </div>
+          <label class="search"
+            ><span>搜尋 Customer ID、客戶名稱或國家</span
+            ><input
+              #customerSearch
+              type="search"
+              [value]="customerQuery()"
+              placeholder="例如 CUST-00001、HK"
+              (keyup.enter)="searchCustomers(customerSearch.value)"
+            /><button
+              type="button"
+              class="primary"
+              (click)="searchCustomers(customerSearch.value)"
+            >
+              Search
+            </button></label
+          >
+          @if (customersLoading() && customerPage().items.length === 0) {
+            <p class="empty">正在載入 Customer Reference…</p>
+          } @else {
+            <div class="table-scroll">
+              <table>
+                <caption class="visually-hidden">
+                  Customer reference search results
+                </caption>
+                <thead>
+                  <tr>
+                    <th>Customer ID</th>
+                    <th>Customer Name</th>
+                    <th>Country</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (
+                    customer of customerPage().items;
+                    track customer.customerId
+                  ) {
+                    <tr>
+                      <td>
+                        <b>{{ customer.customerId }}</b>
+                      </td>
+                      <td>{{ customer.name }}</td>
+                      <td>{{ customer.country }}</td>
+                      <td>
+                        <button
+                          type="button"
+                          class="primary"
+                          (click)="selectCustomer(customer)"
+                        >
+                          Select
+                        </button>
+                      </td>
+                    </tr>
+                  } @empty {
+                    <tr>
+                      <td colspan="4" class="empty">沒有符合條件的客戶。</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+          <div class="pager">
+            <span
+              >共 {{ customerPage().total }} 筆 · 第 {{ customerPage().page }} /
+              {{ customerPage().totalPages || 1 }} 頁</span
+            >
+            <div>
+              <button
+                type="button"
+                class="ghost"
+                [disabled]="!hasPreviousCustomerPage() || customersLoading()"
+                (click)="moveCustomerPage(-1)"
+              >
+                Previous</button
+              ><button
+                type="button"
+                class="ghost"
+                [disabled]="!hasNextCustomerPage() || customersLoading()"
+                (click)="moveCustomerPage(1)"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </dialog>
+      </div>
+    }
   }
+} @loading (after 100ms; minimum 300ms) {
+  <ssi-loading-state label="Loading reference picker…" />
 }

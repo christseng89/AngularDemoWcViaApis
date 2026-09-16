@@ -1,50 +1,79 @@
-<section class="workspace-intro swift-data-intro">
-  <div>
-    <p class="kicker">OAS → SCREEN PARAMETERS → REUSABLE CRUD</p>
-    <h2>SWIFT Data Service</h2>
-    <p>
-      OpenAPI 定義 API contract，<code>x-ui-resources</code> 定義 Screen
-      參數；RMA、Entities、Nostro Account 由同一個 CRUD
-      Shell、Formly、Maker–Checker、版本與撤銷控制呈現。SSI 維護請由側欄 SSI
-      Maintenance 進入。
-    </p>
-  </div>
-  <div class="baseline">
-    @if (contract(); as oas) {
-      <b>{{ oas.info.title }}</b
-      ><span>{{ oas.info.version }}</span
-      ><span
-        >{{ oas["x-standards-baseline"]["standardsRelease"] }} ·
-        {{ oas["x-standards-baseline"]["bicStandard"] }} ·
-        {{ oas["x-standards-baseline"]["currencyStandard"] }}</span
-      >
-    }
-  </div>
-</section>
-@if (notice(); as message) {
-  <div class="notice" [class]="message.kind">
-    {{ message.text }}<button (click)="notice.set(null)">×</button>
+@if (!checkerMode()) {
+  <section class="workspace-intro swift-data-intro">
+    <div>
+      <p class="kicker">OAS → SCREEN PARAMETERS → REUSABLE CRUD</p>
+      <h2>SWIFT Data Service</h2>
+      <p>
+        OpenAPI 定義 API contract，<code>x-ui-resources</code> 定義 Screen
+        參數；RMA、Entities、Nostro Account 由同一個 CRUD
+        Shell、Formly、Maker–Checker、版本與撤銷控制呈現。SSI 維護請由側欄 SSI
+        Maintenance 進入。
+      </p>
+    </div>
+    <div class="baseline">
+      @if (contract(); as oas) {
+        <b>{{ oas.info.title }}</b
+        ><span>{{ oas.info.version }}</span
+        ><span
+          >{{ oas["x-standards-baseline"]["standardsRelease"] }} ·
+          {{ oas["x-standards-baseline"]["bicStandard"] }} ·
+          {{ oas["x-standards-baseline"]["currencyStandard"] }}</span
+        >
+      }
+    </div>
+  </section>
+}
+@if (bankPickerTarget()) {
+  <ssi-bank-service-picker-dialog
+    [title]="bankPickerTitle()"
+    [items]="bankPickerItems()"
+    [loading]="bankPickerLoading()"
+    [error]="bankPickerError()"
+    [query]="bankQuery()"
+    [page]="bankPage().page"
+    [total]="bankPage().total"
+    [totalPages]="bankPage().totalPages"
+    (searchRequested)="searchBanks($event)"
+    (pageRequested)="moveBankToPage($event)"
+    (selected)="selectBank($event)"
+    (cancelled)="closeBankPicker()"
+  />
+}
+@if (noticeAlert(); as message) {
+  <ssi-alert
+    [model]="message"
+    variant="inline"
+    [dismissible]="true"
+    (dismiss)="notice.set(null)"
+  />
+}
+@if (busy()) {
+  <div class="index-loading" role="status" aria-live="polite">
+    <span class="index-spinner" aria-hidden="true"></span>
+    <span>Loading {{ resource()?.label ?? "SWIFT Data Service" }}…</span>
   </div>
 }
-<section class="resource-tabs" aria-label="SWIFT data resource">
-  @for (item of resources(); track item.id) {
-    <button
-      [class.active]="resourceId() === item.id"
-      (click)="chooseResource(item.id)"
-    >
-      {{ item.label }}
-    </button>
-  }
-</section>
+@if (!checkerMode()) {
+  <section class="catalog-tabs" aria-label="SWIFT data resource">
+    @for (item of resources(); track item.id) {
+      <button
+        [class.active]="resourceId() === item.id"
+        (click)="chooseResource(item.id)"
+      >
+        {{ item.label }}
+      </button>
+    }
+  </section>
+}
 @if (resource(); as current) {
-  <section class="panel">
+  <section class="panel" [attr.aria-busy]="busy()">
     <div class="panel-title">
       <div>
         <p class="kicker">{{ current.id.toUpperCase() }} MASTER DATA</p>
         <h2>{{ current.label }}</h2>
         <p class="subtitle">{{ current.description }}</p>
       </div>
-      @if (!formVisible() && !detailTarget()) {
+      @if (!checkerMode() && !formVisible() && !detailTarget()) {
         <div class="toolbar">
           <button
             class="upload-button"
@@ -74,33 +103,35 @@
                 (change)="upload($event, false)"
             /></label>
           }
-          <button class="primary" (click)="startCreate()">＋ 新增</button>
+          <button class="primary" (click)="startCreate()">Add</button>
         </div>
       }
     </div>
     @if (!formVisible() && !detailTarget()) {
-      <fieldset class="status-options">
-        <legend>Record status</legend>
-        @for (
-          option of [
-            { value: "ACTIVE", label: "Active" },
-            { value: "DRAFT", label: "Draft" },
-            { value: "SUPERSEDED", label: "Superseded" },
-            { value: "ALL", label: "All" },
-          ];
-          track option.value
-        ) {
-          <label [class.selected]="statusFilter() === option.value"
-            ><input
-              type="radio"
-              name="swift-data-status"
-              [value]="option.value"
-              [checked]="statusFilter() === option.value"
-              (change)="setStatusFilter($any(option.value))"
-            /><span>{{ option.label }}</span></label
-          >
-        }
-      </fieldset>
+      @if (!checkerMode()) {
+        <fieldset class="status-options">
+          <legend>Record status</legend>
+          @for (
+            option of [
+              { value: "ACTIVE", label: "Active" },
+              { value: "DRAFT", label: "Draft" },
+              { value: "SUPPRESSED", label: "Suppressed" },
+              { value: "ALL", label: "All" },
+            ];
+            track option.value
+          ) {
+            <label [class.selected]="statusFilter() === option.value"
+              ><input
+                type="radio"
+                name="swift-data-status"
+                [value]="option.value"
+                [checked]="statusFilter() === option.value"
+                (change)="setStatusFilter($any(option.value))"
+              /><span>{{ option.label }}</span></label
+            >
+          }
+        </fieldset>
+      }
       <label class="index-search">
         <span>Search {{ current.label }} index</span>
         <input
@@ -132,7 +163,7 @@
                   "
                 >
                   <button
-                    class="sort-heading"
+                    class="sort-header"
                     type="button"
                     (click)="toggleSort(columnPath(column))"
                   >
@@ -141,7 +172,55 @@
                   </button>
                 </th>
               }
-              <th>可執行動作</th>
+              <th
+                [attr.aria-sort]="
+                  sortPath() === '__requestType'
+                    ? sortDirection() === 'asc'
+                      ? 'ascending'
+                      : 'descending'
+                    : 'none'
+                "
+              >
+                <button
+                  class="sort-header"
+                  type="button"
+                  (click)="toggleSort('__requestType')"
+                >
+                  Request Type
+                  <span>{{ sortIndicator("__requestType") }}</span>
+                </button>
+              </th>
+              @if (!checkerMode()) {
+                @for (
+                  actionColumn of [
+                    { path: "__openRevisionStatus", label: "Revision Status" },
+                    { path: "__workflowAction", label: "Submit" },
+                    { path: "__editAction", label: "Edit / Revise" },
+                    { path: "__revokeAction", label: "Suppress" },
+                    { path: "__revokeDraftAction", label: "Revoke Draft" },
+                  ];
+                  track actionColumn.path
+                ) {
+                  <th
+                    [attr.aria-sort]="
+                      sortPath() === actionColumn.path
+                        ? sortDirection() === 'asc'
+                          ? 'ascending'
+                          : 'descending'
+                        : 'none'
+                    "
+                  >
+                    <button
+                      class="sort-header"
+                      type="button"
+                      (click)="toggleSort(actionColumn.path)"
+                    >
+                      {{ actionColumn.label }}
+                      <span>{{ sortIndicator(actionColumn.path) }}</span>
+                    </button>
+                  </th>
+                }
+              }
             </tr>
           </thead>
           <tbody>
@@ -150,7 +229,7 @@
                 class="data-row"
                 tabindex="0"
                 [attr.aria-label]="rowLabel(row)"
-                (dblclick)="view(row)"
+                (click)="view(row)"
                 (keydown)="openRowFromKeyboard($event, row)"
               >
                 @for (column of current.columns; track columnPath(column)) {
@@ -165,40 +244,90 @@
                     >
                   </td>
                 }
-                <td>
-                  <div class="row-actions">
-                    @if (row.status === "DRAFT") {
+                <td class="request-type-cell">
+                  <span class="revision-state">{{
+                    requestTypeLabel(row)
+                  }}</span>
+                </td>
+                @if (!checkerMode()) {
+                  <td class="revision-action-cell">
+                    @if (row.status === "ACTIVE" && row.hasOpenRevision) {
+                      <span class="revision-state">{{
+                        openRevisionLabel(row)
+                      }}</span>
+                    }
+                  </td>
+                  <td class="workflow-action-cell">
+                    @if (canAct(row, "submit")) {
                       <button
-                        class="edit-action"
-                        (click)="$event.stopPropagation(); edit(row)"
+                        class="primary lifecycle-action"
+                        (click)="$event.stopPropagation(); act(row, 'submit')"
                       >
-                        修訂
+                        Submit
                       </button>
                     }
-                    @if (row.status === "ACTIVE" || row.status === "APPROVED") {
+                    @if (canAct(row, "approve")) {
                       <button
-                        class="edit-action"
-                        (click)="$event.stopPropagation(); revise(row)"
+                        class="primary lifecycle-action"
+                        (click)="$event.stopPropagation(); act(row, 'approve')"
                       >
-                        修訂
+                        Approve
                       </button>
                     }
+                  </td>
+                  <td class="edit-action-cell">
                     @if (
-                      row.status !== "REVOKED" && row.status !== "SUPERSEDED"
+                      (row.status === "DRAFT" || row.status === "WIP") &&
+                      row["changeType"] !== "SUPPRESSION"
                     ) {
                       <button
-                        class="danger"
-                        (click)="$event.stopPropagation(); requestRevoke(row)"
+                        class="ghost edit-action"
+                        (click)="$event.stopPropagation(); edit(row)"
                       >
-                        撤銷
+                        Edit
                       </button>
                     }
-                  </div>
-                </td>
+                    @if (row.status === "ACTIVE" && !row.hasOpenRevision) {
+                      <button
+                        class="ghost edit-action"
+                        (click)="$event.stopPropagation(); revise(row)"
+                      >
+                        Revise
+                      </button>
+                    }
+                  </td>
+                  <td class="revoke-action-cell">
+                    @if (canSuppress(row)) {
+                      <button
+                        class="danger revoke-action"
+                        (click)="$event.stopPropagation(); requestSuppress(row)"
+                      >
+                        Suppress
+                      </button>
+                    }
+                  </td>
+                  <td class="revoke-action-cell">
+                    @if (canRevokeDraft(row)) {
+                      <button
+                        class="danger revoke-action"
+                        (click)="
+                          $event.stopPropagation(); requestDraftRevoke(row)
+                        "
+                      >
+                        Revoke Draft
+                      </button>
+                    }
+                  </td>
+                }
               </tr>
             } @empty {
               <tr>
-                <td [attr.colspan]="current.columns.length + 1" class="empty">
+                <td
+                  [attr.colspan]="
+                    current.columns.length + (checkerMode() ? 1 : 6)
+                  "
+                  class="empty"
+                >
                   沒有符合目前 Status 與 Search 的資料。
                 </td>
               </tr>
@@ -209,7 +338,7 @@
       <div class="pager">
         <span
           >Page {{ page() }} / {{ totalPages() }} ·
-          {{ sortedRows().length }} records</span
+          {{ totalItems() }} records</span
         >
         <div>
           <button
@@ -218,14 +347,14 @@
             [disabled]="page() === 1"
             (click)="movePage(-1)"
           >
-            上一頁</button
+            Previous</button
           ><button
             class="ghost"
             type="button"
             [disabled]="page() === totalPages()"
             (click)="movePage(1)"
           >
-            下一頁
+            Next
           </button>
         </div>
       </div>
@@ -233,18 +362,32 @@
     @if (formVisible()) {
       <form class="oas-form" [formGroup]="form" (ngSubmit)="save()">
         <div class="form-heading">
-          <p class="kicker">GENERATED FROM OPENAPI PARAMETERS</p>
-          <h3>{{ editingId() ? "編輯 DRAFT" : "建立 DRAFT" }}</h3>
+          <div>
+            <p class="kicker">GENERATED FROM OPENAPI PARAMETERS</p>
+            <h3>{{ editingId() ? "編輯 DRAFT" : "建立 DRAFT" }}</h3>
+          </div>
+          <button
+            type="button"
+            class="icon-button"
+            aria-label="Cancel"
+            (click)="cancelWork()"
+          >
+            ×
+          </button>
         </div>
         <formly-form [form]="form" [fields]="fields()" [model]="model" />
         <div class="actions">
-          <button class="ghost" type="button" (click)="cancelWork()">
-            取消 / Cancel</button
-          ><button class="primary" type="submit" [disabled]="busy()">
-            儲存 DRAFT
+          <button class="primary" type="submit" [disabled]="busy()">
+            Save Draft
           </button>
         </div>
       </form>
+    }
+    @if (!formVisible() && savedDraftId()) {
+      <p class="data-disclaimer compact-warning" role="status">
+        草稿 {{ savedDraftId() }} 已儲存。請在下方 DRAFT 清單按「提交」；
+        儲存草稿本身不會送審。
+      </p>
     }
     @if (importResult()) {
       <details class="import-result" open>
@@ -255,46 +398,109 @@
   </section>
 }
 @if (detailTarget(); as row) {
-  <section class="bic-dialog detail-dialog">
-    @if (resource(); as current) {
-      <p class="kicker">PARAMETER-DRIVEN RECORD VIEW</p>
-      <h2>檢視 {{ current.label }}</h2>
-      <dl class="delete-summary">
-        @for (field of coreFields(current); track field.key) {
-          <div>
-            <dt>{{ field.label }}</dt>
-            <dd>{{ value(row, field.key) }}</dd>
+  @if (resource(); as current) {
+    <ssi-governed-record-view
+      [label]="current.label"
+      [recordId]="row.id"
+      [version]="row.version"
+      [status]="row.status"
+      [fields]="fields()"
+      [model]="detailModel()"
+      (closed)="cancelWork()"
+    >
+      @if (messageTypeChanges(row); as changes) {
+        <section
+          class="message-type-comparison"
+          aria-label="Message Type changes"
+        >
+          <div class="message-type-comparison-heading">
+            <p class="kicker">APPROVAL COMPARISON</p>
+            <h3>Message Type Changes</h3>
           </div>
-        }
-        <div>
-          <dt>Status</dt>
-          <dd>{{ row.status }}</dd>
-        </div>
-        <div>
-          <dt>Version</dt>
-          <dd>{{ row.version }}</dd>
-        </div>
-      </dl>
-      <details class="record-evidence">
-        <summary>完整欄位、適用性與治理證據</summary>
-        <dl class="delete-summary">
-          @for (field of detailFields(current); track field.key) {
-            <div>
-              <dt>{{ field.label }}</dt>
-              <dd>{{ value(row, field.key) }}</dd>
+          @if (requestTypeLabel(row) === "EDIT") {
+            <div class="message-type-change-group unchanged-types">
+              <b>UNCHANGED</b>
+              <div class="message-type-change-values">
+                @for (messageType of changes.unchanged; track messageType) {
+                  <span>{{ messageType }}</span>
+                } @empty {
+                  <span class="empty-change">None</span>
+                }
+              </div>
             </div>
           }
-        </dl>
-        @if (current.id === "ssi") {
-          <h3>SSI_APPLICABILITY（獨立一對多）</h3>
-          <pre>{{ row["applicability"] | json }}</pre>
-        }
-      </details>
-      <div class="actions">
-        <button class="ghost" (click)="cancelWork()">取消 / Cancel</button>
-      </div>
-    }
-  </section>
+          @if (requestTypeLabel(row) !== "SUPPRESSED") {
+            <div class="message-type-change-group added-types">
+              <b>ADDED</b>
+              <div class="message-type-change-values">
+                @for (messageType of changes.added; track messageType) {
+                  <span>{{ messageType }}</span>
+                } @empty {
+                  <span class="empty-change">None</span>
+                }
+              </div>
+            </div>
+          }
+          @if (requestTypeLabel(row) !== "ADD") {
+            <div class="message-type-change-group suppressed-types">
+              <b>SUPPRESSED</b>
+              <div class="message-type-change-values">
+                @for (messageType of changes.suppressed; track messageType) {
+                  <span>{{ messageType }}</span>
+                } @empty {
+                  <span class="empty-change">None</span>
+                }
+              </div>
+            </div>
+          }
+        </section>
+      }
+      @if (row["changeType"] === "SUPPRESSION") {
+        <section class="suppression-review" aria-label="Suppression request">
+          <b>SUPPRESSION</b>
+          <p>{{ row["suppressionReason"] }}</p>
+        </section>
+      }
+      @if (checkerMode() && canAct(row, "approve")) {
+        <div class="actions checker-decision-actions">
+          <span
+            class="request-type-badge"
+            [class.edit-request]="requestTypeLabel(row) === 'EDIT'"
+            [class.suppress-request]="requestTypeLabel(row) === 'SUPPRESSED'"
+            >{{ requestTypeLabel(row) }}</span
+          >
+          <label class="checker-reject-reason">
+            Reject reason
+            <input
+              type="text"
+              [value]="checkerRejectReason()"
+              (input)="checkerRejectReason.set($any($event.target).value)"
+              placeholder="Reason returned to Maker (minimum 5 characters)"
+            />
+          </label>
+          @if (checkerRejectReason().trim().length >= 5) {
+            <button
+              type="button"
+              class="danger"
+              [disabled]="busy()"
+              (click)="rejectFromChecker(row)"
+            >
+              Reject
+            </button>
+          } @else {
+            <button
+              type="button"
+              class="primary"
+              [disabled]="busy()"
+              (click)="act(row, 'approve')"
+            >
+              Approve
+            </button>
+          }
+        </div>
+      }
+    </ssi-governed-record-view>
+  }
 }
 @if (revokeTarget(); as row) {
   <div
@@ -304,14 +510,46 @@
   >
     <section
       class="bic-dialog delete-dialog"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="suppression-dialog-title"
       (click)="$event.stopPropagation()"
       (keydown.escape)="revokeTarget.set(null)"
     >
-      <p class="kicker danger-text">LOGICAL REVOCATION</p>
-      <h2>撤銷 {{ resource()?.label }}</h2>
-      <p>紀錄 {{ row.id }} 將改為 REVOKED；SQLite audit 與 outbox 證據保留。</p>
+      <div class="dialog-header">
+        <div>
+          <p class="kicker danger-text">
+            {{
+              row.status === "DRAFT" ? "DRAFT CONTROL" : "FOUR-EYES SUPPRESSION"
+            }}
+          </p>
+          <h2 id="suppression-dialog-title">
+            {{ row.status === "DRAFT" ? "Revoke Draft" : "Suppress" }}
+            {{ resource()?.label }}
+          </h2>
+        </div>
+        <button
+          class="icon-button"
+          type="button"
+          aria-label="Cancel"
+          (click)="revokeTarget.set(null); revokeReason.set('')"
+        >
+          ×
+        </button>
+      </div>
+      <p>
+        @if (row.status === "DRAFT") {
+          撤銷此 Draft；原 Active 紀錄不變，並恢復 Revise／Suppress 操作。
+        } @else {
+          建立 SUPPRESSION DRAFT；原 Active 紀錄在 Checker 核准前繼續有效。
+        }
+      </p>
       <label class="delete-reason"
-        ><span>撤銷原因 *</span
+        ><span
+          >{{
+            row.status === "DRAFT" ? "Revoke reason" : "Suppression reason"
+          }}
+          *</span
         ><textarea
           #reason
           rows="3"
@@ -321,13 +559,14 @@
         ><small>至少 5 個字元</small></label
       >
       <div class="actions">
-        <button class="ghost" (click)="revokeTarget.set(null)">取消</button
-        ><button
+        <button
           class="danger-action"
           [disabled]="revokeReason().trim().length < 5"
-          (click)="confirmRevoke()"
+          (click)="confirmSuppression()"
         >
-          確認撤銷
+          {{
+            row.status === "DRAFT" ? "Revoke Draft" : "Create Suppression Draft"
+          }}
         </button>
       </div>
     </section>

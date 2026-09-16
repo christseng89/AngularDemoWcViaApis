@@ -143,7 +143,9 @@
           "key": "ownBic",
           "label": "Own BIC (ISO 9362)",
           "required": true,
-          "type": "input",
+          "type": "bic-input",
+          "referenceSource": "reference/banks",
+          "description": "Select a governed BIC from Bank Service.",
           "pattern": "^[A-Z0-9]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$",
           "minLength": 8,
           "maxLength": 11
@@ -152,18 +154,12 @@
           "key": "counterpartyBic",
           "label": "Counterparty BIC (ISO 9362)",
           "required": true,
-          "type": "input",
+          "type": "bic-input",
+          "referenceSource": "reference/banks",
+          "description": "Select a governed BIC from Bank Service.",
           "pattern": "^[A-Z0-9]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$",
           "minLength": 8,
           "maxLength": 11
-        },
-        {
-          "key": "service",
-          "label": "SWIFT Service",
-          "required": true,
-          "type": "select",
-          "options": ["FIN", "FINPLUS"],
-          "defaultValue": "FIN"
         },
         {
           "key": "direction",
@@ -178,15 +174,58 @@
           "label": "Message Types",
           "required": true,
           "type": "multicheckbox",
+          "optionsSource": "rma-authorisations/message-types",
           "options": [
+            "MT101",
+            "MT103",
+            "MT200",
+            "MT202",
+            "MT202COV",
+            "MT203",
+            "MT205",
+            "MT205COV",
             "MT300",
+            "MT304",
+            "MT305",
+            "MT306",
             "MT320",
+            "MT330",
+            "MT340",
+            "MT341",
+            "MT350",
+            "MT360",
+            "MT361",
+            "MT362",
+            "MT364",
+            "MT365",
             "MT400",
+            "MT410",
+            "MT412",
+            "MT416",
+            "MT420",
+            "MT422",
+            "MT430",
+            "MT450",
+            "MT455",
+            "MT456",
             "MT700",
+            "MT705",
+            "MT707",
+            "MT710",
+            "MT720",
+            "MT730",
+            "MT734",
             "MT740",
             "MT742",
+            "MT750",
+            "MT752",
+            "MT754",
+            "MT756",
             "MT760",
             "MT765",
+            "MT767",
+            "MT768",
+            "MT769",
             "pacs.008.001.12",
             "pacs.009.001.08",
             "pacs.009.001.12",
@@ -210,7 +249,7 @@
           "defaultValue": "2027-12-31"
         }
       ],
-      "x-lifecycle": ["submit", "approve", "activate", "revise", "revoke"]
+      "x-lifecycle": ["submit", "approve", "reject", "revise", "suppress"]
     },
     {
       "id": "ssi",
@@ -493,10 +532,27 @@
           "maxLength": 2
         },
         {
+          "key": "route.beneficiarySource",
+          "label": "Beneficiary Source",
+          "description": "SSI stores the Beneficiary BIC only when source is SSI. TRANSACTION means the value is supplied by transaction data and must not be stored in SSI.",
+          "required": true,
+          "type": "select",
+          "options": ["SSI", "TRANSACTION"],
+          "defaultValue": "SSI"
+        },
+        {
           "key": "route.beneficiaryBic",
           "label": "Beneficiary BIC (ISO 9362)",
-          "required": true,
           "type": "input",
+          "description": "Select the institution through Bank Service; the governed BIC is displayed. Bank Service does not provide an account.",
+          "x-required-when": {
+            "path": "route.beneficiarySource",
+            "equals": "SSI"
+          },
+          "x-disabled-when": {
+            "path": "route.beneficiarySource",
+            "equals": "TRANSACTION"
+          },
           "pattern": "^[A-Z0-9]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$",
           "minLength": 8,
           "maxLength": 11
@@ -542,7 +598,7 @@
           "inputType": "date"
         }
       ],
-      "x-lifecycle": ["submit", "approve", "activate", "revise", "revoke"]
+      "x-lifecycle": ["submit", "approve", "reject", "revise", "suppress"]
     },
     {
       "id": "entity",
@@ -648,7 +704,7 @@
           "defaultValue": "2099-12-31"
         }
       ],
-      "x-lifecycle": ["submit", "approve", "activate", "revise", "revoke"]
+      "x-lifecycle": ["submit", "approve", "reject", "revise", "suppress"]
     },
     {
       "id": "nostro",
@@ -709,7 +765,9 @@
           "key": "accountServicerBic",
           "label": "Account Servicer BIC (ISO 9362)",
           "required": true,
-          "type": "input",
+          "type": "bic-input",
+          "referenceSource": "reference/banks",
+          "description": "Select the Account Servicer from Bank Service.",
           "pattern": "^[A-Z0-9]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$",
           "minLength": 8,
           "maxLength": 11
@@ -726,7 +784,7 @@
           "label": "Masked/Demo Account Reference",
           "required": true,
           "type": "input",
-          "pattern": "^DEMO-[A-Z0-9-]{4,40}$"
+          "pattern": "^(DEMO|MT[0-9]{1,3})-[A-Z0-9-]{4,60}$"
         },
         {
           "key": "purpose",
@@ -769,7 +827,7 @@
           "defaultValue": "2027-12-31"
         }
       ],
-      "x-lifecycle": ["submit", "approve", "activate", "revise", "revoke"]
+      "x-lifecycle": ["submit", "approve", "reject", "revise", "suppress"]
     }
   ],
   "paths": {
@@ -824,6 +882,22 @@
         "responses": {
           "200": {
             "description": "Logically revoked; audit retained"
+          }
+        }
+      }
+    },
+    "/rma-authorisations/{id}/suppress": {
+      "post": {
+        "operationId": "createRmaSuppressionDraft",
+        "parameters": [{ "$ref": "#/components/parameters/Id" }],
+        "requestBody": { "$ref": "#/components/requestBodies/Suppression" },
+        "responses": {
+          "201": {
+            "description": "SUPPRESSION DRAFT created; existing ACTIVE remains effective pending Checker approval"
+          },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "409": {
+            "description": "Record is not ACTIVE or another open revision exists"
           }
         }
       }
@@ -893,6 +967,38 @@
         }
       }
     },
+    "/ssis/{id}/suppress": {
+      "post": {
+        "operationId": "createSsiSuppressionDraft",
+        "parameters": [{ "$ref": "#/components/parameters/Id" }],
+        "requestBody": { "$ref": "#/components/requestBodies/Suppression" },
+        "responses": {
+          "201": {
+            "description": "SUPPRESSION DRAFT created; existing ACTIVE remains effective pending Checker approval"
+          },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "409": {
+            "description": "Record is not ACTIVE or another open revision exists"
+          }
+        }
+      }
+    },
+    "/booking-branch-entities/{id}/suppress": {
+      "post": {
+        "operationId": "createEntitySuppressionDraft",
+        "parameters": [{ "$ref": "#/components/parameters/Id" }],
+        "requestBody": { "$ref": "#/components/requestBodies/Suppression" },
+        "responses": {
+          "201": {
+            "description": "SUPPRESSION DRAFT created; existing ACTIVE remains effective pending Checker approval"
+          },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "409": {
+            "description": "Record is not ACTIVE or another open revision exists"
+          }
+        }
+      }
+    },
     "/nostro-accounts": {
       "get": {
         "operationId": "listNostro",
@@ -944,6 +1050,22 @@
         "responses": {
           "200": {
             "description": "Logically revoked; audit retained"
+          }
+        }
+      }
+    },
+    "/nostro-accounts/{id}/suppress": {
+      "post": {
+        "operationId": "createNostroSuppressionDraft",
+        "parameters": [{ "$ref": "#/components/parameters/Id" }],
+        "requestBody": { "$ref": "#/components/requestBodies/Suppression" },
+        "responses": {
+          "201": {
+            "description": "SUPPRESSION DRAFT created; existing ACTIVE remains effective pending Checker approval"
+          },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "409": {
+            "description": "Record is not ACTIVE or another open revision exists"
           }
         }
       }
@@ -1803,6 +1925,22 @@
             }
           }
         }
+      },
+      "Suppression": {
+        "required": true,
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["maker", "reason"],
+              "properties": {
+                "maker": { "type": "string", "minLength": 1 },
+                "reason": { "type": "string", "minLength": 5 }
+              }
+            }
+          }
+        }
       }
     },
     "responses": {
@@ -1892,17 +2030,35 @@
         "type": "object",
         "additionalProperties": false,
         "description": "Exact indivisible SSI route selected from discovery. Every versioned component is revalidated before execution.",
-        "required": ["routeId", "definitionId", "definitionVersion", "fixtureBindingId", "contextSha256", "ssi", "applicability", "nostro", "rma"],
+        "required": [
+          "routeId",
+          "definitionId",
+          "definitionVersion",
+          "fixtureBindingId",
+          "contextSha256",
+          "ssi",
+          "applicability",
+          "nostro",
+          "rma"
+        ],
         "properties": {
           "routeId": { "type": "string", "minLength": 1 },
           "definitionId": { "type": "string", "minLength": 1 },
           "definitionVersion": { "type": "string", "minLength": 1 },
           "fixtureBindingId": { "type": "string", "minLength": 1 },
           "contextSha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
-          "ssi": { "$ref": "#/components/schemas/PageParameterVersionedRecordIdentity" },
-          "applicability": { "$ref": "#/components/schemas/PageParameterVersionedRecordIdentity" },
-          "nostro": { "$ref": "#/components/schemas/PageParameterVersionedRecordIdentity" },
-          "rma": { "$ref": "#/components/schemas/PageParameterVersionedRecordIdentity" }
+          "ssi": {
+            "$ref": "#/components/schemas/PageParameterVersionedRecordIdentity"
+          },
+          "applicability": {
+            "$ref": "#/components/schemas/PageParameterVersionedRecordIdentity"
+          },
+          "nostro": {
+            "$ref": "#/components/schemas/PageParameterVersionedRecordIdentity"
+          },
+          "rma": {
+            "$ref": "#/components/schemas/PageParameterVersionedRecordIdentity"
+          }
         }
       },
       "PageParameterLookupDefaultSelection": {
@@ -2569,7 +2725,7 @@
           },
           "maskedAccountRef": {
             "type": "string",
-            "pattern": "^DEMO-[A-Z0-9-]{4,40}$"
+            "pattern": "^(DEMO|MT[0-9]{1,3})-[A-Z0-9-]{4,60}$"
           },
           "purpose": {
             "type": "string",

@@ -25,6 +25,7 @@ let nextResolutionResponse: unknown;
 let nextResolutionError: unknown;
 let nextConfirmationResponse: unknown;
 let pendingResolutionResponse: Subject<unknown> | undefined;
+let pendingSsiResponse: Subject<unknown> | undefined;
 
 const fakeDocument = {
   defaultView: {
@@ -127,6 +128,8 @@ const fakeHttp = {
       });
     if (url.includes("/reference/currencies"))
       return of([{ code: "USD", decimals: 2, standard: "ISO 4217" }]);
+    if (url.includes("/rma-authorisations/message-types"))
+      return of(["MT202", "pacs.009.001.08"]);
     if (url.includes("/settlements/message-index")) return of({ items: [] });
     if (url.endsWith("/nostro-accounts"))
       return of([
@@ -215,6 +218,10 @@ const fakeHttp = {
         archiveRetentionDays: 365,
         scheduleIntervalHours: 12,
       });
+    if (url.endsWith("/ssis/summary"))
+      return of({ currentOwn: 0, pendingApproval: 0, active: 0, archived: 0 });
+    if (url.includes("/ssis?")) return pendingSsiResponse ?? of([]);
+    if (url.endsWith("/ssis")) return pendingSsiResponse ?? of([]);
     if (url.endsWith("/audit")) return of([]);
     return of([]);
   }),
@@ -401,6 +408,25 @@ jest.doMock(
 );
 
 describe("portal component behavior", () => {
+  it("does not eagerly request parent workspace data or submit settlement POSTs during application startup", async () => {
+    fakeHttp.get.mockClear();
+    fakeHttp.post.mockClear();
+    const { AppComponent } = await import("./app.component");
+    const component = new AppComponent();
+
+    component.ngOnInit();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(fakeHttp.get).not.toHaveBeenCalled();
+    expect(
+      fakeHttp.post.mock.calls.filter(([url]) =>
+        String(url).includes("/settlements/"),
+      ),
+    ).toEqual([]);
+  });
+
   it("does not download the full SSI register when opening resolution indexes", async () => {
     const { AppComponent } = await import("./app.component");
     const component = new AppComponent();
@@ -414,6 +440,132 @@ describe("portal component behavior", () => {
     component.navigate("dashboard");
 
     expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("clears a stale global notice when navigation provides its own page-level status", async () => {
+    const { AppComponent } = await import("./app.component");
+    const component = new AppComponent();
+    component.notice.set({ kind: "warning", text: "stale dependency warning" });
+
+    component.navigate("resolver");
+
+    expect(component.notice()).toBeNull();
+  });
+
+  it("loads Currency options when New or Edit enters Maker without navigation", async () => {
+    const { AppComponent } = await import("./app.component");
+    const component = new AppComponent();
+    const loadCurrencies = jest
+      .spyOn(component as never, "loadCurrencies" as never)
+      .mockResolvedValue(undefined as never);
+
+    component.startNew();
+    expect(loadCurrencies).toHaveBeenCalledTimes(1);
+
+    loadCurrencies.mockClear();
+    component.edit({
+      id: "SSI-DRAFT",
+      counterpartyId: "ANY",
+      scope: "STANDING",
+      status: "DRAFT",
+      maker: "maker.revision",
+      route: { currency: "USD" },
+      version: 2,
+    });
+    expect(loadCurrencies).toHaveBeenCalledTimes(1);
+  });
+
+  it("reserves WIP on Revise and lets X or Escape cancel it on the server", async () => {
+    const { AppComponent } = await import("./app.component");
+    const component = new AppComponent();
+    const activeRow = {
+      id: "SSI-ACTIVE",
+      counterpartyId: "BANK-1",
+      scope: "STANDING",
+      status: "ACTIVE",
+      maker: "maker.original",
+      ownershipType: "OWN" as const,
+      ownerParty: "HK01",
+      publisherParty: "HK01",
+      route: { currency: "USD", counterpartyType: "BANK" },
+      version: 9,
+    };
+
+    fakeHttp.post.mockClear();
+    component.notice.set({ kind: "error", text: "stale conflict" });
+    await component.revise(activeRow);
+
+    expect(component.view()).toBe("maker");
+    expect(component.notice()).toBeNull();
+    expect(component.editingId()).toBe("ROW-REVISION");
+    expect(component.revisionSource()?.id).toBe("SSI-ACTIVE");
+    expect(fakeHttp.post).toHaveBeenCalledWith(
+      expect.stringContaining("/ssis/SSI-ACTIVE/revise"),
+      { maker: "maker.revision" },
+    );
+
+    await component.closeMaker();
+    expect(component.view()).toBe("dashboard");
+    expect(component.revisionSource()).toBeNull();
+    expect(fakeHttp.post).toHaveBeenCalledWith(
+      expect.stringContaining("/ssis/ROW-REVISION/cancel-revision"),
+      { actor: "maker.revision" },
+    );
+
+    fakeHttp.post.mockClear();
+    await component.revise(activeRow);
+    await component.closeOverlayOnEscape();
+    expect(component.view()).toBe("dashboard");
+    expect(component.revisionSource()).toBeNull();
+    expect(fakeHttp.post).toHaveBeenCalledWith(
+      expect.stringContaining("/ssis/ROW-REVISION/cancel-revision"),
+      { actor: "maker.revision" },
+    );
+
+    fakeHttp.post.mockClear();
+    fakeHttp.put.mockClear();
+    await component.revise(activeRow);
+    await component.create();
+    expect(fakeHttp.post).toHaveBeenCalledWith(
+      expect.stringContaining("/ssis/SSI-ACTIVE/revise"),
+      { maker: "maker.revision" },
+    );
+    expect(fakeHttp.put).toHaveBeenCalledWith(
+      expect.stringContaining("/ssis/ROW-REVISION"),
+      expect.objectContaining({ maker: "maker.revision" }),
+    );
+  });
+
+  it("uses Escape as the common cancel action for SSI overlays", async () => {
+    const { AppComponent } = await import("./app.component");
+    const component = new AppComponent();
+
+    component.bicPickerTarget.set("accountWithBic");
+    await component.closeOverlayOnEscape();
+    expect(component.bicPickerTarget()).toBeNull();
+
+    component.tagTransactionOpen.set(true);
+    await component.closeOverlayOnEscape();
+    expect(component.tagTransactionOpen()).toBe(false);
+
+    component.paymentTransactionOpen.set(true);
+    await component.closeOverlayOnEscape();
+    expect(component.paymentTransactionOpen()).toBe(false);
+  });
+
+  it("keeps a Bank Service outage in feature state without adding a duplicate global banner", async () => {
+    rejectHttp = true;
+    try {
+      const { AppComponent } = await import("./app.component");
+      const component = new AppComponent();
+
+      await component.loadResolutionBanks();
+
+      expect(component.resolutionBanksError()).toBe("BANK_SERVICE_UNAVAILABLE");
+      expect(component.notice()).toBeNull();
+    } finally {
+      rejectHttp = false;
+    }
   });
 
   it("does not let background MT347 candidates overwrite the MT2 bank identity", async () => {
@@ -1069,8 +1221,13 @@ describe("portal component behavior", () => {
     expect(component.paymentMessageIndexSortKey()).toBe("description");
     component.sortPaymentMessageIndexBy("description");
     expect(component.paymentMessageIndexSortDirection()).toBe("desc");
+    fakeHttp.get.mockClear();
     component.selectOwnershipTab("COUNTERPARTY");
+    await Promise.resolve();
     expect(component.ownershipTab()).toBe("COUNTERPARTY");
+    expect(fakeHttp.get).toHaveBeenCalledWith(
+      expect.stringContaining("/reference/counterparties"),
+    );
     component.searchCounterpartyInbox("bank");
     expect(component.counterpartyInboxSearch()).toBe("bank");
     component.selectCounterpartyPartyType("BANK_NO_SSI");
@@ -1089,10 +1246,22 @@ describe("portal component behavior", () => {
     expect(component.ownershipAriaSort("CURRENCY")).toBe("none");
     component.moveIndexPage(1);
     component.moveCounterpartyInboxPage(1);
+    fakeHttp.get.mockClear();
     component.openCounterpartySsi("BANK-1");
+    await Promise.resolve();
     expect(component.selectedCounterpartyId()).toBe("BANK-1");
+    expect(fakeHttp.get).toHaveBeenCalledWith(
+      expect.stringMatching(/\/ssis\?.*counterpartyId=BANK-1/),
+    );
+    fakeHttp.get.mockClear();
     component.closeCounterpartySsi();
+    await Promise.resolve();
     expect(component.selectedCounterpartyId()).toBe("");
+    const listRequest = fakeHttp.get.mock.calls.find(([url]) =>
+      url.includes("/ssis?"),
+    )?.[0];
+    expect(listRequest).toBeDefined();
+    expect(listRequest).not.toContain("counterpartyId=");
     component.setTheme("dark");
     expect(component.theme()).toBe("dark");
   });
@@ -1154,6 +1323,7 @@ describe("portal component behavior", () => {
     const { AppComponent } = await import("./app.component");
     const component = new AppComponent();
     await Promise.resolve();
+    component.auditTab.set("ssi");
     component.auditRows.set(
       Array.from({ length: 11 }, (_, index) => ({
         id: index + 1,
@@ -1161,7 +1331,15 @@ describe("portal component behavior", () => {
         action: index % 2 === 0 ? "UPDATED" : "ACTIVATE",
         actor: `operator.${index + 1}`,
         occurred_at: `2026-09-10T00:${String(index).padStart(2, "0")}:00Z`,
-        payload: JSON.stringify({ ssiCode: `SSI-DEMO-${index + 1}` }),
+        payload: JSON.stringify({
+          id: `SSI-${index + 1}`,
+          counterpartyId: `BANK-${index + 1}`,
+          scope: "STANDING",
+          status: "ACTIVE",
+          maker: `operator.${index + 1}`,
+          route: { currency: "USD", counterpartyType: "BANK" },
+          version: 1,
+        }),
       })),
     );
 
@@ -1172,9 +1350,9 @@ describe("portal component behavior", () => {
     expect(component.auditCurrentPage()).toBe(2);
     const detail = component.pagedAuditRows()[0]!;
     component.openAuditDetail(detail);
-    expect(component.selectedAuditDetail()?.eventId).toBe(detail.eventId);
+    expect(component.detailTarget()?.id).toBe(detail.ssiId);
     component.closeOverlayOnEscape();
-    expect(component.selectedAuditDetail()).toBeNull();
+    expect(component.detailTarget()).toBeNull();
   });
 
   it("drives payment, SSI maintenance, resolution, and tag-selection state", async () => {
@@ -1363,23 +1541,47 @@ describe("portal component behavior", () => {
     const counterparty = component
       .fields()
       .find((field) => field.key === "counterpartyId")!;
+    const counterpartyType = component
+      .fields()
+      .find((field) => field.key === "route.counterpartyType")!;
+    expect(counterpartyType.props?.options).toEqual([
+      { label: "Bank／銀行", value: "BANK" },
+      {
+        label: "Any approved bank／任何已核准銀行",
+        value: "ANY_BANK",
+      },
+    ]);
     const expressions = counterparty.expressions!;
-    const evaluate = (key: string, counterpartyType: "BANK" | "CUSTOMER") =>
+    const evaluate = (
+      key: string,
+      counterpartyType: "BANK" | "ANY_BANK" | "CUSTOMER",
+    ) =>
       (expressions[key] as (field: unknown) => unknown)({
         model: { route: { counterpartyType } },
       });
 
-    expect(evaluate("props.minLength", "BANK")).toBe(8);
+    expect(evaluate("props.minLength", "BANK")).toBe(3);
     expect(evaluate("props.minLength", "CUSTOMER")).toBe(3);
-    expect(evaluate("props.maxLength", "BANK")).toBe(11);
+    expect(evaluate("props.minLength", "ANY_BANK")).toBe(3);
+    expect(evaluate("props.maxLength", "BANK")).toBe(35);
     expect(evaluate("props.maxLength", "CUSTOMER")).toBe(35);
+    expect(evaluate("props.maxLength", "ANY_BANK")).toBe(3);
     expect(typeof evaluate("props.pattern", "BANK")).toBe("string");
     expect(evaluate("props.pattern", "CUSTOMER")).toBeInstanceOf(RegExp);
+    expect(String(evaluate("props.pattern", "ANY_BANK"))).toContain("ANY");
     expect(String(evaluate("props.validationMessage", "BANK"))).toContain(
-      "BIC8",
+      "Counterparty ID",
     );
     expect(String(evaluate("props.validationMessage", "CUSTOMER"))).toContain(
       "Customer ID",
+    );
+    expect(String(evaluate("props.validationMessage", "ANY_BANK"))).toContain(
+      "ANY",
+    );
+    expect(evaluate("props.readonly", "ANY_BANK")).toBe(true);
+    expect(evaluate("props.showPicker", "ANY_BANK")).toBe(false);
+    expect(String(evaluate("props.description", "ANY_BANK"))).toContain(
+      "交易資料",
     );
     expect(evaluate("props.pickerLabel", "BANK")).toBe("從 Bank Service 選擇");
     expect(evaluate("props.pickerLabel", "CUSTOMER")).toBe(
@@ -1523,6 +1725,12 @@ describe("portal component behavior", () => {
     component.selectedCounterpartyId.set("CUST-1");
     expect(component.counterpartyInbox()).toHaveLength(1);
     expect(component.selectedCounterparty()?.counterpartyId).toBe("CUST-1");
+    component.ssiSummary.set({
+      currentOwn: 1,
+      pendingApproval: 1,
+      active: 1,
+      archived: 1,
+    });
     expect(component.activeCount()).toBe(1);
     expect(component.archivedCount()).toBe(1);
     expect(component.pending()).toHaveLength(1);
@@ -1645,7 +1853,7 @@ describe("portal component behavior", () => {
       name: "Customer",
       country: "US",
     });
-    await component.openBicPicker("beneficiaryBic", "Beneficiary");
+    await component.openBicPicker("counterpartyId", "Counterparty");
     component.selectBank({
       bankServiceId: "BANK-1",
       bic: "CHASUS33",
@@ -1655,6 +1863,10 @@ describe("portal component behavior", () => {
       standard: "BIC",
     });
     expect(setValue).toHaveBeenCalled();
+    expect(component.model).toMatchObject({
+      counterpartyId: "CP-CHASUS33",
+      route: { counterpartyBic: "CHASUS33" },
+    });
     expect(component.selectedBic("counterpartyId")).toBe("CUSTOMER");
     component.resolutionClearingSystem.set("UNKNOWN");
     await component.refreshResolutionClearingOptions();
@@ -1684,15 +1896,19 @@ describe("portal component behavior", () => {
       const { AppComponent } = await import("./app.component");
       const component = new AppComponent();
       component.ngOnInit();
+      component.navigate("resolver");
       await Promise.resolve();
       await Promise.resolve();
-      expect(component.resolutionBanksError()).toBe("BANK_SERVICE_UNAVAILABLE");
-      expect(component.paymentMessageIndexError()).toBe(
-        "PAYMENT_MESSAGE_INDEX_UNAVAILABLE",
-      );
+      await Promise.resolve();
+      expect(component.resolutionBanksError()).toBe("");
+      expect(component.paymentMessageIndexError()).toBe("");
+      expect(component.notice()).toBeNull();
 
       await component.refresh();
       await component.loadPaymentMessageIndex();
+      expect(component.paymentMessageIndexError()).toBe(
+        "PAYMENT_MESSAGE_INDEX_UNAVAILABLE",
+      );
       await component.loadFinResolutionCatalogue();
       component.model = {
         maker: "maker",
@@ -1709,7 +1925,7 @@ describe("portal component behavior", () => {
         route: { currency: "USD" },
         version: 1,
       };
-      await component.act(row, "activate");
+      await component.act({ ...row, status: "PENDING_APPROVAL" }, "approve");
       await component.revise(row);
       component.requestDelete(row);
       component.deleteReason.set("duplicate record");
@@ -1763,15 +1979,61 @@ describe("portal component behavior", () => {
       await component.searchCustomers("customer");
       await component.moveCustomerPage(1);
       component.navigate("audit");
-      await Promise.resolve();
+      await component.loadAudit();
 
-      expect(component.notice()?.kind).toMatch(/warning|error/);
+      expect(component.auditError()).toBe("AUDIT_SERVICE_UNAVAILABLE");
       expect(component.resolutionLoading()).toBe(false);
       expect(component.resolutionConfirming()).toBe(false);
       expect(component.tagLoading()).toBe(false);
     } finally {
       rejectHttp = false;
     }
+  });
+
+  it("keeps the SSI index in a loading state until Draft rows arrive", async () => {
+    const { AppComponent } = await import("./app.component");
+    const component = new AppComponent();
+    pendingSsiResponse = new Subject<unknown>();
+
+    const refresh = component.refresh();
+    expect(component.ssiIndexLoading()).toBe(true);
+
+    pendingSsiResponse.next([
+      {
+        id: "SSI-EUR-DRAFT",
+        counterpartyId: "ANY",
+        scope: "STANDING",
+        maker: "maker.revision",
+        ownershipType: "OWN",
+        ownerParty: "HK01",
+        publisherParty: "HK01",
+        route: { currency: "EUR", accountWithBic: "DEUTDEFF" },
+        status: "DRAFT",
+        version: 11,
+      },
+      {
+        id: "SSI-JPY-DRAFT",
+        counterpartyId: "ANY",
+        scope: "STANDING",
+        maker: "maker.revision",
+        ownershipType: "OWN",
+        ownerParty: "HK01",
+        publisherParty: "HK01",
+        route: { currency: "JPY", accountWithBic: "BOTKJPJT" },
+        status: "DRAFT",
+        version: 20,
+      },
+    ]);
+    pendingSsiResponse.complete();
+    await refresh;
+    component.ownershipStatus.set("DRAFT");
+
+    expect(component.ssiIndexLoading()).toBe(false);
+    expect(component.visibleRows().map((row) => row.id)).toEqual([
+      "SSI-EUR-DRAFT",
+      "SSI-JPY-DRAFT",
+    ]);
+    pendingSsiResponse = undefined;
   });
 
   it("initialises SWIFT Data CRUD and applies local filtering and sorting", async () => {
@@ -1835,6 +2097,19 @@ describe("portal component behavior", () => {
           maximum: 999,
           optionsSource: "currencies",
         },
+        {
+          key: "route.beneficiaryBic",
+          label: "Beneficiary BIC",
+          type: "input",
+          "x-required-when": {
+            path: "route.beneficiarySource",
+            equals: "SSI",
+          },
+          "x-disabled-when": {
+            path: "route.beneficiarySource",
+            equals: "TRANSACTION",
+          },
+        },
       ],
       "x-lifecycle": ["submit", "approve", "activate"],
     };
@@ -1866,8 +2141,10 @@ describe("portal component behavior", () => {
       row,
     );
     expect(component.rowLabel(row)).toContain("ROW-1");
-    expect(component.coreFields(resource)).toHaveLength(2);
-    expect(component.detailFields(resource)).toHaveLength(2);
+    expect(component.detailModel()).toMatchObject({
+      id: "ROW-1",
+      route: { currency: "USD" },
+    });
     const messageTypeField = component
       .fields()
       .find((field) => field.key === "messageTypes")!;
@@ -1877,6 +2154,23 @@ describe("portal component behavior", () => {
       true,
     );
     expect(validateMessageTypes({ value: "javascript:alert(1)" })).toBe(false);
+    const beneficiaryField = component
+      .fields()
+      .find((field) => field.key === "route.beneficiaryBic")!;
+    const requiredExpression = beneficiaryField.expressions?.[
+      "props.required"
+    ] as (field: { model: unknown }) => boolean;
+    const disabledExpression = beneficiaryField.expressions?.[
+      "props.disabled"
+    ] as (field: { model: unknown }) => boolean;
+    expect(
+      requiredExpression({ model: { route: { beneficiarySource: "SSI" } } }),
+    ).toBe(true);
+    expect(
+      disabledExpression({
+        model: { route: { beneficiarySource: "TRANSACTION" } },
+      }),
+    ).toBe(true);
     component.edit(row);
     component.model = {
       id: "ROW-1",
@@ -1884,12 +2178,27 @@ describe("portal component behavior", () => {
       messageTypes: "MT202, MT202COV",
       amount: "25",
     };
+    fakeHttp.get.mockClear();
     await component.save();
+    expect(component.formVisible()).toBe(false);
+    expect(component.statusFilter()).toBe("DRAFT");
+    expect(component.editingId()).toBeNull();
+    expect(component.savedDraftId()).toBe("ROW-1");
+    expect(
+      fakeHttp.get.mock.calls.some(([url]) =>
+        String(url).includes("status=DRAFT"),
+      ),
+    ).toBe(true);
+    expect(component.canAct(row, "submit")).toBe(true);
+    expect(component.canAct(row, "approve")).toBe(false);
+    expect(
+      component.canAct({ ...row, status: "PENDING_APPROVAL" }, "approve"),
+    ).toBe(true);
     await component.act(row, "submit");
     await component.revise({ ...row, status: "ACTIVE" });
-    component.requestRevoke(row);
+    component.requestSuppress({ ...row, status: "ACTIVE" });
     component.revokeReason.set("duplicate record");
-    await component.confirmRevoke();
+    await component.confirmSuppression();
 
     expect(component.value({ ...row, scope: "REUSABLE" }, "scope")).toBe(
       "STANDING",
@@ -1940,10 +2249,11 @@ describe("portal component behavior", () => {
     };
     await component.upload({ target: uploadTarget } as unknown as Event, true);
     expect(uploadTarget.value).toBe("");
-  }, 15_000);
+  }, 30_000);
 
   it("provides native Formly select and BIC behaviors", async () => {
-    const { BicInputType, NativeSelectType } = await import("./formly-types");
+    const { BicInputType, MessageTypeTagsType, NativeSelectType } =
+      await import("./formly-types");
     const select = new NativeSelectType();
     Object.defineProperty(select, "props", {
       value: { options: [{ label: "USD", value: "USD" }] },
@@ -1969,6 +2279,37 @@ describe("portal component behavior", () => {
     expect(bic.validationMessage).toBe("Invalid bank");
     bic.openPicker();
     expect(pickerAction).toHaveBeenCalled();
+
+    const tags = new MessageTypeTagsType();
+    let messageTypeValue = "MT300";
+    const messageTypeControl = {
+      get value() {
+        return messageTypeValue;
+      },
+      setValue: (value: string) => {
+        messageTypeValue = value;
+      },
+      markAsDirty: jest.fn(),
+      markAsTouched: jest.fn(),
+    };
+    Object.defineProperty(tags, "formControl", {
+      value: messageTypeControl,
+    });
+    Object.defineProperty(tags, "props", {
+      value: {
+        options: [
+          { label: "MT300", value: "MT300" },
+          { label: "pacs.009.001.08", value: "pacs.009.001.08" },
+        ],
+      },
+    });
+    expect(tags.isSelected("MT300")).toBe(true);
+    tags.query.set("pacs");
+    expect(tags.visibleOptions.map(({ value }) => value)).toEqual([
+      "pacs.009.001.08",
+    ]);
+    tags.toggle("pacs.009.001.08");
+    expect(messageTypeValue).toBe("MT300, pacs.009.001.08");
   });
 
   it("fails closed for SWIFT Data service errors and malformed imports", async () => {
@@ -2006,9 +2347,9 @@ describe("portal component behavior", () => {
       await component.save();
       await component.act(row, "submit");
       await component.revise(row);
-      component.requestRevoke(row);
+      component.requestSuppress({ ...row, status: "ACTIVE" });
       component.revokeReason.set("duplicate record");
-      await component.confirmRevoke();
+      await component.confirmSuppression();
       const uploadTarget = {
         files: [
           {

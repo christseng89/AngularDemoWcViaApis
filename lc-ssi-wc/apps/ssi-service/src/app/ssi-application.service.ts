@@ -8,6 +8,7 @@ import {
 import { randomUUID } from "node:crypto";
 import {
   SqliteSsiRepository,
+  type SsiPageRequest,
   type SsiApplicabilityInput,
   type SsiRecord,
 } from "./sqlite-ssi.repository";
@@ -29,6 +30,7 @@ import {
   type PaymentCounterpartyType,
 } from "./payment-settlement-profile";
 import { PaymentMessageIndexService } from "./payment-message-index.service";
+import { revisionWipExpiresAt } from "./shared/sqlite-governed.repository";
 
 export interface CreateSsiCommand {
   counterpartyId: string;
@@ -176,8 +178,7 @@ function canonicalSettlementFor(
     reimbursementAgentBics: [parties.deliveryAgentBic].filter(
       (value): value is string => Boolean(value),
     ),
-    settlementAccountReference:
-      nostroEvidence?.accountReference?.trim() ?? "",
+    settlementAccountReference: nostroEvidence?.accountReference?.trim() ?? "",
     directAccountRelationshipCount,
     settlementCountry: selected.route["settlementCountry"] ?? "",
     settlementMarket: selected.route["settlementMarket"] ?? "",
@@ -258,6 +259,13 @@ function validateClearingScope(
 }
 
 function validateRouteBics(route: Record<string, string>): void {
+  const beneficiarySource = route["beneficiarySource"];
+  if (beneficiarySource === "SSI" && !route["beneficiaryBic"])
+    throw new BadRequestException("BENEFICIARY_BIC_REQUIRED");
+  if (beneficiarySource === "TRANSACTION" && route["beneficiaryBic"])
+    throw new BadRequestException(
+      "TRANSACTION_BENEFICIARY_MUST_NOT_BE_STORED_IN_SSI",
+    );
   for (const field of [
     "bic",
     "beneficiaryBic",
@@ -274,9 +282,10 @@ function validateRouteBics(route: Record<string, string>): void {
 function validateCounterpartyIdentity(route: Record<string, string>): void {
   const counterpartyType = route["counterpartyType"] ?? "BANK";
   const counterpartyBic = route["counterpartyBic"];
+  if (counterpartyType === "ANY_BANK" && counterpartyBic !== "ANY")
+    throw new BadRequestException("ANY_BANK_COUNTERPARTY_MUST_USE_ANY");
   if (
     counterpartyType === "BANK" &&
-    counterpartyBic !== "ANY" &&
     (!counterpartyBic || !BIC_PATTERN.test(counterpartyBic))
   )
     throw new BadRequestException("BANK_COUNTERPARTY_BIC_REQUIRED");
@@ -304,15 +313,28 @@ export class SsiApplicationService {
     private readonly nostro: NostroApplicationService,
     private readonly paymentMessageIndex: PaymentMessageIndexService,
   ) {}
-  list(): Array<
+  list(status?: string): Array<
     SsiRecord & {
       applicability: ReturnType<SqliteSsiRepository["listApplicability"]>;
     }
   > {
-    return this.repository.list().map((record) => ({
+    return this.repository.list(status).map((record) => ({
       ...this.withExplicitOwnership(record),
       applicability: this.repository.listApplicability(record.id),
     }));
+  }
+  listPage(request: SsiPageRequest) {
+    const page = this.repository.listPage(request);
+    return {
+      ...page,
+      items: page.items.map((record) => ({
+        ...this.withExplicitOwnership(record),
+        applicability: this.repository.listApplicability(record.id),
+      })),
+    };
+  }
+  summary() {
+    return this.repository.summary();
   }
   listApplicability(ssiId?: string): unknown {
     return this.repository.listApplicability(ssiId);
@@ -374,7 +396,9 @@ export class SsiApplicationService {
 
   update(id: string, command: CreateSsiCommand): SsiRecord {
     const current = this.requireRecord(id);
-    if (current.status !== "DRAFT")
+    if (current.changeType === "SUPPRESSION")
+      throw new ConflictException("SUPPRESSION_DRAFT_CANNOT_BE_EDITED");
+    if (!["DRAFT", "WIP"].includes(current.status))
       throw new ConflictException(
         "Only DRAFT SSI can be updated; create a revision instead",
       );
@@ -387,9 +411,11 @@ export class SsiApplicationService {
       scope: command.scope,
       route: command.route,
       ...this.resolveOwnership(command),
+      status: "DRAFT",
       version: current.version + 1,
       updatedAt: new Date().toISOString(),
     };
+    delete next.revisionWipExpiresAt;
     this.repository.save(next, "UPDATED", command.maker);
     return next;
   }
@@ -397,11 +423,14 @@ export class SsiApplicationService {
   revise(id: string, maker: string): SsiRecord {
     const current = this.requireRecord(id);
     if (!maker) throw new BadRequestException("MAKER_REQUIRED");
-    if (current.status === "DRAFT") return current;
     if (["REVOKED", "SUPERSEDED"].includes(current.status))
       throw new ConflictException(
         "Revoked or superseded SSI cannot be revised",
       );
+    if (!["ACTIVE", "APPROVED"].includes(current.status))
+      throw new ConflictException("INVALID_REVISION_STATUS");
+    if (this.repository.hasOpenRevision?.(current.id))
+      throw new ConflictException("OPEN_REVISION_EXISTS");
     const now = new Date().toISOString();
     const revision: SsiRecord = {
       id: randomUUID(),
@@ -410,14 +439,74 @@ export class SsiApplicationService {
       maker,
       ...this.resolveOwnership(current),
       route: { ...current.route },
-      status: "DRAFT",
+      status: "WIP",
+      revisionWipExpiresAt: revisionWipExpiresAt(),
       version: current.version + 1,
       amendmentOfId: current.id,
       createdAt: now,
       updatedAt: now,
     };
-    this.repository.save(revision, "REVISION_CREATED", maker);
+    const reserved =
+      this.repository.saveRevisionWorkInProgress?.(revision, maker) ??
+      (this.repository.save(revision, "WIP_RESERVED", maker), true);
+    if (!reserved) throw new ConflictException("REVISION_NOT_AVAILABLE");
+    this.copyApplicability(current.id, revision.id, maker);
     return revision;
+  }
+
+  cancelRevision(id: string, actor: string): SsiRecord {
+    const current = this.requireRecord(id);
+    if (!actor) throw new BadRequestException("ACTOR_REQUIRED");
+    if (current.status !== "WIP")
+      throw new ConflictException("CANCELLATION_REQUIRES_WIP");
+    if (actor !== current.maker)
+      throw new ConflictException("ONLY_REVISION_MAKER_CAN_CANCEL");
+    const cancelled: SsiRecord = {
+      ...current,
+      status: "REVOKED",
+      revokeReason: "Revision WIP cancelled by maker",
+      version: current.version + 1,
+      updatedAt: new Date().toISOString(),
+    };
+    delete cancelled.revisionWipExpiresAt;
+    this.repository.save(cancelled, "WIP_CANCELLED", actor);
+    return cancelled;
+  }
+
+  suppress(id: string, maker: string, reason: string): SsiRecord {
+    const current = this.requireRecord(id);
+    if (!maker) throw new BadRequestException("MAKER_REQUIRED");
+    if ((reason?.trim().length ?? 0) < 5)
+      throw new BadRequestException("SUPPRESSION_REASON_REQUIRED");
+    if (current.status !== "ACTIVE")
+      throw new ConflictException("ONLY_ACTIVE_CAN_BE_SUPPRESSED");
+    if (this.repository.hasOpenRevision?.(current.id))
+      throw new ConflictException("OPEN_REVISION_EXISTS");
+    const now = new Date().toISOString();
+    const suppression: SsiRecord = {
+      ...current,
+      id: randomUUID(),
+      maker,
+      status: "DRAFT",
+      changeType: "SUPPRESSION",
+      suppressionReason: reason.trim(),
+      version: current.version + 1,
+      amendmentOfId: current.id,
+      createdAt: now,
+      updatedAt: now,
+    };
+    delete suppression.checker;
+    const reserved =
+      this.repository.saveRevisionWorkInProgress?.(
+        suppression,
+        maker,
+        "SUPPRESSION_DRAFT_CREATED",
+      ) ??
+      (this.repository.save(suppression, "SUPPRESSION_DRAFT_CREATED", maker),
+      true);
+    if (!reserved) throw new ConflictException("SUPPRESSION_NOT_AVAILABLE");
+    this.copyApplicability(current.id, suppression.id, maker);
+    return suppression;
   }
 
   revoke(id: string, actor: string, reason: string): SsiRecord {
@@ -427,6 +516,10 @@ export class SsiApplicationService {
       throw new BadRequestException("REVOCATION_REASON_REQUIRED");
     if (current.status === "REVOKED")
       throw new ConflictException("SSI already revoked");
+    if (current.status === "ACTIVE")
+      throw new ConflictException("ACTIVE_REQUIRES_SUPPRESSION");
+    if (!["DRAFT", "WIP"].includes(current.status))
+      throw new ConflictException("REVOCATION_REQUIRES_DRAFT");
     if (current.status !== "DRAFT" && actor === current.maker)
       throw new ConflictException("Maker cannot revoke an approved SSI");
     const next: SsiRecord = {
@@ -442,13 +535,15 @@ export class SsiApplicationService {
 
   transition(
     id: string,
-    action: "SUBMIT" | "APPROVE" | "ACTIVATE",
+    action: "SUBMIT" | "APPROVE" | "REJECT" | "ACTIVATE",
     actor: string,
+    reason = "",
   ): SsiRecord {
     const current = this.requireRecord(id);
     const expected = {
       SUBMIT: "DRAFT",
       APPROVE: "PENDING_APPROVAL",
+      REJECT: "PENDING_APPROVAL",
       ACTIVATE: "APPROVED",
     }[action];
     if (current.status !== expected)
@@ -457,37 +552,101 @@ export class SsiApplicationService {
       );
     if (action === "SUBMIT" && actor !== current.maker)
       throw new ConflictException("Only the maker can submit");
-    if (action === "APPROVE" && actor === current.maker)
-      throw new ConflictException("Maker cannot approve their own SSI");
     if (
-      action === "ACTIVATE" &&
+      (action === "APPROVE" || action === "REJECT") &&
+      actor === current.maker
+    )
+      throw new ConflictException("Maker cannot check their own SSI");
+    if (action === "REJECT" && reason.trim().length < 5)
+      throw new BadRequestException("REJECTION_REASON_REQUIRED");
+    const activates = action === "APPROVE" || action === "ACTIVATE";
+    if (
+      action === "SUBMIT" &&
+      current.changeType === "SUPPRESSION" &&
+      (current.suppressionReason?.trim().length ?? 0) < 5
+    )
+      throw new BadRequestException("SUPPRESSION_REASON_REQUIRED");
+    if (action === "APPROVE" && current.changeType === "SUPPRESSION") {
+      const suppressed = this.repository.approveSuppression(current.id, actor);
+      if (!suppressed) throw new ConflictException("SUPPRESSION_STATE_CHANGED");
+      return suppressed;
+    }
+    if (
+      activates &&
       current.scope === "TRANSACTION_SPECIFIC" &&
       !current.route["transactionBindingReference"]?.trim()
     )
       throw new ConflictException("TRANSACTION_BINDING_REQUIRED");
-    if (
-      action === "ACTIVATE" &&
-      !this.repository
-        .listApplicability(id)
-        .some((row) => row.status === "ACTIVE")
-    )
+    const applicability = activates
+      ? this.ensureRevisionApplicability(current, actor)
+      : [];
+    if (activates && !applicability.some((row) => row.status === "ACTIVE"))
       throw new ConflictException("ACTIVE_SSI_APPLICABILITY_REQUIRED");
-    if (action === "ACTIVATE") this.validateRoute(current.route);
+    if (activates) this.validateRoute(current.route);
     const status = {
       SUBMIT: "PENDING_APPROVAL",
-      APPROVE: "APPROVED",
+      APPROVE: "ACTIVE",
+      REJECT: "DRAFT",
       ACTIVATE: "ACTIVE",
     }[action];
-    if (action === "ACTIVATE") this.supersedePreviousActive(current, actor);
+    if (activates) this.supersedePreviousActive(current, actor);
     const next: SsiRecord = {
       ...current,
       status,
       version: current.version + 1,
       updatedAt: new Date().toISOString(),
       ...(action === "APPROVE" ? { checker: actor } : {}),
+      ...(action === "REJECT"
+        ? { checker: actor, rejectionReason: reason.trim() }
+        : {}),
     };
     this.repository.save(next, action, actor);
     return next;
+  }
+
+  private ensureRevisionApplicability(
+    record: SsiRecord,
+    actor: string,
+  ): ReturnType<SqliteSsiRepository["listApplicability"]> {
+    const current = this.repository.listApplicability(record.id);
+    if (current.length > 0 || !record.amendmentOfId) return current;
+    return this.copyApplicability(record.amendmentOfId, record.id, actor);
+  }
+
+  private copyApplicability(
+    sourceId: string,
+    targetId: string,
+    actor: string,
+  ): ReturnType<SqliteSsiRepository["listApplicability"]> {
+    const source = this.repository.listApplicability(sourceId);
+    if (source.length === 0) return [];
+    return this.repository.replaceApplicability(
+      targetId,
+      source.map(
+        ({
+          consumer,
+          product,
+          businessFunction,
+          paymentLeg,
+          direction,
+          status,
+          validFrom,
+          validTo,
+          fixtureBindingIds,
+        }) => ({
+          consumer,
+          product,
+          businessFunction,
+          paymentLeg,
+          direction,
+          status,
+          validFrom,
+          validTo,
+          ...(fixtureBindingIds ? { fixtureBindingIds } : {}),
+        }),
+      ),
+      actor,
+    );
   }
 
   private validateResolutionRequest(request: RouteResolutionRequest): void {
@@ -780,7 +939,9 @@ export class SsiApplicationService {
         list?: () => ReturnType<NostroApplicationService["list"]>;
       }
     ).list;
-    const references = (typeof list === "function" ? list.call(this.nostro) : [])
+    const references = (
+      typeof list === "function" ? list.call(this.nostro) : []
+    )
       .filter((record) => {
         const allowed = record.allowedBookingEntities ?? [];
         return (
@@ -837,23 +998,25 @@ export class SsiApplicationService {
     const exactCounterparty = request.counterpartyBic || request.counterpartyId;
     const profileAvailable =
       request.businessService === COV_BUSINESS_SERVICE &&
-      this.repository.list().some(
-        (candidate) =>
-          candidate.status === "ACTIVE" &&
-          candidate.route["currency"] === request.currency &&
-          candidate.route["bookingEntity"] === request.bookingEntity &&
-          (candidate.route["counterpartyBic"] || candidate.counterpartyId) ===
-            exactCounterparty &&
-          routeList(candidate.route, "messageTypes").includes(
-            request.messageType,
-          ) &&
-          routeList(candidate.route, "businessService").includes(
-            COV_BUSINESS_SERVICE,
-          ) &&
-          routeList(candidate.route, "sourceMessageTypes").includes(
-            sourceMessageType,
-          ),
-      );
+      this.repository
+        .list()
+        .some(
+          (candidate) =>
+            candidate.status === "ACTIVE" &&
+            candidate.route["currency"] === request.currency &&
+            candidate.route["bookingEntity"] === request.bookingEntity &&
+            (candidate.route["counterpartyBic"] || candidate.counterpartyId) ===
+              exactCounterparty &&
+            routeList(candidate.route, "messageTypes").includes(
+              request.messageType,
+            ) &&
+            routeList(candidate.route, "businessService").includes(
+              COV_BUSINESS_SERVICE,
+            ) &&
+            routeList(candidate.route, "sourceMessageTypes").includes(
+              sourceMessageType,
+            ),
+        );
     if (!profileAvailable)
       throw new ServiceUnavailableException("PROFILE_INCOMPLETE");
   }

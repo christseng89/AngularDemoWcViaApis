@@ -165,5 +165,21 @@ describe("Counterparty Inbox query model", () => {
         (row) => row.id,
       ),
     ).toEqual(["a", "b"]);
+
+    const requests = [
+      { ...rows[0], id: "suppression", changeType: "SUPPRESSION" as const },
+      { ...rows[0], id: "new" },
+      {
+        ...rows[0],
+        id: "revision",
+        changeType: "REVISION" as const,
+        amendmentOfId: "source",
+      },
+    ];
+    expect(
+      sortSsiOwnershipRows(requests, "REQUEST_TYPE", "ASC").map(
+        (row) => row.id,
+      ),
+    ).toEqual(["new", "revision", "suppression"]);
   });
 });

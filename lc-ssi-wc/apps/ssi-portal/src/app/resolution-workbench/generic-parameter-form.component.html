@@ -134,11 +134,17 @@
     }
 
     <div class="workbench-actions">
-      <button type="button" [disabled]="submitting()" (click)="cancel()">
-        Cancel
+      <button
+        type="button"
+        class="ghost"
+        [disabled]="submitting()"
+        (click)="cancel()"
+      >
+        Back
       </button>
       <button
         type="button"
+        class="primary"
         [disabled]="resolveDisabled()"
         [attr.aria-busy]="submitting()"
         (click)="submit()"

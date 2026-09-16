@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import { EntityRepository, type EntityRecord } from "./entity.repository";
+import { revisionWipExpiresAt } from "../shared/sqlite-governed.repository";
 export type EntityCommand = Pick<
   EntityRecord,
   | "branchCode"
@@ -20,8 +21,16 @@ export type EntityCommand = Pick<
 @Injectable()
 export class EntityApplicationService {
   constructor(private readonly repository: EntityRepository) {}
-  list() {
-    return this.repository.list();
+  list(status?: string) {
+    return this.repository.list(status);
+  }
+  listPage(request: {
+    status?: string;
+    page?: number;
+    pageSize?: number;
+    search?: string;
+  }) {
+    return this.repository.listPage(request);
   }
   create(c: EntityCommand) {
     this.validate(c);
@@ -39,16 +48,24 @@ export class EntityApplicationService {
   }
   update(id: string, c: EntityCommand) {
     const current = this.require(id);
-    if (current.status !== "DRAFT" || current.maker !== c.maker) {
+    if (current.changeType === "SUPPRESSION") {
+      throw new ConflictException("SUPPRESSION_DRAFT_CANNOT_BE_EDITED");
+    }
+    if (
+      !["DRAFT", "WIP"].includes(current.status) ||
+      current.maker !== c.maker
+    ) {
       throw new ConflictException("Only original maker can update DRAFT");
     }
     this.validate(c);
     const next = {
       ...current,
       ...c,
+      status: "DRAFT",
       version: current.version + 1,
       updatedAt: new Date().toISOString(),
     };
+    delete next.revisionWipExpiresAt;
     this.repository.save(next, "UPDATED", c.maker, "ENTITY");
     return next;
   }
@@ -57,30 +74,77 @@ export class EntityApplicationService {
     if (!maker || ["REVOKED", "SUPERSEDED"].includes(current.status)) {
       throw new ConflictException("Entity cannot be revised");
     }
+    if (!["ACTIVE", "APPROVED"].includes(current.status)) {
+      throw new ConflictException("INVALID_REVISION_STATUS");
+    }
+    if (this.repository.hasOpenRevision?.(current.id)) {
+      throw new ConflictException("OPEN_REVISION_EXISTS");
+    }
     const now = new Date().toISOString();
     const next: EntityRecord = {
       ...current,
       id: randomUUID(),
       maker,
-      status: "DRAFT",
+      status: "WIP",
+      revisionWipExpiresAt: revisionWipExpiresAt(),
       version: current.version + 1,
       amendmentOfId: current.id,
       createdAt: now,
       updatedAt: now,
     };
     delete next.checker;
-    this.repository.save(next, "REVISION_CREATED", maker, "ENTITY");
+    const reserved =
+      this.repository.saveRevisionWorkInProgress?.(next, maker, "ENTITY") ??
+      (this.repository.save(next, "WIP_RESERVED", maker, "ENTITY"), true);
+    if (!reserved) throw new ConflictException("REVISION_NOT_AVAILABLE");
+    return next;
+  }
+  suppress(id: string, maker: string, reason: string) {
+    const current = this.require(id);
+    if (!maker) throw new BadRequestException("MAKER_REQUIRED");
+    if ((reason?.trim().length ?? 0) < 5)
+      throw new BadRequestException("SUPPRESSION_REASON_REQUIRED");
+    if (current.status !== "ACTIVE")
+      throw new ConflictException("ONLY_ACTIVE_CAN_BE_SUPPRESSED");
+    if (this.repository.hasOpenRevision?.(current.id))
+      throw new ConflictException("OPEN_REVISION_EXISTS");
+    const now = new Date().toISOString();
+    const next: EntityRecord = {
+      ...current,
+      id: randomUUID(),
+      maker,
+      status: "DRAFT",
+      changeType: "SUPPRESSION",
+      suppressionReason: reason.trim(),
+      version: current.version + 1,
+      amendmentOfId: current.id,
+      createdAt: now,
+      updatedAt: now,
+    };
+    delete next.checker;
+    const reserved =
+      this.repository.saveRevisionWorkInProgress?.(
+        next,
+        maker,
+        "ENTITY",
+        "SUPPRESSION_DRAFT_CREATED",
+      ) ??
+      (this.repository.save(next, "SUPPRESSION_DRAFT_CREATED", maker, "ENTITY"),
+      true);
+    if (!reserved) throw new ConflictException("SUPPRESSION_NOT_AVAILABLE");
     return next;
   }
   transition(
     id: string,
-    action: "SUBMIT" | "APPROVE" | "ACTIVATE",
+    action: "SUBMIT" | "APPROVE" | "REJECT" | "ACTIVATE",
     actor: string,
+    reason = "",
   ) {
     const current = this.require(id);
     const expected = {
       SUBMIT: "DRAFT",
       APPROVE: "PENDING_APPROVAL",
+      REJECT: "PENDING_APPROVAL",
       ACTIVATE: "APPROVED",
     }[action];
     if (current.status !== expected) {
@@ -89,10 +153,27 @@ export class EntityApplicationService {
     if (action === "SUBMIT" && actor !== current.maker) {
       throw new ConflictException("Only maker can submit");
     }
-    if (action === "APPROVE" && actor === current.maker) {
+    if (["APPROVE", "REJECT"].includes(action) && actor === current.maker) {
       throw new ConflictException("Maker cannot approve");
     }
-    if (action === "ACTIVATE") {
+    if (
+      action === "SUBMIT" &&
+      current.changeType === "SUPPRESSION" &&
+      (current.suppressionReason?.trim().length ?? 0) < 5
+    )
+      throw new BadRequestException("SUPPRESSION_REASON_REQUIRED");
+    if (action === "REJECT" && reason.trim().length < 5)
+      throw new BadRequestException("REJECTION_REASON_REQUIRED");
+    if (action === "APPROVE" && current.changeType === "SUPPRESSION") {
+      const suppressed = this.repository.approveSuppression?.(
+        current.id,
+        actor,
+        "ENTITY",
+      );
+      if (!suppressed) throw new ConflictException("SUPPRESSION_STATE_CHANGED");
+      return suppressed;
+    }
+    if (action === "APPROVE" || action === "ACTIVATE") {
       for (const previous of this.repository
         .list()
         .filter(
@@ -118,12 +199,16 @@ export class EntityApplicationService {
       ...current,
       status: {
         SUBMIT: "PENDING_APPROVAL",
-        APPROVE: "APPROVED",
+        APPROVE: "ACTIVE",
+        REJECT: "DRAFT",
         ACTIVATE: "ACTIVE",
       }[action],
       version: current.version + 1,
       updatedAt: new Date().toISOString(),
       ...(action === "APPROVE" ? { checker: actor } : {}),
+      ...(action === "REJECT"
+        ? { checker: actor, rejectionReason: reason.trim() }
+        : {}),
     };
     this.repository.save(next, action, actor, "ENTITY");
     return next;
@@ -133,6 +218,10 @@ export class EntityApplicationService {
     if (!actor || reason?.trim().length < 5) {
       throw new BadRequestException("ACTOR_AND_REASON_REQUIRED");
     }
+    if (current.status === "ACTIVE")
+      throw new ConflictException("ACTIVE_REQUIRES_SUPPRESSION");
+    if (!["DRAFT", "WIP"].includes(current.status))
+      throw new ConflictException("REVOCATION_REQUIRES_DRAFT");
     const next = {
       ...current,
       status: "REVOKED",

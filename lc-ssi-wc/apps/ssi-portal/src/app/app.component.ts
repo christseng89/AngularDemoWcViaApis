@@ -9,11 +9,13 @@ import {
 } from "@angular/core";
 import { HttpClient } from "@angular/common/http";
 import { scalarText } from "./scalar-text";
-import { DOCUMENT, JsonPipe } from "@angular/common";
+import { DOCUMENT } from "@angular/common";
 import { ReactiveFormsModule, FormGroup } from "@angular/forms";
 import { FormlyForm, type FormlyFieldConfig } from "@ngx-formly/core";
+import { readonlyFormFields, ssiFormModel } from "./ssi-form-presentation";
 import { firstValueFrom } from "rxjs";
 import { SwiftDataCrudComponent } from "./swift-data-crud.component";
+import { GovernedRecordViewComponent } from "./governed-record-view.component";
 import { presentOfficialFieldName } from "./official-field-name";
 import { hasManualRouteOverride } from "./resolution-route-selection";
 import {
@@ -23,8 +25,6 @@ import {
 } from "./demo-suggestion-candidates";
 import {
   analyzeFin5xSupport,
-  canonicalRole,
-  isSsiResolvableField,
   isVisibleSsiResolutionRow,
 } from "./fin-5x-route-analysis";
 import {
@@ -84,14 +84,22 @@ import {
   type BankServicePickerItem,
 } from "./bank-service-picker-dialog.component";
 import {
+  auditGovernedSnapshot,
   auditPage,
   presentAuditEvent,
+  auditSsiSnapshot,
   sortAuditRows,
   type AuditPresentation,
   type AuditRow,
   type AuditSortDirection,
   type AuditSortKey,
 } from "./audit-presentation";
+import {
+  GovernanceIndexTableComponent,
+  type GovernanceIndexColumn,
+} from "./governance-index-table.component";
+import { LoadingStateComponent } from "./loading-state.component";
+import { DeferredFeatureShellComponent } from "./deferred-feature-shell.component";
 
 type View =
   | "dashboard"
@@ -107,6 +115,59 @@ type BicTarget =
   "counterpartyId" | "beneficiaryBic" | "accountWithBic" | "intermediaryBic";
 type MessageFormat = "FIN_LIKE" | "MX_JSON";
 type ThemeMode = "system" | "light" | "dark";
+type GovernanceTab = "rma" | "entity" | "nostro" | "ssi";
+const AUDIT_INDEX_COLUMNS: Record<
+  GovernanceTab,
+  readonly GovernanceIndexColumn[]
+> = {
+  rma: [
+    { label: "Own BIC", path: "ownBic" },
+    { label: "Counterparty BIC", path: "counterpartyBic" },
+    { label: "Service", path: "service" },
+    { label: "Direction", path: "direction" },
+    { label: "Messages", path: "messageTypes" },
+    { label: "Status", path: "status" },
+    { label: "Version", path: "version" },
+  ],
+  entity: [
+    { label: "Code", path: "branchCode" },
+    { label: "Name", path: "branchName" },
+    { label: "Legal Entity Code", path: "legalEntityCode" },
+    { label: "Legal Entity Name", path: "legalEntityName" },
+    { label: "Country", path: "countryCode" },
+    { label: "Effective From", path: "validFrom" },
+    { label: "Effective To", path: "validTo" },
+    { label: "Status", path: "status" },
+    { label: "Version", path: "version" },
+  ],
+  nostro: [
+    { label: "Legal Entity", path: "ownLegalEntityId" },
+    { label: "Servicer BIC", path: "accountServicerBic" },
+    { label: "Currency", path: "currency" },
+    { label: "Masked Account", path: "maskedAccountRef" },
+    { label: "Purpose", path: "purpose" },
+    { label: "Priority", path: "priority" },
+    { label: "Status", path: "status" },
+    { label: "Version", path: "version" },
+  ],
+  ssi: [
+    { label: "Booking / Legal Entity", path: "route.bookingEntity|ownerParty" },
+    {
+      label: "Account Owner / Servicer",
+      path: "route.accountOwner|route.accountWithBic",
+    },
+    { label: "Account Ref", path: "route.accountId" },
+    { label: "Currency", path: "route.currency" },
+    {
+      label: "Route Class / Priority",
+      path: "route.routePreference|route.priority",
+    },
+    { label: "Effective Period", path: "route.validFrom|route.validTo" },
+    { label: "Status", path: "status" },
+    { label: "Version", path: "version" },
+    { label: "Request Type", path: "__requestType" },
+  ],
+};
 
 const localCalendarDate = (date = new Date()): string => {
   const year = date.getFullYear();
@@ -125,12 +186,72 @@ interface SsiRow {
   route: Record<string, string>;
   version: number;
   amendmentOfId?: string;
+  hasOpenRevision?: boolean;
+  openRevisionId?: string;
+  openRevisionStatus?: "WIP" | "DRAFT" | "PENDING_APPROVAL" | "APPROVED";
+  changeType?: "REVISION" | "SUPPRESSION";
+  suppressionReason?: string;
+  rejectionReason?: string;
   createdAt?: string;
   updatedAt?: string;
   ownershipType?: "OWN" | "COUNTERPARTY";
   ownerParty?: string;
   publisherParty?: string;
   applicability?: readonly SsiApplicability[];
+}
+interface SsiPage {
+  items: readonly SsiRow[];
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+  hasPrevious: boolean;
+  hasNext: boolean;
+}
+interface SsiIndexSummary {
+  currentOwn: number;
+  pendingApproval: number;
+  active: number;
+  archived: number;
+}
+interface CheckerResourceContract {
+  id: string;
+  label: string;
+  endpoint: string;
+  fields?: readonly AuditParameterField[];
+  "x-lifecycle": readonly string[];
+}
+interface AuditParameterField {
+  key: string;
+  label: string;
+  type: string;
+  required?: boolean;
+  inputType?: string;
+  description?: string;
+  pattern?: string;
+  minLength?: number;
+  maxLength?: number;
+  minimum?: number;
+  maximum?: number;
+  options?: readonly string[];
+  optionsSource?: string;
+}
+interface AuditMessageTypeChanges {
+  readonly unchanged: readonly string[];
+  readonly added: readonly string[];
+  readonly suppressed: readonly string[];
+}
+interface CheckerOpenApiContract {
+  "x-ui-resources": readonly CheckerResourceContract[];
+}
+interface GovernedPendingRow {
+  resourceId: string;
+  resourceLabel: string;
+  endpoint: string;
+  id: string;
+  status: string;
+  maker: string;
+  version: number;
 }
 interface CurrencyReference {
   code: string;
@@ -638,9 +759,6 @@ const tagField = (
   expectedSource: string,
 ): TagFieldExpectation => ({ tag, semanticRole, expectedSource });
 
-type ResolutionRoles = Record<string, string>;
-
-const roleValue = (value: string | undefined): string => value ?? "";
 type AriaSortDirection = "ascending" | "descending" | "none";
 
 function paymentSourceLabel(consumer: string): string {
@@ -668,102 +786,6 @@ function sortDirectionIndicator(
 function activeTheme(mode: ThemeMode, prefersDark: boolean): "light" | "dark" {
   if (mode !== "system") return mode;
   return prefersDark ? "dark" : "light";
-}
-
-const selectedRoleValue = (
-  selected: boolean,
-  value: string | undefined,
-): string => (selected ? roleValue(value) : "");
-
-function firstRoleValue(
-  route: Readonly<Record<string, string>>,
-  ...roleNames: readonly string[]
-): string {
-  for (const roleName of roleNames) {
-    const value = route[roleName];
-    if (value) return value;
-  }
-  return "";
-}
-
-function createResolutionRoles(
-  route: Readonly<Record<string, string>>,
-  mt400RouteEnabled: boolean,
-  mt760: boolean,
-  reimbursingBankSelected: boolean,
-): ResolutionRoles {
-  return {
-    ACCOUNT_WITH_INSTITUTION: selectedRoleValue(
-      mt400RouteEnabled,
-      route["ACCOUNT_WITH_INSTITUTION"],
-    ),
-    BENEFICIARY_BANK: selectedRoleValue(
-      mt400RouteEnabled,
-      route["BENEFICIARY_BANK"],
-    ),
-    INTERMEDIARY_INSTITUTION: roleValue(route["INTERMEDIARY_INSTITUTION"]),
-    DELIVERY_AGENT: firstRoleValue(
-      route,
-      "DELIVERY_AGENT",
-      "SENDERS_CORRESPONDENT",
-    ),
-    RECEIVING_AGENT: firstRoleValue(
-      route,
-      "RECEIVING_AGENT",
-      "RECEIVERS_CORRESPONDENT",
-    ),
-    BENEFICIARY_INSTITUTION: firstRoleValue(
-      route,
-      "BENEFICIARY_INSTITUTION",
-      "ACCOUNT_WITH_INSTITUTION",
-    ),
-    SENDERS_CORRESPONDENT: selectedRoleValue(
-      mt400RouteEnabled,
-      route["SENDERS_CORRESPONDENT"],
-    ),
-    RECEIVERS_CORRESPONDENT: selectedRoleValue(
-      mt400RouteEnabled,
-      route["RECEIVERS_CORRESPONDENT"],
-    ),
-    ADVISING_BANK: selectedRoleValue(mt760, route["ADVISING_BANK"]),
-    REIMBURSING_BANK: selectedRoleValue(
-      reimbursingBankSelected,
-      route["REIMBURSING_BANK"],
-    ),
-    ADVISE_THROUGH_BANK: roleValue(route["ADVISE_THROUGH_BANK"]),
-    REQUESTED_CONFIRMATION_PARTY: roleValue(
-      route["REQUESTED_CONFIRMATION_PARTY"],
-    ),
-    NEGOTIATING_BANK: roleValue(route["NEGOTIATING_BANK"]),
-  };
-}
-
-function retainSupportedRoles(
-  roles: ResolutionRoles,
-  supportedRoles: ReadonlySet<string>,
-): void {
-  if (supportedRoles.size === 0) return;
-  for (const roleName of Object.keys(roles)) {
-    if (!supportedRoles.has(roleName)) roles[roleName] = "";
-  }
-}
-
-function applyMt400RouteGraph(
-  roles: ResolutionRoles,
-  mt400: boolean,
-  ssi: DemoFinSuggestionCandidate | null,
-): void {
-  if (!mt400 || !ssi) return;
-  roles["SENDERS_CORRESPONDENT"] = roleValue(
-    ssi.routeGraph.senderCorrespondent,
-  );
-  roles["RECEIVERS_CORRESPONDENT"] = roleValue(
-    ssi.routeGraph.receiverCorrespondent,
-  );
-  roles["ACCOUNT_WITH_INSTITUTION"] = selectedRoleValue(
-    ssi.routeGraph.additionalAccountWithRequired,
-    ssi.routeGraph.accountWithInstitution,
-  );
 }
 
 const MT_MESSAGE_NAMES: Readonly<Record<string, string>> = {
@@ -938,6 +960,7 @@ const TAG_FIELD_EXPECTATIONS: Readonly<
 };
 
 const BIC_PATTERN = "^[A-Z0-9]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$";
+const COUNTERPARTY_ID_PATTERN = "^[A-Z0-9][A-Z0-9._-]{2,34}$";
 const TAG_SCENARIOS: readonly TagScenario[] = [
   {
     id: "MT742_OUT",
@@ -1452,13 +1475,16 @@ const FULL_TAG_SCENARIOS: readonly (TagScenario & { executable: boolean })[] = [
   imports: [
     ReactiveFormsModule,
     FormlyForm,
-    JsonPipe,
     SwiftDataCrudComponent,
     OperationalIssueComponent,
     SettingsPageComponent,
     AlertComponent,
     PageDefinitionIndexWorkspaceComponent,
     BankServicePickerDialogComponent,
+    GovernanceIndexTableComponent,
+    LoadingStateComponent,
+    DeferredFeatureShellComponent,
+    GovernedRecordViewComponent,
   ],
   templateUrl: "./app.component.html",
   host: {
@@ -1481,17 +1507,27 @@ export class AppComponent implements OnInit {
   private resolutionRequestSequence = 0;
   private resolutionConfirmationRequestSequence = 0;
   private tagGenerationRequestSequence = 0;
-  private refreshInFlight: Promise<void> | null = null;
-  readonly view = signal<View>("swiftdata");
+  private refreshRequestSequence = 0;
+  readonly ssiIndexLoading = signal(false);
+  readonly view = signal<View>(this.savedView());
   readonly theme = signal<ThemeMode>("system");
   readonly rows = signal<readonly SsiRow[]>([]);
+  readonly ssiIndexTotalItems = signal(0);
+  readonly ssiIndexTotalPages = signal(1);
+  readonly ssiSummary = signal<SsiIndexSummary>({
+    currentOwn: 0,
+    pendingApproval: 0,
+    active: 0,
+    archived: 0,
+  });
   readonly ownershipTab = signal<"OWN" | "COUNTERPARTY">("OWN");
   readonly ownershipSearch = signal("");
-  readonly ownershipStatus = signal<
-    "CURRENT" | "ACTIVE" | "DRAFT" | "SUPERSEDED"
-  >("CURRENT");
+  readonly ownershipStatus = signal<"ACTIVE" | "DRAFT" | "SUPPRESSED" | "ALL">(
+    "ACTIVE",
+  );
   readonly ownershipSort = signal<SsiOwnershipSort>("BOOKING_ENTITY");
   readonly ownershipSortDirection = signal<SortDirection>("ASC");
+  readonly counterpartyDirectoryLoading = signal(false);
   readonly counterpartyDirectory = signal<readonly CounterpartyReference[]>([]);
   readonly selectedCounterpartyId = signal("");
   readonly counterpartyInboxSearch = signal("");
@@ -1518,8 +1554,8 @@ export class AppComponent implements OnInit {
               this.selectedCounterpartyId(),
         )
         .filter((row) =>
-          this.ownershipStatus() === "CURRENT"
-            ? row.status !== "SUPERSEDED"
+          this.ownershipStatus() === "ALL"
+            ? true
             : row.status === this.ownershipStatus(),
         )
         .filter((row) => {
@@ -1595,23 +1631,12 @@ export class AppComponent implements OnInit {
   );
   readonly indexPage = signal(1);
   readonly indexPageSize = 10;
-  readonly indexTotalPages = computed(() =>
-    Math.max(1, Math.ceil(this.visibleRows().length / this.indexPageSize)),
-  );
-  readonly pagedVisibleRows = computed(() => {
-    const page = Math.min(this.indexPage(), this.indexTotalPages());
-    const start = (page - 1) * this.indexPageSize;
-    return this.visibleRows().slice(start, start + this.indexPageSize);
-  });
+  readonly indexTotalPages = computed(() => this.ssiIndexTotalPages());
+  readonly pagedVisibleRows = computed(() => this.visibleRows());
   readonly activeRows = computed(() =>
     this.rows().filter((row) => row.status === "ACTIVE"),
   );
-  readonly archivedCount = computed(
-    () =>
-      this.rows().filter((row) =>
-        ["REVOKED", "SUPERSEDED"].includes(row.status),
-      ).length,
-  );
+  readonly archivedCount = computed(() => this.ssiSummary().archived);
   readonly notice = signal<{
     kind: "info" | "warning" | "error";
     text: string;
@@ -1635,7 +1660,53 @@ export class AppComponent implements OnInit {
   readonly pending = computed(() =>
     this.rows().filter((row) => row.status === "PENDING_APPROVAL"),
   );
-  readonly activeCount = computed(() => this.activeRows().length);
+  readonly checkerTab = signal<GovernanceTab>("rma");
+  readonly checkerIndexSortPath = signal<string | null>(null);
+  readonly checkerSortDirection = signal<AuditSortDirection>("asc");
+  readonly checkerCurrentPage = signal(1);
+  readonly checkerPageSize = 10;
+  readonly auditTab = signal<GovernanceTab>("rma");
+  readonly governedPending = signal<readonly GovernedPendingRow[]>([]);
+  readonly checkerCount = computed(
+    () => this.ssiSummary().pendingApproval + this.governedPending().length,
+  );
+  readonly checkerIndexColumns = computed(
+    () => AUDIT_INDEX_COLUMNS[this.checkerTab()],
+  );
+  readonly sortedCheckerSsiRows = computed(() => {
+    const path = this.checkerIndexSortPath();
+    if (!path) return this.pending();
+    const direction = this.checkerSortDirection() === "asc" ? 1 : -1;
+    return [...this.pending()].sort(
+      (left, right) =>
+        this.auditRecordValue(left, path).localeCompare(
+          this.auditRecordValue(right, path),
+          undefined,
+          { numeric: true, sensitivity: "base" },
+        ) * direction,
+    );
+  });
+  readonly checkerTotalPages = computed(() =>
+    Math.max(
+      1,
+      Math.ceil(this.sortedCheckerSsiRows().length / this.checkerPageSize),
+    ),
+  );
+  readonly checkerIndexRows = computed(() => {
+    const start = (this.checkerCurrentPage() - 1) * this.checkerPageSize;
+    return this.sortedCheckerSsiRows()
+      .slice(start, start + this.checkerPageSize)
+      .map((record) => ({
+        id: record.id,
+        record,
+        cells: this.checkerIndexColumns().map((column) =>
+          this.auditRecordValue(record, column.path),
+        ),
+        trailing: [record.maker, record.updatedAt || record.createdAt || "—"],
+        source: record,
+      }));
+  });
+  readonly activeCount = computed(() => this.ssiSummary().active);
   readonly form: FormGroup = new FormGroup({});
   model: Record<string, unknown> = {
     maker: "maker.demo",
@@ -1643,14 +1714,32 @@ export class AppComponent implements OnInit {
     ownershipType: "OWN",
     ownerParty: "HK01",
     publisherParty: "HK01",
-    route: { currency: "USD", counterpartyType: "BANK" },
+    counterpartyId: "ANY",
+    route: {
+      currency: "USD",
+      counterpartyType: "ANY_BANK",
+      counterpartyBic: "ANY",
+    },
   };
   readonly currenciesLoading = signal(false);
   readonly currencies = signal<readonly CurrencyReference[]>([]);
   readonly countries = signal<readonly CountryReference[]>([]);
   readonly fields = signal<FormlyFieldConfig[]>(this.buildFields([]));
+  readonly readonlyFields = computed(() => readonlyFormFields(this.fields()));
   readonly editingId = signal<string | null>(null);
+  readonly revisionSource = signal<SsiRow | null>(null);
+  readonly makerEditing = computed(
+    () => this.editingId() !== null || this.revisionSource() !== null,
+  );
   readonly detailTarget = signal<SsiRow | null>(null);
+  readonly detailForm = new FormGroup({});
+  readonly detailModel = computed<Record<string, unknown>>(() => {
+    const row = this.detailTarget();
+    return row ? this.modelForRow(row) : {};
+  });
+  readonly checkerRejectReason = signal("");
+  readonly governedReviewResourceId = signal<string | null>(null);
+  readonly governedReviewRecordId = signal<string | null>(null);
   readonly deleteTarget = signal<SsiRow | null>(null);
   readonly deleteReason = signal("");
   readonly canConfirmDelete = computed(
@@ -2189,6 +2278,47 @@ export class AppComponent implements OnInit {
     this.tagSupportRows().filter(isVisibleSsiResolutionRow),
   );
   readonly auditRows = signal<readonly AuditRow[]>([]);
+  readonly auditDetail = signal<AuditPresentation | null>(null);
+  readonly auditParameterFields = signal<readonly AuditParameterField[]>([]);
+  readonly auditDetailRecord = computed<Readonly<Record<string, unknown>>>(
+    () => {
+      const detail = this.auditDetail();
+      return detail
+        ? (this.auditObject(auditGovernedSnapshot(detail)) ?? {})
+        : {};
+    },
+  );
+  readonly auditDetailStatus = computed(() =>
+    scalarText(this.auditDetailRecord()["status"]),
+  );
+  readonly auditDetailVersion = computed(() =>
+    Number(this.auditDetailRecord()["version"] ?? 0),
+  );
+  readonly auditDetailModel = computed<Record<string, unknown>>(() => {
+    const record = this.auditDetailRecord();
+    return {
+      ...record,
+      ...(Array.isArray(record["messageTypes"])
+        ? { messageTypes: record["messageTypes"].join(", ") }
+        : {}),
+    };
+  });
+  readonly auditDetailFields = computed<FormlyFieldConfig[]>(() =>
+    this.auditParameterFields().map((field) => ({
+      key: field.key,
+      type: field.type,
+      props: this.auditFieldProps(field),
+    })),
+  );
+  readonly auditResourceLabel = computed(() => {
+    const labels: Record<GovernanceTab, string> = {
+      rma: "RMA",
+      entity: "Entities",
+      nostro: "Nostro",
+      ssi: "SSI",
+    };
+    return labels[this.auditTab()];
+  });
   readonly auditOnlineQueryDays = signal(7);
   readonly auditArchiveAfterDays = signal(14);
   readonly auditArchiveRetentionDays = signal(365);
@@ -2200,15 +2330,27 @@ export class AppComponent implements OnInit {
   );
   readonly auditSortKey = signal<AuditSortKey>("title");
   readonly auditSortDirection = signal<AuditSortDirection>("asc");
+  readonly auditIndexSortPath = signal<string | null>(null);
   readonly auditCurrentPage = signal(1);
   readonly auditPageSize = 10;
-  readonly sortedAuditRows = computed(() =>
-    sortAuditRows(
+  readonly sortedAuditRows = computed(() => {
+    const rows = sortAuditRows(
       this.auditRows(),
       this.auditSortKey(),
       this.auditSortDirection(),
-    ).map(presentAuditEvent),
-  );
+    ).map(presentAuditEvent);
+    const path = this.auditIndexSortPath();
+    if (!path) return rows;
+    const direction = this.auditSortDirection() === "asc" ? 1 : -1;
+    return [...rows].sort(
+      (left, right) =>
+        this.auditRecordValue(this.auditRecord(left), path).localeCompare(
+          this.auditRecordValue(this.auditRecord(right), path),
+          undefined,
+          { numeric: true, sensitivity: "base" },
+        ) * direction,
+    );
+  });
   readonly auditTotalPages = computed(() =>
     Math.max(1, Math.ceil(this.sortedAuditRows().length / this.auditPageSize)),
   );
@@ -2219,8 +2361,30 @@ export class AppComponent implements OnInit {
       this.auditPageSize,
     ),
   );
-  readonly selectedAuditDetail = signal<AuditPresentation | null>(null);
+  readonly auditIndexColumns = computed(
+    () => AUDIT_INDEX_COLUMNS[this.auditTab()],
+  );
+  readonly auditIndexRows = computed(() =>
+    this.pagedAuditRows().map((event) => {
+      const record = this.auditRecord(event);
+      return {
+        id: event.eventId,
+        cells: this.auditIndexColumns().map((column) =>
+          this.auditRecordValue(record, column.path),
+        ),
+        trailing: [
+          scalarText(record["maker"]),
+          scalarText(record["createdAt"] ?? record["updatedAt"]),
+          scalarText(record["checker"]),
+          record["checker"] ? event.occurredAt : "",
+        ],
+        source: event,
+      };
+    }),
+  );
   pseudoContent = FULL_TAG_SCENARIOS[0]!.content;
+  private readonly loadedFeatureData = new Set<string>();
+  private readonly featureDataLoads = new Map<string, Promise<void>>();
 
   constructor() {
     const saved = this.document.defaultView?.localStorage.getItem("ssi-theme");
@@ -2237,7 +2401,9 @@ export class AppComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    void this.loadWorkspaceData();
+    // SWIFT Data owns its own resource loading. A persisted SSI view loads only
+    // SSI data, so browser refresh does not create or query the RMA component.
+    if (this.view() !== "swiftdata") void this.ensureFeatureData(this.view());
   }
 
   private async loadWorkspaceData(): Promise<void> {
@@ -2265,60 +2431,252 @@ export class AppComponent implements OnInit {
   }
 
   refresh(): Promise<void> {
-    if (this.refreshInFlight) return this.refreshInFlight;
-    const request = this.performRefresh();
-    this.refreshInFlight = request;
-    void request.finally(() => {
-      if (this.refreshInFlight === request) this.refreshInFlight = null;
-    });
-    return request;
+    return this.performRefresh(++this.refreshRequestSequence);
   }
 
-  private async performRefresh(): Promise<void> {
+  private async performRefresh(requestSequence: number): Promise<void> {
+    this.ssiIndexLoading.set(true);
     try {
-      this.rows.set(
-        await firstValueFrom(this.http.get<SsiRow[]>(`${this.api}/ssis`)),
+      const checkerView = this.view() === "checker";
+      const query = new URLSearchParams({
+        status: checkerView ? "PENDING_APPROVAL" : this.ownershipStatus(),
+        page: checkerView ? "1" : String(this.indexPage()),
+        pageSize: checkerView ? "100" : String(this.indexPageSize),
+        sortBy: checkerView ? "STATUS" : this.ownershipSort(),
+        sortDirection: checkerView ? "ASC" : this.ownershipSortDirection(),
+      });
+      if (!checkerView) {
+        query.set("ownershipType", this.ownershipTab());
+        const search = this.ownershipSearch().trim();
+        if (search) query.set("search", search);
+        if (this.selectedCounterpartyId())
+          query.set("counterpartyId", this.selectedCounterpartyId());
+      }
+      const [response, summary] = await Promise.all([
+        firstValueFrom(
+          this.http.get<SsiPage | SsiRow[]>(
+            `${this.api}/ssis?${query.toString()}`,
+          ),
+        ),
+        firstValueFrom(
+          this.http.get<SsiIndexSummary>(`${this.api}/ssis/summary`),
+        ),
+      ]);
+      const page: SsiPage = Array.isArray(response)
+        ? {
+            items: response,
+            page: 1,
+            pageSize: response.length || this.indexPageSize,
+            totalItems: response.length,
+            totalPages: 1,
+            hasPrevious: false,
+            hasNext: false,
+          }
+        : response;
+      if (requestSequence !== this.refreshRequestSequence) return;
+      this.rows.set(page.items);
+      this.ssiIndexTotalItems.set(page.totalItems);
+      this.ssiIndexTotalPages.set(Math.max(1, page.totalPages));
+      this.ssiSummary.set(summary);
+      this.indexPage.set(
+        Math.min(this.indexPage(), Math.max(1, page.totalPages)),
       );
-      this.indexPage.set(Math.min(this.indexPage(), this.indexTotalPages()));
       this.ensureTagSsiSelection();
     } catch {
       this.notice.set({
         kind: "warning",
         text: "BFF 尚未啟動；啟動後重新整理即可。",
       });
+    } finally {
+      if (requestSequence === this.refreshRequestSequence)
+        this.ssiIndexLoading.set(false);
     }
   }
 
   navigate(view: View): void {
+    this.notice.set(null);
     this.view.set(view);
+    this.document.defaultView?.localStorage.setItem("ssi-active-view", view);
     if (view === "treasury" || view === "tradefinance")
       this.enterFinResolution(view);
-    if (view === "audit") void this.loadAudit();
-    if (this.requiresSsiRefresh(view)) void this.refresh();
+    void this.ensureFeatureData(view);
   }
 
-  private enterPaymentResolution(): void {
-    this.resolutionConsumer.set("CENTRAL_PAYMENT");
-    this.resolutionCounterpartyType.set("BANK");
-    this.resolutionFunction.set("INTERBANK_TRANSFER");
-    this.resolutionMessageType.set("pacs.009.001.08");
-    this.resolutionReference.set("MT2XX-2026-000001");
-    this.resolutionOutputFormat.set("MT");
-    this.paymentTransactionOpen.set(false);
-    this.selectedPaymentMessage.set(null);
-    this.selectedPaymentScenario.set(null);
-    this.paymentMessageIndexSearch.set("");
-    if (!this.paymentMessageIndex().length) void this.loadPaymentMessageIndex();
-    this.clearResolution();
+  private savedView(): View {
+    const saved =
+      this.document.defaultView?.localStorage.getItem("ssi-active-view");
+    return [
+      "swiftdata",
+      "dashboard",
+      "maker",
+      "checker",
+      "resolver",
+      "treasury",
+      "tradefinance",
+      "audit",
+      "settings",
+    ].includes(saved ?? "")
+      ? (saved as View)
+      : "swiftdata";
+  }
+
+  private ensureFeatureData(view: View): Promise<void> {
+    const key =
+      view === "treasury" || view === "tradefinance" ? "fin-resolution" : view;
+    if (this.loadedFeatureData.has(key)) return Promise.resolve();
+    const existing = this.featureDataLoads.get(key);
+    if (existing) return existing;
+    const load = this.loadFeatureData(view)
+      .then(() => {
+        this.loadedFeatureData.add(key);
+      })
+      .finally(() => this.featureDataLoads.delete(key));
+    this.featureDataLoads.set(key, load);
+    return load;
+  }
+
+  private async loadFeatureData(view: View): Promise<void> {
+    if (view === "swiftdata" || view === "settings") return;
+    if (view === "audit") {
+      await this.loadAudit();
+      return;
+    }
+    if (view === "checker") {
+      await Promise.all([this.refresh(), this.loadGovernedPending()]);
+      return;
+    }
+    if (view === "dashboard") {
+      await Promise.all([this.refresh(), this.loadCounterpartyDirectory()]);
+      return;
+    }
+    if (view === "maker") {
+      await Promise.all([
+        this.refresh(),
+        this.loadCurrencies(),
+        this.loadCountries(),
+        this.loadCounterpartyDirectory(),
+        this.loadBookingBranches(),
+      ]);
+      return;
+    }
+    // The parameter-driven Resolution workspace loads only the selected page
+    // definition and its own dependent lookups. The legacy parent workspace
+    // must not preload unrelated reference services or emit duplicate alerts.
+  }
+
+  private async loadGovernedPending(): Promise<void> {
+    try {
+      const contract = await firstValueFrom(
+        this.http.get<CheckerOpenApiContract>(
+          "/openapi/swift-data-service.v1.json",
+        ),
+      );
+      const resources = contract["x-ui-resources"].filter(
+        (resource) =>
+          resource.id !== "ssi" && resource["x-lifecycle"].includes("approve"),
+      );
+      const rows = await Promise.all(
+        resources.map(async (resource) => ({
+          resource,
+          rows: await firstValueFrom(
+            this.http.get<
+              Array<{
+                id: string;
+                status: string;
+                maker: string;
+                version: number;
+              }>
+            >(`${this.api}/${resource.endpoint}?status=PENDING_APPROVAL`),
+          ),
+        })),
+      );
+      this.governedPending.set(
+        rows.flatMap(({ resource, rows: resourceRows }) =>
+          resourceRows
+            .filter(({ status }) => status === "PENDING_APPROVAL")
+            .map((row) => ({
+              ...row,
+              resourceId: resource.id,
+              resourceLabel: resource.label,
+              endpoint: resource.endpoint,
+            })),
+        ),
+      );
+    } catch {
+      this.governedPending.set([]);
+      this.notice.set({
+        kind: "warning",
+        text: "Checker Queue 暫時無法載入全部受控資料資源。",
+      });
+    }
+  }
+
+  async approveGoverned(row: GovernedPendingRow): Promise<void> {
+    try {
+      await firstValueFrom(
+        this.http.post(`${this.api}/${row.endpoint}/${row.id}/approve`, {
+          actor: "checker.demo",
+        }),
+      );
+      this.notice.set({
+        kind: "info",
+        text: `${row.resourceLabel} 已由獨立 Checker 核准並生效。`,
+      });
+      await Promise.all([this.loadGovernedPending(), this.refresh()]);
+    } catch {
+      this.notice.set({
+        kind: "error",
+        text: `${row.resourceLabel} Checker Approve 被生命週期／四眼控制拒絕。`,
+      });
+    }
+  }
+
+  reviewGoverned(row: GovernedPendingRow): void {
+    this.governedReviewResourceId.set(row.resourceId);
+    this.governedReviewRecordId.set(row.id);
+    this.navigate("swiftdata");
+  }
+
+  reviewForChecker(row: SsiRow): void {
+    this.checkerRejectReason.set("");
+    this.detailTarget.set(row);
+  }
+
+  async decideSsi(row: SsiRow, decision: "approve" | "reject"): Promise<void> {
+    const reason = this.checkerRejectReason().trim();
+    if (decision === "reject" && reason.length < 5) {
+      this.notice.set({
+        kind: "warning",
+        text: "Reject 必須輸入至少 5 個字元的退回原因。",
+      });
+      return;
+    }
+    try {
+      await firstValueFrom(
+        this.http.post(`${this.api}/ssis/${row.id}/${decision}`, {
+          actor: "checker.demo",
+          ...(decision === "reject" ? { reason } : {}),
+        }),
+      );
+      this.detailTarget.set(null);
+      this.checkerRejectReason.set("");
+      await Promise.all([this.refresh(), this.loadGovernedPending()]);
+      this.notice.set({
+        kind: "info",
+        text:
+          decision === "approve"
+            ? "SSI 已由獨立 Checker 核准並啟用。"
+            : "SSI 已退回 Maker 的 DRAFT 工作清單。",
+      });
+    } catch {
+      this.notice.set({
+        kind: "error",
+        text: `Checker ${decision === "approve" ? "Approve" : "Reject"} 被生命週期／四眼控制拒絕。`,
+      });
+    }
   }
 
   private enterFinResolution(view: "treasury" | "tradefinance"): void {
-    if (
-      (!this.finResolutionCatalogue().length ||
-        this.finResolutionCatalogueError()) &&
-      !this.finResolutionCatalogueLoading()
-    )
-      void this.loadFinResolutionCatalogue();
     const activeMode = view === "treasury" ? "TREASURY" : "TRADE_FINANCE";
     const allowed = new Set(
       this.finResolutionCatalogue()
@@ -2335,10 +2693,6 @@ export class AppComponent implements OnInit {
     this.tagTransactionOpen.set(false);
     this.tagCatalogPage.set(1);
     this.tagCatalogSearch.set("");
-  }
-
-  private requiresSsiRefresh(view: View): boolean {
-    return ["dashboard", "maker", "checker"].includes(view);
   }
 
   async loadPaymentMessageIndex(): Promise<void> {
@@ -2479,15 +2833,65 @@ export class AppComponent implements OnInit {
   }
 
   openAuditDetail(detail: AuditPresentation): void {
-    this.selectedAuditDetail.set(detail);
+    if (this.auditTab() === "ssi") {
+      const snapshot = auditSsiSnapshot(detail);
+      if (snapshot) {
+        this.detailTarget.set(snapshot as SsiRow);
+        return;
+      }
+    }
+    this.auditDetail.set(detail);
   }
 
-  closeAuditDetail(): void {
-    this.selectedAuditDetail.set(null);
+  auditSnapshot(detail: AuditPresentation): unknown {
+    return auditGovernedSnapshot(detail);
   }
 
-  closeOverlayOnEscape(): void {
-    if (this.selectedAuditDetail()) this.closeAuditDetail();
+  auditMessageTypeChanges(
+    detail: AuditPresentation,
+  ): AuditMessageTypeChanges | null {
+    const changedFields = this.auditObject(detail.changedFields);
+    const messageTypes = this.auditObject(changedFields?.["messageTypes"]);
+    if (!messageTypes) return null;
+    const values = (key: string): readonly string[] =>
+      Array.isArray(messageTypes[key])
+        ? messageTypes[key].filter(
+            (value): value is string => typeof value === "string",
+          )
+        : [];
+    return {
+      unchanged: values("unchanged"),
+      added: values("added"),
+      suppressed: values("suppressed"),
+    };
+  }
+
+  async closeOverlayOnEscape(): Promise<void> {
+    if (this.bicPickerTarget()) {
+      this.closeBicPicker();
+      return;
+    }
+    if (this.tagTransactionOpen()) {
+      this.cancelTagTransaction();
+      return;
+    }
+    if (this.paymentTransactionOpen()) {
+      this.closePaymentTransaction();
+      return;
+    }
+    if (this.auditDetail()) {
+      this.auditDetail.set(null);
+      return;
+    }
+    if (this.deleteTarget()) {
+      this.closeDeleteDialog();
+      return;
+    }
+    if (this.view() === "maker") {
+      await this.closeMaker();
+      return;
+    }
+    if (this.detailTarget()) this.detailTarget.set(null);
   }
 
   closePaymentTransaction(): void {
@@ -2501,6 +2905,7 @@ export class AppComponent implements OnInit {
     this.indexPage.set(
       Math.min(this.indexTotalPages(), Math.max(1, this.indexPage() + delta)),
     );
+    void this.refresh();
   }
   selectOwnershipTab(tab: "OWN" | "COUNTERPARTY"): void {
     this.ownershipTab.set(tab);
@@ -2508,6 +2913,11 @@ export class AppComponent implements OnInit {
     this.ownershipSortDirection.set("ASC");
     this.indexPage.set(1);
     if (tab === "OWN") this.selectedCounterpartyId.set("");
+    if (tab === "COUNTERPARTY") {
+      void Promise.all([this.refresh(), this.loadCounterpartyDirectory()]);
+      return;
+    }
+    void this.refresh();
   }
   searchCounterpartyInbox(query: string): void {
     this.counterpartyInboxSearch.set(query);
@@ -2541,6 +2951,19 @@ export class AppComponent implements OnInit {
       this.ownershipSortDirection.set("ASC");
     }
     this.indexPage.set(1);
+    void this.refresh();
+  }
+  selectOwnershipStatus(
+    status: "ACTIVE" | "DRAFT" | "SUPPRESSED" | "ALL",
+  ): void {
+    this.ownershipStatus.set(status);
+    this.indexPage.set(1);
+    void this.refresh();
+  }
+  searchOwnershipIndex(value: string): void {
+    this.ownershipSearch.set(value);
+    this.indexPage.set(1);
+    void this.refresh();
   }
   counterpartyAriaSort(
     sort: CounterpartyInboxSort,
@@ -2585,17 +3008,19 @@ export class AppComponent implements OnInit {
     if (party?.ssiCount === 0) return;
     this.selectedCounterpartyId.set(counterpartyId);
     this.ownershipSearch.set("");
-    this.ownershipStatus.set("CURRENT");
+    this.ownershipStatus.set("ACTIVE");
     this.ownershipSort.set("CURRENCY");
     this.ownershipSortDirection.set("ASC");
     this.indexPage.set(1);
     this.detailTarget.set(null);
+    void this.refresh();
   }
   closeCounterpartySsi(): void {
     this.selectedCounterpartyId.set("");
     this.ownershipSearch.set("");
     this.indexPage.set(1);
     this.detailTarget.set(null);
+    void this.refresh();
   }
   setTheme(mode: ThemeMode): void {
     this.theme.set(mode);
@@ -2613,8 +3038,34 @@ export class AppComponent implements OnInit {
   }
   startNew(): void {
     this.editingId.set(null);
+    this.revisionSource.set(null);
     this.resetMaker();
     this.view.set("maker");
+    this.ensureMakerCurrencies();
+  }
+
+  async closeMaker(): Promise<void> {
+    const revisionId = this.revisionSource() ? this.editingId() : null;
+    if (revisionId) {
+      try {
+        await firstValueFrom(
+          this.http.post(`${this.api}/ssis/${revisionId}/cancel-revision`, {
+            actor: String(this.model["maker"] ?? "maker.revision"),
+          }),
+        );
+      } catch {
+        this.notice.set({
+          kind: "error",
+          text: "無法取消修訂；In Progress 鎖定仍保留，請重試。",
+        });
+        return;
+      }
+    }
+    this.editingId.set(null);
+    this.revisionSource.set(null);
+    this.form.reset();
+    if (revisionId) await this.refresh();
+    this.view.set("dashboard");
   }
 
   async create(): Promise<void> {
@@ -2633,11 +3084,15 @@ export class AppComponent implements OnInit {
       else await firstValueFrom(this.http.post(`${this.api}/ssis`, this.model));
       this.notice.set({
         kind: "info",
-        text: id
-          ? "SSI 草稿已更新；請提交 Checker 審批。"
-          : "SSI 草稿已建立；請提交 Checker 審批。",
+        text:
+          id || this.revisionSource()
+            ? "SSI 草稿已更新；請提交審批。"
+            : "SSI 草稿已建立；請提交審批。",
       });
       this.editingId.set(null);
+      this.revisionSource.set(null);
+      this.ownershipStatus.set("DRAFT");
+      this.indexPage.set(1);
       await this.refresh();
       this.view.set("dashboard");
     } catch {
@@ -2648,10 +3103,7 @@ export class AppComponent implements OnInit {
     }
   }
 
-  async act(
-    row: SsiRow,
-    action: "submit" | "approve" | "activate",
-  ): Promise<void> {
+  async act(row: SsiRow, action: "submit" | "approve"): Promise<void> {
     const actor = action === "submit" ? row.maker : "checker.demo";
     try {
       await firstValueFrom(
@@ -2664,48 +3116,60 @@ export class AppComponent implements OnInit {
   }
 
   edit(row: SsiRow): void {
-    if (row.status !== "DRAFT") {
+    if (row.changeType === "SUPPRESSION") return;
+    if (!["DRAFT", "WIP"].includes(row.status)) {
       void this.revise(row);
       return;
     }
     this.editingId.set(row.id);
-    this.model = {
-      maker: row.maker,
-      counterpartyId: row.counterpartyId,
-      scope: row.scope,
-      ownershipType: this.ownershipOf(row),
-      ownerParty: row.ownerParty,
-      publisherParty: row.publisherParty,
-      route: {
-        ...row.route,
-        counterpartyType: row.route["counterpartyType"] ?? "BANK",
-      },
-    };
+    this.revisionSource.set(null);
+    this.model = this.modelForRow(row);
     this.view.set("maker");
+    this.ensureMakerCurrencies();
+  }
+
+  private ensureMakerCurrencies(): void {
+    if (this.currencies().length === 0 && !this.currenciesLoading())
+      void this.loadCurrencies();
+  }
+
+  requestTypeLabel(row: SsiRow): "ADD" | "EDIT" | "SUPPRESSED" {
+    if (row.changeType === "SUPPRESSION") return "SUPPRESSED";
+    if (row.changeType === "REVISION" || row.amendmentOfId) return "EDIT";
+    return "ADD";
+  }
+
+  private modelForRow(row: SsiRow): Record<string, unknown> {
+    return ssiFormModel(row, this.ownershipOf(row));
   }
 
   async revise(row: SsiRow): Promise<void> {
     try {
+      const maker = "maker.revision";
       const revision = await firstValueFrom(
-        this.http.post<SsiRow>(`${this.api}/ssis/${row.id}/revise`, {
-          maker: "maker.revision",
-        }),
+        this.http.post<SsiRow>(`${this.api}/ssis/${row.id}/revise`, { maker }),
       );
+      this.notice.set(null);
+      this.editingId.set(revision.id);
+      this.revisionSource.set(row);
+      this.model = { ...this.modelForRow(revision), maker };
+      this.view.set("maker");
+      this.ensureMakerCurrencies();
       await this.refresh();
-      this.edit(revision);
-      this.notice.set({
-        kind: "info",
-        text: `已由 v${row.version} 建立 DRAFT 修訂版；原 Active SSI 在新版本啟用前繼續有效。`,
-      });
     } catch {
       this.notice.set({
         kind: "error",
-        text: "無法建立修訂版；已撤銷或已取代的 SSI 不可修訂。",
+        text: "無法建立修訂；此 SSI 可能正由其他使用者修改。",
       });
     }
   }
 
   requestDelete(row: SsiRow): void {
+    this.deleteTarget.set(row);
+    this.deleteReason.set("");
+  }
+  requestDraftRevoke(row: SsiRow): void {
+    if (row.status !== "DRAFT") return;
     this.deleteTarget.set(row);
     this.deleteReason.set("");
   }
@@ -2718,19 +3182,37 @@ export class AppComponent implements OnInit {
     const reason = this.deleteReason().trim();
     if (!row || reason.length < 5) return;
     try {
-      await firstValueFrom(
-        this.http.delete(`${this.api}/ssis/${row.id}`, {
-          body: { actor: "checker.demo", reason },
-        }),
-      );
+      if (row.status === "DRAFT") {
+        await firstValueFrom(
+          this.http.delete(`${this.api}/ssis/${row.id}`, {
+            body: { actor: row.maker, reason },
+          }),
+        );
+      } else {
+        await firstValueFrom(
+          this.http.post(`${this.api}/ssis/${row.id}/suppress`, {
+            maker: "maker.suppression",
+            reason,
+          }),
+        );
+      }
       this.closeDeleteDialog();
+      this.ownershipStatus.set(row.status === "DRAFT" ? "ACTIVE" : "DRAFT");
+      this.indexPage.set(1);
       this.notice.set({
         kind: "info",
-        text: "SSI 已邏輯撤銷；歷史版本及稽核證據已保留。",
+        text:
+          row.status === "DRAFT"
+            ? "Draft 已撤銷；原 Active SSI 已恢復可 Revise／Suppress。"
+            : "SUPPRESSION DRAFT 已建立；原 Active SSI 在 Checker 核准前繼續有效。",
       });
       await this.refresh();
     } catch {
-      this.notice.set({ kind: "error", text: "撤銷失敗。" });
+      await this.refresh();
+      this.notice.set({
+        kind: "error",
+        text: "Suppression 建立失敗；狀態已重新檢查，可能已有進行中的工作。",
+      });
     }
   }
 
@@ -3219,169 +3701,6 @@ export class AppComponent implements OnInit {
     };
   }
 
-  private tagResolutionPayload(ssi: DemoFinSuggestionCandidate | null) {
-    const mt760 = this.isMt760Suggestion();
-    const mt400 = this.isMt400Suggestion();
-    const authenticatedMt400Route =
-      mt400 && this.mt400SettlementMode() === "AUTHENTICATED_RECEIVING_ROUTE";
-    const descriptor = this.selectedTagScenario().descriptor;
-    return {
-      service: "FIN",
-      resolutionMode: this.view() === "treasury" ? "TREASURY" : "TRADE_FINANCE",
-      ...descriptor,
-      bookingEntity: this.resolutionBookingEntity(),
-      transactionReference: this.tagTransactionReference(),
-      currency: this.resolutionCurrency(),
-      receiverBic: this.resolutionCounterpartyBic(),
-      valueDate: this.resolutionValueDate(),
-      sourceSsiId: ssi?.id,
-      roles: this.tagResolutionRoles(
-        ssi,
-        mt760,
-        mt400,
-        authenticatedMt400Route,
-      ),
-      roleSources: this.syntheticRoleSources(),
-      controls: this.tagResolutionControls(ssi, mt760, mt400),
-      roleEvidence: this.tagRoleEvidence(ssi, mt400, authenticatedMt400Route),
-    };
-  }
-
-  private tagResolutionRoles(
-    ssi: DemoFinSuggestionCandidate | null,
-    mt760: boolean,
-    mt400: boolean,
-    authenticatedMt400Route: boolean,
-  ): Record<string, string> {
-    const route = ssi?.roleValues ?? {};
-    const roles = createResolutionRoles(
-      route,
-      !mt400 || authenticatedMt400Route,
-      mt760,
-      this.tagReimbursementArrangement() === "REIMBURSING_BANK",
-    );
-    const supportedRoles = new Set(
-      this.selectedTagFieldExpectations()
-        .filter(isSsiResolvableField)
-        .map((field) => canonicalRole(field.semanticRole)),
-    );
-    retainSupportedRoles(roles, supportedRoles);
-    applyMt400RouteGraph(roles, mt400, ssi);
-    return roles;
-  }
-
-  private syntheticRoleSources(): Readonly<Record<string, "SYNTHETIC_DEMO">> {
-    const roles = [
-      "ADVISING_BANK",
-      "REIMBURSING_BANK",
-      "SENDERS_CORRESPONDENT",
-      "RECEIVERS_CORRESPONDENT",
-      "ACCOUNT_WITH_INSTITUTION",
-      "BENEFICIARY_BANK",
-      "ADVISE_THROUGH_BANK",
-      "REQUESTED_CONFIRMATION_PARTY",
-      "NEGOTIATING_BANK",
-      "INTERMEDIARY_INSTITUTION",
-      "DELIVERY_AGENT",
-      "RECEIVING_AGENT",
-      "BENEFICIARY_INSTITUTION",
-    ];
-    return Object.fromEntries(roles.map((role) => [role, "SYNTHETIC_DEMO"]));
-  }
-
-  private tagResolutionControls(
-    ssi: DemoFinSuggestionCandidate | null,
-    mt760: boolean,
-    mt400: boolean,
-  ) {
-    if (mt760)
-      return {
-        sequence: "B",
-        purpose: "ISSU",
-        formOfUndertaking: "STBY",
-        confirmationInstructions: this.mt760ConfirmationInstructions(),
-        field50Present: true,
-      };
-    if (!mt400) return undefined;
-    return {
-      accountRelationship: this.mt400SettlementMode(),
-      directRelationshipEvidenceId: ssi?.directRelationshipEvidenceId ?? "",
-      routeGraph: ssi
-        ? {
-            routeComplete: ssi.routeGraph.routeComplete,
-            evidenceValid: ssi.routeGraph.evidenceValid,
-            additionalAccountWithRequired:
-              ssi.routeGraph.additionalAccountWithRequired,
-          }
-        : undefined,
-    };
-  }
-
-  private syntheticEvidence(
-    ssi: DemoFinSuggestionCandidate | null,
-    ownerSide: "SENDER_SIDE" | "RECEIVER_SIDE" | "TRANSACTION_PARTY",
-    roleAssignment: string,
-  ) {
-    if (!ssi) return undefined;
-    const value = ssi.roleValues[roleAssignment]?.trim();
-    return {
-      ownerSide,
-      sourceType: "SYNTHETIC_DEMO",
-      sourceRecordId: ssi.id,
-      status: "ACTIVE",
-      approvalStatus: "APPROVED",
-      effectiveFrom: ssi.effectiveFrom,
-      effectiveTo: ssi.effectiveTo,
-      version: String(ssi.version),
-      demoData: true,
-      roleAssignment,
-      canonicalRouteNodeId: value
-        ? `${ssi.id}|${ownerSide}|${value.toUpperCase()}`
-        : undefined,
-    };
-  }
-
-  private tagRoleEvidence(
-    ssi: DemoFinSuggestionCandidate | null,
-    mt400: boolean,
-    authenticatedMt400Route: boolean,
-  ) {
-    const evidence = (
-      ownerSide: "SENDER_SIDE" | "RECEIVER_SIDE" | "TRANSACTION_PARTY",
-      role: string,
-    ) => this.syntheticEvidence(ssi, ownerSide, role);
-    return {
-      SENDERS_CORRESPONDENT: evidence("SENDER_SIDE", "SENDERS_CORRESPONDENT"),
-      RECEIVERS_CORRESPONDENT: evidence(
-        "RECEIVER_SIDE",
-        "RECEIVERS_CORRESPONDENT",
-      ),
-      ACCOUNT_WITH_INSTITUTION: evidence(
-        mt400 && authenticatedMt400Route ? "RECEIVER_SIDE" : "SENDER_SIDE",
-        "ACCOUNT_WITH_INSTITUTION",
-      ),
-      BENEFICIARY_BANK: evidence("TRANSACTION_PARTY", "BENEFICIARY_BANK"),
-      REIMBURSING_BANK: evidence("SENDER_SIDE", "REIMBURSING_BANK"),
-      ADVISING_BANK: evidence("TRANSACTION_PARTY", "ADVISING_BANK"),
-      ADVISE_THROUGH_BANK: evidence("TRANSACTION_PARTY", "ADVISE_THROUGH_BANK"),
-      REQUESTED_CONFIRMATION_PARTY: evidence(
-        "TRANSACTION_PARTY",
-        "REQUESTED_CONFIRMATION_PARTY",
-      ),
-      NEGOTIATING_BANK: evidence("TRANSACTION_PARTY", "NEGOTIATING_BANK"),
-      INTERMEDIARY_INSTITUTION: evidence(
-        "SENDER_SIDE",
-        "INTERMEDIARY_INSTITUTION",
-      ),
-      DELIVERY_AGENT: evidence("SENDER_SIDE", "DELIVERY_AGENT"),
-      RECEIVING_AGENT: evidence("RECEIVER_SIDE", "RECEIVING_AGENT"),
-      BENEFICIARY_INSTITUTION: evidence(
-        "RECEIVER_SIDE",
-        "BENEFICIARY_INSTITUTION",
-      ),
-    };
-  }
-
   async openBicPicker(target: BicTarget, title: string): Promise<void> {
     this.bicPickerTarget.set(target);
     this.bicPickerTitle.set(title);
@@ -3423,9 +3742,21 @@ export class AppComponent implements OnInit {
   selectBank(bank: BankReference): void {
     const target = this.bicPickerTarget();
     if (!target) return;
-    this.form
-      .get(target === "counterpartyId" ? target : `route.${target}`)
-      ?.setValue(bank.bic);
+    if (target === "counterpartyId") {
+      const counterpartyId = `CP-${bank.bic}`;
+      this.form.get("counterpartyId")?.setValue(counterpartyId);
+      this.model = {
+        ...this.model,
+        counterpartyId,
+        route: {
+          ...(this.model["route"] as Record<string, string> | undefined),
+          counterpartyBic: bank.bic,
+        },
+      };
+      this.closeBicPicker();
+      return;
+    }
+    this.form.get(`route.${target}`)?.setValue(bank.bic);
     this.closeBicPicker();
   }
   selectBankPickerItem(item: BankServicePickerItem): void {
@@ -3534,7 +3865,6 @@ export class AppComponent implements OnInit {
       this.clearingSystems.set(
         response.items.filter((item) => item.status === "ACTIVE"),
       );
-      await this.refreshResolutionClearingOptions();
     } catch {
       this.notice.set({
         kind: "warning",
@@ -3578,17 +3908,15 @@ export class AppComponent implements OnInit {
         banks.find((bank) => bank.bic === this.resolutionCounterpartyBic()) ??
         banks[0];
       if (!selected) throw new Error("Bank Service returned no identities");
-      this.selectResolutionCounterpartyBankService(selected.bankServiceId);
+      this.resolutionCounterpartyBankServiceId.set(selected.bankServiceId);
+      this.resolutionCounterpartyBic.set(selected.bic);
+      this.clearResolution();
     } catch {
       this.resolutionBanks.set([]);
       this.resolutionCounterpartyBankServiceId.set("");
       this.resolutionCounterpartyBic.set("");
       this.clearResolution();
       this.resolutionBanksError.set("BANK_SERVICE_UNAVAILABLE");
-      this.notice.set({
-        kind: "warning",
-        text: "Bank Service 暫時不可用，Resolution 採 fail-closed。",
-      });
     } finally {
       this.resolutionBanksLoading.set(false);
     }
@@ -3605,6 +3933,7 @@ export class AppComponent implements OnInit {
     }
   }
   private async loadCounterpartyDirectory(): Promise<void> {
+    this.counterpartyDirectoryLoading.set(true);
     try {
       const response = await firstValueFrom(
         this.http.get<{ items: readonly CounterpartyReference[] }>(
@@ -3618,6 +3947,8 @@ export class AppComponent implements OnInit {
         kind: "warning",
         text: "Counterparty Master 暫時不可用。",
       });
+    } finally {
+      this.counterpartyDirectoryLoading.set(false);
     }
   }
   private async loadBanks(page: number): Promise<void> {
@@ -3664,15 +3995,35 @@ export class AppComponent implements OnInit {
     this.auditLoading.set(true);
     this.auditError.set("");
     try {
-      const [rows, lifecycle] = await Promise.all([
-        firstValueFrom(this.http.get<AuditRow[]>(`${this.api}/audit`)),
+      const auditPath: Record<GovernanceTab, string> = {
+        rma: "rma-authorisations/audit/events",
+        entity: "booking-branch-entities/audit/events",
+        nostro: "nostro-accounts/audit/events",
+        ssi: "audit",
+      };
+      const [rows, lifecycle, contract] = await Promise.all([
+        firstValueFrom(
+          this.http.get<AuditRow[]>(
+            `${this.api}/${auditPath[this.auditTab()]}`,
+          ),
+        ),
         firstValueFrom(
           this.http.get<AuditLifecycleHealth>(
             `${this.api}/health/audit-retention`,
           ),
         ),
+        firstValueFrom(
+          this.http.get<CheckerOpenApiContract>(
+            "/openapi/swift-data-service.v1.json",
+          ),
+        ),
       ]);
       this.auditRows.set(rows);
+      this.auditParameterFields.set(
+        contract["x-ui-resources"].find(
+          (resource) => resource.id === this.auditTab(),
+        )?.fields ?? [],
+      );
       this.auditOnlineQueryDays.set(lifecycle.onlineQueryDays);
       this.auditArchiveAfterDays.set(lifecycle.archiveAfterDays);
       this.auditArchiveRetentionDays.set(lifecycle.archiveRetentionDays);
@@ -3680,10 +4031,120 @@ export class AppComponent implements OnInit {
       this.auditCurrentPage.set(1);
     } catch {
       this.auditError.set("AUDIT_SERVICE_UNAVAILABLE");
-      this.notice.set({ kind: "error", text: "Audit API 暫時不可用。" });
     } finally {
       this.auditLoading.set(false);
     }
+  }
+  selectAuditTab(tab: GovernanceTab): void {
+    this.auditDetail.set(null);
+    this.detailTarget.set(null);
+    this.auditTab.set(tab);
+    this.auditIndexSortPath.set(null);
+    void this.loadAudit();
+  }
+  selectCheckerTab(tab: GovernanceTab): void {
+    this.checkerTab.set(tab);
+    this.checkerIndexSortPath.set(null);
+    this.checkerCurrentPage.set(1);
+  }
+  sortCheckerIndex(path: string): void {
+    if (this.checkerIndexSortPath() === path)
+      this.checkerSortDirection.update((direction) =>
+        direction === "asc" ? "desc" : "asc",
+      );
+    else {
+      this.checkerIndexSortPath.set(path);
+      this.checkerSortDirection.set("asc");
+    }
+    this.checkerCurrentPage.set(1);
+  }
+  moveCheckerPage(delta: number): void {
+    this.checkerCurrentPage.update((page) =>
+      Math.min(this.checkerTotalPages(), Math.max(1, page + delta)),
+    );
+  }
+  sortAuditIndex(path: string): void {
+    if (this.auditIndexSortPath() === path)
+      this.auditSortDirection.update((direction) =>
+        direction === "asc" ? "desc" : "asc",
+      );
+    else {
+      this.auditIndexSortPath.set(path);
+      this.auditSortDirection.set("asc");
+    }
+    this.auditCurrentPage.set(1);
+  }
+  private auditRecord(
+    event: AuditPresentation,
+  ): Readonly<Record<string, unknown>> {
+    const value = auditGovernedSnapshot(event);
+    return value !== null && typeof value === "object" && !Array.isArray(value)
+      ? (value as Readonly<Record<string, unknown>>)
+      : {};
+  }
+  private auditRecordValue(record: object, path: string): string {
+    if (path === "__requestType")
+      return this.requestTypeLabel(record as SsiRow);
+    if (path.includes("|"))
+      return (
+        path
+          .split("|")
+          .map((part) => this.auditRecordValue(record, part))
+          .filter((part) => part !== "—")
+          .join(" / ") || "—"
+      );
+    let value: unknown = record;
+    for (const key of path.split(".")) {
+      if (value === null || typeof value !== "object" || Array.isArray(value))
+        return "—";
+      value = (value as Readonly<Record<string, unknown>>)[key];
+    }
+    if (path === "status" && value === "PENDING_APPROVAL") return "SUBMITTED";
+    return Array.isArray(value) ? value.join(", ") : scalarText(value) || "—";
+  }
+  private auditObject(
+    value: unknown,
+  ): Readonly<Record<string, unknown>> | null {
+    return value !== null && typeof value === "object" && !Array.isArray(value)
+      ? (value as Readonly<Record<string, unknown>>)
+      : null;
+  }
+  private auditFieldProps(
+    field: AuditParameterField,
+  ): NonNullable<FormlyFieldConfig["props"]> {
+    const props: NonNullable<FormlyFieldConfig["props"]> = {
+      label: field.label,
+      required: Boolean(field.required),
+      showPicker: false,
+      options:
+        field.optionsSource === "reference/currencies"
+          ? this.currencies().map(({ code, decimals }) => ({
+              label: `${code} · ${decimals} decimals`,
+              value: code,
+            }))
+          : (field.options ?? []).map((value) => ({ label: value, value })),
+    };
+    const description =
+      field.type === "multicheckbox"
+        ? "受控 Message Types；按 View Message Types 查看完整選擇。"
+        : field.description;
+    const optionalProps: Array<
+      [keyof NonNullable<FormlyFieldConfig["props"]>, unknown]
+    > = [
+      ["type", field.inputType],
+      ["description", description],
+      ["pattern", field.pattern],
+      ["minLength", field.minLength],
+      ["maxLength", field.maxLength],
+      ["min", field.minimum],
+      ["max", field.maximum],
+    ];
+    for (const [key, value] of optionalProps)
+      if (value !== undefined) props[key] = value as never;
+    return props;
+  }
+  displayStatus(status: string): string {
+    return status === "PENDING_APPROVAL" ? "SUBMITTED" : status;
   }
   private resetMaker(): void {
     this.model = {
@@ -3692,7 +4153,13 @@ export class AppComponent implements OnInit {
       ownershipType: this.ownershipTab(),
       ownerParty: this.ownershipTab() === "OWN" ? "HK01" : "COUNTERPARTY",
       publisherParty: this.ownershipTab() === "OWN" ? "HK01" : "COUNTERPARTY",
-      route: { currency: "USD", counterpartyType: "BANK" },
+      counterpartyId: "ANY",
+      route: {
+        currency: "USD",
+        counterpartyType: "ANY_BANK",
+        counterpartyBic: "ANY",
+        beneficiarySource: "SSI",
+      },
     };
     this.form.reset(this.model);
   }
@@ -3703,9 +4170,21 @@ export class AppComponent implements OnInit {
     };
     const counterpartyId = scalarText(this.model["counterpartyId"]).trim();
     route["counterpartyType"] = route["counterpartyType"] ?? "BANK";
-    if (route["counterpartyType"] === "BANK")
-      route["counterpartyBic"] = counterpartyId;
-    else delete route["counterpartyBic"];
+    if (route["counterpartyType"] === "BANK") {
+      const currentBic = scalarText(route["counterpartyBic"])
+        .trim()
+        .toUpperCase();
+      const derivedBic = counterpartyId.replace(/^CP-/i, "").toUpperCase();
+      if (new RegExp(BIC_PATTERN).test(currentBic))
+        route["counterpartyBic"] = currentBic;
+      else if (new RegExp(BIC_PATTERN).test(derivedBic))
+        route["counterpartyBic"] = derivedBic;
+      else delete route["counterpartyBic"];
+    } else if (route["counterpartyType"] === "ANY_BANK") {
+      route["counterpartyBic"] = "ANY";
+      this.model = { ...this.model, counterpartyId: "ANY", route };
+      return;
+    } else delete route["counterpartyBic"];
     this.model = { ...this.model, counterpartyId, route };
   }
 
@@ -3757,10 +4236,13 @@ export class AppComponent implements OnInit {
           label: "Counterparty Type／交易對手類型",
           required: true,
           description:
-            "Bank 的識別碼必須是 SWIFT BIC；Customer 可使用 SWIFT BIC 或內部 Customer ID。",
+            "SSI Maintenance 僅管理銀行間 settlement SSI；一般 Bank 使用 SWIFT BIC，通用 fallback 使用 ANY。",
           options: [
             { label: "Bank／銀行", value: "BANK" },
-            { label: "Customer／客戶", value: "CUSTOMER" },
+            {
+              label: "Any approved bank／任何已核准銀行",
+              value: "ANY_BANK",
+            },
           ],
         },
       },
@@ -3768,10 +4250,11 @@ export class AppComponent implements OnInit {
         key: "counterpartyId",
         type: "bic-input",
         props: {
-          label: "交易對手識別碼",
+          label: "Counterparty ID／交易對手識別碼",
           required: true,
-          placeholder: "Bank: CITIUS33；Customer: CUST-000001",
-          description: "可手動輸入，或從 Bank Service 選擇並回填 SWIFT BIC。",
+          placeholder: "Bank: CP-CITIUS33；通用 fallback: ANY",
+          description:
+            "內部穩定識別碼；Bank Service 選擇會同步保存對應的 SWIFT BIC。",
           pickerAction: () =>
             void this.openBicPicker("counterpartyId", "選擇交易對手識別碼"),
         },
@@ -3783,7 +4266,13 @@ export class AppComponent implements OnInit {
               }
             )?.route?.counterpartyType === "CUSTOMER"
               ? /^[A-Z0-9][A-Z0-9._-]{2,34}$/i
-              : BIC_PATTERN,
+              : (
+                    field.model as {
+                      route?: { counterpartyType?: string };
+                    }
+                  )?.route?.counterpartyType === "ANY_BANK"
+                ? /^ANY$/
+                : COUNTERPARTY_ID_PATTERN,
           "props.minLength": (field) =>
             (
               field.model as {
@@ -3791,7 +4280,13 @@ export class AppComponent implements OnInit {
               }
             )?.route?.counterpartyType === "CUSTOMER"
               ? 3
-              : 8,
+              : (
+                    field.model as {
+                      route?: { counterpartyType?: string };
+                    }
+                  )?.route?.counterpartyType === "ANY_BANK"
+                ? 3
+                : 3,
           "props.maxLength": (field) =>
             (
               field.model as {
@@ -3799,7 +4294,13 @@ export class AppComponent implements OnInit {
               }
             )?.route?.counterpartyType === "CUSTOMER"
               ? 35
-              : 11,
+              : (
+                    field.model as {
+                      route?: { counterpartyType?: string };
+                    }
+                  )?.route?.counterpartyType === "ANY_BANK"
+                ? 3
+                : 35,
           "props.validationMessage": (field) =>
             (
               field.model as {
@@ -3807,7 +4308,24 @@ export class AppComponent implements OnInit {
               }
             )?.route?.counterpartyType === "CUSTOMER"
               ? "請輸入 3–35 字元的 Customer ID，或從 Customer Service 選擇"
-              : "請輸入符合 ISO 9362 的 BIC8／BIC11，或從 Bank Service 選擇",
+              : (
+                    field.model as {
+                      route?: { counterpartyType?: string };
+                    }
+                  )?.route?.counterpartyType === "ANY_BANK"
+                ? "通用 fallback 固定使用 ANY；實際受款銀行由交易資料提供"
+                : "請輸入 3–35 字元的內部 Counterparty ID，或從 Bank Service 選擇",
+          "props.description": (field) =>
+            (field.model as { route?: { counterpartyType?: string } })?.route
+              ?.counterpartyType === "ANY_BANK"
+              ? "通用 fallback 適用任何已核准銀行；實際交易對手由交易資料提供。"
+              : "內部穩定識別碼；SWIFT BIC 另存於受控 route 資料。",
+          "props.showPicker": (field) =>
+            (field.model as { route?: { counterpartyType?: string } })?.route
+              ?.counterpartyType !== "ANY_BANK",
+          "props.readonly": (field) =>
+            (field.model as { route?: { counterpartyType?: string } })?.route
+              ?.counterpartyType === "ANY_BANK",
           "props.pickerLabel": (field) =>
             (
               field.model as {
@@ -3848,15 +4366,42 @@ export class AppComponent implements OnInit {
         },
       },
       {
+        key: "route.beneficiarySource",
+        type: "select",
+        props: {
+          label: "Beneficiary Source",
+          required: true,
+          description:
+            "SSI 表示 Beneficiary BIC 儲存在本 SSI；Transaction 表示由交易資料提供，SSI 不得儲存或推導。",
+          options: [
+            { label: "SSI／由 SSI 提供", value: "SSI" },
+            { label: "Transaction／由交易提供", value: "TRANSACTION" },
+          ],
+        },
+      },
+      {
         key: "route.beneficiaryBic",
         type: "bic-input",
         props: {
           label: "Beneficiary BIC（ISO 9362）",
-          description:
-            "可手動輸入 BIC8/BIC11，或直接從右側 Bank Service 選擇。",
           pickerAction: () =>
             void this.openBicPicker("beneficiaryBic", "選擇 Beneficiary BIC"),
-          ...bicValidation,
+          pattern: BIC_PATTERN,
+          maxLength: 11,
+          minLength: 8,
+        },
+        expressions: {
+          "props.required": (field) =>
+            (field.model as { route?: { beneficiarySource?: string } })?.route
+              ?.beneficiarySource !== "TRANSACTION",
+          "props.disabled": (field) =>
+            (field.model as { route?: { beneficiarySource?: string } })?.route
+              ?.beneficiarySource === "TRANSACTION",
+          "props.description": (field) =>
+            (field.model as { route?: { beneficiarySource?: string } })?.route
+              ?.beneficiarySource === "TRANSACTION"
+              ? "不儲存在 SSI；由交易資料提供。"
+              : "可手動輸入 BIC8/BIC11，或從 Bank Service 選擇銀行身分並回填唯讀 BIC。",
         },
       },
       {
@@ -3865,7 +4410,7 @@ export class AppComponent implements OnInit {
         props: {
           label: "Account With Institution（ISO 9362）",
           description:
-            "SSI 的 Account With Institution；選擇後直接回填此欄位。",
+            "SSI 的 Account With Institution BIC；Bank Service 只提供銀行身分與 BIC，不提供帳號。",
           pickerAction: () =>
             void this.openBicPicker(
               "accountWithBic",

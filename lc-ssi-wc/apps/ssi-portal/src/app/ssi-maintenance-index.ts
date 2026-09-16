@@ -40,7 +40,13 @@ export type SsiOwnershipSort =
   | "ROUTE_PRIORITY"
   | "EFFECTIVE_PERIOD"
   | "STATUS"
-  | "VERSION";
+  | "VERSION"
+  | "REQUEST_TYPE"
+  | "REVISION_STATUS"
+  | "SUBMIT"
+  | "EDIT_REVISE"
+  | "SUPPRESS"
+  | "REVOKE_DRAFT";
 
 type Comparator<T> = (left: T, right: T) => number;
 
@@ -140,6 +146,10 @@ export interface SortableSsiRow {
   status: string;
   version: number;
   ownerParty?: string;
+  amendmentOfId?: string;
+  changeType?: "REVISION" | "SUPPRESSION";
+  hasOpenRevision?: boolean;
+  openRevisionStatus?: string;
   route: Readonly<Record<string, string>>;
 }
 
@@ -204,6 +214,29 @@ export function sortSsiOwnershipRows<T extends SortableSsiRow>(
     ),
     STATUS: (left, right) => compareText(left.status, right.status),
     VERSION: (left, right) => left.version - right.version,
+    REQUEST_TYPE: (left, right) =>
+      compareText(
+        left.changeType ?? (left.amendmentOfId ? "REVISION" : "NEW"),
+        right.changeType ?? (right.amendmentOfId ? "REVISION" : "NEW"),
+      ),
+    REVISION_STATUS: (left, right) =>
+      compareText(left.openRevisionStatus, right.openRevisionStatus),
+    SUBMIT: (left, right) =>
+      Number(left.status === "DRAFT") - Number(right.status === "DRAFT"),
+    EDIT_REVISE: (left, right) =>
+      Number(
+        left.status === "DRAFT" ||
+          (left.status === "ACTIVE" && !left.hasOpenRevision),
+      ) -
+      Number(
+        right.status === "DRAFT" ||
+          (right.status === "ACTIVE" && !right.hasOpenRevision),
+      ),
+    SUPPRESS: (left, right) =>
+      Number(left.status === "ACTIVE" && !left.hasOpenRevision) -
+      Number(right.status === "ACTIVE" && !right.hasOpenRevision),
+    REVOKE_DRAFT: (left, right) =>
+      Number(left.status === "DRAFT") - Number(right.status === "DRAFT"),
   };
   return [...rows].sort((left, right) => {
     const compared = comparators[sort](left, right);

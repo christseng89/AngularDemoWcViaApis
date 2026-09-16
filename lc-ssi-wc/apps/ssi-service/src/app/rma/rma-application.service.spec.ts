@@ -3,7 +3,11 @@ import {
   ConflictException,
   NotFoundException,
 } from "@nestjs/common";
-import { RmaApplicationService } from "./rma-application.service";
+import {
+  compareRmaMessageTypes,
+  deriveRmaService,
+  RmaApplicationService,
+} from "./rma-application.service";
 import type { RmaRecord, RmaRepository } from "./rma.repository";
 
 const record = (overrides: Partial<RmaRecord> = {}): RmaRecord => ({
@@ -61,6 +65,25 @@ const repository = (records: RmaRecord[] = []) => {
     save: jest.fn((item: RmaRecord) => {
       saved.push(item);
     }),
+    hasOpenRevision: jest.fn(() => false),
+    saveRevisionWorkInProgress: jest.fn((item: RmaRecord) => {
+      records.push(item);
+      saved.push(item);
+      return true;
+    }),
+    approveSuppression: jest.fn((id: string, actor: string) => {
+      const request = records.find((item) => item.id === id);
+      const source = records.find((item) => item.id === request?.amendmentOfId);
+      if (!request || !source) return undefined;
+      const superseded = { ...source, status: "SUPERSEDED" } as RmaRecord;
+      const suppressed = {
+        ...request,
+        status: "SUPPRESSED",
+        checker: actor,
+      } as RmaRecord;
+      saved.push(superseded, suppressed);
+      return suppressed;
+    }),
     audit: jest.fn(() => auditRows),
   };
   return { value: value as unknown as RmaRepository, saved, auditRows };
@@ -78,6 +101,66 @@ const command = () => ({
 });
 
 describe("RmaApplicationService lifecycle", () => {
+  it("compares an edited Message Type set without changing the original", () => {
+    expect(
+      compareRmaMessageTypes(
+        ["MT103", "MT202", "MT734"],
+        ["MT103", "MT202", "MT400"],
+      ),
+    ).toEqual({
+      unchanged: ["MT103", "MT202"],
+      added: ["MT400"],
+      suppressed: ["MT734"],
+    });
+  });
+
+  it("derives one combined service label from the selected Message Types", () => {
+    expect(deriveRmaService(["MT202", "pacs.009.001.08"])).toBe(
+      "FIN / FINPLUS",
+    );
+  });
+
+  it("recomputes Message Type changes on approval and records immutable before/after evidence", () => {
+    const original = record({
+      id: "original",
+      messageTypes: ["MT103", "MT202", "MT734"],
+    });
+    const pending = record({
+      id: "revision",
+      amendmentOfId: original.id,
+      status: "PENDING_APPROVAL",
+      maker: "maker.revision",
+      messageTypes: ["MT103", "MT202", "MT400"],
+    });
+    const repo = repository([original, pending]);
+
+    const approved = new RmaApplicationService(repo.value).transition(
+      pending.id,
+      "APPROVE",
+      "checker.other",
+    );
+
+    expect(approved.messageTypeChanges).toEqual({
+      unchanged: ["MT103", "MT202"],
+      added: ["MT400"],
+      suppressed: ["MT734"],
+    });
+    expect(repo.value.save).toHaveBeenCalledWith(
+      approved,
+      "APPROVE",
+      "checker.other",
+      "RMA",
+      expect.objectContaining({
+        before: original,
+        after: approved,
+        changedFields: {
+          messageTypes: approved.messageTypeChanges,
+        },
+      }),
+    );
+    expect(original.messageTypes).toEqual(["MT103", "MT202", "MT734"]);
+  });
+
   it("creates, lists and audits records", () => {
     const repo = repository();
     const subject = new RmaApplicationService(repo.value);
@@ -87,6 +170,11 @@ describe("RmaApplicationService lifecycle", () => {
       status: "DRAFT",
       version: 1,
       source: "SYNTHETIC_DEMO",
+      messageTypeChanges: {
+        unchanged: [],
+        added: ["MT202"],
+        suppressed: [],
+      },
     });
     expect(created.id).toMatch(/^[0-9a-f-]{36}$/);
     expect(repo.value.save).toHaveBeenCalledWith(
@@ -97,6 +185,45 @@ describe("RmaApplicationService lifecycle", () => {
     );
     expect(subject.list()).toEqual([]);
     expect(subject.audit()).toEqual(repo.auditRows);
+  });
+
+  it.each(["ACTIVE", "APPROVED", "DRAFT", "WIP", "PENDING_APPROVAL"])(
+    "rejects ADD when the logical RMA index already has a %s record",
+    (status) => {
+      const existing = record({
+        ownBic: "DEMOHKHH",
+        counterpartyBic: "CHASUS33",
+        service: "FIN",
+        direction: "OUTBOUND",
+        status,
+      });
+      expect(() =>
+        new RmaApplicationService(repository([existing]).value).create(
+          command(),
+        ),
+      ).toThrow("RMA_INDEX_ALREADY_EXISTS");
+    },
+  );
+
+  it("allows ADD for a different counterparty BIC", () => {
+    const existing = record({
+      ownBic: "DEMOHKHH",
+      counterpartyBic: "BARCGB22",
+      service: "FIN",
+      direction: "OUTBOUND",
+    });
+    expect(
+      new RmaApplicationService(repository([existing]).value).create(command())
+        .status,
+    ).toBe("DRAFT");
+  });
+
+  it("allows the other direction for the same BIC pair", () => {
+    const existing = record({ direction: "INBOUND" });
+    expect(
+      new RmaApplicationService(repository([existing]).value).create(command())
+        .status,
+    ).toBe("DRAFT");
   });
 
   it("updates only the original maker's draft and retains its source", () => {
@@ -130,7 +257,7 @@ describe("RmaApplicationService lifecycle", () => {
       "new-maker",
     );
     expect(revised).toMatchObject({
-      status: "DRAFT",
+      status: "WIP",
       amendmentOfId: current.id,
       maker: "new-maker",
       version: 4,
@@ -144,6 +271,51 @@ describe("RmaApplicationService lifecycle", () => {
         repository([record({ status: "REVOKED" })]).value,
       ).revise("RMA-1", "maker"),
     ).toThrow(ConflictException);
+  });
+
+  it("creates a governed suppression draft and only suppresses after independent approval", () => {
+    const active = record({ id: "active", status: "ACTIVE", maker: "maker" });
+    const repo = repository([active]);
+    const subject = new RmaApplicationService(repo.value);
+
+    const suppression = subject.suppress(
+      active.id,
+      "maker.suppress",
+      "relationship terminated",
+    );
+    expect(suppression).toMatchObject({
+      status: "DRAFT",
+      changeType: "SUPPRESSION",
+      suppressionReason: "relationship terminated",
+      amendmentOfId: active.id,
+      maker: "maker.suppress",
+      messageTypeChanges: {
+        unchanged: [],
+        added: [],
+        suppressed: active.messageTypes,
+      },
+    });
+
+    const pending = record({
+      ...suppression,
+      id: "suppression",
+      status: "PENDING_APPROVAL",
+    });
+    const approvalRepo = repository([active, pending]);
+    const approved = new RmaApplicationService(approvalRepo.value).transition(
+      pending.id,
+      "APPROVE",
+      "checker.other",
+    );
+    expect(approved).toMatchObject({
+      status: "SUPPRESSED",
+      checker: "checker.other",
+    });
+    expect(approvalRepo.saved).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: active.id, status: "SUPERSEDED" }),
+      ]),
+    );
   });
 
   it("enforces maker/checker transitions and supersedes overlapping active records", () => {
@@ -183,7 +355,7 @@ describe("RmaApplicationService lifecycle", () => {
         "APPROVE",
         "checker",
       ),
-    ).toMatchObject({ status: "APPROVED", checker: "checker" });
+    ).toMatchObject({ status: "ACTIVE", checker: "checker" });
 
     const repo = repository([approved, active]);
     expect(
@@ -208,7 +380,7 @@ describe("RmaApplicationService lifecycle", () => {
   });
 
   it("revokes with a meaningful reason and rejects invalid requests", () => {
-    const current = record();
+    const current = record({ status: "DRAFT" });
     const repo = repository([current]);
     expect(
       new RmaApplicationService(repo.value).revoke(
@@ -246,6 +418,7 @@ describe("RmaApplicationService lifecycle", () => {
     [{ ...command(), direction: "SIDEWAYS" }, "INVALID_RMA_SCOPE"],
     [{ ...command(), messageTypes: [] }, "INVALID_MESSAGE_TYPES"],
     [{ ...command(), messageTypes: ["invalid"] }, "INVALID_MESSAGE_TYPES"],
+    [{ ...command(), messageTypes: ["MT700"] }, "UNSUPPORTED_RMA_MESSAGE_TYPE"],
     [{ ...command(), maker: "" }, "INVALID_RMA_DATES"],
     [{ ...command(), validFrom: "invalid" }, "INVALID_RMA_DATES"],
     [{ ...command(), validTo: "2025-01-01" }, "INVALID_RMA_DATES"],

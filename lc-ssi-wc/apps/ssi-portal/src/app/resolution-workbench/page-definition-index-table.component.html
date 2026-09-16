@@ -1,12 +1,18 @@
 <section class="definition-index-workspace">
   @if (selected(); as selection) {
-    <button class="back-button" type="button" (click)="close()">
-      <span aria-hidden="true">←</span> Back to transaction index
+    <button
+      class="drawer-close workbench-cancel"
+      type="button"
+      aria-label="Cancel"
+      (click)="close()"
+    >
+      ×
     </button>
     <ssi-resolution-workbench
       [selection]="selection"
       [pageSize]="pageSize()"
       (cancelled)="backToScenarios()"
+      (dismissed)="close()"
     />
   } @else {
     @if (failure(); as currentFailure) {
@@ -202,17 +208,19 @@
           <div>
             <button
               type="button"
+              class="ghost"
               [disabled]="page() === 1"
               (click)="movePage(-1)"
             >
-              上一頁
+              Previous
             </button>
             <button
               type="button"
+              class="ghost"
               [disabled]="page() === totalPages()"
               (click)="movePage(1)"
             >
-              下一頁
+              Next
             </button>
           </div>
         </div>
@@ -276,7 +284,7 @@
         <button
           type="button"
           class="drawer-close"
-          aria-label="Close scenario index"
+          aria-label="Cancel scenario index"
           (click)="closeDrawer()"
         >
           ×
@@ -483,19 +491,20 @@
         <div>
           <button
             type="button"
+            class="ghost"
             [disabled]="drawerPage() === 1"
             (click)="moveDrawerPage(-1)"
           >
-            上一頁
+            Previous
           </button>
           <button
             type="button"
+            class="ghost"
             [disabled]="drawerPage() === drawerTotalPages()"
             (click)="moveDrawerPage(1)"
           >
-            下一頁
+            Next
           </button>
-          <button type="button" (click)="closeDrawer()">Close</button>
         </div>
       </footer>
     </dialog>

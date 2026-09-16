@@ -156,7 +156,7 @@ describe("NostroApplicationService", () => {
     const revised = harness([current]).service.revise(current.id, "new-maker");
     expect(revised).toMatchObject({
       maker: "new-maker",
-      status: "DRAFT",
+      status: "WIP",
       version: 3,
       amendmentOfId: current.id,
     });
@@ -175,7 +175,7 @@ describe("NostroApplicationService", () => {
   );
 
   it("rejects a revision without a maker", () => {
-    const current = record();
+    const current = record({ status: "DRAFT" });
     expect(() => harness([current]).service.revise(current.id, "")).toThrow(
       ConflictException,
     );
@@ -201,7 +201,7 @@ describe("NostroApplicationService", () => {
     expect(
       harness([current]).service.transition(current.id, "APPROVE", "checker"),
     ).toMatchObject({
-      status: "APPROVED",
+      status: "ACTIVE",
       checker: "checker",
     });
   });
@@ -239,7 +239,7 @@ describe("NostroApplicationService", () => {
   });
 
   it("revokes with a trimmed reason", () => {
-    const current = record();
+    const current = record({ status: "DRAFT" });
     expect(
       harness([current]).service.revoke(
         current.id,
