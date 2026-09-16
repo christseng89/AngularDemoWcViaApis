@@ -86,7 +86,7 @@ Catalogue generation rules:
    - `MT103 REMIT` is eligible only when an effective approved community／MUG／profile row exists; otherwise it returns `UNSUPPORTED_PROFILE` and does not expand the base `MT103` authorization.
    - `pacs.008.001.08` plain (`BizSvc=swift.cbprplus.04`) and STP (`BizSvc=swift.cbprplus.stp.04`) are in scope, with `NbOfTxs=1`; they appear as one selectable `pacs.008.001.08` Message Type with governed profile metadata.
    - `MT101` is `OUT_OF_SCOPE` and must never be selectable or loaded as SSI-supported.
-   - `pacs.008.001.12` entered the legacy data because the earlier implementation used a generic ISO 20022 version without the governed SWIFT／CBPR+ profile source. It must not coexist as a selectable catalogue entry or be accepted by manual ADD／EDIT. Controlled Load Data／Repair converts known positive operational occurrences to `pacs.008.001.08` and records explicit `from=.001.12 → to=.001.08` evidence; immutable audit history and isolated negative／legacy fixtures are not rewritten.
+   - `pacs.008.001.12` entered the legacy data because the earlier implementation used a generic ISO 20022 version without the governed SWIFT／CBPR+ profile source. It must not coexist as a selectable catalogue entry or be accepted by manual ADD／EDIT. Controlled Load Data／Repair converts eligible positive Operational／Draft occurrences to `pacs.008.001.08` and records explicit `from=.001.12 → to=.001.08` evidence; immutable audit history, isolated negative／legacy fixtures, and records with unknown eligibility are not rewritten.
 4. A message type with documentation evidence but `OUT_OF_SSI_SCOPE` mapping is not selectable.
 5. UI, API validation, Load Data, Audit, and Repair must verify the same catalogue version and SHA-256.
 6. Runtime eligibility requires `selectable=true`, `approvalStatus=APPROVED`, the requested standards release, and `effectiveFrom <= asOf <= effectiveTo`.
@@ -209,9 +209,10 @@ For each canonical key at the chosen `asOf` timestamp:
 
 For legacy `.001.12` data, the deterministic repair outcomes are:
 
-- `.001.12` plus other supported values: remove `.001.12`, retain the supported values, derive service again, and propose an EDIT Draft only when Gate 2 permits Apply.
-- `.001.12` plus an already governed `.001.08`: retain `.001.08`, remove `.001.12`, and never count this as converting `.12` into `.08`.
-- `.001.12` as the only value: retained union is empty; create no replacement `.001.08` and route the record to manual Suppression review.
+- Eligible positive Operational／Draft `.001.12` plus other supported values: convert `.001.12` to `.001.08`, retain the other supported values, derive service again, record conversion provenance, and propose an EDIT Draft only when Gate 2 permits Apply.
+- Eligible positive Operational／Draft `.001.12` plus an already governed `.001.08`: retain one deduplicated `.001.08`, record the `.12 → .08` conversion and deduplication, and propose an EDIT Draft only when Gate 2 permits Apply.
+- Eligible positive Operational／Draft `.001.12` as the only value: target one governed `.001.08` with explicit conversion evidence.
+- Immutable history, isolated negative／legacy fixtures, or records whose lifecycle, source, fixture eligibility, or conversion scope is unknown: perform no conversion or mutation and route the item to manual review.
 
 This is a two-phase governed workflow, not one database transaction:
 

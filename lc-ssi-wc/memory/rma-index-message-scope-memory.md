@@ -33,6 +33,7 @@
 - Use one searchable, categorized, multi-select Popup rather than free-text syntax.
 - The Popup has exactly three parameter-driven tabs: `Security`, `Trade Finance`, and `Payment`.
 - Within every tab, show a two-column checkbox matrix: `INBOUND` on the left and `OUTBOUND` on the right. Do not replace it with a direction dropdown and do not stack the directions vertically.
+- The left and right columns render the same governed parameter set with the same categories, ordering, Message Types, and Descriptions. They are not separate catalogues; only the checked authorization state differs by direction. Any future direction applicability restriction remains metadata on the same parameter item rather than a second hard-coded list.
 - Every option displays governed Message Type and official Description. Category, Description, direction applicability, ordering, and selectable status come from the same governed policy metadata as API validation, Load Data, Audit, and Repair; the UI must not hard-code them.
 - The visual reference's sample MT5xx values are layout examples only. They must not be introduced unless a future governed SSI parameter snapshot explicitly makes them eligible.
 - ADD and EDIT use the same selector. ADD may check multiple values in both directions. EDIT pre-checks the original approved values and produces `ADDED`／`SUPPRESSED` deltas separately for each canonical bank-direction record.
