@@ -31,6 +31,7 @@ export type CounterpartyInboxSort =
   | "STATUS_EVIDENCE"
   | "LAST_VERIFIED";
 export type SsiOwnershipSort =
+  | "SSI_ID"
   | "BOOKING_ENTITY"
   | "ACCOUNT_SERVICER"
   | "ACCOUNT_REF"
@@ -142,6 +143,7 @@ export function queryCounterpartyInbox(
 
 export interface SortableSsiRow {
   id: string;
+  counterpartyId?: string;
   scope: string;
   status: string;
   version: number;
@@ -171,6 +173,8 @@ export function sortSsiOwnershipRows<T extends SortableSsiRow>(
     (left, right) =>
       compare(left.route, right.route, left, right);
   const comparators: Readonly<Record<SsiOwnershipSort, Comparator<T>>> = {
+    SSI_ID: (left, right) =>
+      compareText(left.counterpartyId ?? left.id, right.counterpartyId ?? right.id),
     BOOKING_ENTITY: routeComparator((left, right, leftRow, rightRow) =>
       compareText(
         left["bookingEntity"] || leftRow.ownerParty,

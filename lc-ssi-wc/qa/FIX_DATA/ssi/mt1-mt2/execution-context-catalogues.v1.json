@@ -1,0 +1,2782 @@
+{
+  "approval": {
+    "ba": "PENDING",
+    "qa": "PENDING"
+  },
+  "artifactId": "SSI-MT1-MT2-EXECUTION-CONTEXT-CATALOGUES-V1",
+  "catalogueBindings": [
+    "ISO4217",
+    "ENTITY",
+    "PRODUCT",
+    "BUSINESS_FUNCTION",
+    "PAYMENT_LEG",
+    "ACCOUNT_RELATIONSHIP",
+    "ACCOUNT_PURPOSE",
+    "ROUTE_PREFERENCE",
+    "OFFICIAL_ROLE",
+    "LOOKUP_CONTRACT",
+    "PROFILE_VARIANT",
+    "SEQUENCE",
+    "SETTLEMENT_LEG"
+  ],
+  "closedVocabularies": {
+    "accountOwnerRole": [
+      "OWN_ENTITY",
+      "COUNTERPARTY",
+      "NOT_APPLICABLE"
+    ],
+    "accountRequirement": [
+      "REQUIRED",
+      "OPTIONAL_VALIDATE_IF_PRESENT",
+      "NOT_REQUIRED"
+    ],
+    "accountServicerRole": [
+      "OWN_ENTITY",
+      "COUNTERPARTY",
+      "DERIVED_BY_NOSTRO_LOOKUP",
+      "NOT_APPLICABLE"
+    ],
+    "bookingEntityRequirement": [
+      "REQUIRED",
+      "FROM_CONTEXT",
+      "NOT_REQUIRED"
+    ],
+    "currencyRequirement": [
+      "REQUIRED",
+      "FROM_TRANSACTION",
+      "NOT_REQUIRED"
+    ],
+    "inputAccountCase": [
+      "ABSENT",
+      "SINGLE_VALID",
+      "SINGLE_INVALID",
+      "MULTIPLE"
+    ],
+    "officialRole": [
+      "TAG_53A",
+      "TAG_53J",
+      "TAG_54A",
+      "TAG_56A",
+      "TAG_57A",
+      "NOT_APPLICABLE"
+    ],
+    "routePreference": [
+      "DIRECT",
+      "INTERMEDIATED",
+      "REFERENCE_ONLY",
+      "NOT_APPLICABLE"
+    ]
+  },
+  "completion": {
+    "complete": true,
+    "executableContexts": 0,
+    "heldContexts": 2,
+    "scope": "GATE0S_HELD_ONLY"
+  },
+  "contexts": [
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "HKD",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "MT103",
+      "contextId": "CTX-MT103-PLAIN-OUT",
+      "currency": {
+        "currency": "HKD",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "PRIMARY",
+      "productId": "DEMO-PRODUCT",
+      "transactionReference": "DEMO-REF-1",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "TRANSACTION",
+        "valueDate": "2026-09-17"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "NOT_APPLICABLE",
+        "decimalValue": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "source": "NOT_APPLICABLE"
+      },
+      "businessFunctionId": "NOT_APPLICABLE",
+      "contextId": "CTX-OOS-MT101",
+      "currency": {
+        "currency": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "source": "NOT_APPLICABLE"
+      },
+      "paymentLegId": "NOT_APPLICABLE",
+      "productId": "NOT_APPLICABLE",
+      "transactionReference": "NOT_APPLICABLE",
+      "valueDate": {
+        "effectiveFrom": "NOT_APPLICABLE",
+        "effectiveTo": "NOT_APPLICABLE",
+        "source": "NOT_APPLICABLE",
+        "valueDate": "NOT_APPLICABLE"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "NOT_APPLICABLE",
+        "decimalValue": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "source": "NOT_APPLICABLE"
+      },
+      "businessFunctionId": "NOT_APPLICABLE",
+      "contextId": "CTX-PACS008-CLASSIFICATION-HOLD",
+      "currency": {
+        "currency": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "source": "NOT_APPLICABLE"
+      },
+      "executionState": "HELD",
+      "family": "pacs.008",
+      "paymentLegId": "NOT_APPLICABLE",
+      "productId": "NOT_APPLICABLE",
+      "transactionReference": "NOT_APPLICABLE",
+      "valueDate": {
+        "effectiveFrom": "NOT_APPLICABLE",
+        "effectiveTo": "NOT_APPLICABLE",
+        "source": "NOT_APPLICABLE",
+        "valueDate": "NOT_APPLICABLE"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "NOT_APPLICABLE",
+        "decimalValue": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "source": "NOT_APPLICABLE"
+      },
+      "businessFunctionId": "NOT_APPLICABLE",
+      "contextId": "CTX-PACS009-CLASSIFICATION-HOLD",
+      "currency": {
+        "currency": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "source": "NOT_APPLICABLE"
+      },
+      "executionState": "HELD",
+      "family": "pacs.009",
+      "paymentLegId": "NOT_APPLICABLE",
+      "productId": "NOT_APPLICABLE",
+      "transactionReference": "NOT_APPLICABLE",
+      "valueDate": {
+        "effectiveFrom": "NOT_APPLICABLE",
+        "effectiveTo": "NOT_APPLICABLE",
+        "source": "NOT_APPLICABLE",
+        "valueDate": "NOT_APPLICABLE"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "HKD",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "ANY",
+      "contextId": "CTX-09E928E1-F3D1-4C9B-A10C-51707A303E4B-PACS008",
+      "currency": {
+        "currency": "HKD",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "BANK_REIMBURSEMENT",
+      "productId": "ANY",
+      "transactionReference": "DEMO-09E928E1-PACS008",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "HKD",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "ANY",
+      "contextId": "CTX-09E928E1-F3D1-4C9B-A10C-51707A303E4B-PACS009",
+      "currency": {
+        "currency": "HKD",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "BANK_REIMBURSEMENT",
+      "productId": "ANY",
+      "transactionReference": "DEMO-09E928E1-PACS009",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "CHF",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "INTERBANK_TRANSFER",
+      "contextId": "CTX-123B04EC-75BC-5D16-8232-D2EAEBEA7907-PACS009",
+      "currency": {
+        "currency": "CHF",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "INTERBANK_SETTLEMENT",
+      "productId": "CENTRAL_PAYMENT",
+      "transactionReference": "DEMO-123B04EC-PACS009",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "HKD",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "DEMAND_GUARANTEE_CLAIM_PAYMENT",
+      "contextId": "CTX-12FED8B5-20A9-4FA0-B684-CFC08BD307FE-PACS009",
+      "currency": {
+        "currency": "HKD",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "CLAIM_PAYMENT",
+      "productId": "DEMAND_GUARANTEE",
+      "transactionReference": "DEMO-12FED8B5-PACS009",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "EUR",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "INTERBANK_TRANSFER",
+      "contextId": "CTX-163482F1-A692-5908-AD22-7E94C8634890-PACS009",
+      "currency": {
+        "currency": "EUR",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "INTERBANK_SETTLEMENT",
+      "productId": "CENTRAL_PAYMENT",
+      "transactionReference": "DEMO-163482F1-PACS009",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "GBP",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "IMPORT_COLLECTION_PAYMENT",
+      "contextId": "CTX-1A386704-017A-4439-BB65-29FC3FD6E8DC-PACS009",
+      "currency": {
+        "currency": "GBP",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "COLLECTION_SETTLEMENT",
+      "productId": "IMPORT_COLLECTION",
+      "transactionReference": "DEMO-1A386704-PACS009",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "GBP",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "INTERBANK_TRANSFER",
+      "contextId": "CTX-1A9BBD1F-B884-5FBF-87D4-1E8C79A13800-PACS009",
+      "currency": {
+        "currency": "GBP",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "INTERBANK_SETTLEMENT",
+      "productId": "CENTRAL_PAYMENT",
+      "transactionReference": "DEMO-1A9BBD1F-PACS009",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "CHF",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "MONEY_MARKET_SETTLEMENT",
+      "contextId": "CTX-1BB2BA6F-B11D-4ED8-8213-482DBFA6AFD4-PACS009",
+      "currency": {
+        "currency": "CHF",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "INTERBANK_SETTLEMENT",
+      "productId": "TREASURY_MONEY_MARKET",
+      "transactionReference": "DEMO-1BB2BA6F-PACS009",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "USD",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "ANY",
+      "contextId": "CTX-22A11830-F848-4281-805F-8E693C98B364-PACS008",
+      "currency": {
+        "currency": "USD",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "BANK_REIMBURSEMENT",
+      "productId": "ANY",
+      "transactionReference": "DEMO-22A11830-PACS008",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "USD",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "ANY",
+      "contextId": "CTX-22A11830-F848-4281-805F-8E693C98B364-PACS009",
+      "currency": {
+        "currency": "USD",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "BANK_REIMBURSEMENT",
+      "productId": "ANY",
+      "transactionReference": "DEMO-22A11830-PACS009",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "GBP",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "CUSTOMER_CREDIT_TRANSFER",
+      "contextId": "CTX-2856D36C-8F5D-4385-9473-E8B39941F7FE-PACS008",
+      "currency": {
+        "currency": "GBP",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "CUSTOMER_TRANSFER",
+      "productId": "CENTRAL_PAYMENT",
+      "transactionReference": "DEMO-2856D36C-PACS008",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "CNY",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "CUSTOMER_CREDIT_TRANSFER",
+      "contextId": "CTX-2927617A-E7E4-479E-9BC4-27A6705383EE-PACS008",
+      "currency": {
+        "currency": "CNY",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "CUSTOMER_TRANSFER",
+      "productId": "CENTRAL_PAYMENT",
+      "transactionReference": "DEMO-2927617A-PACS008",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "GBP",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "EXPORT_LC_PROCEEDS_SETTLEMENT",
+      "contextId": "CTX-351807B1-C715-4F53-8FBD-058CC9A14EAB-PACS008",
+      "currency": {
+        "currency": "GBP",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "PROCEEDS_SETTLEMENT",
+      "productId": "EXPORT_LC",
+      "transactionReference": "DEMO-351807B1-PACS008",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "CNY",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "CUSTOMER_CREDIT_TRANSFER",
+      "contextId": "CTX-38DF686A-9022-4AD6-8AC7-22435411D983-PACS008",
+      "currency": {
+        "currency": "CNY",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "CUSTOMER_TRANSFER",
+      "productId": "CENTRAL_PAYMENT",
+      "transactionReference": "DEMO-38DF686A-PACS008",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "AUD",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "LC_REIMBURSEMENT_SETTLEMENT",
+      "contextId": "CTX-42AAE02A-0597-4982-B4C0-4B27BB44A549-PACS009",
+      "currency": {
+        "currency": "AUD",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "BANK_REIMBURSEMENT",
+      "productId": "LC_REIMBURSEMENT",
+      "transactionReference": "DEMO-42AAE02A-PACS009",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "EUR",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "IMPORT_LC_BANK_REIMBURSEMENT",
+      "contextId": "CTX-45EA4C86-67D4-40B7-935D-904A6E3FFD12-PACS009",
+      "currency": {
+        "currency": "EUR",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "BANK_REIMBURSEMENT",
+      "productId": "IMPORT_LC",
+      "transactionReference": "DEMO-45EA4C86-PACS009",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "JPY",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "INTERBANK_TRANSFER",
+      "contextId": "CTX-4A32AA4B-5F8A-5B43-BF52-7B00AD2F8673-PACS009",
+      "currency": {
+        "currency": "JPY",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "INTERBANK_SETTLEMENT",
+      "productId": "CENTRAL_PAYMENT",
+      "transactionReference": "DEMO-4A32AA4B-PACS009",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "GBP",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "ANY",
+      "contextId": "CTX-50531295-C91A-4EB5-9C21-69D2DAB38B7C-PACS008",
+      "currency": {
+        "currency": "GBP",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "BANK_REIMBURSEMENT",
+      "productId": "ANY",
+      "transactionReference": "DEMO-50531295-PACS008",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "GBP",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "ANY",
+      "contextId": "CTX-50531295-C91A-4EB5-9C21-69D2DAB38B7C-PACS009",
+      "currency": {
+        "currency": "GBP",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "BANK_REIMBURSEMENT",
+      "productId": "ANY",
+      "transactionReference": "DEMO-50531295-PACS009",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "CNY",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "CUSTOMER_CREDIT_TRANSFER",
+      "contextId": "CTX-50754B21-224E-44F0-882A-306C9B042036-PACS008",
+      "currency": {
+        "currency": "CNY",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "CUSTOMER_TRANSFER",
+      "productId": "CENTRAL_PAYMENT",
+      "transactionReference": "DEMO-50754B21-PACS008",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "AUD",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "LC_REIMBURSEMENT_SETTLEMENT",
+      "contextId": "CTX-50D51F4C-9905-46F2-AC93-E0E1A4330019-PACS009",
+      "currency": {
+        "currency": "AUD",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "BANK_REIMBURSEMENT",
+      "productId": "LC_REIMBURSEMENT",
+      "transactionReference": "DEMO-50D51F4C-PACS009",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "USD",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "IMPORT_COLLECTION_PAYMENT",
+      "contextId": "CTX-54C26B29-E351-4391-AA38-8614AAB63C4F-PACS009",
+      "currency": {
+        "currency": "USD",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "COLLECTION_SETTLEMENT",
+      "productId": "IMPORT_COLLECTION",
+      "transactionReference": "DEMO-54C26B29-PACS009",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "USD",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "ANY",
+      "contextId": "CTX-5547DF35-B8E3-4375-A54A-E569FC4E69FA-PACS008",
+      "currency": {
+        "currency": "USD",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "BANK_REIMBURSEMENT",
+      "productId": "ANY",
+      "transactionReference": "DEMO-5547DF35-PACS008",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "USD",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "ANY",
+      "contextId": "CTX-5547DF35-B8E3-4375-A54A-E569FC4E69FA-PACS009",
+      "currency": {
+        "currency": "USD",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "BANK_REIMBURSEMENT",
+      "productId": "ANY",
+      "transactionReference": "DEMO-5547DF35-PACS009",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "HKD",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "CUSTOMER_CREDIT_TRANSFER",
+      "contextId": "CTX-5E2D8D46-C53A-41FD-A8C5-4351F2C56615-PACS008",
+      "currency": {
+        "currency": "HKD",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "CUSTOMER_TRANSFER",
+      "productId": "CENTRAL_PAYMENT",
+      "transactionReference": "DEMO-5E2D8D46-PACS008",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "EUR",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "CUSTOMER_CREDIT_TRANSFER",
+      "contextId": "CTX-64D1E5DA-C9ED-4A1A-A92B-01476F05F477-PACS008",
+      "currency": {
+        "currency": "EUR",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "CUSTOMER_TRANSFER",
+      "productId": "CENTRAL_PAYMENT",
+      "transactionReference": "DEMO-64D1E5DA-PACS008",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "SGD",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "INTERBANK_TRANSFER",
+      "contextId": "CTX-6D14DA92-FAF4-5611-854A-EF2C42350913-PACS009",
+      "currency": {
+        "currency": "SGD",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "INTERBANK_SETTLEMENT",
+      "productId": "CENTRAL_PAYMENT",
+      "transactionReference": "DEMO-6D14DA92-PACS009",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "AUD",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "ANY",
+      "contextId": "CTX-71C01B10-581D-4892-84E5-92BD247727DA-PACS008",
+      "currency": {
+        "currency": "AUD",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "BANK_REIMBURSEMENT",
+      "productId": "ANY",
+      "transactionReference": "DEMO-71C01B10-PACS008",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "AUD",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "ANY",
+      "contextId": "CTX-71C01B10-581D-4892-84E5-92BD247727DA-PACS009",
+      "currency": {
+        "currency": "AUD",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "BANK_REIMBURSEMENT",
+      "productId": "ANY",
+      "transactionReference": "DEMO-71C01B10-PACS009",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "AUD",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "INTERBANK_TRANSFER",
+      "contextId": "CTX-7E285998-4C3C-5D63-B05A-B613CD39C7B1-PACS009",
+      "currency": {
+        "currency": "AUD",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "INTERBANK_SETTLEMENT",
+      "productId": "CENTRAL_PAYMENT",
+      "transactionReference": "DEMO-7E285998-PACS009",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "USD",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "IMPORT_COLLECTION_PAYMENT",
+      "contextId": "CTX-867B9600-5A93-45A3-A4C8-EC5B008FE8CF-PACS009",
+      "currency": {
+        "currency": "USD",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "COLLECTION_SETTLEMENT",
+      "productId": "IMPORT_COLLECTION",
+      "transactionReference": "DEMO-867B9600-PACS009",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "SGD",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "ANY",
+      "contextId": "CTX-8DE05200-E796-42CC-8806-F6E7437A20B2-PACS008",
+      "currency": {
+        "currency": "SGD",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "BANK_REIMBURSEMENT",
+      "productId": "ANY",
+      "transactionReference": "DEMO-8DE05200-PACS008",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "SGD",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "ANY",
+      "contextId": "CTX-8DE05200-E796-42CC-8806-F6E7437A20B2-PACS009",
+      "currency": {
+        "currency": "SGD",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "BANK_REIMBURSEMENT",
+      "productId": "ANY",
+      "transactionReference": "DEMO-8DE05200-PACS009",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "CAD",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "INTERBANK_TRANSFER",
+      "contextId": "CTX-91765D67-8E0C-52F4-92A1-501EF37BBA23-PACS009",
+      "currency": {
+        "currency": "CAD",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "INTERBANK_SETTLEMENT",
+      "productId": "CENTRAL_PAYMENT",
+      "transactionReference": "DEMO-91765D67-PACS009",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "CHF",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "MONEY_MARKET_SETTLEMENT",
+      "contextId": "CTX-946B7448-F719-4BD4-8D83-F66C597E1F6D-PACS009",
+      "currency": {
+        "currency": "CHF",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "INTERBANK_SETTLEMENT",
+      "productId": "TREASURY_MONEY_MARKET",
+      "transactionReference": "DEMO-946B7448-PACS009",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "GBP",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "EXPORT_LC_PROCEEDS_SETTLEMENT",
+      "contextId": "CTX-9532BA2C-717F-42B6-8437-5FF7E270FCCB-PACS008",
+      "currency": {
+        "currency": "GBP",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "PROCEEDS_SETTLEMENT",
+      "productId": "EXPORT_LC",
+      "transactionReference": "DEMO-9532BA2C-PACS008",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "USD",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "IMPORT_LC_BANK_REIMBURSEMENT",
+      "contextId": "CTX-A1E1AC1A-A16F-414C-AC70-85731ED84D3F-PACS009",
+      "currency": {
+        "currency": "USD",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "BANK_REIMBURSEMENT",
+      "productId": "IMPORT_LC",
+      "transactionReference": "DEMO-A1E1AC1A-PACS009",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "USD",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "INTERBANK_TRANSFER",
+      "contextId": "CTX-A6486F75-A0A8-5207-9C28-CEDF30F4F990-PACS009",
+      "currency": {
+        "currency": "USD",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "INTERBANK_SETTLEMENT",
+      "productId": "CENTRAL_PAYMENT",
+      "transactionReference": "DEMO-A6486F75-PACS009",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "CNY",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "ANY",
+      "contextId": "CTX-AE2A71AE-A2A1-427C-8701-B519DBBF12B1-PACS008",
+      "currency": {
+        "currency": "CNY",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "BANK_REIMBURSEMENT",
+      "productId": "ANY",
+      "transactionReference": "DEMO-AE2A71AE-PACS008",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "CNY",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "ANY",
+      "contextId": "CTX-AE2A71AE-A2A1-427C-8701-B519DBBF12B1-PACS009",
+      "currency": {
+        "currency": "CNY",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "BANK_REIMBURSEMENT",
+      "productId": "ANY",
+      "transactionReference": "DEMO-AE2A71AE-PACS009",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "USD",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "INTERBANK_TRANSFER",
+      "contextId": "CTX-B0C18C9A-2FF7-59D4-96D0-F600853B8408-PACS009",
+      "currency": {
+        "currency": "USD",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "INTERBANK_SETTLEMENT",
+      "productId": "CENTRAL_PAYMENT",
+      "transactionReference": "DEMO-B0C18C9A-PACS009",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "EUR",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "ANY",
+      "contextId": "CTX-B6436323-B43E-42C6-AFD1-764A5A264E11-PACS008",
+      "currency": {
+        "currency": "EUR",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "BANK_REIMBURSEMENT",
+      "productId": "ANY",
+      "transactionReference": "DEMO-B6436323-PACS008",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "EUR",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "ANY",
+      "contextId": "CTX-B6436323-B43E-42C6-AFD1-764A5A264E11-PACS009",
+      "currency": {
+        "currency": "EUR",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "BANK_REIMBURSEMENT",
+      "productId": "ANY",
+      "transactionReference": "DEMO-B6436323-PACS009",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "USD",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "EXPORT_COLLECTION_PROCEEDS_SETTLEMENT",
+      "contextId": "CTX-B96E8D9A-327B-4FB0-9777-A9AD9D86AC43-PACS008",
+      "currency": {
+        "currency": "USD",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "PROCEEDS_SETTLEMENT",
+      "productId": "EXPORT_COLLECTION",
+      "transactionReference": "DEMO-B96E8D9A-PACS008",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "USD",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "EXPORT_COLLECTION_PROCEEDS_SETTLEMENT",
+      "contextId": "CTX-B96E8D9A-327B-4FB0-9777-A9AD9D86AC43-PACS009",
+      "currency": {
+        "currency": "USD",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "PROCEEDS_SETTLEMENT",
+      "productId": "EXPORT_COLLECTION",
+      "transactionReference": "DEMO-B96E8D9A-PACS009",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "CAD",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "ANY",
+      "contextId": "CTX-BFBEEC3D-E9A5-458D-8036-7419A45C6866-PACS008",
+      "currency": {
+        "currency": "CAD",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "BANK_REIMBURSEMENT",
+      "productId": "ANY",
+      "transactionReference": "DEMO-BFBEEC3D-PACS008",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "CAD",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "ANY",
+      "contextId": "CTX-BFBEEC3D-E9A5-458D-8036-7419A45C6866-PACS009",
+      "currency": {
+        "currency": "CAD",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "BANK_REIMBURSEMENT",
+      "productId": "ANY",
+      "transactionReference": "DEMO-BFBEEC3D-PACS009",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "HKD",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "INTERBANK_TRANSFER",
+      "contextId": "CTX-C07BB708-F81E-5976-B6DE-62171BDCAB57-PACS009",
+      "currency": {
+        "currency": "HKD",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "INTERBANK_SETTLEMENT",
+      "productId": "CENTRAL_PAYMENT",
+      "transactionReference": "DEMO-C07BB708-PACS009",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "EUR",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "IMPORT_COLLECTION_PAYMENT",
+      "contextId": "CTX-C12BD429-CF8C-4B57-9575-299BBE58D680-PACS009",
+      "currency": {
+        "currency": "EUR",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "COLLECTION_SETTLEMENT",
+      "productId": "IMPORT_COLLECTION",
+      "transactionReference": "DEMO-C12BD429-PACS009",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "JPY",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "STANDBY_LC_CLAIM_PAYMENT",
+      "contextId": "CTX-CA1D12D4-1208-40D5-A8FE-BCD040BDA6E3-PACS009",
+      "currency": {
+        "currency": "JPY",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "CLAIM_PAYMENT",
+      "productId": "STANDBY_LC",
+      "transactionReference": "DEMO-CA1D12D4-PACS009",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "JPY",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "STANDBY_LC_CLAIM_PAYMENT",
+      "contextId": "CTX-CA4A553D-77F0-4F30-B2A7-C83C4D81F52B-PACS009",
+      "currency": {
+        "currency": "JPY",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "CLAIM_PAYMENT",
+      "productId": "STANDBY_LC",
+      "transactionReference": "DEMO-CA4A553D-PACS009",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "SGD",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "EXPORT_COLLECTION_PROCEEDS_SETTLEMENT",
+      "contextId": "CTX-CC4F488C-99E1-40AD-A59D-A7D73F643DE4-PACS008",
+      "currency": {
+        "currency": "SGD",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "PROCEEDS_SETTLEMENT",
+      "productId": "EXPORT_COLLECTION",
+      "transactionReference": "DEMO-CC4F488C-PACS008",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "CHF",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "ANY",
+      "contextId": "CTX-CD321EEF-6C2F-40A2-82C6-E835745D002E-PACS008",
+      "currency": {
+        "currency": "CHF",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "BANK_REIMBURSEMENT",
+      "productId": "ANY",
+      "transactionReference": "DEMO-CD321EEF-PACS008",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "CHF",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "ANY",
+      "contextId": "CTX-CD321EEF-6C2F-40A2-82C6-E835745D002E-PACS009",
+      "currency": {
+        "currency": "CHF",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "BANK_REIMBURSEMENT",
+      "productId": "ANY",
+      "transactionReference": "DEMO-CD321EEF-PACS009",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "EUR",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "IMPORT_COLLECTION_PAYMENT",
+      "contextId": "CTX-CD50CA60-1EC8-4A16-B61C-B03ABF6A9C58-PACS009",
+      "currency": {
+        "currency": "EUR",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "COLLECTION_SETTLEMENT",
+      "productId": "IMPORT_COLLECTION",
+      "transactionReference": "DEMO-CD50CA60-PACS009",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "JPY",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "ANY",
+      "contextId": "CTX-D20BA710-2EF3-4F3D-8222-ACAFF54C4441-PACS008",
+      "currency": {
+        "currency": "JPY",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "BANK_REIMBURSEMENT",
+      "productId": "ANY",
+      "transactionReference": "DEMO-D20BA710-PACS008",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "JPY",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "ANY",
+      "contextId": "CTX-D20BA710-2EF3-4F3D-8222-ACAFF54C4441-PACS009",
+      "currency": {
+        "currency": "JPY",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "BANK_REIMBURSEMENT",
+      "productId": "ANY",
+      "transactionReference": "DEMO-D20BA710-PACS009",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "HKD",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "DEMAND_GUARANTEE_CLAIM_PAYMENT",
+      "contextId": "CTX-D60D207B-29B2-4352-8314-89378EDCF139-PACS009",
+      "currency": {
+        "currency": "HKD",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "CLAIM_PAYMENT",
+      "productId": "DEMAND_GUARANTEE",
+      "transactionReference": "DEMO-D60D207B-PACS009",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "CNY",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "INTERBANK_TRANSFER",
+      "contextId": "CTX-DADFC78E-619E-5FCA-BA19-69A5732FD246-PACS009",
+      "currency": {
+        "currency": "CNY",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "INTERBANK_SETTLEMENT",
+      "productId": "CENTRAL_PAYMENT",
+      "transactionReference": "DEMO-DADFC78E-PACS009",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "USD",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "IMPORT_LC_BANK_REIMBURSEMENT",
+      "contextId": "CTX-E029AD81-7715-4C2A-9452-75876508CACB-PACS009",
+      "currency": {
+        "currency": "USD",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "BANK_REIMBURSEMENT",
+      "productId": "IMPORT_LC",
+      "transactionReference": "DEMO-E029AD81-PACS009",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "USD",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "INTERBANK_TRANSFER",
+      "contextId": "CTX-E5F71960-AFF2-5F27-B01F-58194E54E736-PACS009",
+      "currency": {
+        "currency": "USD",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "INTERBANK_SETTLEMENT",
+      "productId": "CENTRAL_PAYMENT",
+      "transactionReference": "DEMO-E5F71960-PACS009",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "GBP",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "ANY",
+      "contextId": "CTX-E73224F3-5B8B-4702-AD97-A88C87CDC3A6-PACS008",
+      "currency": {
+        "currency": "GBP",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "BANK_REIMBURSEMENT",
+      "productId": "ANY",
+      "transactionReference": "DEMO-E73224F3-PACS008",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "GBP",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "ANY",
+      "contextId": "CTX-E73224F3-5B8B-4702-AD97-A88C87CDC3A6-PACS009",
+      "currency": {
+        "currency": "GBP",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "BANK_REIMBURSEMENT",
+      "productId": "ANY",
+      "transactionReference": "DEMO-E73224F3-PACS009",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "CAD",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "FX_SETTLEMENT",
+      "contextId": "CTX-EB1A6C37-F327-4038-8241-8AAC9F5D20B9-PACS009",
+      "currency": {
+        "currency": "CAD",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "INTERBANK_SETTLEMENT",
+      "productId": "TREASURY_FX",
+      "transactionReference": "DEMO-EB1A6C37-PACS009",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "CAD",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "FX_SETTLEMENT",
+      "contextId": "CTX-ED799438-A80B-4787-85E5-443A0CA5C5BB-PACS009",
+      "currency": {
+        "currency": "CAD",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "INTERBANK_SETTLEMENT",
+      "productId": "TREASURY_FX",
+      "transactionReference": "DEMO-ED799438-PACS009",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "USD",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "CUSTOMER_CREDIT_TRANSFER",
+      "contextId": "CTX-F080B2A5-7D6D-41AE-9FDA-B6078F3E5771-PACS008",
+      "currency": {
+        "currency": "USD",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "CUSTOMER_TRANSFER",
+      "productId": "CENTRAL_PAYMENT",
+      "transactionReference": "DEMO-F080B2A5-PACS008",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    },
+    {
+      "account": {
+        "ownerRole": "NOT_APPLICABLE",
+        "purpose": "NOT_APPLICABLE",
+        "relationship": "NOT_APPLICABLE",
+        "requirement": "NOT_REQUIRED",
+        "servicerRole": "NOT_APPLICABLE",
+        "suppliedAccounts": {
+          "case": "ABSENT"
+        }
+      },
+      "amount": {
+        "currency": "SGD",
+        "decimalValue": "100.00",
+        "requirement": "FROM_TRANSACTION"
+      },
+      "bookingEntity": {
+        "bookingEntityId": "HK01",
+        "requirement": "FROM_CONTEXT",
+        "source": "CONTEXT"
+      },
+      "businessFunctionId": "EXPORT_COLLECTION_PROCEEDS_SETTLEMENT",
+      "contextId": "CTX-F4BAE14B-A208-45AE-990A-DF840FB9AF9F-PACS008",
+      "currency": {
+        "currency": "SGD",
+        "requirement": "FROM_TRANSACTION",
+        "source": "TRANSACTION"
+      },
+      "paymentLegId": "PROCEEDS_SETTLEMENT",
+      "productId": "EXPORT_COLLECTION",
+      "transactionReference": "DEMO-F4BAE14B-PACS008",
+      "valueDate": {
+        "effectiveFrom": "2026-01-01",
+        "effectiveTo": "2027-12-31",
+        "source": "CONTEXT",
+        "valueDate": "2026-01-01"
+      }
+    }
+  ],
+  "executable": false,
+  "status": "DRAFT"
+}

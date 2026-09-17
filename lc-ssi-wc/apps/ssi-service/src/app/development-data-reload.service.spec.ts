@@ -2,7 +2,7 @@ import { HttpException } from "@nestjs/common";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DatabaseSync } from "node:sqlite";
+import { backup, DatabaseSync } from "node:sqlite";
 import { DevelopmentDataReloadService } from "./development-data-reload.service";
 
 const codeOf = (action: () => unknown): { status: number; code: string } => {
@@ -86,6 +86,40 @@ describe("DevelopmentDataReloadService", () => {
     });
     expect(status.seedSha256).toMatch(/^[a-f0-9]{64}$/);
     expect(JSON.stringify(status)).not.toContain("secret");
+  });
+
+  it("uses the approved MT1/MT2 canonical seed as the default reload source", () => {
+    const status = new DevelopmentDataReloadService(
+      environment({ SSI_DEMO_SEED_PATH: undefined }),
+    ).status();
+    expect(status).toMatchObject({
+      reloadAvailable: true,
+      fixtureId: "SSI-DEMO-MT1-MT2-PACS008-PACS009-V1",
+    });
+    expect(status.seedSha256).toBe(
+      "f9ebdf0a06cb2f9f269f7a9f0c73c2bddb568f6e45c9f93c34680422e681f662",
+    );
+  });
+
+  it("reloads the approved MT1/MT2 seed twice into an isolated Development DB", async () => {
+    const source = new DatabaseSync("data/ssi-demo.sqlite", { readOnly: true });
+    try {
+      await backup(source, databasePath);
+    } finally {
+      source.close();
+    }
+    const service = new DevelopmentDataReloadService(
+      environment({ SSI_DEMO_SEED_PATH: undefined }),
+    );
+    const first = service.reload("secret");
+    const second = service.reload("secret");
+    expect(first).toMatchObject({
+      code: "DEMO_DATA_RELOADED",
+      fixtureId: "SSI-DEMO-MT1-MT2-PACS008-PACS009-V1",
+      importedRows: { ssi: 10637, ssi_applicability: 10973 },
+    });
+    expect(second.snapshotHash).toBe(first.snapshotHash);
+    expect(second.importedRows).toEqual(first.importedRows);
   });
 
   it.each([

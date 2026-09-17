@@ -1,0 +1,20 @@
+{
+  "artifactId":"SSI-MT1-MT2-GATE0S-SCHEMA-CLOSURE-PACK-V7",
+  "status":"REVIEW_REQUESTED",
+  "executable":false,
+  "round":"3B_R5_SELECTED_ACCOUNT_AUTHORITY_REVIEW",
+  "basePack":{"path":"gate0s-schema-closure-pack.v6.json","sha256":"2B5B3DF1AC40969A15A1A8E207F812F36710E1F7BDA5F435E92B5E699BEA4D19"},
+  "change":"Move accountRuleKey authority into the Rule schema and validate every Oracle selected identity against the exact same-SHA manifest scope/id/version before case-neutral comparison.",
+  "changedArtifacts":[
+    {"path":"rule-oracle.schema.v1.json","sha256":"CC7233C9C4645FEDA68686A1A2B03D903D4AE7731E67589D672A3BF08A88048E"},
+    {"path":"schema-meta-test-payloads.v1.json","sha256":"38F20C65ECF7C9009E6B1BE6E492920DBE00BA287E123D5312C651F4B0672097"}
+  ],
+  "invariants":{
+    "accountRuleKey":"EXACT_RULE_ROW_AUTHORITY_NO_GENERATED_NAMING",
+    "oracleSelections":"EVERY_KIND_EXACT_MANIFEST_SCOPE_ID_VERSION_OR_TYPED_SENTINEL",
+    "optionalReasonAndCandidateCount":"EXACT_RULE_ROW_MATCH",
+    "optionalOutcome":"CASE_SPECIFIC_RULE_FIELD_MATCH"
+  },
+  "scopeBoundary":{"generator":"PROHIBITED","fixtureOrDataMutation":"PROHIBITED","reload":"PROHIBITED","databaseMutation":"PROHIBITED"},
+  "approval":{"ba":"PENDING","qa":"PENDING"}
+}

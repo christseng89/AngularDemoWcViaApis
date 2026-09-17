@@ -693,6 +693,18 @@
                       </caption>
                       <thead>
                         <tr>
+                          <th [attr.aria-sort]="ownershipAriaSort('SSI_ID')">
+                            <button
+                              class="sort-header"
+                              type="button"
+                              (click)="sortOwnershipIndex('SSI_ID')"
+                            >
+                              SSI ID
+                              <span aria-hidden="true">{{
+                                ownershipSortIndicator("SSI_ID")
+                              }}</span>
+                            </button>
+                          </th>
                           @if (ownershipTab() === "OWN") {
                             <th
                               [attr.aria-sort]="
@@ -958,6 +970,10 @@
                               $event.preventDefault(); reviewForChecker(row)
                             "
                           >
+                            <td>
+                              <b>{{ row.counterpartyId }}</b
+                              ><small>{{ row.id }}</small>
+                            </td>
                             @if (ownershipTab() === "OWN") {
                               <td>
                                 <b>{{
@@ -1167,6 +1183,11 @@
                         : "建立新 DRAFT，完成後回到清單提交。"
                     }}
                   </p>
+                  @if (revisionSourceIdentity(); as sourceIdentity) {
+                    <p>
+                      原 SSI：<b>{{ sourceIdentity }}</b>
+                    </p>
+                  }
                 </div>
                 <button
                   class="drawer-close"

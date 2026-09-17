@@ -1,0 +1,23 @@
+{
+  "artifactId":"SSI-MT1-MT2-ROUND4-SCHEMA-AMENDMENT-PACK-V5",
+  "status":"REVIEW_REQUESTED",
+  "executable":false,
+  "round":"4_RULE_TABLE_ORACLE_CLOSURE_SCHEMA_AMENDMENT_R4",
+  "supersedes":{"path":"round4-schema-amendment-pack.v4.json","sha256":"D611697ABDD7DB95BF7041390D04E65BB106EF5F43F1013F9E07043F81EEB2E5","baVerdict":"CHANGES_REQUIRED","qaVerdict":"PASS"},
+  "approvedPartition":{"path":"round4-partition-ruling.v1.json","sha256":"8EE334403C8CC94CF34B0470C7F7D4F2032C0E33645D065F0BB1110DE5B6FCA6"},
+  "resolvedBaFinding":"Partition integrity now requires both physical array length and unique Set cardinality: ANY length=11 and unique=11; Customer length=5 and unique=5; overlap=0. Tests cover replacement duplicates and appended duplicates for both lists, plus cross-list overlap.",
+  "rmaReferenceBoundary":{"referencePaths":["qa/FIX_DATA/rma","qa/FIX_DATA/src/rma"],"rmaPolicyInvocations":0,"rmaMutationCount":0},
+  "virtualNostroDecision":{"path":"memory/ssi-demo-virtual-nostro-microservice-decision-v1.md","sha256":"2C5C903D427B7B6DFF5B08B01B0B5B9A8E68CFA92594BB21ED50660E437E76AA","mode":"CONTROLLED_VIRTUAL_MICROSERVICE","realServiceCalls":0,"stubCallsInThisRound":0,"accountMutations":0,"postingCount":0},
+  "changedArtifacts":[
+    {"path":"qa/FIX_DATA/ssi/mt1-mt2/rule-oracle.schema.v1.json","sha256":"15335E5AC3C9D977ECC1CC35710DE7B5A7B658955338754E25ACBC624459D6DB"},
+    {"path":"qa/FIX_DATA/ssi/mt1-mt2/outcome-reason-code-catalogue.v1.json","sha256":"06D21883A1C5CA8EA41C1871BFB9407C7A5CBD828822FA7E25B4283E5A518B84"},
+    {"path":"qa/FIX_DATA/ssi/mt1-mt2/schema-meta-test-payloads.v1.json","sha256":"B2ED0B313C24E4BFED3E1C88A9626435B22EB5CCD4F3A2026BC3BA2F0AC6DAF2"},
+    {"path":"qa/FIX_DATA/src/ssi/mt1-mt2-contract-validator.ts","sha256":"E2358754737B67B56624CCD806F595F99E4D3E6FB4A5551E93ABAA704F545AED"},
+    {"path":"qa/FIX_DATA/src/ssi/mt1-mt2-contract-validator.test.ts","sha256":"24D321A31A14BC4D71C983F518599D85E6E53952326E92DA3987291E13CD5745"}
+  ],
+  "greenEvidence":{"tests":"18/18 PASS","eslint":"PASS","targetedTypecheck":"PASS","jsonParse":"PASS","anyArrayLength":11,"anyUniqueCount":11,"customerArrayLength":5,"customerUniqueCount":5,"crossListOverlap":0,"replacementDuplicatesRejected":"PASS","appendedDuplicatesRejected":"PASS","crossListOverlapRejected":"PASS","completeAnyRuleBaseline":"PASS","completeCustomerOosRuleBaseline":"PASS"},
+  "runtimeDatabase":{"path":"data/ssi-demo.sqlite","sha256":"CD77E40C5D82E99648A22A6C188241E3997C8C4A64460FCC0DA1F4F527A8453A","databaseWrites":0},
+  "requestedApproval":"APPROVE_SCHEMA_AMENDMENT_AND_AUTHORIZE_RULE_ORACLE_MATERIALIZATION_ONLY",
+  "scopeBoundary":{"ruleOracleMaterialization":"REQUESTED","generator":"PROHIBITED","fixtureOrDataMutation":"PROHIBITED","reload":"PROHIBITED","databaseMutation":"PROHIBITED"},
+  "approval":{"ba":"PENDING","qa":"PENDING"}
+}

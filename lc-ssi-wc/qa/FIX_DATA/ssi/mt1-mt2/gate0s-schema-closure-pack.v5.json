@@ -1,0 +1,33 @@
+{
+  "artifactId": "SSI-MT1-MT2-GATE0S-SCHEMA-CLOSURE-PACK-V5",
+  "status": "REVIEW_REQUESTED",
+  "executable": false,
+  "round": "3B_R2_CONTRACT_REVIEW",
+  "basePack": {
+    "path": "gate0s-schema-closure-pack.v4.json",
+    "sha256": "2CD7B8E1CFD8E8FD5497334E65569351A17913F0EC5C985CD3C9D33C35DEA77C"
+  },
+  "change": "Close BA/QA adversarial gaps without changing the approved conversion principle: complete account truth table, exact-set meta coverage, manifest/partition/alias reconciliation, and recursive Rule/Oracle FK and join validation.",
+  "changedArtifacts": [
+    {"path":"schema-meta-test-vectors.v1.json","sha256":"F2E5801EFF5B467CDB16227745F54D179440751C2C8F0DC90A85F9D5AE160FE0"},
+    {"path":"canonical-group-manifest.v1.json","sha256":"E8D3BBEB0C31FDC720F84C3C673D9A782D3F841527573F817D259BFF8869C6FD"},
+    {"path":"expected-selected-identity-manifest.v1.json","sha256":"2686039B3311ABDF8D7967D12DBA3736D1DD0A57D08344E43E08B442DF565561"},
+    {"path":"execution-context-catalogues.v1.json","sha256":"DB8DED833186E2939F17335A3D0DAA0B5B59DFB082D5FC26C87AF96DC3CE7F6A"},
+    {"path":"derivation-tuple-catalogue.v1.json","sha256":"EE4678214F7A9252CD2C08541702FD9DCC33B7F709297F189001F85CCDCDBED5"}
+  ],
+  "invariants": {
+    "accountRequirementCaseSelection": "CLOSED_MATRIX",
+    "metaVectorCoverage": "POSITIVE_NEGATIVE_DECLARATION_PAYLOAD_MAP_EXACT_SET",
+    "selectedManifest": "EXACT_ARTIFACT_ID_SCOPE_ID_VERSION",
+    "partitionMembership": "RECOMPUTED_FROM_CONTENT",
+    "aliasInventory": "24_PACS008_32_DUAL_11_SOURCE_ONLY",
+    "ruleOracleReferences": "RECURSIVE_FK_JOIN_VALIDATION"
+  },
+  "scopeBoundary": {
+    "generator": "PROHIBITED",
+    "fixtureOrDataMutation": "PROHIBITED",
+    "reload": "PROHIBITED",
+    "databaseMutation": "PROHIBITED"
+  },
+  "approval": {"ba":"PENDING","qa":"PENDING"}
+}

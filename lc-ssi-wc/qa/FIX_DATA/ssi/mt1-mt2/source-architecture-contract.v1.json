@@ -1,0 +1,20 @@
+{
+  "artifactId":"SSI-MT1-MT2-SOURCE-ARCHITECTURE-CONTRACT-V1",
+  "status":"DRAFT",
+  "executable":false,
+  "architecture":"OO_CLASS_PLUS_PARAMETER_DRIVEN",
+  "sharedSourceRoot":"qa/FIX_DATA/src/governed-data-repair",
+  "sharedPublicSeams":["GovernedDataRepository","RepairReportWriter","RepairIssue","DomainRepairReport","SsiCanonicalKey","Sha256FileIdentity","DeterministicJsonFileWriter"],
+  "excludedSharedSeams":[{"name":"GovernedDataRepairPlanner","reason":"CURRENT_FACTORY_AND_EXECUTE_PATH_ALWAYS_COMPOSE_AND_INVOKE_RMA_POLICY"}],
+  "reuseRule":"COMPOSE_NEUTRAL_PUBLIC_CONTRACTS_REPOSITORY_REPORTING_CANONICAL_IDENTITY_AND_ARTIFACT_IO; DO_NOT_CLONE_ENGINE",
+  "orchestratorContract":{"requiredType":"DOMAIN_SELECTIVE","selectedDomain":"SSI","allowedPolicyNamespace":"SSI_ONLY","rmaPolicyInvocationCount":0,"otherDomainMutationCount":0,"implementationStatus":"REQUIRED_BEFORE_ROUND_3B_EXECUTION"},
+  "parameterSources":["repair-rule-table.v1.json","test-oracle.v1.json","execution-parameter-catalogue.v1.json","derivation-tuple-catalogue.v1.json"],
+  "ssiSpecificSourceRoot":"qa/FIX_DATA/src/ssi",
+  "ssiSpecificResponsibilities":["SSI_ELIGIBILITY_POLICY","SSI_LIFECYCLE_POLICY","SSI_AUDIT_POLICY","SSI_RECORD_PROJECTION","SSI_APPLICABILITY_GRAPH","SSI_VISIBILITY","SSI_ORACLE_COMPARISON"],
+  "rmaSpecificSourceRoot":"qa/FIX_DATA/src/rma",
+  "rmaPolicyReuse":"PROHIBITED",
+  "rmaMutation":"PROHIBITED_IN_THIS_CHANGE_PACKAGE",
+  "businessInferenceInCode":"PROHIBITED",
+  "generatorAuthorized":false,
+  "approval":{"ba":"PENDING","qa":"PENDING"}
+}

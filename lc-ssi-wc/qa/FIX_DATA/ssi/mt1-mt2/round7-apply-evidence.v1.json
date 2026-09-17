@@ -1,0 +1,32 @@
+{
+  "artifactId": "SSI-MT1-MT2-ROUND7-APPLY-EVIDENCE-V1",
+  "gateSha256": "18D5BDA753BA8382F9BD01E4044DECAE04BCDD737F758C73D9681ED21A65FB4A",
+  "authorizationSha256": "B5B6686AA565F4CCE1ED0B6627570A5E997D63560ABC6A999CEC551C02F1494C",
+  "targetDatabase": "data/ssi-demo.sqlite",
+  "candidateSha256": "1EF6B1DB11B5AE981673B15B88620F73FA67F7A9854759794F2DEE1AE330D3DC",
+  "status": "PASS",
+  "backupPath": "C:\\Users\\samfi\\Downloads\\outputs\\lc-ssi-wc\\qa\\_ARCHIVE\\ssi\\ssi-demo.pre-round7-apply.sqlite",
+  "backupSha256": "80F5BD09D8BAF782FC159E96EF1C0C47A3675CBF53483A9B5289C3462DC31709",
+  "logicalShaBefore": "31c843856d2ab0a6da6e6a4b5852a9b3f8da5c9fefa9fc0e48f2385f8cfdc7db",
+  "logicalShaAfter": "81472776a9c7ce6e4598e2192942f31d87ee4c837b7b8e27140ed43dc239f6e3",
+  "firstApply": {
+    "ssiInserts": 49,
+    "applicabilityInserts": 128
+  },
+  "secondApply": {
+    "ssiInserts": 0,
+    "applicabilityInserts": 0
+  },
+  "candidateSsiRows": 49,
+  "candidateApplicabilityRows": 128,
+  "duplicateCandidateIds": 0,
+  "orphanApplicabilityRows": 0,
+  "integrityCheck": "ok",
+  "rmaRowsChanged": 0,
+  "nostroRowsChanged": 0,
+  "entityRowsChanged": 0,
+  "postApplySeed": {
+    "path": "C:\\Users\\samfi\\Downloads\\outputs\\lc-ssi-wc\\qa\\FIX_DATA\\ssi\\mt1-mt2\\ssi-demo.mt1-mt2-v1.canonical.seed.json",
+    "sha256": "F9EBDF0A06CB2F9F269F7A9F0C73C2BDDB568F6E45C9F93C34680422E681F662"
+  }
+}

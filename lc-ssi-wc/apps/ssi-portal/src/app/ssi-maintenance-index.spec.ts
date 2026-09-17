@@ -182,4 +182,31 @@ describe("Counterparty Inbox query model", () => {
       ),
     ).toEqual(["new", "revision", "suppression"]);
   });
+
+  it("sorts the additive SSI ID index column", () => {
+    const rows = [
+      {
+        id: "2",
+        counterpartyId: "CP-ANY-SGD",
+        scope: "STANDING",
+        status: "ACTIVE",
+        version: 1,
+        route: {},
+      },
+      {
+        id: "1",
+        counterpartyId: "CP-ANY-AUD",
+        scope: "STANDING",
+        status: "ACTIVE",
+        version: 1,
+        route: {},
+      },
+    ];
+
+    expect(
+      sortSsiOwnershipRows(rows, "SSI_ID", "ASC").map(
+        (row) => row.counterpartyId,
+      ),
+    ).toEqual(["CP-ANY-AUD", "CP-ANY-SGD"]);
+  });
 });

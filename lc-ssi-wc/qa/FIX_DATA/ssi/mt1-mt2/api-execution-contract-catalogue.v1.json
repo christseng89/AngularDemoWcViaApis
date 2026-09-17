@@ -1,0 +1,8 @@
+{
+  "artifactId":"SSI-MT1-MT2-API-EXECUTION-CONTRACT-CATALOGUE-V1","status":"DRAFT","executable":false,
+  "requestSchemas":[{"requestSchemaId":"SSI-RESOLUTION-REQUEST-V1","additionalProperties":false,"requiredFields":["amount","currency","productId","businessFunctionId","paymentLegId","bookingEntityId","valueDate","transactionReference","accountRelationship","suppliedAccounts"]}],
+  "requestTemplates":[{"requestTemplateId":"SSI-DEMO-MT1-MT2-REQUEST-V1","requestSchemaId":"SSI-RESOLUTION-REQUEST-V1","defaulting":"PROHIBITED","hardCoding":"PROHIBITED","messageTypeInference":"PROHIBITED"}],
+  "fieldBindings":[{"fieldBindingId":"SSI-DEMO-MT1-MT2-FIELD-BINDING-V1","requestTemplateId":"SSI-DEMO-MT1-MT2-REQUEST-V1","bindings":{"amount":"executionContext.amount.decimalValue","currency":"executionContext.currency.currency","productId":"executionContext.productId","businessFunctionId":"executionContext.businessFunctionId","paymentLegId":"executionContext.paymentLegId","bookingEntityId":"executionContext.bookingEntity.bookingEntityId","valueDate":"executionContext.valueDate.valueDate","transactionReference":"executionContext.transactionReference","accountRelationship":"executionContext.account.relationship","suppliedAccounts":"executionContext.account.suppliedAccounts"}}],
+  "contracts":[{"apiContractId":"API-SSI-RESOLVE-V1","method":"POST","endpoint":"/api/ssis/resolve","requestSchemaId":"SSI-RESOLUTION-REQUEST-V1","requestTemplateId":"SSI-DEMO-MT1-MT2-REQUEST-V1","fieldBindingId":"SSI-DEMO-MT1-MT2-FIELD-BINDING-V1"}],
+  "prohibitedContract":{"submission":"PROHIBITED","apiContractId":"NOT_APPLICABLE"},"combinationPolicy":"EXACT_ATOMIC_CONTRACT_ROW_ONLY","approval":{"ba":"PENDING","qa":"PENDING"}
+}

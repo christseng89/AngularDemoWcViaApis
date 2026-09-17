@@ -1728,6 +1728,10 @@ export class AppComponent implements OnInit {
   readonly readonlyFields = computed(() => readonlyFormFields(this.fields()));
   readonly editingId = signal<string | null>(null);
   readonly revisionSource = signal<SsiRow | null>(null);
+  readonly revisionSourceIdentity = computed(() => {
+    const source = this.revisionSource();
+    return source ? `${source.counterpartyId} · v${source.version}` : null;
+  });
   readonly makerEditing = computed(
     () => this.editingId() !== null || this.revisionSource() !== null,
   );
@@ -2637,7 +2641,10 @@ export class AppComponent implements OnInit {
     this.navigate("swiftdata");
   }
 
-  reviewForChecker(row: SsiRow): void {
+  async reviewForChecker(row: SsiRow): Promise<void> {
+    if (this.currencies().length === 0 && !this.currenciesLoading())
+      await this.loadCurrencies();
+    this.detailForm.reset(this.modelForRow(row));
     this.checkerRejectReason.set("");
     this.detailTarget.set(row);
   }

@@ -1,0 +1,46 @@
+{
+  "artifactId": "SSI-MT1-MT2-GATE0S-SCHEMA-APPROVAL-PACK-V1",
+  "status": "DRAFT",
+  "executable": false,
+  "plan": {
+    "path": "qa/FIX_DATA/mt2/2026-09-17-ssi-mt1-mt2-pacs008-pacs009-demo-data-repair.md",
+    "sha256": "5D500AC57FF7C7491D872D2AC7A2AE36B37F88BF027A09147520A6B3E3E8950C"
+  },
+  "artifacts": [
+    {"path":"api-execution-contract-catalogue.v1.json","sha256":"3091EE1C218C368400EF86683C72C2C32E20581F84DC51F79422028C7B60E530"},
+    {"path":"ba-qa-review.v1.md","sha256":"6015EFDDC3D3EC0491BE3E571E35169DA97166F1D23A7F32BB3A9D9218B093B3"},
+    {"path":"ba-ruling-evidence-registry.v1.json","sha256":"1FB1155B4E8DEB2471C68906882AA18B7663041466772257A1CD48C11E7F59CF"},
+    {"path":"controlled-source-evidence-registry.v1.json","sha256":"E158C453961E9F7533E8CD05888DF639FF9DFB541A28107FE10DA837E7F1E781"},
+    {"path":"derivation-tuple-catalogue.v1.json","sha256":"D4B53F32957B7E539CB23656F1263B224E529365CFEE07088B51283BA353A632"},
+    {"path":"execution-context-catalogues.v1.json","sha256":"FF5D76671BAC808627383A1DACA18611C526EBE6359ED00E16B63CC17F209336"},
+    {"path":"expected-partition-manifest.v1.json","sha256":"F91769F8306C22CDE4E598C8DDD5C4AB1FED572745FCE0D1079E8A9B297105DF"},
+    {"path":"expected-selected-identity-manifest.v1.json","sha256":"B8A2C9116F5E220B52CDAD858872C51ED5E9E35A8F5249F8A9F55D18865E17EC"},
+    {"path":"out-of-scope-message-catalogue.v1.json","sha256":"56770BE3AD0832DFC146F426624025851EAC772C3639672F3896B7677ABD8817"},
+    {"path":"outcome-reason-code-catalogue.v1.json","sha256":"A96CFBE5823C2A828F866DC68039624873651B2716EB08A5C5E0DFFC6D15684E"},
+    {"path":"product-policy-evidence-registry.v1.json","sha256":"34BE72037A07798691F4E2391BADF07DC0557D0D5A9B676FF34354A6ACDA6D75"},
+    {"path":"qa-invariant-evidence-registry.v1.json","sha256":"8C30EB9EBCF3F3AC8D712DE69E45FFA5F8236E18C204DB8972BBB2EDE9DE7ACE"},
+    {"path":"repair-rule-table.v1.json","sha256":"15DA2367FB2E23B9F3D290EB3C87CE39C80B3D1249F17BDC52AE73C68F04FAF6"},
+    {"path":"rule-oracle.schema.v1.json","sha256":"F184C81CAE90A8FB5EEC7A41570C6328738A638654D7DFE95AB4ABB4769A77A1"},
+    {"path":"schema-meta-test-vectors.v1.json","sha256":"AD328383E2C5B4FCB30327D00CBC2C6D80CFFC3DD5580B31CA6D3A64253A55A0"},
+    {"path":"test-oracle.v1.json","sha256":"F6F1978C24E1CB6751ABE7D6CFA779A862AD34C84227AAAE3A46D7A81745F0AD"}
+  ],
+  "checks": {
+    "jsonParseErrors": 0,
+    "jsonSchema202012Compile": "PASS",
+    "dateFormatValidation": "DEFERRED_TO_GATE0S_FORMAT_PLUGIN",
+    "executableArtifacts": 0,
+    "databaseWrites": 0,
+    "sourceCodeChanges": 0,
+    "generatorRuns": 0
+  },
+  "knownIncompleteArtifacts": [
+    "execution-context-catalogues.v1.json",
+    "derivation-tuple-catalogue.v1.json",
+    "expected-partition-manifest.v1.json",
+    "expected-selected-identity-manifest.v1.json",
+    "repair-rule-table.v1.json",
+    "test-oracle.v1.json"
+  ],
+  "round1DecisionRequested": "Confirm the non-executable Gate 0S draft structure and authorize only Gate 0I read-only inventory reconciliation. This is not a request to freeze Gate 0S.",
+  "approval": {"ba":"PENDING","qa":"PENDING"}
+}

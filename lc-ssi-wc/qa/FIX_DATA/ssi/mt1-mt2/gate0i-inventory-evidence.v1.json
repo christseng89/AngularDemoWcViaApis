@@ -1,0 +1,49 @@
+{
+  "artifactId": "SSI-MT1-MT2-GATE0I-INVENTORY-EVIDENCE-V1",
+  "status": "REVIEW_REQUIRED",
+  "mode": "READ_ONLY",
+  "artifacts": [
+    {"path":"qa/FIX_DATA/src/ssi/mt1-mt2-active-inventory.ts","sha256":"A5ABC5D6F2B1D868CE0168D620A7958D579F82EE1B1D6D005EBECDADBE09F6DD"},
+    {"path":"qa/FIX_DATA/src/ssi/mt1-mt2-active-inventory.test.ts","sha256":"423F86B75AD457868775A693CEBAFAD6BEFF4D8A81683341316F7C47813CC0C8"},
+    {"path":"qa/FIX_DATA/ssi/mt1-mt2/active-inventory.v1.json","sha256":"6380A02E5CF0C60C945C0211E9B22E760F4DB07944660FA8F8D64C2ED1DF903A"},
+    {"path":"qa/FIX_DATA/ssi/mt1-mt2/runtime-drift-preservation.v1.json","sha256":"F1638A81249D299D43B4A04FBFEDE1217465C45E3943FD17B9E659D9CDBBC1DA"}
+  ],
+  "inputs": [
+    {"path":"data/ssi-demo.sqlite","sha256Before":"CD77E40C5D82E99648A22A6C188241E3997C8C4A64460FCC0DA1F4F527A8453A","sha256After":"CD77E40C5D82E99648A22A6C188241E3997C8C4A64460FCC0DA1F4F527A8453A"},
+    {"path":"qa/FIX_DATA/ssi/reload-test-data/ssi-demo.mt347-v1.1.approved.canonical.seed.json","sha256":"F7E07F02E6714619A7F0982D0798A7E064B547F8C32E486269F93EB6EA9A10E7"}
+  ],
+  "inventory": {
+    "ssiPacs008Active12": 24,
+    "ssiPacs008Active08": 0,
+    "ssiPacs009Active12": 43,
+    "ssiPacs009Active08": 68,
+    "ssiPacs009DualToken": 32,
+    "ssiPacs009SourceOnly": 11,
+    "rmaPacs008Active12": 2,
+    "rmaPacs008Active08": 28,
+    "rmaPacs009Active12": 2,
+    "rmaPacs009Active08": 40,
+    "rmaMt1Active": 8,
+    "rmaMt2Active": 14,
+    "rmaResidualPhysicalRows": 2,
+    "rmaResidualSourceTokenMemberships": 4,
+    "rmaResidualCanonicalGroups": 2
+  },
+  "runtimeOnly": {
+    "revokedSsi": 2,
+    "activeApplicability": 12,
+    "logicalSha256":"E4000BD27B5E69D721F15B48B19607F4B8043470FB688040DA0FD825C65CE8B3",
+    "disposition":"PRESERVE_NON_TARGET_RUNTIME_DRIFT"
+  },
+  "verification": {
+    "tests":"3/3 PASS",
+    "eslint":"PASS",
+    "targetedTypecheck":"PASS",
+    "databaseWrites":0,
+    "unknownDisposition":0,
+    "npmDependencyTree":"PASS",
+    "npmAudit":"NOT_RUN_EXTERNAL_METADATA_DISCLOSURE_NOT_AUTHORIZED"
+  },
+  "nextRoundRequested":"Authorize Round 3 schema closure/validator preparation only after BA and QA accept this inventory evidence.",
+  "approval":{"ba":"PENDING","qa":"PENDING"}
+}

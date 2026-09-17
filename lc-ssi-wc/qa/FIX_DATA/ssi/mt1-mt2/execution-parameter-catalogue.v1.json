@@ -1,0 +1,21 @@
+{
+  "artifactId":"SSI-MT1-MT2-EXECUTION-PARAMETER-CATALOGUE-V1","status":"DRAFT","executable":false,
+  "routePreferences":["DIRECT","INTERMEDIATED","REFERENCE_ONLY","NOT_APPLICABLE"],
+  "officialRoles":["TAG_53A","TAG_53J","TAG_54A","TAG_56A","TAG_57A","NOT_APPLICABLE"],
+  "lookupContracts":[
+    {"id":"LOOKUP-NOT-APPLICABLE","type":"NOT_APPLICABLE","stub":"NOT_APPLICABLE"},
+    {"id":"LOOKUP-VIRTUAL-NOSTRO-OWNER-SERVICER-CURRENCY","type":"NOSTRO_LOOKUP","stub":"CONTROLLED_VIRTUAL_STUB","ownerSource":"OWN_ENTITY","servicerSource":"COUNTERPARTY","currencySource":"TRANSACTION"}
+  ],
+  "profileVariants":["PACS008-PLAIN","PACS008-STP","PACS008-REMIT","PACS009-PLAIN","PACS009-COV","PACS009-ADV-OOS","NOT_APPLICABLE"],
+  "sequenceIds":["SINGLE","COVER_LEG","NOT_APPLICABLE"],
+  "settlementLegIds":["CUSTOMER_CREDIT","FI_CREDIT","COVER","NOT_APPLICABLE"],
+  "entities":["HK01","NOT_APPLICABLE"],
+  "products":["MT1_REFERENCE","MT2_REFERENCE","NOT_APPLICABLE"],
+  "businessFunctions":["SSI_RESOLUTION","VERSION_CANONICALIZATION","NOT_APPLICABLE"],
+  "paymentLegs":["CUSTOMER","INSTITUTION","COVER","NOT_APPLICABLE"],
+  "accountRelationships":["NOSTRO","VOSTRO","REFERENCE_ONLY","NOT_APPLICABLE"],
+  "accountPurposes":["SETTLEMENT","REIMBURSEMENT","REFERENCE","NOT_APPLICABLE"],
+  "currencyCodes":["AUD","CNY","EUR","HKD","SGD","USD"],
+  "unknownIdPolicy":"REJECT",
+  "approval":{"ba":"PENDING","qa":"PENDING"}
+}

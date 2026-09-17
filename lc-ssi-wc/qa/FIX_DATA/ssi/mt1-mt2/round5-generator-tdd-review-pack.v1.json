@@ -1,0 +1,52 @@
+{
+  "artifactId": "SSI-MT1-MT2-ROUND5-GENERATOR-TDD-REVIEW-PACK-V1",
+  "round": 5,
+  "status": "PENDING_BA_QA_SAME_SHA_REVIEW",
+  "authorizationSource": {
+    "round4Pack": "round4-materialization-review-pack.v2.json",
+    "round4PackSha256": "3D0CFE311273F570B89A1027127AA38F429E565D6C4F23AB4063AC251978C651",
+    "ba": "PASS",
+    "qa": "PASS"
+  },
+  "artifacts": {
+    "generatorSha256": "4201E7B2A17D3B1370E280A768E11492F8560F00CC0CA44C28640A2AADD17B93",
+    "generatorTestSha256": "C3324B709716E99BAE872B5EC00BB313B0A092776600007065D205DB15ADC245",
+    "ruleTableSha256": "6AFB11A59329B12C2E86CD7814547A71651565627AD64A84BD5C6E95316B350C",
+    "candidateLogicalSha256": "76607BA92A0C28E203AA1121C2D3EBA41B0ED79A147D3A2B7916AEFD08ABD39E"
+  },
+  "candidateReconciliation": {
+    "ssiDraftSuccessors": 49,
+    "applicabilityDraftSuccessors": 128,
+    "uniqueSsiIds": 49,
+    "uniqueApplicabilityIds": 128,
+    "pacs008CanonicalMemberships": 19,
+    "pacs009GovernedConversionGroups": 43,
+    "pacs009PreExistingCanonicalMembershipsOutsideLegacyPacs009Group": 6,
+    "pacs009CanonicalMembershipsActuallyPreserved": 49,
+    "pacs008LegacyMemberships": 0,
+    "pacs009LegacyMemberships": 0,
+    "databaseWrites": 0,
+    "virtualNostroCalls": 0,
+    "rmaPolicyInvocations": 0
+  },
+  "pacs009PreservationDecision": {
+    "rule": "DO_NOT_REMOVE_VALID_PACS009_001_08",
+    "explanation": "The approved 43 count covers canonical groups targeted by pacs.009 legacy conversion. Six additional pacs.008-only source records already contain valid pacs.009.001.08 and are preserved, producing 49 physical successor memberships.",
+    "prohibitedAlternative": "REMOVE_SIX_VALID_PACS009_001_08_TO_FORCE_SCOPED_COUNT_43"
+  },
+  "verification": {
+    "nodeTests": "22/22 PASS",
+    "eslint": "PASS",
+    "targetedTypecheck": "PASS",
+    "repeatedGenerationSha": "IDENTICAL",
+    "databaseShaBefore": "CD77E40C5D82E99648A22A6C188241E3997C8C4A64460FCC0DA1F4F527A8453A",
+    "databaseShaAfter": "CD77E40C5D82E99648A22A6C188241E3997C8C4A64460FCC0DA1F4F527A8453A"
+  },
+  "authorizationRequested": "ROUND6_DRY_RUN_PREFLIGHT_ONLY",
+  "reloadAuthorized": false,
+  "databaseMutationAuthorized": false,
+  "approval": {
+    "ba": "PENDING",
+    "qa": "PENDING"
+  }
+}

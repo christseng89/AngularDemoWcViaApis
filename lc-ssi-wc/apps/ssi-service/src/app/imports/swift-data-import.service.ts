@@ -25,6 +25,10 @@ export interface ImportRequest {
   idempotencyKey: string;
   records: unknown[];
 }
+interface ImportExecutionTelemetry {
+  databaseWriteAttempts: number;
+  nostroLookupAttempts: number;
+}
 const validEnvelope = (request: ImportRequest): boolean =>
   Boolean(request.fileName?.endsWith(".json")) &&
   Boolean(request.idempotencyKey) &&
@@ -55,10 +59,14 @@ export class SwiftDataImportService {
       throw new BadRequestException("CHECKSUM_MISMATCH");
     if (this.completed.has(request.idempotencyKey))
       return this.completed.get(request.idempotencyKey);
+    const telemetry: ImportExecutionTelemetry = {
+      databaseWriteAttempts: 0,
+      nostroLookupAttempts: 0,
+    };
     const results = request.records.map((record, index) =>
-      this.importRecord(request, record, index),
+      this.importRecord(request, record, index, telemetry),
     );
-    const response = this.importResponse(request, actual, results);
+    const response = this.importResponse(request, actual, results, telemetry);
     if (!request.dryRun) this.completed.set(request.idempotencyKey, response);
     return response;
   }
@@ -67,12 +75,14 @@ export class SwiftDataImportService {
     request: ImportRequest,
     record: unknown,
     index: number,
+    telemetry: ImportExecutionTelemetry,
   ): Record<string, unknown> {
     try {
       if (request.dryRun) {
         this.validateDryRunRecord(request.dataType, record);
         return { row: index + 1, status: "VALIDATED" };
       }
+      telemetry.databaseWriteAttempts += 1;
       const created = this.createRecord(request.dataType, record);
       return { row: index + 1, status: "DRAFT_CREATED", id: created.id };
     } catch (error) {
@@ -120,6 +130,7 @@ export class SwiftDataImportService {
     request: ImportRequest,
     checksum: string,
     results: readonly Record<string, unknown>[],
+    telemetry: ImportExecutionTelemetry,
   ): Record<string, unknown> {
     return {
       dataType: request.dataType,
@@ -130,6 +141,10 @@ export class SwiftDataImportService {
       accepted: results.filter((r) => r.status !== "REJECTED").length,
       rejected: results.filter((r) => r.status === "REJECTED").length,
       results,
+      executionTelemetry: {
+        databaseWriteAttempts: telemetry.databaseWriteAttempts,
+        nostroLookupAttempts: telemetry.nostroLookupAttempts,
+      },
     };
   }
 }

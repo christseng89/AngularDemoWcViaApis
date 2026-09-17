@@ -214,6 +214,7 @@ export class SqliteSsiRepository implements OnModuleDestroy {
     }
     const where = clauses.length ? ` WHERE ${clauses.join(" AND ")}` : "";
     const sortExpressions: Readonly<Record<string, string>> = {
+      SSI_ID: "json_extract(payload,'$.counterpartyId')",
       BOOKING_ENTITY: "json_extract(payload,'$.route.bookingEntity')",
       ACCOUNT_SERVICER: "json_extract(payload,'$.route.accountWithBic')",
       ACCOUNT_REF: "json_extract(payload,'$.route.accountId')",

@@ -1,0 +1,19 @@
+{
+  "artifactId":"SSI-MT1-MT2-GATE0S-SCHEMA-CLOSURE-PACK-V6",
+  "status":"REVIEW_REQUESTED",
+  "executable":false,
+  "round":"3B_R3_ORACLE_JOIN_REVIEW",
+  "basePack":{"path":"gate0s-schema-closure-pack.v5.json","sha256":"54FFC6BE015620D66F3B81C315A202E3B31E26201FA3BD7E39956C5675A95C82"},
+  "change":"Split Rule and Oracle recursive validation; require Oracle visibility and denominator fields; close exact scope, canonical cardinality, and cross-document Rule/Oracle joins.",
+  "changedArtifacts":[
+    {"path":"rule-oracle.schema.v1.json","sha256":"47785B28FBF65DEC51C5F68E1E27718C39D61B49E1F4170251589BCFFF5DCFF7"}
+  ],
+  "invariants":{
+    "selectedIdentity":"EXACT_MANIFEST_SCOPE_ID_VERSION",
+    "canonicalCardinality":"GROUP_COUNT_AND_RECONCILIATION_TOTAL_EQUAL_EXACT_KEY_SET",
+    "oracleValidation":"SCHEMA_SHAPED_RECURSIVE_WITHOUT_EXCEPTION",
+    "ruleOracleJoin":"CONTEXT_SELECTION_API_ACTIVATION_DISPOSITION_VALIDATION_VISIBILITY_DENOMINATOR_EFFECTS_AND_DELTAS"
+  },
+  "scopeBoundary":{"generator":"PROHIBITED","fixtureOrDataMutation":"PROHIBITED","reload":"PROHIBITED","databaseMutation":"PROHIBITED"},
+  "approval":{"ba":"PENDING","qa":"PENDING"}
+}

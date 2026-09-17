@@ -1,0 +1,17 @@
+{
+  "artifactId": "SSI-MT1-MT2-OOS-MESSAGE-CATALOGUE-V1",
+  "status": "DRAFT",
+  "executable": false,
+  "entries": [
+    {"identity":"MT101","family":"MT1","scopeDisposition":"OUT_OF_SCOPE_CLOSED","validationOwner":"FULL_FIN_VALIDATOR","reasonCode":"UNSUPPORTED_MESSAGE_IDENTITY"},
+    {"identity":"MT102","family":"MT1","scopeDisposition":"OUT_OF_SCOPE_CLOSED","validationOwner":"FULL_FIN_VALIDATOR","reasonCode":"UNSUPPORTED_MESSAGE_IDENTITY"},
+    {"identity":"MT104","family":"MT1","scopeDisposition":"OUT_OF_SCOPE_CLOSED","validationOwner":"FULL_FIN_VALIDATOR","reasonCode":"UNSUPPORTED_MESSAGE_IDENTITY"},
+    {"identity":"MT107","family":"MT1","scopeDisposition":"OUT_OF_SCOPE_CLOSED","validationOwner":"FULL_FIN_VALIDATOR","reasonCode":"UNSUPPORTED_MESSAGE_IDENTITY"},
+    {"identity":"MT204","family":"MT2","scopeDisposition":"OUT_OF_SCOPE_CLOSED","validationOwner":"FULL_FIN_VALIDATOR","reasonCode":"UNSUPPORTED_MESSAGE_IDENTITY"},
+    {"identity":"PACS009_ADV","family":"pacs.009","scopeDisposition":"OUT_OF_SCOPE_CLOSED","validationOwner":"CBPR_USAGE_GUIDELINE_VALIDATOR","reasonCode":"UNSUPPORTED_PROFILE"},
+    {"identity":"CLRG_PHASE1","family":"pacs.008","scopeDisposition":"OUT_OF_SCOPE_CLOSED","validationOwner":"SSI_PROFILE_GATE","reasonCode":"UNSUPPORTED_PROFILE"},
+    {"identity":"INVALID_OR_MISSING_PROFILE","family":"MT1","scopeDisposition":"OUT_OF_SCOPE_CLOSED","validationOwner":"SSI_PROFILE_GATE","reasonCode":"UNSUPPORTED_PROFILE"}
+  ],
+  "unknownIdentityPolicy": "FAIL_SCHEMA_VALIDATION",
+  "approval": {"ba":"PENDING","qa":"PENDING"}
+}

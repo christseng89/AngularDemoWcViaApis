@@ -1,0 +1,23 @@
+{
+  "artifactId":"SSI-MT1-MT2-ROUND3B-VALIDATOR-TDD-EVIDENCE-V5",
+  "status":"REVIEW_REQUESTED",
+  "executable":false,
+  "authorizedContract":{"path":"gate0s-schema-closure-pack.v6.json","sha256":"2B5B3DF1AC40969A15A1A8E207F812F36710E1F7BDA5F435E92B5E699BEA4D19"},
+  "sourceArtifacts":[
+    {"path":"qa/FIX_DATA/src/ssi/domain-selective-repair-orchestrator.ts","sha256":"A6AA2057B6D44765DBFF474A014FBDC0178E46EBDCBCC1FE4E20FB1D94A4CF11"},
+    {"path":"qa/FIX_DATA/src/ssi/mt1-mt2-contract-validator.ts","sha256":"8AD7951D0F76CD84FACCA2C8D3EB1897963C0CAAC018F91539E90490357ED179"},
+    {"path":"qa/FIX_DATA/src/ssi/mt1-mt2-contract-validator.test.ts","sha256":"A948F7898EBB27B9651CDA692A1D4509CFDE05E9744AF10B9FC9B0A558A9D924"}
+  ],
+  "greenEvidence":{"tests":"16/16 PASS","eslint":"PASS","targetedTypecheck":"PASS"},
+  "adversarialCoverage":{
+    "allV4Checks":"PASS",
+    "optionalFourCaseClosure":"PASS",
+    "optionalCaseSpecificSuppliedAccounts":"PASS",
+    "optionalOutcomeBinding":"PASS",
+    "optionalOutcomeMismatch":"REJECTED",
+    "unapprovedAccountRuleKey":"REJECTED"
+  },
+  "runtimeDatabase":{"path":"data/ssi-demo.sqlite","sha256":"CD77E40C5D82E99648A22A6C188241E3997C8C4A64460FCC0DA1F4F527A8453A","databaseWrites":0},
+  "scopeBoundary":{"requestedApproval":"CLOSE_ROUND_3_AND_AUTHORIZE_ROUND_4_RULE_TABLE_ORACLE_CLOSURE_ONLY","generator":"PROHIBITED","fixtureOrDataMutation":"PROHIBITED","reload":"PROHIBITED","databaseMutation":"PROHIBITED"},
+  "approval":{"ba":"PENDING","qa":"PENDING"}
+}

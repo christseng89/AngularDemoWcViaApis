@@ -1,0 +1,367 @@
+{
+  "approval": {
+    "ba": "PENDING",
+    "qa": "PENDING"
+  },
+  "artifactId": "SSI-MT1-MT2-EXPECTED-PARTITION-MANIFEST-V1",
+  "completion": {
+    "complete": true,
+    "executableGroups": 62,
+    "heldGroups": 0,
+    "multiple": 0,
+    "scope": "ROUND4_APPROVED_PARTITION",
+    "totalGroups": 67,
+    "unknown": 0
+  },
+  "executable": false,
+  "partitions": {
+    "CONVERT": [
+      {
+        "canonicalGroupKey": "SSI:09E928E1-F3D1-4C9B-A10C-51707A303E4B:PACS008",
+        "executable": true,
+        "reasonCode": "SOURCE_VERSION_CONVERTED"
+      },
+      {
+        "canonicalGroupKey": "SSI:09E928E1-F3D1-4C9B-A10C-51707A303E4B:PACS009",
+        "executable": true,
+        "reasonCode": "SOURCE_VERSION_CONVERTED"
+      },
+      {
+        "canonicalGroupKey": "SSI:22A11830-F848-4281-805F-8E693C98B364:PACS008",
+        "executable": true,
+        "reasonCode": "SOURCE_VERSION_CONVERTED"
+      },
+      {
+        "canonicalGroupKey": "SSI:2927617A-E7E4-479E-9BC4-27A6705383EE:PACS008",
+        "executable": true,
+        "reasonCode": "SOURCE_VERSION_CONVERTED"
+      },
+      {
+        "canonicalGroupKey": "SSI:351807B1-C715-4F53-8FBD-058CC9A14EAB:PACS008",
+        "executable": true,
+        "reasonCode": "SOURCE_VERSION_CONVERTED"
+      },
+      {
+        "canonicalGroupKey": "SSI:38DF686A-9022-4AD6-8AC7-22435411D983:PACS008",
+        "executable": true,
+        "reasonCode": "SOURCE_VERSION_CONVERTED"
+      },
+      {
+        "canonicalGroupKey": "SSI:50531295-C91A-4EB5-9C21-69D2DAB38B7C:PACS008",
+        "executable": true,
+        "reasonCode": "SOURCE_VERSION_CONVERTED"
+      },
+      {
+        "canonicalGroupKey": "SSI:5547DF35-B8E3-4375-A54A-E569FC4E69FA:PACS008",
+        "executable": true,
+        "reasonCode": "SOURCE_VERSION_CONVERTED"
+      },
+      {
+        "canonicalGroupKey": "SSI:5547DF35-B8E3-4375-A54A-E569FC4E69FA:PACS009",
+        "executable": true,
+        "reasonCode": "SOURCE_VERSION_CONVERTED"
+      },
+      {
+        "canonicalGroupKey": "SSI:71C01B10-581D-4892-84E5-92BD247727DA:PACS008",
+        "executable": true,
+        "reasonCode": "SOURCE_VERSION_CONVERTED"
+      },
+      {
+        "canonicalGroupKey": "SSI:71C01B10-581D-4892-84E5-92BD247727DA:PACS009",
+        "executable": true,
+        "reasonCode": "SOURCE_VERSION_CONVERTED"
+      },
+      {
+        "canonicalGroupKey": "SSI:867B9600-5A93-45A3-A4C8-EC5B008FE8CF:PACS009",
+        "executable": true,
+        "reasonCode": "SOURCE_VERSION_CONVERTED"
+      },
+      {
+        "canonicalGroupKey": "SSI:8DE05200-E796-42CC-8806-F6E7437A20B2:PACS008",
+        "executable": true,
+        "reasonCode": "SOURCE_VERSION_CONVERTED"
+      },
+      {
+        "canonicalGroupKey": "SSI:8DE05200-E796-42CC-8806-F6E7437A20B2:PACS009",
+        "executable": true,
+        "reasonCode": "SOURCE_VERSION_CONVERTED"
+      },
+      {
+        "canonicalGroupKey": "SSI:9532BA2C-717F-42B6-8437-5FF7E270FCCB:PACS008",
+        "executable": true,
+        "reasonCode": "SOURCE_VERSION_CONVERTED"
+      },
+      {
+        "canonicalGroupKey": "SSI:AE2A71AE-A2A1-427C-8701-B519DBBF12B1:PACS008",
+        "executable": true,
+        "reasonCode": "SOURCE_VERSION_CONVERTED"
+      },
+      {
+        "canonicalGroupKey": "SSI:AE2A71AE-A2A1-427C-8701-B519DBBF12B1:PACS009",
+        "executable": true,
+        "reasonCode": "SOURCE_VERSION_CONVERTED"
+      },
+      {
+        "canonicalGroupKey": "SSI:B6436323-B43E-42C6-AFD1-764A5A264E11:PACS008",
+        "executable": true,
+        "reasonCode": "SOURCE_VERSION_CONVERTED"
+      },
+      {
+        "canonicalGroupKey": "SSI:B6436323-B43E-42C6-AFD1-764A5A264E11:PACS009",
+        "executable": true,
+        "reasonCode": "SOURCE_VERSION_CONVERTED"
+      },
+      {
+        "canonicalGroupKey": "SSI:B96E8D9A-327B-4FB0-9777-A9AD9D86AC43:PACS008",
+        "executable": true,
+        "reasonCode": "SOURCE_VERSION_CONVERTED"
+      },
+      {
+        "canonicalGroupKey": "SSI:BFBEEC3D-E9A5-458D-8036-7419A45C6866:PACS008",
+        "executable": true,
+        "reasonCode": "SOURCE_VERSION_CONVERTED"
+      },
+      {
+        "canonicalGroupKey": "SSI:BFBEEC3D-E9A5-458D-8036-7419A45C6866:PACS009",
+        "executable": true,
+        "reasonCode": "SOURCE_VERSION_CONVERTED"
+      },
+      {
+        "canonicalGroupKey": "SSI:CC4F488C-99E1-40AD-A59D-A7D73F643DE4:PACS008",
+        "executable": true,
+        "reasonCode": "SOURCE_VERSION_CONVERTED"
+      },
+      {
+        "canonicalGroupKey": "SSI:CD321EEF-6C2F-40A2-82C6-E835745D002E:PACS008",
+        "executable": true,
+        "reasonCode": "SOURCE_VERSION_CONVERTED"
+      },
+      {
+        "canonicalGroupKey": "SSI:CD321EEF-6C2F-40A2-82C6-E835745D002E:PACS009",
+        "executable": true,
+        "reasonCode": "SOURCE_VERSION_CONVERTED"
+      },
+      {
+        "canonicalGroupKey": "SSI:D20BA710-2EF3-4F3D-8222-ACAFF54C4441:PACS008",
+        "executable": true,
+        "reasonCode": "SOURCE_VERSION_CONVERTED"
+      },
+      {
+        "canonicalGroupKey": "SSI:D20BA710-2EF3-4F3D-8222-ACAFF54C4441:PACS009",
+        "executable": true,
+        "reasonCode": "SOURCE_VERSION_CONVERTED"
+      },
+      {
+        "canonicalGroupKey": "SSI:E73224F3-5B8B-4702-AD97-A88C87CDC3A6:PACS008",
+        "executable": true,
+        "reasonCode": "SOURCE_VERSION_CONVERTED"
+      },
+      {
+        "canonicalGroupKey": "SSI:E73224F3-5B8B-4702-AD97-A88C87CDC3A6:PACS009",
+        "executable": true,
+        "reasonCode": "SOURCE_VERSION_CONVERTED"
+      },
+      {
+        "canonicalGroupKey": "SSI:F4BAE14B-A208-45AE-990A-DF840FB9AF9F:PACS008",
+        "executable": true,
+        "reasonCode": "SOURCE_VERSION_CONVERTED"
+      }
+    ],
+    "GENERATE_CANONICAL": [],
+    "HOLD_DEPENDENCY": [],
+    "OUT_OF_SCOPE": [
+      {
+        "canonicalGroupKey": "SSI:2856D36C-8F5D-4385-9473-E8B39941F7FE:PACS008",
+        "executable": false,
+        "reasonCode": "CUSTOMER_DATA_NOT_BANK_SSI"
+      },
+      {
+        "canonicalGroupKey": "SSI:50754B21-224E-44F0-882A-306C9B042036:PACS008",
+        "executable": false,
+        "reasonCode": "CUSTOMER_DATA_NOT_BANK_SSI"
+      },
+      {
+        "canonicalGroupKey": "SSI:5E2D8D46-C53A-41FD-A8C5-4351F2C56615:PACS008",
+        "executable": false,
+        "reasonCode": "CUSTOMER_DATA_NOT_BANK_SSI"
+      },
+      {
+        "canonicalGroupKey": "SSI:64D1E5DA-C9ED-4A1A-A92B-01476F05F477:PACS008",
+        "executable": false,
+        "reasonCode": "CUSTOMER_DATA_NOT_BANK_SSI"
+      },
+      {
+        "canonicalGroupKey": "SSI:F080B2A5-7D6D-41AE-9FDA-B6078F3E5771:PACS008",
+        "executable": false,
+        "reasonCode": "CUSTOMER_DATA_NOT_BANK_SSI"
+      }
+    ],
+    "REMOVE_SOURCE_TOKEN": [
+      {
+        "canonicalGroupKey": "SSI:123B04EC-75BC-5D16-8232-D2EAEBEA7907:PACS009",
+        "executable": true,
+        "reasonCode": "SOURCE_TOKEN_REMOVED_TARGET_ALREADY_PRESENT"
+      },
+      {
+        "canonicalGroupKey": "SSI:12FED8B5-20A9-4FA0-B684-CFC08BD307FE:PACS009",
+        "executable": true,
+        "reasonCode": "SOURCE_TOKEN_REMOVED_TARGET_ALREADY_PRESENT"
+      },
+      {
+        "canonicalGroupKey": "SSI:163482F1-A692-5908-AD22-7E94C8634890:PACS009",
+        "executable": true,
+        "reasonCode": "SOURCE_TOKEN_REMOVED_TARGET_ALREADY_PRESENT"
+      },
+      {
+        "canonicalGroupKey": "SSI:1A386704-017A-4439-BB65-29FC3FD6E8DC:PACS009",
+        "executable": true,
+        "reasonCode": "SOURCE_TOKEN_REMOVED_TARGET_ALREADY_PRESENT"
+      },
+      {
+        "canonicalGroupKey": "SSI:1A9BBD1F-B884-5FBF-87D4-1E8C79A13800:PACS009",
+        "executable": true,
+        "reasonCode": "SOURCE_TOKEN_REMOVED_TARGET_ALREADY_PRESENT"
+      },
+      {
+        "canonicalGroupKey": "SSI:1BB2BA6F-B11D-4ED8-8213-482DBFA6AFD4:PACS009",
+        "executable": true,
+        "reasonCode": "SOURCE_TOKEN_REMOVED_TARGET_ALREADY_PRESENT"
+      },
+      {
+        "canonicalGroupKey": "SSI:22A11830-F848-4281-805F-8E693C98B364:PACS009",
+        "executable": true,
+        "reasonCode": "SOURCE_TOKEN_REMOVED_TARGET_ALREADY_PRESENT"
+      },
+      {
+        "canonicalGroupKey": "SSI:42AAE02A-0597-4982-B4C0-4B27BB44A549:PACS009",
+        "executable": true,
+        "reasonCode": "SOURCE_TOKEN_REMOVED_TARGET_ALREADY_PRESENT"
+      },
+      {
+        "canonicalGroupKey": "SSI:45EA4C86-67D4-40B7-935D-904A6E3FFD12:PACS009",
+        "executable": true,
+        "reasonCode": "SOURCE_TOKEN_REMOVED_TARGET_ALREADY_PRESENT"
+      },
+      {
+        "canonicalGroupKey": "SSI:4A32AA4B-5F8A-5B43-BF52-7B00AD2F8673:PACS009",
+        "executable": true,
+        "reasonCode": "SOURCE_TOKEN_REMOVED_TARGET_ALREADY_PRESENT"
+      },
+      {
+        "canonicalGroupKey": "SSI:50531295-C91A-4EB5-9C21-69D2DAB38B7C:PACS009",
+        "executable": true,
+        "reasonCode": "SOURCE_TOKEN_REMOVED_TARGET_ALREADY_PRESENT"
+      },
+      {
+        "canonicalGroupKey": "SSI:50D51F4C-9905-46F2-AC93-E0E1A4330019:PACS009",
+        "executable": true,
+        "reasonCode": "SOURCE_TOKEN_REMOVED_TARGET_ALREADY_PRESENT"
+      },
+      {
+        "canonicalGroupKey": "SSI:54C26B29-E351-4391-AA38-8614AAB63C4F:PACS009",
+        "executable": true,
+        "reasonCode": "SOURCE_TOKEN_REMOVED_TARGET_ALREADY_PRESENT"
+      },
+      {
+        "canonicalGroupKey": "SSI:6D14DA92-FAF4-5611-854A-EF2C42350913:PACS009",
+        "executable": true,
+        "reasonCode": "SOURCE_TOKEN_REMOVED_TARGET_ALREADY_PRESENT"
+      },
+      {
+        "canonicalGroupKey": "SSI:7E285998-4C3C-5D63-B05A-B613CD39C7B1:PACS009",
+        "executable": true,
+        "reasonCode": "SOURCE_TOKEN_REMOVED_TARGET_ALREADY_PRESENT"
+      },
+      {
+        "canonicalGroupKey": "SSI:91765D67-8E0C-52F4-92A1-501EF37BBA23:PACS009",
+        "executable": true,
+        "reasonCode": "SOURCE_TOKEN_REMOVED_TARGET_ALREADY_PRESENT"
+      },
+      {
+        "canonicalGroupKey": "SSI:946B7448-F719-4BD4-8D83-F66C597E1F6D:PACS009",
+        "executable": true,
+        "reasonCode": "SOURCE_TOKEN_REMOVED_TARGET_ALREADY_PRESENT"
+      },
+      {
+        "canonicalGroupKey": "SSI:A1E1AC1A-A16F-414C-AC70-85731ED84D3F:PACS009",
+        "executable": true,
+        "reasonCode": "SOURCE_TOKEN_REMOVED_TARGET_ALREADY_PRESENT"
+      },
+      {
+        "canonicalGroupKey": "SSI:A6486F75-A0A8-5207-9C28-CEDF30F4F990:PACS009",
+        "executable": true,
+        "reasonCode": "SOURCE_TOKEN_REMOVED_TARGET_ALREADY_PRESENT"
+      },
+      {
+        "canonicalGroupKey": "SSI:B0C18C9A-2FF7-59D4-96D0-F600853B8408:PACS009",
+        "executable": true,
+        "reasonCode": "SOURCE_TOKEN_REMOVED_TARGET_ALREADY_PRESENT"
+      },
+      {
+        "canonicalGroupKey": "SSI:B96E8D9A-327B-4FB0-9777-A9AD9D86AC43:PACS009",
+        "executable": true,
+        "reasonCode": "SOURCE_TOKEN_REMOVED_TARGET_ALREADY_PRESENT"
+      },
+      {
+        "canonicalGroupKey": "SSI:C07BB708-F81E-5976-B6DE-62171BDCAB57:PACS009",
+        "executable": true,
+        "reasonCode": "SOURCE_TOKEN_REMOVED_TARGET_ALREADY_PRESENT"
+      },
+      {
+        "canonicalGroupKey": "SSI:C12BD429-CF8C-4B57-9575-299BBE58D680:PACS009",
+        "executable": true,
+        "reasonCode": "SOURCE_TOKEN_REMOVED_TARGET_ALREADY_PRESENT"
+      },
+      {
+        "canonicalGroupKey": "SSI:CA1D12D4-1208-40D5-A8FE-BCD040BDA6E3:PACS009",
+        "executable": true,
+        "reasonCode": "SOURCE_TOKEN_REMOVED_TARGET_ALREADY_PRESENT"
+      },
+      {
+        "canonicalGroupKey": "SSI:CA4A553D-77F0-4F30-B2A7-C83C4D81F52B:PACS009",
+        "executable": true,
+        "reasonCode": "SOURCE_TOKEN_REMOVED_TARGET_ALREADY_PRESENT"
+      },
+      {
+        "canonicalGroupKey": "SSI:CD50CA60-1EC8-4A16-B61C-B03ABF6A9C58:PACS009",
+        "executable": true,
+        "reasonCode": "SOURCE_TOKEN_REMOVED_TARGET_ALREADY_PRESENT"
+      },
+      {
+        "canonicalGroupKey": "SSI:D60D207B-29B2-4352-8314-89378EDCF139:PACS009",
+        "executable": true,
+        "reasonCode": "SOURCE_TOKEN_REMOVED_TARGET_ALREADY_PRESENT"
+      },
+      {
+        "canonicalGroupKey": "SSI:DADFC78E-619E-5FCA-BA19-69A5732FD246:PACS009",
+        "executable": true,
+        "reasonCode": "SOURCE_TOKEN_REMOVED_TARGET_ALREADY_PRESENT"
+      },
+      {
+        "canonicalGroupKey": "SSI:E029AD81-7715-4C2A-9452-75876508CACB:PACS009",
+        "executable": true,
+        "reasonCode": "SOURCE_TOKEN_REMOVED_TARGET_ALREADY_PRESENT"
+      },
+      {
+        "canonicalGroupKey": "SSI:E5F71960-AFF2-5F27-B01F-58194E54E736:PACS009",
+        "executable": true,
+        "reasonCode": "SOURCE_TOKEN_REMOVED_TARGET_ALREADY_PRESENT"
+      },
+      {
+        "canonicalGroupKey": "SSI:EB1A6C37-F327-4038-8241-8AAC9F5D20B9:PACS009",
+        "executable": true,
+        "reasonCode": "SOURCE_TOKEN_REMOVED_TARGET_ALREADY_PRESENT"
+      },
+      {
+        "canonicalGroupKey": "SSI:ED799438-A80B-4787-85E5-443A0CA5C5BB:PACS009",
+        "executable": true,
+        "reasonCode": "SOURCE_TOKEN_REMOVED_TARGET_ALREADY_PRESENT"
+      }
+    ],
+    "SKIP_COV": [],
+    "SKIP_HISTORY": [],
+    "SKIP_NEGATIVE": [],
+    "UNCHANGED": []
+  },
+  "status": "FROZEN"
+}

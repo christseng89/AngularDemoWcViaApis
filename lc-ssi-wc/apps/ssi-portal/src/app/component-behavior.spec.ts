@@ -525,6 +525,35 @@ describe("portal component behavior", () => {
     expect(loadCurrencies).toHaveBeenCalledTimes(1);
   });
 
+  it("loads Currency options before opening SSI detail and exposes the revision source identity", async () => {
+    const { AppComponent } = await import("./app.component");
+    const component = new AppComponent();
+    const loadCurrencies = jest
+      .spyOn(component as never, "loadCurrencies" as never)
+      .mockImplementation(async () => {
+        component.currencies.set([{ code: "SGD", decimals: 2 }]);
+      });
+    const activeRow = {
+      id: "SSI-ACTIVE",
+      counterpartyId: "CP-ANY-SGD",
+      scope: "STANDING",
+      status: "ACTIVE",
+      maker: "maker.original",
+      ownershipType: "OWN" as const,
+      route: { currency: "SGD", counterpartyBic: "ANY" },
+      version: 9,
+    };
+
+    await component.reviewForChecker(activeRow);
+    expect(loadCurrencies).toHaveBeenCalledTimes(1);
+    expect(component.detailModel()).toMatchObject({
+      route: { currency: "SGD" },
+    });
+
+    await component.revise(activeRow);
+    expect(component.revisionSourceIdentity()).toBe("CP-ANY-SGD · v9");
+  });
+
   it("reserves WIP on Revise and lets X or Escape cancel it on the server", async () => {
     const { AppComponent } = await import("./app.component");
     const component = new AppComponent();

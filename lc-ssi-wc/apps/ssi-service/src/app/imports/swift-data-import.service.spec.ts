@@ -121,6 +121,10 @@ describe("SwiftDataImportService", () => {
         accepted: 1,
         rejected: 0,
         results: [{ row: 1, status: "VALIDATED" }],
+        executionTelemetry: {
+          databaseWriteAttempts: 0,
+          nostroLookupAttempts: 0,
+        },
       });
       expect(context.ssi.create).not.toHaveBeenCalled();
       expect(context.rma.create).not.toHaveBeenCalled();
@@ -128,6 +132,16 @@ describe("SwiftDataImportService", () => {
       expect(context.entity.create).not.toHaveBeenCalled();
     },
   );
+
+  it("reports authoritative write-attempt telemetry for a non-dry import", () => {
+    const { subject } = harness();
+    expect(subject.import(request())).toMatchObject({
+      executionTelemetry: {
+        databaseWriteAttempts: 1,
+        nostroLookupAttempts: 0,
+      },
+    });
+  });
 
   it("reports validation failures and non-Error throws per row", () => {
     const context = harness();

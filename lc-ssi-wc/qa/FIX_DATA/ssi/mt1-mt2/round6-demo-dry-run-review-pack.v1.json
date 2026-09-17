@@ -1,0 +1,82 @@
+{
+  "artifactId": "SSI-MT1-MT2-ROUND6-DEMO-DRY-RUN-REVIEW-PACK-V1",
+  "scope": "DEMO_PROTOTYPE_ZERO_WRITE_DRY_RUN_ONLY",
+  "status": "PENDING_BA_QA_REVIEW",
+  "governance": {
+    "decision": "memory/ssi-demo-prototype-repair-governance-v1.md",
+    "productionMigrationGovernance": "NOT_APPLICABLE",
+    "databaseMutation": "PROHIBITED",
+    "reload": "PROHIBITED"
+  },
+  "dryRun": {
+    "evidence": "round6-api-dry-run-evidence.v1.json",
+    "sha256": "D39F2D175742631F587DA82E0DED81917D88CB5B365F64C22051F7E275C3E2CC",
+    "candidateSsiRows": 49,
+    "accepted": 49,
+    "rejected": 0,
+    "applicabilityContextsReconciled": 128,
+    "exactApplicabilityMappingSha256": "E492093531FA810AC6FA6A3DE83F1DD65C14AFE0ADFA7A1A5958D348346F62E9",
+    "ruleGroups": 67,
+    "inScopeGroups": 62,
+    "outOfScopeGroups": 5,
+    "outOfScopeSubmitted": 0,
+    "beforeSnapshot": "31c843856d2ab0a6da6e6a4b5852a9b3f8da5c9fefa9fc0e48f2385f8cfdc7db",
+    "afterSnapshot": "31c843856d2ab0a6da6e6a4b5852a9b3f8da5c9fefa9fc0e48f2385f8cfdc7db",
+    "databaseWrites": 0
+    ,"telemetrySource": "SERVICE_EXECUTION_COUNTERS"
+  },
+  "candidate": {
+    "sha256": "1EF6B1DB11B5AE981673B15B88620F73FA67F7A9854759794F2DEE1AE330D3DC",
+    "pacs008LegacyTokens": 0,
+    "pacs009LegacyTokens": 0,
+    "pacs008CanonicalMemberships": 19,
+    "pacs009CanonicalMemberships": 49,
+    "counterpartyBinding": "RULE_TABLE_PARAMETER_DRIVEN",
+    "virtualNostroMode": "CONTROLLED_VIRTUAL_STUB_ONLY",
+    "virtualNostroCalls": 0
+  },
+  "archive": {
+    "path": "qa/_ARCHIVE/ssi/ssi-demo.pre-mt1-mt2-repair.20260917.canonical.seed.json",
+    "sha256": "F7E07F02E6714619A7F0982D0798A7E064B547F8C32E486269F93EB6EA9A10E7"
+  },
+  "source": {
+    "candidateGenerator": {
+      "path": "qa/FIX_DATA/src/ssi/mt1-mt2-candidate-generator.ts",
+      "sha256": "36F70034CC3AD513B4C1F1466347633FBDFDFFD0C6D5466CDA8FD3F656BE2916"
+    },
+    "apiDryRun": {
+      "path": "qa/FIX_DATA/src/ssi/mt1-mt2-api-dry-run.ts",
+      "sha256": "5CC374B4A8D982179A471C3632F21E1DAF379A3FE93B0A30BDFE8FE7F8022116"
+    },
+    "serviceTelemetry": {
+      "path": "apps/ssi-service/src/app/imports/swift-data-import.service.ts",
+      "sha256": "A26899129DBA2C80D39A4FD218C73D1B56FE35A0DF10F94AEE3375612BD2B4EC"
+    },
+    "apiDryRunTests": {
+      "path": "qa/FIX_DATA/src/ssi/mt1-mt2-api-dry-run.test.ts",
+      "sha256": "C42EB2941C7B2845D0139E5A9DF0FED7CEBB4405F2029F5EC16FF6DF893B8C06"
+    },
+    "preflightTests": {
+      "path": "qa/FIX_DATA/src/ssi/mt1-mt2-preflight.test.ts",
+      "sha256": "A2330D7E6B0AF5ABBB5641D77B4D63492EAF23DB1712114413085DD0D2BD7C7F"
+    }
+  },
+  "verification": {
+    "tests": "30/30 MT1-MT2 PASS + 1010/1010 SSI service PASS",
+    "eslint": "PASS",
+    "targetedTypecheck": "PASS",
+    "isolatedFirstApply": "49 SSI / 128 Applicability",
+    "isolatedSecondApply": "0 SSI / 0 Applicability",
+    "fkOrphanCount": 0,
+    "integrity": "PASS",
+    "nonTargetLogicalMutation": 0
+    ,"nonzeroWriteTelemetryRejected": true
+    ,"nonzeroNostroTelemetryRejected": true
+  },
+  "reviewQuestion": "Does this zero-write Demo Dry Run close the three prior Demo correctness gaps and authorize preparation of the next non-mutating review step only?",
+  "databaseApplyAuthorizationRequested": false,
+  "approval": {
+    "ba": "PENDING",
+    "qa": "PENDING"
+  }
+}

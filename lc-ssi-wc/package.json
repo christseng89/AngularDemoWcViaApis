@@ -21,7 +21,7 @@
     "demo:publish:reload-test-data": "node --experimental-strip-types qa/FIX_DATA/src/rma/reload-test-data/publish.ts",
     "demo:dry-run:reload-test-data": "node --experimental-strip-types qa/FIX_DATA/src/rma/reload-test-data/api-dry-run.ts",
     "demo:dry-run:ssi-mt347": "node --experimental-strip-types qa/FIX_DATA/src/ssi/dry-run.ts",
-    "demo:preflight:ssi-reload-source": "node --experimental-strip-types qa/FIX_DATA/src/ssi/reload-source.ts",
+    "demo:preflight:ssi-reload-source": "node --experimental-strip-types qa/FIX_DATA/src/ssi/reload-source-v1.2.ts",
     "demo:build:ssi-mt347-seed-candidate": "node --experimental-strip-types qa/FIX_DATA/src/ssi/build-seed-candidate.ts",
     "demo:preflight:ssi-mt347-reload": "node --experimental-strip-types qa/FIX_DATA/src/ssi/mt347-reload-preflight.ts",
     "demo:apply:ssi-mt347-v1.1": "node --experimental-strip-types qa/FIX_DATA/src/ssi/mt347-runtime-apply.ts",
