@@ -157,6 +157,7 @@ describe("SQLite governed repositories", () => {
       totalPages: 1,
       hasPrevious: false,
       hasNext: false,
+      distinctCurrencyCount: 1,
     });
     expect(repository.summary()).toEqual({
       currentOwn: 0,
@@ -212,6 +213,59 @@ describe("SQLite governed repositories", () => {
     expect(repository.listApplicability(record.id)).toEqual(second);
     expect(repository.listApplicability()).toEqual(second);
     expect(repository.audit()).toHaveLength(4);
+    repository.onModuleDestroy();
+  });
+
+  it("aggregates complete counterparty coverage independently of pagination", () => {
+    const repository = new SqliteSsiRepository();
+    const makeRecord = (
+      id: string,
+      counterpartyId: string,
+      currency: string,
+    ): SsiRecord => ({
+      id,
+      counterpartyId: `CP-${id}`,
+      scope: "REUSABLE",
+      maker: "maker.test",
+      status: "ACTIVE",
+      version: 1,
+      ownershipType: "COUNTERPARTY",
+      route: { counterpartyBic: counterpartyId, currency },
+      createdAt: "2026-09-11T00:00:00.000Z",
+      updatedAt: "2026-09-11T00:00:00.000Z",
+    });
+    repository.save(
+      makeRecord("SSI-1", "BARCGB22", "GBP"),
+      "CREATED",
+      "maker.test",
+    );
+    repository.save(
+      makeRecord("SSI-2", "BARCGB22", "EUR"),
+      "CREATED",
+      "maker.test",
+    );
+    repository.save(
+      makeRecord("SSI-3", "DEUTDEFF", "EUR"),
+      "CREATED",
+      "maker.test",
+    );
+
+    expect(repository.counterpartyCoverage("ACTIVE")).toEqual([
+      {
+        counterpartyId: "BARCGB22",
+        ssiCount: 2,
+        currencyCount: 2,
+        statuses: ["ACTIVE"],
+        lastVerified: expect.any(String),
+      },
+      {
+        counterpartyId: "DEUTDEFF",
+        ssiCount: 1,
+        currencyCount: 1,
+        statuses: ["ACTIVE"],
+        lastVerified: expect.any(String),
+      },
+    ]);
     repository.onModuleDestroy();
   });
 

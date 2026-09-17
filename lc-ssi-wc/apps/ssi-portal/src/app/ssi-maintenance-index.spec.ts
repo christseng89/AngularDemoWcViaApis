@@ -13,20 +13,13 @@ describe("Counterparty Inbox query model", () => {
     country: index % 2 ? "US" : "GB",
     partyType: "BANK" as const,
   }));
-  const ssis = banks.slice(0, 3).flatMap((bank, index) => [
-    {
-      status: "ACTIVE",
-      updatedAt: `2026-09-0${index + 1}`,
-      ownerParty: bank.bic,
-      route: { counterpartyBic: bank.bic, currency: "USD" },
-    },
-    {
-      status: "DRAFT",
-      updatedAt: `2026-09-0${index + 2}`,
-      ownerParty: bank.bic,
-      route: { counterpartyBic: bank.bic, currency: "EUR" },
-    },
-  ]);
+  const ssis = banks.slice(0, 3).map((bank, index) => ({
+    counterpartyId: bank.bic,
+    ssiCount: 2,
+    currencyCount: 2,
+    statuses: ["ACTIVE", "DRAFT"],
+    lastVerified: `2026-09-0${index + 2}`,
+  }));
 
   it("builds one row per Bank Directory counterparty, including zero coverage", () => {
     const inbox = buildCounterpartyInbox(banks, ssis);
@@ -120,10 +113,11 @@ describe("Counterparty Inbox query model", () => {
     ];
     const inbox = buildCounterpartyInbox(customers, [
       {
-        status: "ACTIVE",
-        updatedAt: "2026-09-09",
-        ownerParty: "CUST-00001",
-        route: { currency: "HKD", accountWithBic: "HSBCHKHH" },
+        counterpartyId: "CUST-00001",
+        ssiCount: 1,
+        currencyCount: 1,
+        statuses: ["ACTIVE"],
+        lastVerified: "2026-09-09",
       },
     ]);
 

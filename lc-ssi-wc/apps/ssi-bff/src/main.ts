@@ -115,6 +115,13 @@ class BffController {
   @Get("ssis/summary") ssiSummary(): Promise<unknown> {
     return forwardSsi("ssis/summary");
   }
+  @Get("ssis/counterparty-coverage") counterpartyCoverage(
+    @Query("status") status = "ACTIVE",
+  ): Promise<unknown> {
+    return forwardSsi(
+      `ssis/counterparty-coverage?status=${encodeURIComponent(status)}`,
+    );
+  }
   @Get("ssi-applicability") applicability(
     @Query("ssiId") ssiId = "",
   ): Promise<unknown> {

@@ -33,6 +33,7 @@ import {
   queryCounterpartyInbox,
   sortSsiOwnershipRows,
   type CounterpartyInboxSort,
+  type CounterpartySsiSummarySource,
   type SortDirection,
   type SsiOwnershipSort,
 } from "./ssi-maintenance-index";
@@ -207,6 +208,7 @@ interface SsiPage {
   totalPages: number;
   hasPrevious: boolean;
   hasNext: boolean;
+  distinctCurrencyCount: number;
 }
 interface SsiIndexSummary {
   currentOwn: number;
@@ -1514,6 +1516,7 @@ export class AppComponent implements OnInit {
   readonly rows = signal<readonly SsiRow[]>([]);
   readonly ssiIndexTotalItems = signal(0);
   readonly ssiIndexTotalPages = signal(1);
+  readonly ssiIndexDistinctCurrencyCount = signal(0);
   readonly ssiSummary = signal<SsiIndexSummary>({
     currentOwn: 0,
     pendingApproval: 0,
@@ -1529,6 +1532,9 @@ export class AppComponent implements OnInit {
   readonly ownershipSortDirection = signal<SortDirection>("ASC");
   readonly counterpartyDirectoryLoading = signal(false);
   readonly counterpartyDirectory = signal<readonly CounterpartyReference[]>([]);
+  readonly counterpartyCoverage = signal<
+    readonly CounterpartySsiSummarySource[]
+  >([]);
   readonly selectedCounterpartyId = signal("");
   readonly counterpartyInboxSearch = signal("");
   readonly counterpartyPartyType = signal<
@@ -1586,10 +1592,7 @@ export class AppComponent implements OnInit {
       this.counterpartyDirectory().filter(
         (party) => (party.partyType ?? "BANK") === partyType,
       ),
-      this.rows().filter(
-        (row) =>
-          this.ownershipOf(row) === "COUNTERPARTY" && row.status !== "REVOKED",
-      ),
+      this.counterpartyCoverage(),
     );
     if (selectedType === "BANK_SSI") {
       return inbox.filter((party) => party.ssiCount > 0);
@@ -2440,6 +2443,12 @@ export class AppComponent implements OnInit {
 
   private async performRefresh(requestSequence: number): Promise<void> {
     this.ssiIndexLoading.set(true);
+    if (this.selectedCounterpartyId()) {
+      this.rows.set([]);
+      this.ssiIndexTotalItems.set(0);
+      this.ssiIndexTotalPages.set(1);
+      this.ssiIndexDistinctCurrencyCount.set(0);
+    }
     try {
       const checkerView = this.view() === "checker";
       const query = new URLSearchParams({
@@ -2475,12 +2484,16 @@ export class AppComponent implements OnInit {
             totalPages: 1,
             hasPrevious: false,
             hasNext: false,
+            distinctCurrencyCount: new Set(
+              response.map((row) => row.route["currency"]).filter(Boolean),
+            ).size,
           }
         : response;
       if (requestSequence !== this.refreshRequestSequence) return;
       this.rows.set(page.items);
       this.ssiIndexTotalItems.set(page.totalItems);
       this.ssiIndexTotalPages.set(Math.max(1, page.totalPages));
+      this.ssiIndexDistinctCurrencyCount.set(page.distinctCurrencyCount);
       this.ssiSummary.set(summary);
       this.indexPage.set(
         Math.min(this.indexPage(), Math.max(1, page.totalPages)),
@@ -3942,14 +3955,23 @@ export class AppComponent implements OnInit {
   private async loadCounterpartyDirectory(): Promise<void> {
     this.counterpartyDirectoryLoading.set(true);
     try {
-      const response = await firstValueFrom(
-        this.http.get<{ items: readonly CounterpartyReference[] }>(
-          `${this.api}/reference/counterparties`,
+      const [response, coverage] = await Promise.all([
+        firstValueFrom(
+          this.http.get<{ items: readonly CounterpartyReference[] }>(
+            `${this.api}/reference/counterparties`,
+          ),
         ),
-      );
+        firstValueFrom(
+          this.http.get<readonly CounterpartySsiSummarySource[]>(
+            `${this.api}/ssis/counterparty-coverage?status=ACTIVE`,
+          ),
+        ),
+      ]);
       this.counterpartyDirectory.set(response.items);
+      this.counterpartyCoverage.set(coverage);
     } catch {
       this.counterpartyDirectory.set([]);
+      this.counterpartyCoverage.set([]);
       this.notice.set({
         kind: "warning",
         text: "Counterparty Master 暫時不可用。",

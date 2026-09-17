@@ -270,6 +270,7 @@ const fakeHttp = {
       });
     if (url.endsWith("/ssis/summary"))
       return of({ currentOwn: 0, pendingApproval: 0, active: 0, archived: 0 });
+    if (url.includes("/ssis/counterparty-coverage")) return of([]);
     if (url.includes("/ssis?")) return pendingSsiResponse ?? of([]);
     if (url.endsWith("/ssis")) return pendingSsiResponse ?? of([]);
     if (url.endsWith("/audit")) return of([]);
@@ -1369,23 +1370,23 @@ describe("portal component behavior", () => {
         partyType: "CUSTOMER",
       },
     ]);
-    component.rows.set([
+    component.counterpartyCoverage.set([
       {
-        id: "SSI-BANK",
         counterpartyId: "BANK-COVERED",
-        scope: "REUSABLE",
-        status: "ACTIVE",
-        maker: "maker",
-        ownershipType: "COUNTERPARTY",
-        ownerParty: "BANK-COVERED",
-        route: { currency: "USD", counterpartyBic: "BANK-COVERED" },
-        version: 1,
+        ssiCount: 12,
+        currencyCount: 2,
+        statuses: ["ACTIVE"],
+        lastVerified: "2026-09-18T00:00:00.000Z",
       },
     ]);
 
     expect(
       component.counterpartyInbox().map((party) => party.counterpartyId),
     ).toEqual(["BANK-COVERED"]);
+    expect(component.counterpartyInbox()[0]).toMatchObject({
+      ssiCount: 12,
+      currencyCount: 2,
+    });
     component.selectCounterpartyPartyType("BANK_NO_SSI");
     expect(
       component.counterpartyInbox().map((party) => party.counterpartyId),
@@ -2112,6 +2113,58 @@ describe("portal component behavior", () => {
       "SSI-EUR-DRAFT",
       "SSI-JPY-DRAFT",
     ]);
+    pendingSsiResponse = undefined;
+  });
+
+  it("clears stale global pagination and uses scoped counterparty totals", async () => {
+    const { AppComponent } = await import("./app.component");
+    const component = new AppComponent();
+    component.counterpartyDirectory.set([
+      {
+        counterpartyId: "BOFAUS3N",
+        bic: "BOFAUS3N",
+        name: "Bank of America",
+        country: "US",
+        partyType: "BANK",
+      },
+    ]);
+    component.counterpartyCoverage.set([
+      {
+        counterpartyId: "BOFAUS3N",
+        ssiCount: 3418,
+        currencyCount: 5,
+        statuses: ["ACTIVE"],
+        lastVerified: "2026-09-18T00:00:00.000Z",
+      },
+    ]);
+    component.ssiIndexTotalItems.set(10318);
+    component.ssiIndexTotalPages.set(1032);
+    pendingSsiResponse = new Subject<unknown>();
+
+    component.openCounterpartySsi("BOFAUS3N");
+    expect(component.ssiIndexLoading()).toBe(true);
+    expect(component.rows()).toEqual([]);
+    expect(component.ssiIndexTotalItems()).toBe(0);
+    expect(component.ssiIndexTotalPages()).toBe(1);
+
+    pendingSsiResponse.next({
+      items: [],
+      page: 1,
+      pageSize: 10,
+      totalItems: 3418,
+      totalPages: 342,
+      hasPrevious: false,
+      hasNext: true,
+      distinctCurrencyCount: 5,
+    });
+    pendingSsiResponse.complete();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(component.ssiIndexLoading()).toBe(false);
+    expect(component.ssiIndexTotalItems()).toBe(3418);
+    expect(component.ssiIndexTotalPages()).toBe(342);
+    expect(component.ssiIndexDistinctCurrencyCount()).toBe(5);
     pendingSsiResponse = undefined;
   });
 

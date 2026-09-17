@@ -58,6 +58,11 @@ export class SsiController {
   @Get("summary") summary(): unknown {
     return this.service.summary();
   }
+  @Get("counterparty-coverage") counterpartyCoverage(
+    @Query("status") status?: string,
+  ): unknown {
+    return this.service.counterpartyCoverage(status);
+  }
   @Get("applicability") applicability(@Query("ssiId") ssiId?: string): unknown {
     return this.service.listApplicability(ssiId);
   }

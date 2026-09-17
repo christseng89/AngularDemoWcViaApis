@@ -8,10 +8,11 @@ export interface CounterpartyDirectoryItem {
 }
 
 export interface CounterpartySsiSummarySource {
-  status: string;
-  updatedAt?: string;
-  ownerParty?: string;
-  route: Readonly<Record<string, string>>;
+  counterpartyId: string;
+  ssiCount: number;
+  currencyCount: number;
+  statuses: readonly string[];
+  lastVerified: string;
 }
 
 export interface CounterpartyInboxItem extends CounterpartyDirectoryItem {
@@ -71,31 +72,22 @@ export function buildCounterpartyInbox(
   ssis: readonly CounterpartySsiSummarySource[],
 ): readonly CounterpartyInboxItem[] {
   return parties.map((party) => {
-    const records = ssis.filter(
-      (ssi) =>
-        (ssi.route["counterpartyBic"] || ssi.ownerParty) ===
-        (party.bic || party.counterpartyId),
+    const coverage = ssis.find(
+      (item) => item.counterpartyId === (party.bic || party.counterpartyId),
     );
-    const statuses = [...new Set(records.map((record) => record.status))].sort(
-      (left, right) => left.localeCompare(right),
-    );
-    const verifiedDates = records
-      .map((record) => record.updatedAt ?? "")
-      .filter(Boolean)
-      .sort((left, right) => left.localeCompare(right));
+    const ssiCount = coverage?.ssiCount ?? 0;
+    const statuses = coverage?.statuses ?? [];
     let evidenceSummary = "NO SSI COVERAGE";
-    if (records.length) {
-      const recordLabel = records.length === 1 ? "record" : "records";
-      evidenceSummary = `${statuses.join(" · ")} · ${records.length} governed ${recordLabel}`;
+    if (ssiCount) {
+      const recordLabel = ssiCount === 1 ? "record" : "records";
+      evidenceSummary = `${statuses.join(" · ")} · ${ssiCount} governed ${recordLabel}`;
     }
     return {
       ...party,
-      ssiCount: records.length,
-      currencyCount: new Set(
-        records.map((record) => record.route["currency"]).filter(Boolean),
-      ).size,
+      ssiCount,
+      currencyCount: coverage?.currencyCount ?? 0,
       statuses,
-      lastVerified: verifiedDates.at(-1) ?? "",
+      lastVerified: coverage?.lastVerified ?? "",
       evidenceSummary,
     };
   });
@@ -174,7 +166,10 @@ export function sortSsiOwnershipRows<T extends SortableSsiRow>(
       compare(left.route, right.route, left, right);
   const comparators: Readonly<Record<SsiOwnershipSort, Comparator<T>>> = {
     SSI_ID: (left, right) =>
-      compareText(left.counterpartyId ?? left.id, right.counterpartyId ?? right.id),
+      compareText(
+        left.counterpartyId ?? left.id,
+        right.counterpartyId ?? right.id,
+      ),
     BOOKING_ENTITY: routeComparator((left, right, leftRow, rightRow) =>
       compareText(
         left["bookingEntity"] || leftRow.ownerParty,

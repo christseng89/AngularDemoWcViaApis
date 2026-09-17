@@ -53,6 +53,13 @@ export interface SsiIndexSummary {
   active: number;
   archived: number;
 }
+export interface CounterpartySsiCoverage {
+  counterpartyId: string;
+  ssiCount: number;
+  currencyCount: number;
+  statuses: readonly string[];
+  lastVerified: string;
+}
 export interface SsiApplicabilityRecord {
   id: string;
   ssiId: string;
@@ -174,7 +181,9 @@ export class SqliteSsiRepository implements OnModuleDestroy {
       .map((row) => this.withOpenRevision(row));
   }
 
-  listPage(request: SsiPageRequest): PagedResult<SsiRecord> {
+  listPage(
+    request: SsiPageRequest,
+  ): PagedResult<SsiRecord> & { distinctCurrencyCount: number } {
     this.expireRevisionWorkInProgress();
     const page = Math.max(1, Math.trunc(request.page ?? 1));
     const pageSize = Math.min(
@@ -245,6 +254,15 @@ export class SqliteSsiRepository implements OnModuleDestroy {
           .get(...parameters) as { count: number }
       ).count,
     );
+    const distinctCurrencyCount = Number(
+      (
+        this.db
+          .prepare(
+            `SELECT COUNT(DISTINCT NULLIF(json_extract(payload,'$.route.currency'),'')) AS count FROM ssi${where}`,
+          )
+          .get(...parameters) as { count: number }
+      ).count,
+    );
     const items = this.db
       .prepare(
         `SELECT base.payload, ${this.openRevisionSelectSql("base")} AS open_revision
@@ -263,7 +281,58 @@ export class SqliteSsiRepository implements OnModuleDestroy {
       totalPages,
       hasPrevious: page > 1,
       hasNext: page < totalPages,
+      distinctCurrencyCount,
     };
+  }
+
+  counterpartyCoverage(status = "ACTIVE"): readonly CounterpartySsiCoverage[] {
+    const ownershipExpression = `COALESCE(
+      json_extract(payload,'$.ownershipType'),
+      CASE
+        WHEN json_extract(payload,'$.counterpartyId')='ANY'
+          OR json_extract(payload,'$.route.counterpartyBic')='ANY' THEN 'OWN'
+        ELSE 'COUNTERPARTY'
+      END
+    )`;
+    const counterpartyExpression = `COALESCE(
+      NULLIF(json_extract(payload,'$.route.counterpartyBic'),''),
+      NULLIF(json_extract(payload,'$.ownerParty'),''),
+      NULLIF(json_extract(payload,'$.counterpartyId'),'')
+    )`;
+    const statusClause =
+      status && status !== "ALL"
+        ? "AND json_extract(payload,'$.status')=?"
+        : "AND json_extract(payload,'$.status')<>'REVOKED'";
+    const parameters = status && status !== "ALL" ? [status] : [];
+    return this.db
+      .prepare(
+        `SELECT
+           ${counterpartyExpression} AS counterparty_id,
+           COUNT(*) AS ssi_count,
+           COUNT(DISTINCT NULLIF(json_extract(payload,'$.route.currency'),'')) AS currency_count,
+           GROUP_CONCAT(DISTINCT json_extract(payload,'$.status')) AS statuses,
+           MAX(updated_at) AS last_verified
+         FROM ssi
+         WHERE ${ownershipExpression}='COUNTERPARTY'
+           ${statusClause}
+           AND ${counterpartyExpression} IS NOT NULL
+         GROUP BY ${counterpartyExpression}
+         ORDER BY ${counterpartyExpression}`,
+      )
+      .all(...parameters)
+      .map((row) => {
+        const value = row as Record<string, string | number | null>;
+        return {
+          counterpartyId: String(value["counterparty_id"] ?? ""),
+          ssiCount: Number(value["ssi_count"] ?? 0),
+          currencyCount: Number(value["currency_count"] ?? 0),
+          statuses: String(value["statuses"] ?? "")
+            .split(",")
+            .filter(Boolean)
+            .sort((left, right) => left.localeCompare(right)),
+          lastVerified: String(value["last_verified"] ?? ""),
+        };
+      });
   }
 
   summary(): SsiIndexSummary {

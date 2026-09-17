@@ -641,11 +641,15 @@
                     <section class="party-detail-header">
                       <p class="kicker">COUNTERPARTY SSI DETAIL</p>
                       <h3>{{ party.counterpartyId }} · {{ party.name }}</h3>
-                      <p>
-                        {{ party.country }} · {{ party.ssiCount }} SSI ·
-                        {{ party.currencyCount }} currencies ·
-                        {{ party.evidenceSummary }}
-                      </p>
+                      @if (ssiIndexLoading()) {
+                        <p>Loading scoped SSI records…</p>
+                      } @else {
+                        <p>
+                          {{ party.country }} · {{ ssiIndexTotalItems() }} SSI ·
+                          {{ ssiIndexDistinctCurrencyCount() }} currencies ·
+                          {{ party.evidenceSummary }}
+                        </p>
+                      }
                     </section>
                   }
                   <fieldset class="status-options">
@@ -1133,7 +1137,11 @@
                       </tbody>
                     </table>
                   </div>
-                  <div class="pager" aria-label="SSI Index pagination">
+                  <div
+                    class="pager"
+                    aria-label="SSI Index pagination"
+                    [hidden]="ssiIndexLoading()"
+                  >
                     <span
                       >Page {{ indexPage() }} / {{ indexTotalPages() }} ·
                       {{ ssiIndexTotalItems() }} records</span

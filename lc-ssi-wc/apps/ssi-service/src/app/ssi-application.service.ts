@@ -336,6 +336,9 @@ export class SsiApplicationService {
   summary() {
     return this.repository.summary();
   }
+  counterpartyCoverage(status?: string) {
+    return this.repository.counterpartyCoverage(status);
+  }
   listApplicability(ssiId?: string): unknown {
     return this.repository.listApplicability(ssiId);
   }
