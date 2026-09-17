@@ -273,7 +273,7 @@ export class DevelopmentDataReloadService {
   private seedPath(): string {
     return resolve(
       this.environment["SSI_DEMO_SEED_PATH"] ??
-        "./qa/FIX_DATA/reload-test-data/ssi-demo.v15.8.pacs009-repaired-isolated.canonical.seed.json",
+        "./qa/FIX_DATA/ssi/reload-test-data/ssi-demo.mt347-v1.1.approved.canonical.seed.json",
     );
   }
 }

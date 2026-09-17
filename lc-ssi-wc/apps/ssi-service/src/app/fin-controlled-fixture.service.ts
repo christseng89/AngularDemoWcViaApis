@@ -35,6 +35,10 @@ interface ControlledRoute {
 interface ControlledSsi extends SsiRecord {
   fixtureFamily?: string;
   fixtureBindingId?: string;
+  fixtureVariantVersion?: string;
+  datasetVersion?: string;
+  usageScope?: string;
+  operationalVisible?: boolean;
   route: ControlledRoute & Record<string, string>;
 }
 
@@ -95,8 +99,9 @@ export class FinControlledFixtureService {
   list(query: FinControlledFixtureQuery): FinControlledFixtureResult {
     this.validate(query);
     if (typeof this.repository.findFinControlledFixtures === "function") {
-      const candidates = this.repository
-        .findFinControlledFixtures(query)
+      const candidates = this.visibleGeneration(
+        this.repository.findFinControlledFixtures(query),
+      )
         .map(({ ssi, applicability }) =>
           this.toCandidate(
             ssi as ControlledSsi,
@@ -120,7 +125,7 @@ export class FinControlledFixtureService {
     const applicabilityBySsi = new Map(
       applicability.map((row) => [row.ssiId, row]),
     );
-    const candidates = this.repository
+    const pairs = this.repository
       .list()
       .map((row) => row as ControlledSsi)
       .filter((row) => this.matchesSsi(row, query, applicabilityBySsi))
@@ -128,8 +133,10 @@ export class FinControlledFixtureService {
         const applicability = applicabilityBySsi.get(row.id);
         if (!applicability)
           throw new Error("CONTROLLED_FIXTURE_APPLICABILITY_MISSING");
-        return this.toCandidate(row, applicability);
-      })
+        return { ssi: row, applicability };
+      });
+    const candidates = this.visibleGeneration(pairs)
+      .map(({ ssi, applicability }) => this.toCandidate(ssi, applicability))
       .sort((left, right) => left.bindingId.localeCompare(right.bindingId))
       .map((row, index) => ({ ...row, priority: (index + 1) * 10 }));
     return {
@@ -152,7 +159,7 @@ export class FinControlledFixtureService {
     const applicabilityBySsi = new Map(
       applicability.map((row) => [row.ssiId, row]),
     );
-    return this.repository
+    const pairs = this.repository
       .list()
       .map((row) => row as ControlledSsi)
       .filter(
@@ -161,8 +168,29 @@ export class FinControlledFixtureService {
           row.status === "ACTIVE" &&
           applicabilityBySsi.has(row.id),
       )
-      .map((row) => this.toCandidate(row, applicabilityBySsi.get(row.id)!))
+      .map((row) => ({
+        ssi: row,
+        applicability: applicabilityBySsi.get(row.id)!,
+      }));
+    return this.visibleGeneration(pairs)
+      .map(({ ssi, applicability }) => this.toCandidate(ssi, applicability))
       .sort((left, right) => left.bindingId.localeCompare(right.bindingId));
+  }
+
+  private visibleGeneration<
+    T extends { ssi: ControlledSsi; applicability: ControlledApplicability },
+  >(rows: readonly T[]): T[] {
+    const versioned = rows.filter(
+      ({ ssi }) =>
+        ssi.fixtureVariantVersion === "MT347-DEMO-ORACLE-V1.1" &&
+        ssi.datasetVersion === "MT347-DEMO-V1.1",
+    );
+    if (versioned.length === 0) return [...rows];
+    return versioned.filter(
+      ({ ssi }) =>
+        ssi.usageScope === "QA_POSITIVE" &&
+        ssi.operationalVisible === false,
+    );
   }
 
   private validate(query: FinControlledFixtureQuery): void {

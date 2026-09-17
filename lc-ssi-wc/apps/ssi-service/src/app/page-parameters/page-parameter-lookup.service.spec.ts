@@ -321,7 +321,7 @@ describe("PageParameterLookupService", () => {
     },
   );
 
-  it("provides one eligible governed default across the complete executable SSI matrix", () => {
+  it("provides one eligible governed default across the controlled positive SSI matrix", () => {
     const repository = new SqliteSsiRepository();
     try {
       const catalogue = new ResolutionPageScenarioCatalogueService(
@@ -337,11 +337,17 @@ describe("PageParameterLookupService", () => {
         new PageParameterLookupDefaultsService(),
       );
       const governed = catalogue.get();
+      const visibleBindings = new Set(
+        fixtureCatalogue.map(
+          ({ fixtureGroupId, bindingId }) => fixtureGroupId ?? bindingId,
+        ),
+      );
       const executable = governed.scenarios.filter(
-        ({ polarity }) => polarity !== "BOUNDARY",
+        ({ polarity, fixtureBindingId }) =>
+          polarity !== "BOUNDARY" && visibleBindings.has(fixtureBindingId),
       );
       const currencies = ["EUR", "GBP", "HKD", "JPY", "USD"];
-      expect(executable).toHaveLength(359);
+      expect(executable).toHaveLength(152);
       for (const scenario of executable) {
         const profile = governed.definitions.find(
           ({ profileId }) => profileId === scenario.profileId,

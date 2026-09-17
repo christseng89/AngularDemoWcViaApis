@@ -135,6 +135,46 @@ describe("FinControlledFixtureService", () => {
     });
   });
 
+  it("isolates historical fixtures when the versioned v1.1 graph is present", () => {
+    const historical = { ...ssi, id: "ssi-historical" };
+    const controlled = {
+      ...ssi,
+      id: "ssi-v1-1",
+      fixtureVariantVersion: "MT347-DEMO-ORACLE-V1.1",
+      datasetVersion: "MT347-DEMO-V1.1",
+      usageScope: "QA_POSITIVE",
+      operationalVisible: false,
+    };
+    const controlledNegative = {
+      ...controlled,
+      id: "ssi-v1-1-negative",
+      usageScope: "QA_NEGATIVE",
+    };
+    const optimizedRepository = {
+      findFinControlledFixtures: jest.fn(() => [
+        { ssi: historical, applicability: { ...applicability, ssiId: historical.id } },
+        { ssi: controlled, applicability: { ...applicability, ssiId: controlled.id } },
+        {
+          ssi: controlledNegative,
+          applicability: { ...applicability, ssiId: controlledNegative.id },
+        },
+      ]),
+    } as unknown as SqliteSsiRepository;
+
+    const result = new FinControlledFixtureService(optimizedRepository).list({
+      messageType: "MT300",
+      sequence: "B1",
+      currency: "USD",
+      bookingEntity: "HK01",
+      valueDate: "2026-09-12",
+      bindingId,
+    });
+
+    expect(result.candidates.map((candidate) => candidate.id)).toEqual([
+      "ssi-v1-1",
+    ]);
+  });
+
   it("does not return a fixture outside its effective date", () => {
     const result = service.list({
       messageType: "MT300",

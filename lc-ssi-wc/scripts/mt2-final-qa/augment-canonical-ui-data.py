@@ -10,7 +10,7 @@ from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[2]
-SEED = ROOT / "qa/FIX_DATA/reload-test-data/ssi-demo.v15.8.pacs009-repaired-isolated.canonical.seed.json"
+SEED = ROOT / "qa/FIX_DATA/rma/reload-test-data/ssi-demo.v15.8.pacs009-repaired-isolated.canonical.seed.json"
 FIXTURE_MANIFEST = (
     ROOT / "parameters/resolution-page-fixtures.mt2-pacs009.sr2026.json"
 )

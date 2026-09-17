@@ -1,0 +1,625 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:lc-ssi-wc:qa:mt347-demo-closure:v1.1",
+  "title": "MT347 Demo Closure V1.1",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "documentId",
+    "status",
+    "governance",
+    "policies",
+    "source",
+    "dimensionAuthority",
+    "templates",
+    "individualDecisions",
+    "groups",
+    "previouslyBlockedInventory",
+    "specialAssertions",
+    "reconciliation"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.1.0"
+    },
+    "documentId": {
+      "const": "MT347-DEMO-CLOSURE-V1.1"
+    },
+    "status": {
+      "const": "BA_MAKER_CONFIRMED_QA_CHECKER_PENDING"
+    },
+    "governance": {
+      "type": "object"
+    },
+    "policies": {
+      "type": "object"
+    },
+    "source": {
+      "type": "object"
+    },
+    "dimensionAuthority": {
+      "type": "object"
+    },
+    "groups": {
+      "type": "array",
+      "minItems": 208,
+      "maxItems": 208,
+      "items": {
+        "$ref": "#/$defs/group"
+      }
+    },
+    "templates": {
+      "type": "array",
+      "minItems": 18,
+      "maxItems": 18
+    },
+    "individualDecisions": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6
+    },
+    "previouslyBlockedInventory": {
+      "type": "array",
+      "minItems": 29,
+      "maxItems": 29,
+      "items": {
+        "$ref": "#/$defs/blocked"
+      }
+    },
+    "specialAssertions": {
+      "type": "object",
+      "required": [
+        "FIX-MT742-010"
+      ],
+      "properties": {
+        "FIX-MT742-010": {
+          "type": "object",
+          "required": [
+            "groupId",
+            "bindingId",
+            "oracleContextCount",
+            "ssiLookup",
+            "ssiRouteCandidateCount",
+            "pass"
+          ],
+          "properties": {
+            "groupId": {
+              "const": "MT742-010"
+            },
+            "bindingId": {
+              "const": "FIX-MT742-010@v1"
+            },
+            "oracleContextCount": {
+              "const": 15
+            },
+            "ssiLookup": {
+              "const": "NOT_PERFORMED"
+            },
+            "ssiRouteCandidateCount": {
+              "const": 0
+            },
+            "pass": {
+              "const": true
+            }
+          }
+        }
+      }
+    },
+    "reconciliation": {
+      "type": "object",
+      "required": [
+        "expected",
+        "actual",
+        "assertions",
+        "controlledStubCounts",
+        "incompletePreviouslyBlockedIds",
+        "allChecksPass"
+      ],
+      "properties": {
+        "expected": {
+          "type": "object"
+        },
+        "actual": {
+          "type": "object"
+        },
+        "assertions": {
+          "type": "object"
+        },
+        "controlledStubCounts": {
+          "type": "object"
+        },
+        "allChecksPass": {
+          "const": true
+        },
+        "incompletePreviouslyBlockedIds": {
+          "type": "array",
+          "maxItems": 0
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sideEffects": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "databaseWrites",
+        "liveServiceCalls",
+        "fixtureMutations",
+        "payloadsGenerated",
+        "confirmedResolutionsCreated",
+        "repairQueueItemsCreated",
+        "auditEventsCreated",
+        "total"
+      ],
+      "properties": {
+        "databaseWrites": {
+          "const": 0
+        },
+        "liveServiceCalls": {
+          "const": 0
+        },
+        "fixtureMutations": {
+          "const": 0
+        },
+        "payloadsGenerated": {
+          "const": 0
+        },
+        "confirmedResolutionsCreated": {
+          "const": 0
+        },
+        "repairQueueItemsCreated": {
+          "const": 0
+        },
+        "auditEventsCreated": {
+          "const": 0
+        },
+        "total": {
+          "const": 0
+        }
+      }
+    },
+    "lookup": {
+      "type": "object",
+      "required": [
+        "contractId",
+        "datasetBoundary",
+        "operationalPickerVisible",
+        "qaOverlayVisible",
+        "candidateLookup",
+        "accountLookup",
+        "execution",
+        "owner",
+        "referenceDataSource",
+        "liveServiceAccessAllowed",
+        "databaseAccessAllowed"
+      ],
+      "properties": {
+        "contractId": {
+          "enum": [
+            "MT347-QA-NEGATIVE-LOOKUP-V1",
+            "MT347-FULL-FIN-EVIDENCE-ONLY-V1"
+          ]
+        },
+        "datasetBoundary": {
+          "const": "QA_NEGATIVE_OVERLAY"
+        },
+        "operationalPickerVisible": {
+          "const": false
+        },
+        "qaOverlayVisible": {
+          "const": true
+        },
+        "candidateLookup": {
+          "enum": [
+            "CONTROLLED_QA_OVERLAY",
+            "NOT_EXECUTED"
+          ]
+        },
+        "accountLookup": {
+          "enum": [
+            "AS_DECLARED_BY_TEST_ORACLE",
+            "NOT_EXECUTED"
+          ]
+        },
+        "execution": {
+          "enum": [
+            "EXECUTE_EXPECTED_REJECT",
+            "EVIDENCE_ONLY"
+          ]
+        },
+        "owner": {
+          "enum": [
+            "SSI_FIELD_RESOLUTION_API",
+            "UPSTREAM_FIN_VALIDATOR"
+          ]
+        },
+        "referenceDataSource": {
+          "const": "CONTROLLED_ARTIFACT_ONLY"
+        },
+        "liveServiceAccessAllowed": {
+          "const": false
+        },
+        "databaseAccessAllowed": {
+          "const": false
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "required": [
+        "sourceFile",
+        "sourceFileSha256",
+        "sourceBindingId",
+        "sourceRecordSha256",
+        "sourceWorkbook",
+        "sourceWorkbookSha256",
+        "memory",
+        "memorySha256",
+        "mrgEvidence",
+        "inputContract",
+        "ownershipContract"
+      ],
+      "properties": {
+        "sourceFile": {
+          "const": "qa/mt347/fixtures/mt347-negative.v1.json"
+        },
+        "sourceFileSha256": {
+          "type": "string",
+          "pattern": "^[A-F0-9]{64}$"
+        },
+        "sourceFixtureId": {
+          "type": "string"
+        },
+        "sourceBindingId": {
+          "type": "string"
+        },
+        "sourceRecordSha256": {
+          "type": "string",
+          "pattern": "^[A-F0-9]{64}$"
+        },
+        "sourceWorkbook": {
+          "type": "string"
+        },
+        "sourceWorkbookSha256": {
+          "type": "string",
+          "pattern": "^[A-F0-9]{64}$"
+        },
+        "memory": {
+          "type": "string"
+        },
+        "memorySha256": {
+          "type": "string",
+          "pattern": "^[A-F0-9]{64}$"
+        },
+        "mrgEvidence": {
+          "type": "string"
+        },
+        "inputContract": {
+          "type": "string"
+        },
+        "ownershipContract": {
+          "type": "string"
+        }
+      }
+    },
+    "variant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "variantKey",
+        "oracleContextKey",
+        "fixtureGroupId",
+        "currency",
+        "bookingEntity",
+        "counterpartyBic",
+        "counterpartyBankServiceId",
+        "direction",
+        "directionPolicy",
+        "routeCandidateExpected",
+        "ssiRouteCandidateKey",
+        "controlledStubIdentity",
+        "sourceType"
+      ],
+      "properties": {
+        "variantKey": {
+          "type": "string",
+          "minLength": 1
+        },
+        "oracleContextKey": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fixtureGroupId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "currency": {
+          "enum": [
+            "USD",
+            "EUR",
+            "GBP",
+            "JPY",
+            "HKD"
+          ]
+        },
+        "bookingEntity": {
+          "const": "HK01"
+        },
+        "counterpartyBic": {
+          "enum": [
+            "DEUTDEFF",
+            "CHASUS33",
+            "BOFAUS3N"
+          ]
+        },
+        "counterpartyBankServiceId": {
+          "enum": [
+            "BANK-SVC-DEUTDEFF",
+            "BANK-SVC-CHASUS33",
+            "BANK-SVC-BOFAUS3N"
+          ]
+        },
+        "direction": {
+          "const": "OUTBOUND"
+        },
+        "directionPolicy": {
+          "const": "DEMO_POLICY_V1"
+        },
+        "routeCandidateExpected": {
+          "type": "boolean"
+        },
+        "ssiRouteCandidateKey": {
+          "type": "string",
+          "minLength": 1
+        },
+        "controlledStubIdentity": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sourceType": {
+          "enum": [
+            "CONTROLLED_VIRTUAL_STUB",
+            "NOT_REQUIRED"
+          ]
+        }
+      }
+    },
+    "group": {
+      "type": "object",
+      "required": [
+        "groupId",
+        "bindingId",
+        "businessStatus",
+        "direction",
+        "lookupContract",
+        "evidenceSource",
+        "expectedOutcome",
+        "reasonCode",
+        "ssiLookup",
+        "ssiRouteRowCount",
+        "ssiRouteCandidateCount",
+        "oracleContextCount",
+        "variantCount",
+        "variants",
+        "controlledStubIdentity",
+        "sourceType",
+        "sideEffects",
+        "resolverOutcome"
+      ],
+      "properties": {
+        "groupId": {
+          "type": "string",
+          "pattern": "^MT[0-9]{3}-[0-9]{3}$"
+        },
+        "bindingId": {
+          "type": "string",
+          "pattern": "^FIX-MT[0-9]{3}-[0-9]{3}@v1$"
+        },
+        "businessStatus": {
+          "enum": [
+            "BA_CONFIRMED",
+            "OUT_OF_SCOPE_CLOSED"
+          ]
+        },
+        "direction": {
+          "const": "OUTBOUND"
+        },
+        "lookupContract": {
+          "$ref": "#/$defs/lookup"
+        },
+        "evidenceSource": {
+          "$ref": "#/$defs/evidence"
+        },
+        "reasonCode": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ssiLookup": {
+          "enum": [
+            "TEST_ORACLE_CONTROLLED",
+            "NOT_PERFORMED"
+          ]
+        },
+        "ssiRouteRowCount": {
+          "enum": [
+            0,
+            15
+          ]
+        },
+        "ssiRouteCandidateCount": {
+          "enum": [
+            0,
+            15
+          ]
+        },
+        "oracleContextCount": {
+          "const": 15
+        },
+        "variantCount": {
+          "const": 15
+        },
+        "variants": {
+          "type": "array",
+          "minItems": 15,
+          "maxItems": 15,
+          "items": {
+            "$ref": "#/$defs/variant"
+          }
+        },
+        "controlledStubIdentity": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sourceType": {
+          "enum": [
+            "CONTROLLED_VIRTUAL_STUB",
+            "NOT_REQUIRED"
+          ]
+        },
+        "sideEffects": {
+          "$ref": "#/$defs/sideEffects"
+        },
+        "resolverOutcome": {
+          "enum": [
+            "FAIL_CLOSED_NO_SSI_OUTPUT",
+            "NOT_EXECUTED_OUT_OF_SCOPE_CLOSED"
+          ]
+        },
+        "expectedOutcome": {
+          "type": "object",
+          "required": [
+            "disposition",
+            "resolverExecution",
+            "resolverOutcome",
+            "finValidation",
+            "demoHttpStatus",
+            "sourceExpectedHttpNote",
+            "payloadGenerated"
+          ],
+          "properties": {
+            "disposition": {
+              "enum": [
+                "EXPECTED_REJECT",
+                "OUT_OF_SCOPE_CLOSED"
+              ]
+            },
+            "resolverExecution": {
+              "enum": [
+                "EXECUTE",
+                "NOT_EXECUTED"
+              ]
+            },
+            "resolverOutcome": {
+              "enum": [
+                "FAIL_CLOSED_NO_SSI_OUTPUT",
+                "NOT_EXECUTED_OUT_OF_SCOPE_CLOSED"
+              ]
+            },
+            "finValidation": {
+              "enum": [
+                "NOT_APPLICABLE",
+                "NOT_EVALUATED"
+              ]
+            },
+            "demoHttpStatus": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "enum": [
+                409,
+                422,
+                null
+              ]
+            },
+            "sourceExpectedHttpNote": {
+              "type": "string",
+              "minLength": 1
+            },
+            "payloadGenerated": {
+              "const": false
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "businessStatus": {
+                "const": "OUT_OF_SCOPE_CLOSED"
+              }
+            },
+            "required": [
+              "businessStatus"
+            ]
+          },
+          "then": {
+            "properties": {
+              "ssiLookup": {
+                "const": "NOT_PERFORMED"
+              },
+              "ssiRouteRowCount": {
+                "const": 0
+              },
+              "ssiRouteCandidateCount": {
+                "const": 0
+              },
+              "resolverOutcome": {
+                "const": "NOT_EXECUTED_OUT_OF_SCOPE_CLOSED"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "ssiRouteRowCount": {
+                "const": 15
+              },
+              "ssiRouteCandidateCount": {
+                "const": 15
+              },
+              "resolverOutcome": {
+                "const": "FAIL_CLOSED_NO_SSI_OUTPUT"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "blocked": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "groupId",
+        "direction",
+        "lookupContract",
+        "evidenceSource",
+        "resolverOutcome",
+        "reasonCode"
+      ],
+      "properties": {
+        "groupId": {
+          "type": "string",
+          "pattern": "^MT[0-9]{3}-[0-9]{3}$"
+        },
+        "direction": {
+          "const": "OUTBOUND"
+        },
+        "lookupContract": {
+          "$ref": "#/$defs/lookup"
+        },
+        "evidenceSource": {
+          "$ref": "#/$defs/evidence"
+        },
+        "resolverOutcome": {
+          "const": "FAIL_CLOSED_NO_SSI_OUTPUT"
+        },
+        "reasonCode": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

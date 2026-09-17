@@ -16,6 +16,7 @@ import {
   EntityApplicationService,
   type EntityCommand,
 } from "../entity/entity-application.service";
+import { Mt347DemoImportValidationProfile } from "./mt347-demo-import-validation.profile";
 export interface ImportRequest {
   dataType: "SSI" | "RMA" | "NOSTRO" | "ENTITY";
   fileName: string;
@@ -43,6 +44,8 @@ export class SwiftDataImportService {
     private readonly rma: RmaApplicationService,
     private readonly nostro: NostroApplicationService,
     private readonly entity: EntityApplicationService,
+    private readonly mt347DemoProfile: Mt347DemoImportValidationProfile =
+      new Mt347DemoImportValidationProfile(),
   ) {}
   import(request: ImportRequest): unknown {
     if (!validEnvelope(request))
@@ -67,7 +70,7 @@ export class SwiftDataImportService {
   ): Record<string, unknown> {
     try {
       if (request.dryRun) {
-        this.validateRecord(request.dataType, record);
+        this.validateDryRunRecord(request.dataType, record);
         return { row: index + 1, status: "VALIDATED" };
       }
       const created = this.createRecord(request.dataType, record);
@@ -79,6 +82,19 @@ export class SwiftDataImportService {
         code: error instanceof Error ? error.message : "UNKNOWN_ERROR",
       };
     }
+  }
+
+  private validateDryRunRecord(
+    dataType: ImportRequest["dataType"],
+    record: unknown,
+  ): void {
+    if (
+      dataType === "SSI" &&
+      this.mt347DemoProfile.validateDryRunIfApplicable(record)
+    ) {
+      return;
+    }
+    this.validateRecord(dataType, record);
   }
 
   private validateRecord(

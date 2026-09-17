@@ -15,6 +15,7 @@ import { NostroApplicationService } from "./nostro/nostro-application.service";
 import { NostroRepository } from "./nostro/nostro.repository";
 import { SwiftDataImportController } from "./imports/swift-data-import.controller";
 import { SwiftDataImportService } from "./imports/swift-data-import.service";
+import { Mt347DemoImportValidationProfile } from "./imports/mt347-demo-import-validation.profile";
 import { EntityController } from "./entity/entity.controller";
 import { EntityApplicationService } from "./entity/entity-application.service";
 import { EntityRepository } from "./entity/entity.repository";
@@ -99,6 +100,7 @@ import {
     EntityApplicationService,
     EntityRepository,
     SwiftDataImportService,
+    Mt347DemoImportValidationProfile,
     MappingCatalogueService,
     FinFieldResolutionPolicy,
     FinFieldResolutionService,

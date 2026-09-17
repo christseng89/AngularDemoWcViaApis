@@ -1,0 +1,18 @@
+{
+  "mode": "DRY_RUN_ZERO_WRITES",
+  "passed": true,
+  "mismatchCount": 0,
+  "databaseWrites": 0,
+  "oracleSha256": "A4A24EDDC0C7E55DCDB3F60CBBDFE189408370D372EE1886F0D5BD9EE4F4D382",
+  "generatedDatasetSha256": "FB8DEAC3DF8F2E84264B902B79EEB22E8A31EC2F424CA59EB930EBD3AF407CCD",
+  "generatedDatasetPath": "C:\\Users\\samfi\\Downloads\\outputs\\lc-ssi-wc\\qa\\FIX_DATA\\ssi\\generated\\mt347-demo-generated.v1.1.json",
+  "reportPath": "C:\\Users\\samfi\\Downloads\\outputs\\lc-ssi-wc\\qa\\FIX_DATA\\ssi\\generated\\mt347-demo-dry-run.v1.1.json",
+  "actual": {
+    "totalGroups": 208,
+    "totalOracleContexts": 3120,
+    "ssiOwnedOracleContexts": 2580,
+    "outOfScopeOracleContexts": 540,
+    "databaseWrites": 0
+  },
+  "mismatches": []
+}

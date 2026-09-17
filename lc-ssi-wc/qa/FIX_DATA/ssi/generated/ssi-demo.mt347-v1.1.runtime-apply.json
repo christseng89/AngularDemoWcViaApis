@@ -1,0 +1,67 @@
+{
+  "result": "PASS",
+  "environment": "DEVELOPMENT_RUNTIME_DB_ONLY",
+  "artifacts": {
+    "baselineSeedSha256": "4F3CC0C491F44591132E3043B7AE2C17845D9A3CCAB1CB42144F7FC4ABD9C03E",
+    "candidateSeedSha256": "5A7A4FCD0EBB32E90351856DA8D6DCF9A0B6819606D73A958EEA9E0A19027E48",
+    "generatedDatasetSha256": "FB8DEAC3DF8F2E84264B902B79EEB22E8A31EC2F424CA59EB930EBD3AF407CCD",
+    "apiDryRun": "CCF8F2A1335DA71B902FE977817E19A75D8A01B5EF5CFC88D11C07B0E731F543",
+    "manifest": "21FC689344312229D67CB589A4A56F9A83455C04E595FB4ED861761ADA269CC0",
+    "preflight": "10A0298D2B15FCE736232AFD7B9DEE9A731B90A2E382ECE5A4EA1900B79052EB"
+  },
+  "database": {
+    "path": "C:\\Users\\samfi\\Downloads\\outputs\\lc-ssi-wc\\data\\ssi-demo.sqlite",
+    "before": {
+      "sha256": "06f61445ecf5725f606f9723c8f464d3e52acc615659e41c937f0ecf2f61a014",
+      "method": "SQLITE_WAL_AWARE_LOGICAL_SNAPSHOT_V1"
+    },
+    "after": {
+      "sha256": "d90ef5bfd9c0d59d12fdf8e8a31fcb4271855dce00a4d61eef8cc1d381367867",
+      "method": "SQLITE_WAL_AWARE_LOGICAL_SNAPSHOT_V1"
+    }
+  },
+  "backup": {
+    "path": "C:\\Users\\samfi\\Downloads\\outputs\\lc-ssi-wc\\qa\\FIX_DATA\\ssi\\generated\\backups\\ssi-demo.pre-mt347-v1.1.20260917.sqlite",
+    "fileSha256": "076933B50873145B4942A2E9AAC67D576B15857DA8819B1ED7EBEC4939B7AE0C",
+    "logicalSha256": "06f61445ecf5725f606f9723c8f464d3e52acc615659e41c937f0ecf2f61a014"
+  },
+  "firstApply": {
+    "inserts": 9720,
+    "updates": 0,
+    "deletes": 0,
+    "ssiInserts": 4860,
+    "applicabilityInserts": 4860
+  },
+  "secondApply": {
+    "inserts": 0,
+    "updates": 0,
+    "deletes": 0,
+    "ssiInserts": 0,
+    "applicabilityInserts": 0
+  },
+  "mt347": {
+    "historicalRows": 5385,
+    "historicalMutations": 0,
+    "versionedSsiRows": 4860,
+    "versionedApplicabilityRows": 4860,
+    "physicalRows": 10245,
+    "positiveRows": 2280,
+    "negativeRows": 2580,
+    "outOfScopeRows": 0
+  },
+  "visibility": {
+    "result": "PASS",
+    "controlledPositiveCandidates": 2280,
+    "controlledNegativeCandidates": 0,
+    "historicalCandidates": 0
+  },
+  "oracleMismatch": 0,
+  "nonTargetMutations": 0,
+  "integrityCheck": "ok",
+  "rollbackAvailable": true,
+  "authorizationBoundary": {
+    "development": true,
+    "uat": false,
+    "production": false
+  }
+}

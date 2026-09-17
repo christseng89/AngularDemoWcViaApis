@@ -14,8 +14,8 @@
 
 **Files:**
 
-- Read: `qa/FIX_DATA/reload-test-data/ssi-demo.v15.4.repaired.canonical.seed.json`
-- Read: `qa/FIX_DATA/reload-test-data/publication-report.json`
+- Read: `qa/FIX_DATA/rma/reload-test-data/ssi-demo.v15.4.repaired.canonical.seed.json`
+- Read: `qa/FIX_DATA/rma/reload-test-data/publication-report.json`
 - Backup: `tmp/gate2-backup/ssi-demo.before-v154.sqlite`
 - Evidence: `tmp/gate2-backup/gate2-evidence.json`
 

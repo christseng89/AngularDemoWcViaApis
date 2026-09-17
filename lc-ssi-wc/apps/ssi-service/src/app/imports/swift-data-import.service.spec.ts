@@ -169,4 +169,43 @@ describe("SwiftDataImportService", () => {
     subject.import(request({ dryRun: true }));
     expect(ssi.validate).toHaveBeenCalledTimes(2);
   });
+
+  it("uses the controlled MT347 profile only for dry-run validation", () => {
+    const previous = process.env["SSI_RUNTIME_ENV"];
+    process.env["SSI_RUNTIME_ENV"] = "demo";
+    try {
+      const context = harness();
+      const controlled = {
+        counterpartyId: "MT347-CHASUS33",
+        fixtureFamily: "MT347-SR2026-SSI",
+        fixtureVariantVersion: "MT347-DEMO-ORACLE-V1.1",
+        maker: "maker.mt347",
+        operationalVisible: false,
+        paymentExecutable: false,
+        scope: "STANDING",
+        usageScope: "QA_POSITIVE",
+        route: {
+          bookingEntity: "HK01",
+          counterpartyBic: "CHASUS33",
+          currency: "USD",
+          importValidationProfile: "MT347_DEMO_FIN_REFERENCE_ONLY_V1",
+          oracleBusinessStatus: "BA_CONFIRMED",
+          oracleContextKey: "MT300-001::USD::CHASUS33::HK01::OUTBOUND",
+          oracleReasonCode: "REFERENCE_ROUTE_VALID",
+          paymentExecutable: "false",
+          profileKind: "FIN_REFERENCE_ONLY",
+          settlementModel: "FIN_REFERENCE_ONLY",
+        },
+      };
+      const result = context.subject.import(
+        request({ dryRun: true, records: [controlled] }),
+      );
+      expect(result).toMatchObject({ accepted: 1, rejected: 0 });
+      expect(context.ssi.validate).not.toHaveBeenCalled();
+      expect(context.ssi.create).not.toHaveBeenCalled();
+    } finally {
+      if (previous === undefined) delete process.env["SSI_RUNTIME_ENV"];
+      else process.env["SSI_RUNTIME_ENV"] = previous;
+    }
+  });
 });

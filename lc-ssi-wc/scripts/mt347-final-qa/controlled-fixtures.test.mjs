@@ -82,7 +82,7 @@ test("canonical seed contains every executable MT347 binding and excludes scope 
   const positive = readJson("qa/mt347/fixtures/mt347-positive.v1.json").records;
   const negative = readJson("qa/mt347/fixtures/mt347-negative.v1.json").records;
   const seed = readJson(
-    "qa/FIX_DATA/reload-test-data/ssi-demo.v15.8.pacs009-repaired-isolated.canonical.seed.json",
+    "qa/FIX_DATA/rma/reload-test-data/ssi-demo.v15.8.pacs009-repaired-isolated.canonical.seed.json",
   );
   const payloads = (table) =>
     seed.tables[table].rows.map((row) =>
@@ -233,7 +233,7 @@ test("canonical role ownership follows the governed FIN profile", () => {
 
 test("transaction-owned roles are kept outside standing SSI route data", () => {
   const seed = readJson(
-    "qa/FIX_DATA/reload-test-data/ssi-demo.v15.8.pacs009-repaired-isolated.canonical.seed.json",
+    "qa/FIX_DATA/rma/reload-test-data/ssi-demo.v15.8.pacs009-repaired-isolated.canonical.seed.json",
   );
   const payloads = (table) =>
     seed.tables[table].rows.map((row) =>
@@ -288,7 +288,7 @@ test("transaction-owned roles are kept outside standing SSI route data", () => {
 
 test("MT300-001 offers three governed SSI counterparties in each controlled currency", () => {
   const seed = readJson(
-    "qa/FIX_DATA/reload-test-data/ssi-demo.v15.8.pacs009-repaired-isolated.canonical.seed.json",
+    "qa/FIX_DATA/rma/reload-test-data/ssi-demo.v15.8.pacs009-repaired-isolated.canonical.seed.json",
   );
   const payloads = (table) =>
     seed.tables[table].rows.map((row) =>

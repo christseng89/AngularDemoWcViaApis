@@ -21,7 +21,7 @@ DEFAULT_SOURCE = (
 )
 DEFAULT_SEED = (
     ROOT
-    / "qa/FIX_DATA/reload-test-data/ssi-demo.v15.8.pacs009-repaired-isolated.canonical.seed.json"
+    / "qa/FIX_DATA/rma/reload-test-data/ssi-demo.v15.8.pacs009-repaired-isolated.canonical.seed.json"
 )
 DEFAULT_TARGET = ROOT / "data/ssi-demo.sqlite"
 IDENTITY_METHOD = "SQLITE_WAL_AWARE_LOGICAL_SNAPSHOT_V1"

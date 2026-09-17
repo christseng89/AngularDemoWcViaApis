@@ -1,0 +1,74 @@
+{
+  "fixtureId": "SSI-DEMO-V15.8-PACS009-REPAIRED-ISOLATED-CANONICAL",
+  "publishedAt": "2026-09-17T00:00:00.000Z",
+  "source": {
+    "path": "tmp/gate2-backup/ssi-demo.before-v154.sqlite",
+    "logicalSha256": "FC8AADC668EFC2C65053B7F302752D50E32F59EDA8A64C060B469940E99B4CA5",
+    "mutation": "NONE_OFFLINE_COPY_ONLY"
+  },
+  "rmaRepair": {
+    "activeBefore": 5484,
+    "activeAfter": 45,
+    "activeCanonicalGroups": 43,
+    "eligibleCanonicalGroupsRepaired": 41,
+    "supersededRecords": 5480,
+    "convertedMessageTypeOccurrences": 65,
+    "conversionBreakdown": {
+      "pacs.008.001.12_to_pacs.008.001.08": 28,
+      "pacs.009.001.12_to_pacs.009.001.08": 37
+    },
+    "excludedMessageTypeOccurrences": 138,
+    "developmentReferenceGap": {
+      "groupsSkipped": 2,
+      "recordsSkipped": 4,
+      "counterpartyBic": "PCBCCNBJ"
+    }
+  },
+  "fixtureIsolation": {
+    "removedRows": 11,
+    "finalActiveRmaRows": 44,
+    "finalOperationalPacs009DeltaGroups": 36,
+    "removedByTable": {
+      "nostro_account": 4,
+      "outbox": 1,
+      "rma_authorisation": 2,
+      "ssi": 2,
+      "ssi_applicability": 2
+    },
+    "derivedQaRmaRows": 0,
+    "orphanSsiApplicabilityRows": 0,
+    "pendingQaOutboxRows": 0,
+    "retainedLocation": "qa/QA_ARCHIVE and controlled QA overlays"
+  },
+  "tableDelta": {
+    "audit_event": { "before": 2235, "after": 2235 },
+    "audit_event_archive": { "before": 0, "after": 0 },
+    "booking_branch_entity": { "before": 33, "after": 33 },
+    "booking_branch_entity_audit": { "before": 104, "after": 104 },
+    "inbox": { "before": 0, "after": 0 },
+    "nostro_account": { "before": 2123, "after": 2119 },
+    "nostro_audit_event": { "before": 1308, "after": 1308 },
+    "outbox": { "before": 2076, "after": 2075 },
+    "rma_audit_event": { "before": 1082, "after": 6603 },
+    "rma_authorisation": { "before": 5618, "after": 5657 },
+    "ssi": { "before": 5728, "after": 5726 },
+    "ssi_applicability": { "before": 5975, "after": 5973 },
+    "swift_data_outbox": { "before": 2182, "after": 2182 }
+  },
+  "verification": {
+    "unexpectedRemovedIds": 0,
+    "knownDuplicateGroups": 0,
+    "knownPacs00800112": 0,
+    "eligiblePacs00900112": 0,
+    "developmentReferenceGapPacs00900112": 2,
+    "knownPacs00900112CovConverted": 0,
+    "knownMt700": 0,
+    "sqliteIntegrity": "ok"
+  },
+  "identity": {
+    "method": "SQLITE_WAL_AWARE_LOGICAL_SNAPSHOT_V1",
+    "logicalSha256": "06F61445ECF5725F606F9723C8F464D3E52ACC615659E41C937F0ECF2F61A014",
+    "seedSha256": "4F3CC0C491F44591132E3043B7AE2C17845D9A3CCAB1CB42144F7FC4ABD9C03E",
+    "verificationDatabasePhysicalSha256": "A2D0119610DEE23650021F96E907CDBFF32AEC55CC086880764DE71556C24FA6"
+  }
+}

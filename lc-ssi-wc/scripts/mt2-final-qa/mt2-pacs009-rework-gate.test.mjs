@@ -9,7 +9,7 @@ const contract = JSON.parse(
 
 const canonicalSeed = JSON.parse(
   fs.readFileSync(
-    "qa/FIX_DATA/reload-test-data/ssi-demo.v15.8.pacs009-repaired-isolated.canonical.seed.json",
+    "qa/FIX_DATA/rma/reload-test-data/ssi-demo.v15.8.pacs009-repaired-isolated.canonical.seed.json",
     "utf8",
   ),
 );
