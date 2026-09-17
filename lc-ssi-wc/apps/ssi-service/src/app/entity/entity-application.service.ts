@@ -21,6 +21,9 @@ export type EntityCommand = Pick<
 @Injectable()
 export class EntityApplicationService {
   constructor(private readonly repository: EntityRepository) {}
+  validateCommand(command: EntityCommand): void {
+    this.validate(command);
+  }
   list(status?: string) {
     return this.repository.list(status);
   }

@@ -52,13 +52,43 @@ describe("RMA supported message-type catalogue", () => {
     expect(policy.supportedMessageTypes).not.toContain("pacs.008.001.12");
   });
 
-  it("exposes the governed legacy conversion separately from supported scope", () => {
-    expect(policy.legacyConversions).toEqual([
-      expect.objectContaining({
-        from: "pacs.008.001.12",
-        to: "pacs.008.001.08",
-      }),
+  it("exposes one governed presentation catalogue for the directional selector", () => {
+    expect(policy.categories.map(({ categoryId }) => categoryId)).toEqual([
+      "SECURITY",
+      "TRADE_FINANCE",
+      "PAYMENT",
     ]);
+    expect(policy.items.map(({ messageType }) => messageType)).toEqual(
+      policy.supportedMessageTypes,
+    );
+    expect(
+      policy.items.every(
+        ({ description, directionApplicability }) =>
+          description.trim().length > 0 &&
+          directionApplicability.inbound.applicable &&
+          directionApplicability.outbound.applicable,
+      ),
+    ).toBe(true);
+  });
+
+  it("exposes governed CBPR+ legacy conversions separately from supported scope", () => {
+    expect(policy.legacyConversions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          from: "pacs.008.001.12",
+          to: "pacs.008.001.08",
+        }),
+        expect.objectContaining({
+          from: "pacs.009.001.12",
+          to: "pacs.009.001.08",
+        }),
+      ]),
+    );
+    expect(policy.legacyConversions).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ from: "pacs.009.001.12.COV" }),
+      ]),
+    );
   });
 
   it("exposes only the approved development reference-gap groups", () => {

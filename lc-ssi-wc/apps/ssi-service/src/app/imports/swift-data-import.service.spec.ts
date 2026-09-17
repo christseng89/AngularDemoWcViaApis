@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import type { NostroApplicationService } from "../nostro/nostro-application.service";
 import type { RmaApplicationService } from "../rma/rma-application.service";
 import type { SsiApplicationService } from "../ssi-application.service";
+import type { EntityApplicationService } from "../entity/entity-application.service";
 import {
   SwiftDataImportService,
   type ImportRequest,
@@ -31,15 +32,21 @@ const harness = () => {
     validateCommand: jest.fn(),
     create: jest.fn(() => ({ id: "NOSTRO-1" })),
   };
+  const entity = {
+    validateCommand: jest.fn(),
+    create: jest.fn(() => ({ id: "ENTITY-1" })),
+  };
   return {
     subject: new SwiftDataImportService(
       ssi as unknown as SsiApplicationService,
       rma as unknown as RmaApplicationService,
       nostro as unknown as NostroApplicationService,
+      entity as unknown as EntityApplicationService,
     ),
     ssi,
     rma,
     nostro,
+    entity,
   };
 };
 
@@ -88,6 +95,7 @@ describe("SwiftDataImportService", () => {
   it.each([
     ["RMA", "RMA-1"],
     ["NOSTRO", "NOSTRO-1"],
+    ["ENTITY", "ENTITY-1"],
   ] as const)(
     "dispatches %s creation to its application service",
     (dataType, id) => {
@@ -101,7 +109,7 @@ describe("SwiftDataImportService", () => {
     },
   );
 
-  it.each(["SSI", "RMA", "NOSTRO"] as const)(
+  it.each(["SSI", "RMA", "NOSTRO", "ENTITY"] as const)(
     "validates %s dry runs without creating records",
     (dataType) => {
       const context = harness();
@@ -117,6 +125,7 @@ describe("SwiftDataImportService", () => {
       expect(context.ssi.create).not.toHaveBeenCalled();
       expect(context.rma.create).not.toHaveBeenCalled();
       expect(context.nostro.create).not.toHaveBeenCalled();
+      expect(context.entity.create).not.toHaveBeenCalled();
     },
   );
 

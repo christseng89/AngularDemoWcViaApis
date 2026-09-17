@@ -19,7 +19,10 @@ DEFAULT_SOURCE = (
     ROOT
     / "qa/mt2/mt2-final/fixtures/overlays/ssi-demo.v15.3-unified-qa-uat.sqlite"
 )
-DEFAULT_SEED = ROOT / "fixtures/ssi-demo.v15.3.canonical.seed.json"
+DEFAULT_SEED = (
+    ROOT
+    / "qa/FIX_DATA/reload-test-data/ssi-demo.v15.8.pacs009-repaired-isolated.canonical.seed.json"
+)
 DEFAULT_TARGET = ROOT / "data/ssi-demo.sqlite"
 IDENTITY_METHOD = "SQLITE_WAL_AWARE_LOGICAL_SNAPSHOT_V1"
 
@@ -102,6 +105,7 @@ def export_seed(
     source_path: Path,
     seed_path: Path,
     fixture_id: str = "SSI-DEMO-V15.3-CANONICAL",
+    source_label: str | None = None,
 ) -> dict[str, Any]:
     source = sqlite3.connect(f"file:{source_path.as_posix()}?mode=ro", uri=True)
     try:
@@ -143,7 +147,7 @@ def export_seed(
         "warning": "Fictional test data only. Never use for production payments.",
         "identityMethod": IDENTITY_METHOD,
         "source": {
-            "path": source_path.relative_to(ROOT).as_posix(),
+            "path": source_label or source_path.relative_to(ROOT).as_posix(),
             "logicalSha256": logical_sha,
         },
         "schema": schema_objects,
@@ -227,12 +231,21 @@ def main() -> None:
     export_parser = subparsers.add_parser("export")
     export_parser.add_argument("--source", type=Path, default=DEFAULT_SOURCE)
     export_parser.add_argument("--seed", type=Path, default=DEFAULT_SEED)
+    export_parser.add_argument("--source-label")
+    export_parser.add_argument(
+        "--fixture-id", default="SSI-DEMO-V15.8-PACS009-REPAIRED-ISOLATED-CANONICAL"
+    )
     rebuild_parser = subparsers.add_parser("rebuild")
     rebuild_parser.add_argument("--seed", type=Path, default=DEFAULT_SEED)
     rebuild_parser.add_argument("--target", type=Path, default=DEFAULT_TARGET)
     args = parser.parse_args()
     result = (
-        export_seed(args.source.resolve(), args.seed.resolve())
+        export_seed(
+            args.source.resolve(),
+            args.seed.resolve(),
+            args.fixture_id,
+            args.source_label,
+        )
         if args.command == "export"
         else rebuild(args.seed.resolve(), args.target.resolve())
     )

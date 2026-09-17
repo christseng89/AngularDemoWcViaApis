@@ -128,6 +128,56 @@ const fakeHttp = {
       });
     if (url.includes("/reference/currencies"))
       return of([{ code: "USD", decimals: 2, standard: "ISO 4217" }]);
+    if (url.includes("/rma-authorisations/message-type-policy"))
+      return of({
+        supportedMessageTypes: ["MT300", "pacs.009.001.08"],
+        categories: [
+          {
+            categoryId: "SECURITY",
+            displayName: "Security",
+            displayOrder: 10,
+            emptyStateText: "No Security messages",
+          },
+          {
+            categoryId: "TRADE_FINANCE",
+            displayName: "Trade Finance",
+            displayOrder: 20,
+            emptyStateText: "No Trade Finance messages",
+          },
+          {
+            categoryId: "PAYMENT",
+            displayName: "Payment",
+            displayOrder: 30,
+            emptyStateText: "No Payment messages",
+          },
+        ],
+        items: [
+          {
+            messageType: "MT300",
+            description: "Foreign Exchange Confirmation",
+            categoryId: "SECURITY",
+            directionApplicability: {
+              inbound: { applicable: true },
+              outbound: { applicable: true },
+            },
+          },
+          {
+            messageType: "pacs.009.001.08",
+            description: "Financial Institution Credit Transfer",
+            categoryId: "PAYMENT",
+            directionApplicability: {
+              inbound: { applicable: true },
+              outbound: { applicable: true },
+            },
+          },
+        ],
+      });
+    if (url.includes("/rma-authorisations/pair-state"))
+      return of({
+        ownBic: "DEMOHKHHXXX",
+        counterpartyBic: "CHASUS33XXX",
+        directions: { INBOUND: null, OUTBOUND: null },
+      });
     if (url.includes("/rma-authorisations/message-types"))
       return of(["MT202", "pacs.009.001.08"]);
     if (url.includes("/settlements/message-index")) return of({ items: [] });
@@ -2068,6 +2118,7 @@ describe("portal component behavior", () => {
       description: "Relationship management",
       columns: [
         { path: "id", label: "ID" },
+        { path: "messageTypes", label: "Messages" },
         {
           paths: ["route.currency", "status"],
           separator: " / ",
@@ -2121,6 +2172,13 @@ describe("portal component behavior", () => {
     await component.chooseResource("rma");
     component.startCreate();
     expect(component.model).toMatchObject({ id: "ROW-1" });
+    const addMessageTypeField = component
+      .fields()
+      .find((field) => field.key === "messageTypes")!;
+    const messageTypeOperation = addMessageTypeField.props?.[
+      "messageTypeOperation"
+    ] as () => "ADD" | "EDIT";
+    expect(messageTypeOperation()).toBe("ADD");
     const row = {
       id: "ROW-1",
       status: "DRAFT",
@@ -2129,14 +2187,14 @@ describe("portal component behavior", () => {
       route: { currency: "USD" },
     };
     component.rows.set([row]);
-    component.view(row);
+    await component.view(row);
     const preventDefault = jest.fn();
-    component.openRowFromKeyboard(
+    await component.openRowFromKeyboard(
       { key: "Enter", preventDefault } as KeyboardEvent,
       row,
     );
     expect(preventDefault).toHaveBeenCalled();
-    component.openRowFromKeyboard(
+    await component.openRowFromKeyboard(
       { key: "Escape", preventDefault } as KeyboardEvent,
       row,
     );
@@ -2171,7 +2229,8 @@ describe("portal component behavior", () => {
         model: { route: { beneficiarySource: "TRANSACTION" } },
       }),
     ).toBe(true);
-    component.edit(row);
+    await component.edit(row);
+    expect(messageTypeOperation()).toBe("EDIT");
     component.model = {
       id: "ROW-1",
       route: { currency: "USD" },
@@ -2207,10 +2266,21 @@ describe("portal component behavior", () => {
       component.value({ ...row, scope: "TRANSACTION_ONLY" }, "scope"),
     ).toBe("TRANSACTION_SPECIFIC");
     expect(component.value({ ...row, list: ["A", "B"] }, "list")).toBe("A, B");
-    expect(component.columnValue(row, resource.columns[1]!)).toBe(
+    expect(
+      component.rmaMessagePreview({
+        ...row,
+        messageTypes: ["MT103", "MT202", "pacs.008.001.08"],
+      }),
+    ).toEqual(["MT103", "MT202", "..."]);
+    expect(
+      component.rmaMessagePreview({ ...row, messageTypes: ["MT103", "MT202"] }),
+    ).toEqual(["MT103", "MT202"]);
+    expect(component.isRmaMessageColumn(resource.columns[1]!)).toBe(true);
+    expect(component.columnValue(row, resource.columns[1]!)).toBe("—");
+    expect(component.columnValue(row, resource.columns[2]!)).toBe(
       "USD / DRAFT",
     );
-    expect(component.columnPath(resource.columns[1]!)).toBe("route.currency");
+    expect(component.columnPath(resource.columns[2]!)).toBe("route.currency");
     component.movePage(5);
     component.rows.set([row, { ...row, id: "ROW-2", version: 2 }]);
     component.setStatusFilter("ALL");
@@ -2301,8 +2371,50 @@ describe("portal component behavior", () => {
           { label: "MT300", value: "MT300" },
           { label: "pacs.009.001.08", value: "pacs.009.001.08" },
         ],
+        messageTypeCategories: [
+          {
+            categoryId: "SECURITY",
+            displayName: "Security",
+            displayOrder: 10,
+            emptyStateText: "No Security messages",
+          },
+          {
+            categoryId: "PAYMENT",
+            displayName: "Payment",
+            displayOrder: 30,
+            emptyStateText: "No Payment messages",
+          },
+        ],
+        messageTypeItems: [
+          {
+            messageType: "MT300",
+            description: "Foreign Exchange Confirmation",
+            categoryId: "SECURITY",
+            directionApplicability: {
+              inbound: { applicable: true },
+              outbound: { applicable: true },
+            },
+          },
+          {
+            messageType: "pacs.009.001.08",
+            description: "Financial Institution Credit Transfer",
+            categoryId: "PAYMENT",
+            directionApplicability: {
+              inbound: { applicable: true },
+              outbound: { applicable: true },
+            },
+          },
+        ],
+        messageTypeSelectionForDirection: (
+          _model: Record<string, unknown>,
+          direction: "INBOUND" | "OUTBOUND",
+        ) => (direction === "INBOUND" ? ["pacs.009.001.08"] : []),
       },
     });
+    Object.defineProperty(tags, "field", {
+      value: { model: { direction: "OUTBOUND" } },
+    });
+    expect(tags.operationButtonLabel).toBe("Edit");
     expect(tags.isSelected("MT300")).toBe(true);
     tags.query.set("pacs");
     expect(tags.visibleOptions.map(({ value }) => value)).toEqual([
@@ -2310,6 +2422,25 @@ describe("portal component behavior", () => {
     ]);
     tags.toggle("pacs.009.001.08");
     expect(messageTypeValue).toBe("MT300, pacs.009.001.08");
+    tags.openPicker();
+    expect(tags.categories.map(({ displayName }) => displayName)).toEqual([
+      "Security",
+      "Payment",
+    ]);
+    expect(tags.categoryItems.map(({ messageType }) => messageType)).toEqual([
+      "MT300",
+    ]);
+    expect(tags.directionEditable("OUTBOUND")).toBe(true);
+    expect(tags.directionEditable("INBOUND")).toBe(false);
+    expect(tags.directionAccessLabel("INBOUND")).toContain("Locked");
+    tags.toggleDirection("INBOUND", "MT300");
+    expect(tags.isDirectionSelected("INBOUND", "pacs.009.001.08")).toBe(true);
+    expect(tags.isDirectionSelected("INBOUND", "MT300")).toBe(false);
+    expect(tags.isDirectionSelected("OUTBOUND", "MT300")).toBe(true);
+    tags.toggleDirection("OUTBOUND", "MT300");
+    expect(tags.isDirectionSelected("OUTBOUND", "MT300")).toBe(false);
+    tags.resetPicker();
+    expect(tags.isDirectionSelected("OUTBOUND", "MT300")).toBe(true);
   });
 
   it("fails closed for SWIFT Data service errors and malformed imports", async () => {

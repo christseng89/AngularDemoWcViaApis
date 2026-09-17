@@ -146,6 +146,16 @@
   display: block;
   white-space: nowrap;
 }
+.rma-message-preview {
+  display: grid;
+  gap: 2px;
+  min-width: 8.5rem;
+  line-height: 1.25;
+}
+.rma-message-preview > span {
+  display: block;
+  white-space: nowrap;
+}
 .workflow-action-cell button,
 .edit-action-cell button,
 .revoke-action-cell button {

@@ -476,6 +476,14 @@ class BffController {
   rmaMessageTypePolicy(): Promise<unknown> {
     return forwardSsi("rma-authorisations/message-type-policy");
   }
+  @Get("rma-authorisations/pair-state")
+  rmaPairState(
+    @Query("ownBic") ownBic: string,
+    @Query("counterpartyBic") counterpartyBic: string,
+  ): Promise<unknown> {
+    const query = new URLSearchParams({ ownBic, counterpartyBic });
+    return forwardSsi(`rma-authorisations/pair-state?${query.toString()}`);
+  }
   @Post("rma-authorisations/check") checkRma(
     @Body() body: unknown,
   ): Promise<unknown> {

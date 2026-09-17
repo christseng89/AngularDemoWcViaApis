@@ -10,6 +10,9 @@ export function readonlyFormFields(
       disabled: true,
       readonly: true,
       showPicker: false,
+      ...(field.type === "multicheckbox"
+        ? { messageTypeOperation: "INQUIRE" }
+        : {}),
     },
     expressions: {
       ...field.expressions,

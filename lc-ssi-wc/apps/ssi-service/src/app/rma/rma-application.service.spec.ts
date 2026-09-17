@@ -61,6 +61,11 @@ const repository = (records: RmaRecord[] = []) => {
   const value = {
     list: jest.fn(() => records),
     findAuthorised: jest.fn(() => records),
+    findActivePair: jest.fn((ownBic: string, counterpartyBic: string) => ({
+      ownBic,
+      counterpartyBic,
+      directions: { INBOUND: null, OUTBOUND: null },
+    })),
     find: jest.fn((id: string) => records.find((item) => item.id === id)),
     save: jest.fn((item: RmaRecord) => {
       saved.push(item);
@@ -101,6 +106,21 @@ const command = () => ({
 });
 
 describe("RmaApplicationService lifecycle", () => {
+  it("loads exact pair state with canonical BIC11 identities", () => {
+    const repo = repository();
+    expect(
+      new RmaApplicationService(repo.value).pairState("DEMOHKHH", "CITIUS33"),
+    ).toEqual({
+      ownBic: "DEMOHKHHXXX",
+      counterpartyBic: "CITIUS33XXX",
+      directions: { INBOUND: null, OUTBOUND: null },
+    });
+    expect(repo.value.findActivePair).toHaveBeenCalledWith(
+      "DEMOHKHHXXX",
+      "CITIUS33XXX",
+    );
+  });
+
   it("compares an edited Message Type set without changing the original", () => {
     expect(
       compareRmaMessageTypes(

@@ -43,6 +43,12 @@ export interface RmaAuthorisationQuery {
   fixtureBindingId?: string;
 }
 
+export interface RmaPairState {
+  ownBic: string;
+  counterpartyBic: string;
+  directions: Record<RmaDirection, RmaRecord | null>;
+}
+
 @Injectable()
 export class RmaRepository extends SqliteGovernedRepository<RmaRecord> {
   constructor() {
@@ -95,6 +101,50 @@ export class RmaRepository extends SqliteGovernedRepository<RmaRecord> {
       wildcardStatement.sql,
       ...wildcardStatement.parameters,
     );
+  }
+
+  findActivePair(ownBic: string, counterpartyBic: string): RmaPairState {
+    const records = this.selectPayloads(
+      `SELECT payload FROM rma_authorisation
+       WHERE json_extract(payload,'$.status')='ACTIVE'
+         AND upper(CASE WHEN length(trim(json_extract(payload,'$.ownBic')))=8
+           THEN trim(json_extract(payload,'$.ownBic')) || 'XXX'
+           ELSE trim(json_extract(payload,'$.ownBic')) END)=?
+         AND upper(CASE WHEN length(trim(json_extract(payload,'$.counterpartyBic')))=8
+           THEN trim(json_extract(payload,'$.counterpartyBic')) || 'XXX'
+           ELSE trim(json_extract(payload,'$.counterpartyBic')) END)=?
+       ORDER BY updated_at DESC, id DESC`,
+      ownBic,
+      counterpartyBic,
+    );
+    const merge = (direction: RmaDirection): RmaRecord | null => {
+      const matches = records.filter(
+        (record) => record.direction === direction,
+      );
+      const representative = matches[0];
+      if (!representative) return null;
+      const messageTypes = [
+        ...new Set(matches.flatMap((record) => record.messageTypes)),
+      ];
+      const hasFin = messageTypes.some((value) => value.startsWith("MT"));
+      const hasFinPlus = messageTypes.some((value) =>
+        value.startsWith("pacs."),
+      );
+      return {
+        ...representative,
+        messageTypes,
+        service:
+          hasFin && hasFinPlus ? "FIN / FINPLUS" : hasFin ? "FIN" : "FINPLUS",
+      };
+    };
+    return {
+      ownBic,
+      counterpartyBic,
+      directions: {
+        INBOUND: merge("INBOUND"),
+        OUTBOUND: merge("OUTBOUND"),
+      },
+    };
   }
 
   listIndexPage(request: PageRequest): PagedResult<RmaRecord> {

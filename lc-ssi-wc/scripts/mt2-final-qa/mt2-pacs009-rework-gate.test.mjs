@@ -8,7 +8,10 @@ const contract = JSON.parse(
 );
 
 const canonicalSeed = JSON.parse(
-  fs.readFileSync("fixtures/ssi-demo.v15.3.canonical.seed.json", "utf8"),
+  fs.readFileSync(
+    "qa/FIX_DATA/reload-test-data/ssi-demo.v15.8.pacs009-repaired-isolated.canonical.seed.json",
+    "utf8",
+  ),
 );
 const mt2FixtureManifest = JSON.parse(
   fs.readFileSync(
@@ -130,7 +133,7 @@ test("canonical QA and UI data provides three resolvable MT2 SSI paths per curre
   const rmas = seedPayloads("rma_authorisation").filter(
     (record) =>
       record.status === "ACTIVE" &&
-      record.service === "FINPLUS" &&
+      ["FINPLUS", "FIN / FINPLUS"].includes(record.service) &&
       record.direction === "OUTBOUND" &&
       record.messageTypes.includes("pacs.009.001.08") &&
       record.validFrom.slice(0, 10) <= effectiveDate &&

@@ -13,6 +13,27 @@ interface RmaScopeDocument {
   }[];
   readonly legacyConversions: readonly LegacyMessageTypeConversion[];
   readonly developmentReferenceGapSkips: readonly DevelopmentReferenceGapSkip[];
+  readonly presentation: {
+    readonly categories: readonly RmaMessageCategory[];
+    readonly items: readonly RmaMessagePolicyItem[];
+  };
+}
+
+export interface RmaMessageCategory {
+  readonly categoryId: "SECURITY" | "TRADE_FINANCE" | "PAYMENT";
+  readonly displayName: string;
+  readonly displayOrder: number;
+  readonly emptyStateText: string;
+}
+
+export interface RmaMessagePolicyItem {
+  readonly messageType: string;
+  readonly description: string;
+  readonly categoryId: RmaMessageCategory["categoryId"];
+  readonly directionApplicability: {
+    readonly inbound: { readonly applicable: boolean };
+    readonly outbound: { readonly applicable: boolean };
+  };
 }
 
 interface PaymentMessageIndex {
@@ -60,16 +81,42 @@ export interface DevelopmentReferenceGapSkip {
 
 export class RmaMessageScopePolicy {
   public readonly supportedMessageTypes: readonly string[];
+  public readonly categories: readonly RmaMessageCategory[];
+  public readonly items: readonly RmaMessagePolicyItem[];
   public readonly legacyConversions: readonly LegacyMessageTypeConversion[];
   public readonly developmentReferenceGapSkips: readonly DevelopmentReferenceGapSkip[];
 
   constructor(input: {
     supportedMessageTypes: Iterable<string>;
+    categories: readonly RmaMessageCategory[];
+    items: readonly RmaMessagePolicyItem[];
     legacyConversions: readonly LegacyMessageTypeConversion[];
     developmentReferenceGapSkips: readonly DevelopmentReferenceGapSkip[];
   }) {
     this.supportedMessageTypes = Object.freeze(
       [...new Set(input.supportedMessageTypes)].sort(),
+    );
+    this.categories = Object.freeze(
+      input.categories
+        .map((category) => Object.freeze({ ...category }))
+        .sort((left, right) => left.displayOrder - right.displayOrder),
+    );
+    this.items = Object.freeze(
+      input.items
+        .map((item) =>
+          Object.freeze({
+            ...item,
+            directionApplicability: Object.freeze({
+              inbound: Object.freeze({
+                ...item.directionApplicability.inbound,
+              }),
+              outbound: Object.freeze({
+                ...item.directionApplicability.outbound,
+              }),
+            }),
+          }),
+        )
+        .sort((left, right) => left.messageType.localeCompare(right.messageType)),
     );
     this.legacyConversions = Object.freeze(
       input.legacyConversions.map((item) => Object.freeze({ ...item })),
@@ -117,8 +164,11 @@ export class RmaSupportedMessageTypeCatalogue {
         throw new Error(`INVALID_RMA_LEGACY_CONVERSION:${conversion.from}`);
       }
     }
+    this.validatePresentation(scope, supported);
     return new RmaMessageScopePolicy({
       supportedMessageTypes: supported,
+      categories: scope.presentation.categories,
+      items: scope.presentation.items,
       legacyConversions: scope.legacyConversions,
       developmentReferenceGapSkips: scope.developmentReferenceGapSkips,
     });
@@ -135,6 +185,9 @@ export class RmaSupportedMessageTypeCatalogue {
       !Array.isArray(scope.baseProfiles) ||
       !Array.isArray(scope.legacyConversions) ||
       !Array.isArray(scope.developmentReferenceGapSkips) ||
+      !scope.presentation ||
+      !Array.isArray(scope.presentation.categories) ||
+      !Array.isArray(scope.presentation.items) ||
       !scope.developmentReferenceGapSkips.every(
         (item) =>
           /^([A-Z0-9]{11})\|([A-Z0-9]{11})\|(INBOUND|OUTBOUND)$/.test(
@@ -145,6 +198,36 @@ export class RmaSupportedMessageTypeCatalogue {
       )
     ) {
       throw new Error("INVALID_RMA_MESSAGE_SCOPE_PARAMETER");
+    }
+  }
+
+  private validatePresentation(
+    scope: RmaScopeDocument,
+    supported: ReadonlySet<string>,
+  ): void {
+    const categories = scope.presentation.categories;
+    const items = scope.presentation.items;
+    const categoryIds = categories.map(({ categoryId }) => categoryId);
+    const expectedCategories = ["SECURITY", "TRADE_FINANCE", "PAYMENT"];
+    const itemTypes = items.map(({ messageType }) => messageType.trim());
+    if (
+      categoryIds.join("|") !== expectedCategories.join("|") ||
+      new Set(categoryIds).size !== categoryIds.length ||
+      new Set(itemTypes).size !== itemTypes.length ||
+      itemTypes.length !== supported.size ||
+      itemTypes.some((messageType) => !supported.has(messageType)) ||
+      [...supported].some((messageType) => !itemTypes.includes(messageType)) ||
+      items.some(
+        (item) =>
+          !categoryIds.includes(item.categoryId) ||
+          !item.description.trim() ||
+          typeof item.directionApplicability?.inbound?.applicable !==
+            "boolean" ||
+          typeof item.directionApplicability?.outbound?.applicable !==
+            "boolean",
+      )
+    ) {
+      throw new Error("INVALID_RMA_MESSAGE_PRESENTATION_PARAMETER");
     }
   }
 

@@ -12,6 +12,14 @@
 - A unified TypeScript audit must be able to read SSI, RMA, Nostro, and Entities through APIs, write one consolidated error log, and classify each issue as ignore-on-load, safe Draft update, governed revision required, or report-only.
 - Automated repair stops at Draft. Submit and Approve remain explicit Maker／Checker actions.
 
+## UI design review gate
+
+- Every participant who proposes, reviews, tests, or implements an SSI-related maintenance screen must first read the applicable current files under `memory/`. This includes Maker, Engineer, BA, Independent BA, QA, and UX roles.
+- Screen design review is limited to at most three review rounds. Each round records the reviewed design, applicable Memory decisions, concerns, required changes, and an explicit `PASS` or `CHANGES_REQUIRED` outcome.
+- Implementation begins only after the screen design receives `PASS`. A code implementation, OAS change, Page Parameters change, or data mutation must not be used to bypass an unresolved design decision.
+- If the primary BA raises a substantive concern that cannot be resolved from the applicable Memory, an Independent BA may provide a second ruling. The Independent BA must read the same Memory and review the same design version; a second BA is not a mechanism for bypassing an existing governed decision.
+- If the design has not passed after the third round, stop implementation and record the unresolved questions for Product Owner decision.
+
 ## Product-wide scope and Cancel standard
 
 - This is the common maintenance-operation standard for **all SSI-related files and functions**, not only the SSI Record page.

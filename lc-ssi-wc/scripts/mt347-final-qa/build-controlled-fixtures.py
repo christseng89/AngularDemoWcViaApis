@@ -829,7 +829,9 @@ def insert_positive_database(
     rebuild_module = importlib.util.module_from_spec(module_spec)
     module_spec.loader.exec_module(rebuild_module)
     export_result = rebuild_module.export_seed(
-        output, root / "fixtures/ssi-demo.v15.3.canonical.seed.json"
+        output,
+        root
+        / "qa/FIX_DATA/reload-test-data/ssi-demo.v15.8.pacs009-repaired-isolated.canonical.seed.json",
     )
     return {"sqlite": output.as_posix(), "sqliteSha256": sha256(output), "seed": export_result}
 

@@ -105,6 +105,13 @@ export class RmaApplicationService {
   messageTypePolicy() {
     return RmaSupportedMessageTypeCatalogue.fromWorkspace().loadPolicy();
   }
+  pairState(ownBic: string, counterpartyBic: string) {
+    const own = normalizeBic(ownBic);
+    const counterparty = normalizeBic(counterpartyBic);
+    if (!BIC.test(own) || !BIC.test(counterparty))
+      throw new BadRequestException("Invalid canonical BIC pair");
+    return this.repository.findActivePair(own, counterparty);
+  }
   validateCommand(command: RmaCommand): void {
     this.validate(command);
   }

@@ -17,7 +17,7 @@ from operator import itemgetter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-SEED = ROOT / "fixtures/ssi-demo.v15.3.canonical.seed.json"
+SEED = ROOT / "qa/FIX_DATA/reload-test-data/ssi-demo.v15.8.pacs009-repaired-isolated.canonical.seed.json"
 POSITIVE_SOURCE = ROOT / "qa/mt347/fixtures/mt347-positive.v1.json"
 NEGATIVE_SOURCE = ROOT / "qa/mt347/fixtures/mt347-negative.v1.json"
 SCENARIOS = ROOT / "parameters/resolution-page-scenarios.sr2026.json"

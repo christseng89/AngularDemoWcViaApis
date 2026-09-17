@@ -23,6 +23,7 @@
 - UI, API validation, Load Data, QA fixtures, and audit must use the same versioned supported-type parameter snapshot.
 - The current governed SSI scope is assembled from `parameters/payment-message-index.json`, `parameters/ssi-mappings.sr2026.manifest.json`, plus the approved MT103／pacs.008 Phase-1 profile. MT101 is explicitly out of SSI scope and must not be offered or loaded.
 - The governed MT1／pacs.008 operational profile is `MT103` plus `pacs.008.001.08`. Earlier positive demo data used `pacs.008.001.12` because it was derived from generic ISO 20022 material without the governed SWIFT／CBPR+ profile source. Controlled Load Data／Repair converts only eligible positive Operational／Draft occurrences to `.001.08` and records the conversion; manual ADD／EDIT still rejects `.001.12`. Immutable audit history and isolated negative／legacy fixtures are not rewritten, and unknown eligibility, source, lifecycle, or conversion scope fails closed without conversion or mutation.
+- The governed CBPR+ pacs.009 operational Message Definition Identifier is `pacs.009.001.08`. For eligible positive Operational／Draft data, controlled Load Data／Repair converts plain `pacs.009.001.12` to `pacs.009.001.08` and records `.08 = ADDED` (or `UNCHANGED` when already present) plus `.12 = SUPPRESSED`. Profile variants such as `.001.12.COV` are not covered by this plain conversion and require a separate governed rule; they remain unsupported／suppressed. Immutable history and the two configured PCBCCNBJ development-reference-gap groups are not mutated.
 - The supported list is exposed through `GET /api/rma-authorisations/message-types`; the BFF, service, UI selector, Load Data, and repair audit must resolve the same set.
 - Load Data filters out-of-scope values before creating or revising an RMA record. It records them as `IGNORED_OUT_OF_SSI_SCOPE`; it must not write them into the RMA Message Types collection.
 - The standard repair path is `npm run demo:audit:governed-data` followed, only after review and explicit authorization, by `npm run demo:repair:governed-data`. Repair may create or update Drafts, but must not Submit or Approve them.
@@ -39,7 +40,7 @@
 - The visual reference's sample MT5xx values are layout examples only. They must not be introduced unless a future governed SSI parameter snapshot explicitly makes them eligible.
 - ADD and EDIT use the same selector. ADD may check multiple values in both directions. EDIT pre-checks the original approved values and produces `ADDED`／`SUPPRESSED` deltas separately for each canonical bank-direction record.
 - VIEW uses the same Popup in read-only mode, showing checked and unchecked options without permitting mutation.
-- Display the selected set compactly in the index; open the Popup for the complete governed selection.
+- Display the selected set compactly in the index: show the first two Message Types as two lines and, only when more values exist, show `...` as the third line. Open View／the Popup for the complete governed selection.
 - Implement this Popup only after data repair has passed BA／QA review and its authorized remediation phase is complete. UI work must not broaden or delay the data-repair safety gates.
 
 ## ADD／EDIT／SUPPRESSED set semantics

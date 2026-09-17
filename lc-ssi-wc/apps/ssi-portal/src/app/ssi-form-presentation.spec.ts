@@ -43,11 +43,15 @@ describe("SSI form presentation", () => {
   });
 
   it("turns shared field definitions into a non-interactive view", () => {
-    const [field] = readonlyFormFields([
+    const [field, messageTypeField] = readonlyFormFields([
       {
         key: "counterpartyId",
         props: { showPicker: true },
         fieldGroup: [{ key: "nested" }],
+      },
+      {
+        key: "messageTypes",
+        type: "multicheckbox",
       },
     ]);
     expect(field.props).toMatchObject({
@@ -60,6 +64,7 @@ describe("SSI form presentation", () => {
       readonly: true,
       showPicker: false,
     });
+    expect(messageTypeField.props?.["messageTypeOperation"]).toBe("INQUIRE");
   });
 
   it("keeps audit and SWIFT Data views on the same governed record component", () => {

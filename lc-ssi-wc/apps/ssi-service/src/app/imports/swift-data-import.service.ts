@@ -12,8 +12,12 @@ import {
   NostroApplicationService,
   type NostroCommand,
 } from "../nostro/nostro-application.service";
+import {
+  EntityApplicationService,
+  type EntityCommand,
+} from "../entity/entity-application.service";
 export interface ImportRequest {
-  dataType: "SSI" | "RMA" | "NOSTRO";
+  dataType: "SSI" | "RMA" | "NOSTRO" | "ENTITY";
   fileName: string;
   checksum?: string;
   dryRun?: boolean;
@@ -26,7 +30,7 @@ const validEnvelope = (request: ImportRequest): boolean =>
   Array.isArray(request.records) &&
   request.records.length >= 1 &&
   request.records.length <= 500 &&
-  ["SSI", "RMA", "NOSTRO"].includes(request.dataType);
+  ["SSI", "RMA", "NOSTRO", "ENTITY"].includes(request.dataType);
 
 const checksumFor = (records: unknown[]): string =>
   createHash("sha256").update(JSON.stringify(records)).digest("hex");
@@ -38,9 +42,11 @@ export class SwiftDataImportService {
     private readonly ssi: SsiApplicationService,
     private readonly rma: RmaApplicationService,
     private readonly nostro: NostroApplicationService,
+    private readonly entity: EntityApplicationService,
   ) {}
   import(request: ImportRequest): unknown {
-    if (!validEnvelope(request)) throw new BadRequestException("INVALID_IMPORT_ENVELOPE");
+    if (!validEnvelope(request))
+      throw new BadRequestException("INVALID_IMPORT_ENVELOPE");
     const actual = checksumFor(request.records);
     if (request.checksum && request.checksum.toLowerCase() !== actual)
       throw new BadRequestException("CHECKSUM_MISMATCH");
@@ -75,16 +81,23 @@ export class SwiftDataImportService {
     }
   }
 
-  private validateRecord(dataType: ImportRequest["dataType"], record: unknown): void {
+  private validateRecord(
+    dataType: ImportRequest["dataType"],
+    record: unknown,
+  ): void {
     if (dataType === "SSI") this.ssi.validate(record as CreateSsiCommand);
     else if (dataType === "RMA") this.rma.validateCommand(record as RmaCommand);
-    else this.nostro.validateCommand(record as NostroCommand);
+    else if (dataType === "NOSTRO")
+      this.nostro.validateCommand(record as NostroCommand);
+    else this.entity.validateCommand(record as EntityCommand);
   }
 
   private createRecord(dataType: ImportRequest["dataType"], record: unknown) {
     if (dataType === "SSI") return this.ssi.create(record as CreateSsiCommand);
     if (dataType === "RMA") return this.rma.create(record as RmaCommand);
-    return this.nostro.create(record as NostroCommand);
+    if (dataType === "NOSTRO")
+      return this.nostro.create(record as NostroCommand);
+    return this.entity.create(record as EntityCommand);
   }
 
   private importResponse(

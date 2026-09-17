@@ -11,6 +11,8 @@ test-results/
 tmp/
 
 qa-archived/
+QA_ARCHIVE/
+audit/
 
 # Rebuildable QA run artifacts (keep reviewed MD/JSON/DOCX summaries tracked)
 qa/mt2/migration-backups/

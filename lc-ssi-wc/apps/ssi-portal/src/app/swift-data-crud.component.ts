@@ -114,6 +114,31 @@ interface MessageTypeChanges {
   readonly added: readonly string[];
   readonly suppressed: readonly string[];
 }
+interface RmaMessageCategory {
+  readonly categoryId: "SECURITY" | "TRADE_FINANCE" | "PAYMENT";
+  readonly displayName: string;
+  readonly displayOrder: number;
+  readonly emptyStateText: string;
+}
+interface RmaMessagePolicyItem {
+  readonly messageType: string;
+  readonly description: string;
+  readonly categoryId: RmaMessageCategory["categoryId"];
+  readonly directionApplicability: {
+    readonly inbound: { readonly applicable: boolean };
+    readonly outbound: { readonly applicable: boolean };
+  };
+}
+interface RmaMessageTypePolicy {
+  readonly supportedMessageTypes: readonly string[];
+  readonly categories: readonly RmaMessageCategory[];
+  readonly items: readonly RmaMessagePolicyItem[];
+}
+interface RmaPairState {
+  readonly ownBic: string;
+  readonly counterpartyBic: string;
+  readonly directions: Readonly<Record<"INBOUND" | "OUTBOUND", Row | null>>;
+}
 
 @Component({
   selector: "ssi-swift-data-crud",
@@ -236,6 +261,10 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
   readonly bankQuery = signal("");
   readonly bankPickerLoading = signal(false);
   readonly bankPickerError = signal<string | null>(null);
+  private readonly rmaDirectionMessageTypes = new Map<
+    string,
+    readonly string[]
+  >();
   readonly bankPage = signal<BankPage>({
     items: [],
     page: 1,
@@ -274,7 +303,7 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
     this.busy.set(true);
     try {
       if (this.checkerMode()) this.statusFilter.set("PENDING_APPROVAL");
-      const [contract, currencies, supportedMessageTypes] = await Promise.all([
+      const [contract, currencies, messageTypePolicy] = await Promise.all([
         firstValueFrom(
           this.http.get<OpenApiUiContract>(
             "/openapi/swift-data-service.v1.json",
@@ -286,8 +315,8 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
           ),
         ),
         firstValueFrom(
-          this.http.get<string[]>(
-            `${this.api}/rma-authorisations/message-types`,
+          this.http.get<RmaMessageTypePolicy>(
+            `${this.api}/rma-authorisations/message-type-policy`,
           ),
         ),
       ]);
@@ -301,7 +330,7 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
       ) {
         this.resourceId.set(requestedResourceId);
       }
-      this.configureFields(currencies, supportedMessageTypes);
+      this.configureFields(currencies, messageTypePolicy);
       await this.refresh();
       const requestedRecordId = this.initialRecordId();
       if (requestedRecordId) {
@@ -330,15 +359,17 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
     this.statusFilter.set(this.checkerMode() ? "PENDING_APPROVAL" : "ACTIVE");
     this.indexSearch.set("");
     this.page.set(1);
-    const [currencies, supportedMessageTypes] = await Promise.all([
+    const [currencies, messageTypePolicy] = await Promise.all([
       firstValueFrom(
         this.http.get<CurrencyReference[]>(`${this.api}/reference/currencies`),
       ),
       firstValueFrom(
-        this.http.get<string[]>(`${this.api}/rma-authorisations/message-types`),
+        this.http.get<RmaMessageTypePolicy>(
+          `${this.api}/rma-authorisations/message-type-policy`,
+        ),
       ),
     ]);
-    this.configureFields(currencies, supportedMessageTypes);
+    this.configureFields(currencies, messageTypePolicy);
     await this.refresh();
   }
 
@@ -378,6 +409,7 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
           }
         : response;
       this.rows.set(result.items);
+      this.cacheRmaDirectionMessageTypes(result.items);
       this.totalItems.set(result.totalItems);
       this.serverTotalPages.set(result.totalPages);
       this.page.set(result.page);
@@ -489,15 +521,16 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
       await this.refresh();
     }
   }
-  view(row: Row): void {
+  async view(row: Row): Promise<void> {
+    await this.hydrateRmaDirectionMessageTypes(row);
     this.checkerRejectReason.set("");
     this.detailTarget.set(row);
     this.formVisible.set(false);
   }
-  openRowFromKeyboard(event: KeyboardEvent, row: Row): void {
+  async openRowFromKeyboard(event: KeyboardEvent, row: Row): Promise<void> {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
-      this.view(row);
+      await this.view(row);
     }
   }
   rowLabel(row: Row): string {
@@ -505,7 +538,7 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
     const identifier = resource?.columns[0];
     return `View ${resource?.label ?? "record"} ${identifier ? this.columnValue(row, identifier) : row.id}`;
   }
-  edit(row: Row): void {
+  async edit(row: Row): Promise<void> {
     if (row["changeType"] === "SUPPRESSION") return;
     if (!["DRAFT", "WIP"].includes(row.status)) {
       void this.revise(row);
@@ -513,6 +546,7 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
     }
     const resource = this.resource();
     if (!resource) return;
+    await this.hydrateRmaDirectionMessageTypes(row);
     this.model = {};
     for (const field of resource.fields)
       this.setPath(
@@ -630,7 +664,7 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
       );
       this.revisionReservationId.set(revision.id);
       await this.refresh();
-      this.edit(revision);
+      await this.edit(revision);
     } catch {
       this.notice.set({ kind: "error", text: "此紀錄無法建立修訂版本。" });
     }
@@ -976,6 +1010,21 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
           .map((path) => this.value(row, path))
           .join(column.separator ?? " · ");
   }
+  isRmaMessageColumn(column: UiColumn): boolean {
+    return this.resourceId() === "rma" && column.path === "messageTypes";
+  }
+  rmaMessagePreview(row: Row): readonly string[] {
+    const value = row["messageTypes"];
+    if (!Array.isArray(value)) return [scalarText(value, "—")];
+    const messages = value.filter(
+      (item): item is string => typeof item === "string" && item.length > 0,
+    );
+    return messages.length > 2
+      ? [...messages.slice(0, 2), "..."]
+      : messages.length
+        ? messages
+        : ["—"];
+  }
   columnPath(column: UiColumn): string {
     return column.path ?? column.paths?.[0] ?? "id";
   }
@@ -1101,13 +1150,13 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
   }
   private configureFields(
     currencies: readonly CurrencyReference[],
-    supportedMessageTypes: readonly string[],
+    messageTypePolicy: RmaMessageTypePolicy,
   ): void {
     const resource = this.resource();
     if (!resource) return;
     this.fields.set(
       resource.fields.map((field) =>
-        this.formlyField(field, currencies, supportedMessageTypes),
+        this.formlyField(field, currencies, messageTypePolicy),
       ),
     );
   }
@@ -1115,12 +1164,12 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
   private formlyField(
     field: UiField,
     currencies: readonly CurrencyReference[],
-    supportedMessageTypes: readonly string[],
+    messageTypePolicy: RmaMessageTypePolicy,
   ): FormlyFieldConfig {
     const config: FormlyFieldConfig = {
       key: field.key,
       type: field.type,
-      props: this.fieldProps(field, currencies, supportedMessageTypes),
+      props: this.fieldProps(field, currencies, messageTypePolicy),
     };
     if (field.defaultValue !== undefined)
       config.defaultValue = field.defaultValue;
@@ -1157,7 +1206,7 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
   private fieldProps(
     field: UiField,
     currencies: readonly CurrencyReference[],
-    supportedMessageTypes: readonly string[],
+    messageTypePolicy: RmaMessageTypePolicy,
   ): NonNullable<FormlyFieldConfig["props"]> {
     const props: NonNullable<FormlyFieldConfig["props"]> = {
       label: field.label,
@@ -1169,7 +1218,10 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
               value: code,
             }))
           : field.optionsSource === "rma-authorisations/message-types"
-            ? supportedMessageTypes.map((value) => ({ label: value, value }))
+            ? messageTypePolicy.supportedMessageTypes.map((value) => ({
+                label: value,
+                value,
+              }))
             : (field.options ?? []).map((value) => ({ label: value, value })),
     };
     const optionalProps: Array<
@@ -1185,9 +1237,17 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
     ];
     for (const [key, value] of optionalProps)
       if (value !== undefined) props[key] = value as never;
-    if (field.type === "multicheckbox")
+    if (field.type === "multicheckbox") {
       props.description =
-        "從受控清單多選；分類捷徑會展開並儲存 explicit Message Types。";
+        "從受控清單選擇；Popup 以相同參數並排顯示 INBOUND／OUTBOUND。";
+      props["messageTypeCategories"] = messageTypePolicy.categories;
+      props["messageTypeItems"] = messageTypePolicy.items;
+      props["messageTypeOperation"] = () => (this.editingId() ? "EDIT" : "ADD");
+      props["messageTypeSelectionForDirection"] = (
+        model: Record<string, unknown>,
+        direction: "INBOUND" | "OUTBOUND",
+      ) => this.rmaMessageTypesForDirection(model, direction);
+    }
     if (field.referenceSource === "reference/banks") {
       props.readonly = true;
       props.showPicker = true;
@@ -1207,6 +1267,93 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
       .every((value) =>
         /^(MT\d{3}(?:COV)?|pacs\.[A-Za-z0-9.]+|\*)$/.test(value),
       );
+
+  private rmaMessageTypesForDirection(
+    model: Record<string, unknown>,
+    direction: "INBOUND" | "OUTBOUND",
+  ): readonly string[] {
+    if (model["direction"] === direction)
+      return this.messageTypesFrom(model["messageTypes"]);
+    return (
+      this.rmaDirectionMessageTypes.get(
+        this.rmaDirectionKey(model, direction),
+      ) ?? []
+    );
+  }
+
+  private cacheRmaDirectionMessageTypes(rows: readonly Row[]): void {
+    if (this.resourceId() !== "rma") return;
+    const candidates = new Map<string, Row[]>();
+    for (const row of rows) {
+      const direction = row["direction"];
+      if (direction !== "INBOUND" && direction !== "OUTBOUND") continue;
+      const key = this.rmaDirectionKey(row, direction);
+      const group = candidates.get(key) ?? [];
+      group.push(row);
+      candidates.set(key, group);
+    }
+    for (const [key, group] of candidates)
+      this.rmaDirectionMessageTypes.set(
+        key,
+        this.messageTypesFrom(this.preferredRmaRow(group)["messageTypes"]),
+      );
+  }
+
+  private async hydrateRmaDirectionMessageTypes(row: Row): Promise<void> {
+    if (this.resourceId() !== "rma") return;
+    this.cacheRmaDirectionMessageTypes([row]);
+    const counterpartyBic = scalarText(row["counterpartyBic"]).trim();
+    if (!counterpartyBic) return;
+    try {
+      const ownBic = scalarText(row["ownBic"]).trim().toLocaleUpperCase();
+      const query = new URLSearchParams({ ownBic, counterpartyBic });
+      const pairState = await firstValueFrom(
+        this.http.get<RmaPairState>(
+          `${this.api}/rma-authorisations/pair-state?${query.toString()}`,
+        ),
+      );
+      this.cacheRmaDirectionMessageTypes(
+        Object.values(pairState.directions).filter(
+          (candidate): candidate is Row => candidate !== null,
+        ),
+      );
+    } catch {
+      this.notice.set({
+        kind: "warning",
+        text: "另一方向的 RMA Message Types 暫時無法載入；目前方向仍可查看。",
+      });
+    }
+  }
+
+  private preferredRmaRow(rows: readonly Row[]): Row {
+    const statusPriority: Record<string, number> = {
+      WIP: 4,
+      DRAFT: 3,
+      PENDING_APPROVAL: 2,
+      ACTIVE: 1,
+    };
+    return [...rows].sort(
+      (left, right) =>
+        (statusPriority[right.status] ?? 0) -
+          (statusPriority[left.status] ?? 0) || right.version - left.version,
+    )[0]!;
+  }
+
+  private rmaDirectionKey(
+    model: Record<string, unknown>,
+    direction: "INBOUND" | "OUTBOUND",
+  ): string {
+    return [
+      scalarText(model["ownBic"]).trim().toLocaleUpperCase(),
+      scalarText(model["counterpartyBic"]).trim().toLocaleUpperCase(),
+      direction,
+    ].join("|");
+  }
+
+  private messageTypesFrom(value: unknown): readonly string[] {
+    const values = Array.isArray(value) ? value : scalarText(value).split(",");
+    return values.map((item) => scalarText(item).trim()).filter(Boolean);
+  }
   private toFormValue(value: unknown, field: UiField): unknown {
     return field.type === "multicheckbox" && Array.isArray(value)
       ? value.join(", ")

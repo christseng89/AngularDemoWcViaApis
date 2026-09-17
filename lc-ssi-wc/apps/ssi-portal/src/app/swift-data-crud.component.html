@@ -234,14 +234,28 @@
               >
                 @for (column of current.columns; track columnPath(column)) {
                   <td [attr.data-column]="columnPath(column)">
-                    <span
-                      [class.status]="columnPath(column) === 'status'"
-                      [class.active-status]="
-                        columnPath(column) === 'status' &&
-                        row.status === 'ACTIVE'
-                      "
-                      >{{ columnValue(row, column) }}</span
-                    >
+                    @if (isRmaMessageColumn(column)) {
+                      <span
+                        class="rma-message-preview"
+                        [attr.title]="columnValue(row, column)"
+                        [attr.aria-label]="
+                          'Messages: ' + columnValue(row, column)
+                        "
+                      >
+                        @for (message of rmaMessagePreview(row); track $index) {
+                          <span>{{ message }}</span>
+                        }
+                      </span>
+                    } @else {
+                      <span
+                        [class.status]="columnPath(column) === 'status'"
+                        [class.active-status]="
+                          columnPath(column) === 'status' &&
+                          row.status === 'ACTIVE'
+                        "
+                        >{{ columnValue(row, column) }}</span
+                      >
+                    }
                   </td>
                 }
                 <td class="request-type-cell">

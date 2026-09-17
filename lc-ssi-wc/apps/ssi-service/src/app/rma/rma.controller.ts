@@ -50,6 +50,12 @@ export class RmaController {
   @Get("message-type-policy") messageTypePolicy(): unknown {
     return this.service.messageTypePolicy();
   }
+  @Get("pair-state") pairState(
+    @Query("ownBic") ownBic: string,
+    @Query("counterpartyBic") counterpartyBic: string,
+  ): unknown {
+    return this.service.pairState(ownBic, counterpartyBic);
+  }
   @Post() create(@Body() body: RmaCommand): unknown {
     return this.lifecycle.create(body);
   }

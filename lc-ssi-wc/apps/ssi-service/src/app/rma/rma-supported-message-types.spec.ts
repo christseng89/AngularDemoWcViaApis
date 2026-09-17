@@ -25,15 +25,26 @@ describe("RMA supported Message Types", () => {
     expect(loadRmaSupportedMessageTypes()).not.toContain("pacs.008.001.12");
   });
 
-  it("loads the legacy .12 to .08 repair conversion from parameters", () => {
-    expect(
+  it("loads the governed plain .12 to .08 repair conversions from parameters", () => {
+    const conversions =
       RmaSupportedMessageTypeCatalogue.fromWorkspace().loadPolicy()
-        .legacyConversions,
-    ).toEqual([
-      expect.objectContaining({
-        from: "pacs.008.001.12",
-        to: "pacs.008.001.08",
-      }),
-    ]);
+        .legacyConversions;
+    expect(conversions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          from: "pacs.008.001.12",
+          to: "pacs.008.001.08",
+        }),
+        expect.objectContaining({
+          from: "pacs.009.001.12",
+          to: "pacs.009.001.08",
+        }),
+      ]),
+    );
+    expect(conversions).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ from: "pacs.009.001.12.COV" }),
+      ]),
+    );
   });
 });

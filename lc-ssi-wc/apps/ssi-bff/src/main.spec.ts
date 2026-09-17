@@ -407,6 +407,12 @@ describe("SSI BFF forwarding contract", () => {
       url: "http://ssi.test/api/rma-authorisations",
     },
     {
+      name: "RMA exact pair state",
+      method: "rmaPairState",
+      args: ["DEMOHKHH", "CITIUS33"],
+      url: "http://ssi.test/api/rma-authorisations/pair-state?ownBic=DEMOHKHH&counterpartyBic=CITIUS33",
+    },
+    {
       name: "RMA creation",
       method: "createRma",
       args: [{ ownBic: "DEMOHKHH" }],

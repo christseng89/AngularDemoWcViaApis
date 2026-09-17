@@ -65,6 +65,10 @@ describe("governed HTTP controller contracts", () => {
     const service = {
       ...governedService(),
       check: jest.fn((body: unknown) => ({ body })),
+      pairState: jest.fn((ownBic: string, counterpartyBic: string) => ({
+        ownBic,
+        counterpartyBic,
+      })),
     };
     const controller = new RmaController(
       service as unknown as RmaApplicationService,
@@ -72,6 +76,10 @@ describe("governed HTTP controller contracts", () => {
     const command = { ownBic: "DEMOHKHH" } as never;
 
     expect(controller.list()).toEqual(["listed"]);
+    expect(controller.pairState("DEMOHKHH", "CITIUS33")).toEqual({
+      ownBic: "DEMOHKHH",
+      counterpartyBic: "CITIUS33",
+    });
     expect(
       controller.check({
         ownBic: "DEMOHKHH",

@@ -13,12 +13,74 @@
       "evidenceStatus": "FIELD_PROFILE_PROVEN"
     }
   ],
+  "presentation": {
+    "categories": [
+      {
+        "categoryId": "SECURITY",
+        "displayName": "Security",
+        "displayOrder": 10,
+        "emptyStateText": "No governed Security message types are available."
+      },
+      {
+        "categoryId": "TRADE_FINANCE",
+        "displayName": "Trade Finance",
+        "displayOrder": 20,
+        "emptyStateText": "No governed Trade Finance message types are available."
+      },
+      {
+        "categoryId": "PAYMENT",
+        "displayName": "Payment",
+        "displayOrder": 30,
+        "emptyStateText": "No governed Payment message types are available."
+      }
+    ],
+    "items": [
+      { "messageType": "MT103", "description": "Single Customer Credit Transfer", "categoryId": "PAYMENT", "directionApplicability": { "inbound": { "applicable": true }, "outbound": { "applicable": true } } },
+      { "messageType": "MT202", "description": "General Financial Institution Transfer", "categoryId": "PAYMENT", "directionApplicability": { "inbound": { "applicable": true }, "outbound": { "applicable": true } } },
+      { "messageType": "MT202COV", "description": "General Financial Institution Transfer — Cover", "categoryId": "PAYMENT", "directionApplicability": { "inbound": { "applicable": true }, "outbound": { "applicable": true } } },
+      { "messageType": "MT205", "description": "Financial Institution Transfer Execution", "categoryId": "PAYMENT", "directionApplicability": { "inbound": { "applicable": true }, "outbound": { "applicable": true } } },
+      { "messageType": "MT205COV", "description": "Financial Institution Transfer Execution — Cover", "categoryId": "PAYMENT", "directionApplicability": { "inbound": { "applicable": true }, "outbound": { "applicable": true } } },
+      { "messageType": "MT300", "description": "Foreign Exchange Confirmation", "categoryId": "SECURITY", "directionApplicability": { "inbound": { "applicable": true }, "outbound": { "applicable": true } } },
+      { "messageType": "MT304", "description": "Advice or Instruction of a Third Party Deal", "categoryId": "SECURITY", "directionApplicability": { "inbound": { "applicable": true }, "outbound": { "applicable": true } } },
+      { "messageType": "MT305", "description": "Foreign Currency Option Confirmation", "categoryId": "SECURITY", "directionApplicability": { "inbound": { "applicable": true }, "outbound": { "applicable": true } } },
+      { "messageType": "MT306", "description": "Foreign Currency Option Confirmation", "categoryId": "SECURITY", "directionApplicability": { "inbound": { "applicable": true }, "outbound": { "applicable": true } } },
+      { "messageType": "MT320", "description": "Fixed Loan or Deposit Confirmation", "categoryId": "SECURITY", "directionApplicability": { "inbound": { "applicable": true }, "outbound": { "applicable": true } } },
+      { "messageType": "MT330", "description": "Call or Notice Loan Confirmation", "categoryId": "SECURITY", "directionApplicability": { "inbound": { "applicable": true }, "outbound": { "applicable": true } } },
+      { "messageType": "MT340", "description": "Forward Rate Agreement Confirmation", "categoryId": "SECURITY", "directionApplicability": { "inbound": { "applicable": true }, "outbound": { "applicable": true } } },
+      { "messageType": "MT341", "description": "Forward Rate Agreement Settlement Confirmation", "categoryId": "SECURITY", "directionApplicability": { "inbound": { "applicable": true }, "outbound": { "applicable": true } } },
+      { "messageType": "MT350", "description": "Advice of Loan or Deposit Interest Payment", "categoryId": "SECURITY", "directionApplicability": { "inbound": { "applicable": true }, "outbound": { "applicable": true } } },
+      { "messageType": "MT360", "description": "Single Currency Interest Rate Derivative Confirmation", "categoryId": "SECURITY", "directionApplicability": { "inbound": { "applicable": true }, "outbound": { "applicable": true } } },
+      { "messageType": "MT361", "description": "Cross Currency Interest Rate Swap Confirmation", "categoryId": "SECURITY", "directionApplicability": { "inbound": { "applicable": true }, "outbound": { "applicable": true } } },
+      { "messageType": "MT362", "description": "Interest Rate Reset or Advice", "categoryId": "SECURITY", "directionApplicability": { "inbound": { "applicable": true }, "outbound": { "applicable": true } } },
+      { "messageType": "MT364", "description": "Single or Cross Currency Interest Rate Derivative Confirmation", "categoryId": "SECURITY", "directionApplicability": { "inbound": { "applicable": true }, "outbound": { "applicable": true } } },
+      { "messageType": "MT365", "description": "Commodity Confirmation", "categoryId": "SECURITY", "directionApplicability": { "inbound": { "applicable": true }, "outbound": { "applicable": true } } },
+      { "messageType": "MT400", "description": "Advice of Payment", "categoryId": "TRADE_FINANCE", "directionApplicability": { "inbound": { "applicable": true }, "outbound": { "applicable": true } } },
+      { "messageType": "MT730", "description": "Acknowledgement", "categoryId": "TRADE_FINANCE", "directionApplicability": { "inbound": { "applicable": true }, "outbound": { "applicable": true } } },
+      { "messageType": "MT734", "description": "Advice of Refusal", "categoryId": "TRADE_FINANCE", "directionApplicability": { "inbound": { "applicable": true }, "outbound": { "applicable": true } } },
+      { "messageType": "MT742", "description": "Reimbursement Claim", "categoryId": "TRADE_FINANCE", "directionApplicability": { "inbound": { "applicable": true }, "outbound": { "applicable": true } } },
+      { "messageType": "MT750", "description": "Advice of Discrepancy", "categoryId": "TRADE_FINANCE", "directionApplicability": { "inbound": { "applicable": true }, "outbound": { "applicable": true } } },
+      { "messageType": "MT752", "description": "Authorisation to Pay, Accept or Negotiate", "categoryId": "TRADE_FINANCE", "directionApplicability": { "inbound": { "applicable": true }, "outbound": { "applicable": true } } },
+      { "messageType": "MT754", "description": "Advice of Payment or Acceptance or Negotiation", "categoryId": "TRADE_FINANCE", "directionApplicability": { "inbound": { "applicable": true }, "outbound": { "applicable": true } } },
+      { "messageType": "MT756", "description": "Advice of Reimbursement or Payment", "categoryId": "TRADE_FINANCE", "directionApplicability": { "inbound": { "applicable": true }, "outbound": { "applicable": true } } },
+      { "messageType": "MT765", "description": "Guarantee or Standby Letter of Credit Demand", "categoryId": "TRADE_FINANCE", "directionApplicability": { "inbound": { "applicable": true }, "outbound": { "applicable": true } } },
+      { "messageType": "MT768", "description": "Acknowledgement of a Guarantee or Standby Message", "categoryId": "TRADE_FINANCE", "directionApplicability": { "inbound": { "applicable": true }, "outbound": { "applicable": true } } },
+      { "messageType": "MT769", "description": "Advice of Reduction or Release", "categoryId": "TRADE_FINANCE", "directionApplicability": { "inbound": { "applicable": true }, "outbound": { "applicable": true } } },
+      { "messageType": "pacs.008.001.08", "description": "FI to FI Customer Credit Transfer", "categoryId": "PAYMENT", "directionApplicability": { "inbound": { "applicable": true }, "outbound": { "applicable": true } } },
+      { "messageType": "pacs.009.001.08", "description": "Financial Institution Credit Transfer", "categoryId": "PAYMENT", "directionApplicability": { "inbound": { "applicable": true }, "outbound": { "applicable": true } } }
+    ]
+  },
   "legacyConversions": [
     {
       "from": "pacs.008.001.12",
       "to": "pacs.008.001.08",
       "scope": "OPERATIONAL_OR_DRAFT_POSITIVE_DATA",
       "reason": "Legacy generic ISO 20022 value is replaced by the governed CBPR+ SSI profile."
+    },
+    {
+      "from": "pacs.009.001.12",
+      "to": "pacs.009.001.08",
+      "scope": "OPERATIONAL_OR_DRAFT_POSITIVE_DATA",
+      "reason": "Legacy generic ISO 20022 value is replaced by the governed CBPR+ SR2026 pacs.009 profile; profile-specific variants require a separate governed rule."
     }
   ],
   "developmentReferenceGapSkips": [
