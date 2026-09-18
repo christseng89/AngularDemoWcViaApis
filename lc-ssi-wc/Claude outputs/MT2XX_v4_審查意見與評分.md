@@ -178,7 +178,7 @@ MT210 仍然要產生，這條網路驗證規則仍會 NAK。建議在 Notificat
 **5.1 Primary local 來源不可稽核。** 目前記載為：
 
 ```
-D:\Baseline_V6_20251231\lc-ssi-wc\us2m_20260717.pdf
+<repo-root>\us2m_20260717.pdf
 ```
 
 Gate 稽核者無法據此取得檔案，也無法確認拿到的是同一份。應改為「檔名 ＋ SHA-256 ＋ 取得日期 ＋ 官方來源 URL」。兩份 MRG 的雜湊我已算過：

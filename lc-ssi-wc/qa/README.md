@@ -9,7 +9,7 @@ evidence from different workstreams cannot overwrite or obscure one another.
 - `shared/` — use only for genuinely cross-family QA tooling or contracts.
 
 Historical material is stored outside this Git repository under
-`D:\Baseline_V6_20251231\qa-archived\<message-family>`.
+`<qa-archive>/<message-family>`.
 
 ## Working rule
 

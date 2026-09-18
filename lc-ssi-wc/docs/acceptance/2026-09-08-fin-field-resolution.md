@@ -1,7 +1,7 @@
 # FIN MT SSI Field Resolution — Acceptance Evidence
 
 Date: 2026-09-08  
-Target: `D:\Baseline_V6_20251231\lc-ssi-wc`
+Target: `<repo-root>`
 
 ## Scope and authority
 

@@ -1,6 +1,6 @@
 # lc-ssi — Outward SSI Suggestion／Resolution 程式碼審查
 
-**審查對象：** `D:\Baseline_V6_20251231\lc-ssi-wc`
+**審查對象：** `<repo-root>`
 **範圍：** Outward SWIFT 交易的 SSI Suggestion 與 SSI Resolution
 **角度：** SWIFT 標準符合性 ＋ 與 v1.0-rc 規格的一致性
 **日期：** 2026-09-07

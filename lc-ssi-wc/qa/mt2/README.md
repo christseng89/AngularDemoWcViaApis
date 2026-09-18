@@ -4,7 +4,7 @@ This directory contains only the current controlled QA/UAT artifacts and the
 fixtures required to reproduce them. Superseded drafts and historical reports
 are retained outside the Git repository under:
 
-`D:\Baseline_V6_20251231\qa-archived\mt2`
+`<qa-archive>/mt2`
 
 ## Current UAT workbook
 

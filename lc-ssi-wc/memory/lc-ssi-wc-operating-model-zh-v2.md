@@ -360,7 +360,7 @@ Block 一經發現立即回報，格式固定如下：
 
 以下要求是目前工作的受控執行基準；細部 SWIFT 語意仍以各 Message Family 的最新受控 Memory／TDD 與 Source Register 為準，不在本章複製第二份規則。
 
-- **工作環境**：自 2026-09-16 起，所有專案修改、測試、掃描與產物都以 `C:\Users\samfi\Downloads\outputs\lc-ssi-wc` 為唯一主目錄；不得再使用 `D:\Baseline_V6_20251231` 或 OneDrive workspace。暫存檔、scanner intermediate、cache 與 transient report 一律放在 repo-local `tmp/`，且 `tmp/` 必須由 Git ignore。
+- **工作環境**：自 2026-09-16 起，所有專案修改、測試、掃描與產物都以 `C:\Users\samfi\Downloads\outputs\lc-ssi-wc` 為唯一主目錄；不得再使用 `legacy D-drive workspace` 或 OneDrive workspace。暫存檔、scanner intermediate、cache 與 transient report 一律放在 repo-local `tmp/`，且 `tmp/` 必須由 Git ignore。
 - **工作編制**：每個 Message Family 至少配置兩位獨立 BA（Maker、Checker）及獨立 QA；所有受控結論適用 4-EYES，不得由作者自行核准。
 - **MT2／pacs.009 範圍**：Payment Index 只包含四個可執行 Message：`MT202`、`MT202COV`、`MT205`、`MT205COV`；每個 Message 依 SWIFT MRG、CBPR+ pacs.009 UG 與 NVR 建立 Operational 及 QA Scenarios。四個 Message 不等於只有四個 Scenario；Scenario 只在輸入契約、處理路徑、validation 或 oracle 有可驗證差異時保留。
 - **Scenario 分類與排序**：Operational 供 UAT 正向流程；QA 包含正向、負向與邊界驗證。排序鍵固定為 Operational／Valid=`0`、Invalid=`1`、Boundary=`2`，同類再依 Description 排序。
