@@ -1,7 +1,7 @@
 # lc-ssi-wc 全專案作業模式與交付治理 — 中文版 v2
 
 **狀態：CONTROLLED**  
-**文件版本：v2.8.24**
+**文件版本：v2.8.25**
 **生效日期：2026-09-18**
 **適用範圍：MT1／pacs.008、MT2／pacs.009 plain/COV/ADV、MT3＋MT4＋MT7（MT347）及未來所有 Message Family**
 
@@ -319,6 +319,23 @@ Block 一經發現立即回報，格式固定如下：
 
 進度更新必須固定列出：已完成、進行中、剩餘、FAIL、BLOCKED、NOT_EXECUTED、下一步與 owner；不得只回覆籠統百分比或時間。發現 BLOCKED 必須主動立即通報，不等待追問。已找到可執行修復路徑的規範／程式／資料缺陷應標 `FAIL/CORRECT`，不可為了方便一律標成 BLOCKED。
 
+### 12.0.1 誠信與故意怠工紅線
+
+一般未遵守規範仍依 `memory/failed-task-retrospective-method-zh-v1.md` 的「第一次警告、第二次移出專案」處理；但下列兩類經事實與證據確認的重大違規，不適用第一次警告，立即停止任務、撤銷其專案角色、移出本專案工作小組並換人：
+
+1. **故意或明知的謊報／誠信違規**：虛報、偽造、歪曲或隱瞞重大狀態、進度、測試、command、evidence、檔案、Git branch／commit、環境、`BLOCKED`、已執行／未執行事項、時間或結果；亦包括明知資料不實仍簽認、轉述或用來取得 Gate／PASS。
+2. **故意怠惰／怠工／不作為**：成員已接受 in-scope 任務，且具備執行所需權限、輸入與可用環境，仍故意不工作、拖延、逃避、擅自棄置任務、拒絕合理 checkpoint／回報、假裝工作仍在進行、隱瞞長期無進展，或以不真實的 `BLOCKED` 掩蓋不作為。
+
+判定與處置必須遵守以下控制，禁止憑印象、單一延誤或人身評價任意指控：
+
+- 建立唯一 `Violation ID`，保全原始時間線、任務與scope、已提供的權限／輸入／環境、checkpoint／溝通紀錄、command／test／agent／Git／檔案狀態及其他可重跑證據；明確區分「已證實事實」「待查假設」及「當事人說明」。
+- 調查期間，PM可立即執行 stop-work、撤銷當前任務或Gate權限並凍結其產出／簽認，以保護專案；此為保全措施，不等於已完成最終事實認定。
+- Independent Checker必須獨立核對證據；PM彙整裁定建議，PO作專案層級最終決定。若確認違規，立即撤銷角色、移出專案、指派新Maker／Checker，並升級PO及所屬管理層。
+- 被移出人員的相關產出、Baseline與簽認立即凍結，不得直接沿用。接任者必須先完成Memory onboarding，再從可信來源獨立重建baseline、重跑必要驗證並重新完成4-EYES。
+- 「開除／換人」在本規範中指停止本專案工作、撤銷專案角色並替換執行人；正式僱傭解僱或其他人事處分，只能由具有人事權限的管理層／HR依公司政策及適用法律決定。
+
+下列情況本身不得視為誠信或怠工違規：已批准的暫停；真實`BLOCKED`且及時如實回報；工具／環境故障；合理等待已揭露的外部依賴；法定或已批准休假；健康／安全情況；合理能力差異；善意估時錯誤；主動報告失敗、風險、錯誤或無心失誤並立即如實更正。工作結果、checkpoint與可驗證證據才是判定依據，不得以加班、在線時長、回覆頻率或個人風格取代結果與誠信證據，亦不得報復善意Stop-Work或問題回報。
+
 ## 12.1 BA 裁定品質
 
 - BA Maker／Checker 必須回到官方來源查證，不得僅根據摘要、既有報告或推測回覆。
@@ -467,3 +484,4 @@ Block 一經發現立即回報，格式固定如下：
 | v2.8.22 | 2026-09-18 | 依 Product Owner 指示新增 TDD Git 隔離治理：所有 TDD 在獨立 branch、建議獨立 worktree；開工前記錄 base HEAD 與 dirty manifest／owner；candidate 提供 exact SHA、同 SHA 4-EYES 與 rollback patch；禁止以 reset／checkout／stash／clean 影響他人 | Maker `/root`；先前簽認因正文 SHA 改變而失效，待 Independent QA／Governance Checker 對 v2.8.22 同 SHA 重驗 |
 | v2.8.23 | 2026-09-18 | 治理身分一致性修正：同步正文 header、AGENTS／CLAUDE active references、MT1 v2 governance identity、manifest 與 canonical LF SHA sidecar chain；修復失效的受控文件連結，不改寫 frozen historical evidence | Governance Maker `/root/angular_lazy_defer_engineer`；待 Independent Governance／QA Checker 對 exact candidate SHA 重驗，未簽認前為 NOT_ACCEPTED |
 | v2.8.24 | 2026-09-18 | 依 Product Owner 簡化治理：active Git-tracked repository 文件以 repo path＋外部 evidence 記錄的 exact Git commit 識別；semantic version 僅為可選標籤，manifest 非身分／角色／簽核權威，並移除手工 document／manifest SHA chain。Main 禁止直接修改／commit，所有受控變更經 Task Branch（緊急時 Hotfix Branch）、適用測試與 4-EYES。Exact base／candidate commit 僅放外部交接與 4-EYES evidence。流程固定為獨立 branch/worktree、explicit staging、local commit/no push；Designer／QA 對同一 commit PASS 後檢查 Main：Main 有變即 rebase、re-test 並對新 commit 重跑完整 4-EYES，未變才 fast-forward，確保 reviewed commit 就是進入 Main 的 commit；之後 Main integration PASS、local Baseline／Release Tag、明確 Main sealed，最後才 cleanup 本任務已合併 branch/worktree，且禁止移除未合併、失敗、調查保留或他人 branch/worktree | Governance Maker `/root/angular_lazy_defer_engineer`；待 Independent Governance／QA Checker 對同一外部 candidate commit 重驗，未簽認前為 NOT_ACCEPTED |
+| v2.8.25 | 2026-09-18 | 依 Product Owner 指示新增誠信與故意怠工紅線：經可驗證證據、Violation ID、Independent Checker及PM／PO程序確認的故意謊報、偽造、歪曲、重大隱瞞或故意不作為，不適用第一次警告，立即stop-work、撤銷專案角色、移出專案並換人；凍結既有產出／簽認，由接任者獨立重建baseline。同步保障善意報錯、真實BLOCKED、批准暫停、環境故障與合理等待依賴，正式人事解僱仍只由管理層／HR決定 | Governance Integrity Maker `/root/governance_integrity_maker`；待 Independent Governance／QA Checker 對同一外部candidate commit重驗，未簽認前為NOT_ACCEPTED |
