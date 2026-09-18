@@ -11,11 +11,11 @@
 Every UI, UI/UX, API, Backend, Data, Database, QA, Security, System Designer, and temporary specialist must, before controlled work starts:
 
 1. Read the current controlled standard and its manifest.
-2. Verify the active repository path and declared semantic version.
-3. Record role, person／agent identity, path, version, acknowledgement time, and task／handoff reference.
+2. Verify the active Git-tracked repository path and the exact Git commit recorded in the external task／review evidence. A semantic version, when present, is an optional human／release label rather than identity or a per-edit Gate.
+3. Record role, person／agent identity, path, optional version label, acknowledgement time, and task／handoff reference.
 4. Record the exact base and candidate Git commits only in the external task handoff／review evidence, never inside the controlled standard or manifest.
 
-Missing acknowledgement or a stale／mismatched active path or semantic version means work must not start, merge, or receive `PASS`. Any controlled-standard change invalidates earlier acknowledgement; every active role must re-read, re-verify, and record a new acknowledgement before continuing.
+Missing acknowledgement or a stale／mismatched active path or external exact Git commit means work must not start, merge, or receive `PASS`. Any controlled-standard change creates a new Git commit and invalidates earlier acknowledgement; every active role must re-read, re-verify, and record a new acknowledgement before continuing.
 
 ## Engineering and design principles
 
@@ -93,9 +93,9 @@ Each controlled handoff must include:
 Role:
 Person / Agent:
 Task / Handoff ID:
-Standard version:
+Optional standard version / release label:
 Standard repo path:
-Manifest repo path:
+Manifest repo path (if present; non-authoritative):
 External base Git commit:
 External candidate Git commit:
 Read and verified at:

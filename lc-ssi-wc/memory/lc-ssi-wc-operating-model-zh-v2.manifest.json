@@ -1,10 +1,12 @@
 {
   "schemaVersion": "1.0",
   "artifact": "memory/lc-ssi-wc-operating-model-zh-v2.md",
-  "version": "v2.8.24",
+  "optionalVersion": "v2.8.24",
   "effectiveDate": "2026-09-18",
-  "identityPolicy": "REPO_PATH_AND_SEMANTIC_VERSION",
-  "changeReason": "Migrate active governance identity from manually maintained document SHA chains to repository path plus semantic version, with Git history and externally recorded exact commits providing review traceability; adopt the Product Owner approved isolated local-commit, independent-review, main-integration, tag, sealing, and cleanup sequence.",
+  "identityPolicy": "GIT_TRACKED_PATH",
+  "manifestAuthority": "LOCATOR_METADATA_ONLY",
+  "roleApprovalAuthority": "EXTERNAL_TASK_AND_4_EYES_EVIDENCE",
+  "changeReason": "Use the Git-tracked repository path with the exact commit recorded externally as active identity; treat semantic version as an optional human or release label; keep the Product Owner approved isolated local-commit, independent-review, main-integration, tag, sealing, and cleanup sequence.",
   "scope": "All current and future SSI Resolution Message Families and their Generic UI consumers.",
   "maker": "/root/angular_lazy_defer_engineer",
   "independentChecker": "PENDING_ASSIGNMENT",
@@ -13,7 +15,7 @@
   "referencedArtifacts": [
     {
       "artifact": "memory/mt347-oas-page-parameters-ui-standard-v1.md",
-      "version": "v1"
+      "optionalVersion": "v1"
     }
   ],
   "reviewEvidence": {

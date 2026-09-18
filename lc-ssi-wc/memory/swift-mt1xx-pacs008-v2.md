@@ -246,14 +246,14 @@ The controlled local Angular/Browser UAT endpoint is `http://localhost:4600`; po
 
 | Role | Artifact identity | Verdict | Date |
 | --- | --- | --- | --- |
-| BA Maker | This Memory v2 repo path／semantic version in the external candidate commit | PENDING | — |
+| BA Maker | This Memory repo path in the externally recorded exact candidate commit | PENDING | — |
 | Independent BA Checker | Same external candidate commit | PENDING | — |
 | QA Checker | Same external candidate commit | PENDING | — |
 | Product Owner | External approval record / bundle manifest | OPEN | — |
 
 Controlled-memory acceptance and implementation authorization are separate. This file becomes the active v2 Memory only after BA Maker, Independent BA Checker, QA Checker and Product Owner approve the same externally recorded Git candidate commit. Phase 1 implementation additionally requires:
 
-The archived `qa-archived/mt1/proposals/v0.6-matrix-review/MT1XX_PACS008_v0.6.bundle.json` and `memory/mt1/MT1XX_PACS008_v0.6_FINAL.bundle.json` are frozen historical evidence and are excluded from the active identity chain. They must not receive new Product Owner approval or be rewritten. Active repository identity now comes from repo path＋semantic version, with the exact Git candidate commit recorded externally.
+The archived `qa-archived/mt1/proposals/v0.6-matrix-review/MT1XX_PACS008_v0.6.bundle.json` and `memory/mt1/MT1XX_PACS008_v0.6_FINAL.bundle.json` are frozen historical evidence and are excluded from the active identity chain. They must not receive new Product Owner approval or be rewritten. Active Git-tracked repository identity comes from the repository path plus the exact Git candidate commit recorded externally; any semantic version is only an optional human／release label.
 
 1. Product Owner approves the frozen OPEN-01/OPEN-02 matrix artifacts already passed by BA/QA.
 2. External handoff evidence records the exact base／candidate Git commits and the applicable non-Git source identities.
