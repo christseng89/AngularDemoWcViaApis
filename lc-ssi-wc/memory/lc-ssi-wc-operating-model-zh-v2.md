@@ -1,8 +1,8 @@
 # lc-ssi-wc 全專案作業模式與交付治理 — 中文版 v2
 
 **狀態：CONTROLLED**  
-**文件版本：v2.8.21**
-**生效日期：2026-09-15**
+**文件版本：v2.8.22**
+**生效日期：2026-09-18**
 **適用範圍：MT1／pacs.008、MT2／pacs.009 plain/COV/ADV、MT3＋MT4＋MT7（MT347）及未來所有 Message Family**
 
 **文件定位：本檔是整個 `lc-ssi-wc` 的持續維護（Living）作業治理基準。** 所有角色、工作分派、協作、4-EYES、API 參數驅動 UI、DB、QA、品質門檻與交付流程均以本檔為準；流程持續改善時必須修改本檔、記錄原因並重新產生 SHA-256，不得只留在口頭、聊天或單次報告中。
@@ -403,7 +403,7 @@ Block 一經發現立即回報，格式固定如下：
 ## 14. 必讀文件
 
 - `docs/architecture/ADR-001-api-driven-ui.md`
-- `memory/swift-mt1xx-pacs008-v1.md`
+- `memory/swift-mt1xx-pacs008-v2.md`
 - `memory/swift-mt2xx-pacs009-v2.md`
 - `memory/swift-mt347-v2.md`
 - 各 Message Family 最新受控 TDD 與 Source Register

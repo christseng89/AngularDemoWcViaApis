@@ -1,0 +1,10 @@
+{
+  "artifact": "memory/ssi-maintenance-workflow-memory.md",
+  "version": null,
+  "status": "NORMATIVE_PROJECT_MEMORY",
+  "canonicalization": "UTF-8 without BOM; CRLF and CR normalized to LF",
+  "sha256": "6CD4A39CF566120466FEA6EA9C4276AC02FED65ABB649B8723F9DBDDE65789C8",
+  "latestConfirmation": "2026-09-18",
+  "manifestMaker": "/root/angular_lazy_defer_engineer",
+  "approval": "PENDING_INDEPENDENT_CHECKER"
+}

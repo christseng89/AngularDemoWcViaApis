@@ -1,0 +1,11 @@
+{
+  "artifact": "memory/cs-design-system-owner-v1.md",
+  "version": "v1",
+  "status": "PERMANENT_TEAM_DECISION",
+  "canonicalization": "UTF-8 without BOM; CRLF and CR normalized to LF",
+  "sha256": "B25EFB1CABA82C75A56FCC507DF0C081EDF93318086E5EF81F38575F3EA2326A",
+  "effectiveDate": "2026-09-18",
+  "owner": "User / Project Lead",
+  "manifestMaker": "/root/angular_lazy_defer_engineer",
+  "approval": "PENDING_INDEPENDENT_CHECKER"
+}
