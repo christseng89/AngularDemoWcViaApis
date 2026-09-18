@@ -109,7 +109,6 @@ import { GovernanceIndexTableComponent } from "./governance-index-table.componen
 import { LoadingStateComponent } from "./loading-state.component";
 import { DeferredFeatureShellComponent } from "./deferred-feature-shell.component";
 import {
-  activeTheme,
   ariaSortDirection,
   auditIndexColumns,
   localCalendarDate,
@@ -135,6 +134,7 @@ import {
   type TagCatalogSortKey,
   type TagMessageCatalogItem,
 } from "./fin-5x-catalog";
+import { ThemeService } from "./theme.service";
 
 interface SsiRow {
   id: string;
@@ -521,6 +521,7 @@ export class AppComponent implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly document = inject(DOCUMENT);
   private readonly changeDetector = inject(ChangeDetectorRef);
+  private readonly themeService = inject(ThemeService);
   private readonly swiftDataCrud = viewChild(SwiftDataCrudComponent);
   private readonly api = "http://localhost:3100/api";
   readonly finResolutionCatalogue = signal<
@@ -535,7 +536,7 @@ export class AppComponent implements OnInit {
   private refreshRequestSequence = 0;
   readonly ssiIndexLoading = signal(false);
   readonly view = signal<View>(this.savedView());
-  readonly theme = signal<ThemeMode>("system");
+  readonly theme = this.themeService.theme;
   readonly rows = signal<readonly SsiRow[]>([]);
   // Checker is an independent transactional projection. It must never replace
   // the SSI Maintenance collection while its PENDING queue is loading.
@@ -1393,20 +1394,6 @@ export class AppComponent implements OnInit {
   private readonly featureDataLoads = new Map<string, Promise<void>>();
   private pendingDeactivation: Promise<boolean> | null = null;
 
-  constructor() {
-    const saved = this.document.defaultView?.localStorage.getItem("ssi-theme");
-    const mode: ThemeMode =
-      saved === "light" || saved === "dark" || saved === "system"
-        ? saved
-        : "system";
-    this.setTheme(mode);
-    this.document.defaultView
-      ?.matchMedia("(prefers-color-scheme: dark)")
-      .addEventListener("change", () => {
-        if (this.theme() === "system") this.applyTheme("system");
-      });
-  }
-
   ngOnInit(): void {
     // SWIFT Data owns its own resource loading. A persisted SSI view loads only
     // SSI data, so browser refresh does not create or query the RMA component.
@@ -2065,18 +2052,7 @@ export class AppComponent implements OnInit {
     void this.refresh();
   }
   setTheme(mode: ThemeMode): void {
-    this.theme.set(mode);
-    this.document.defaultView?.localStorage.setItem("ssi-theme", mode);
-    this.applyTheme(mode);
-  }
-  private applyTheme(mode: ThemeMode): void {
-    const prefersDark =
-      this.document.defaultView?.matchMedia("(prefers-color-scheme: dark)")
-        .matches ?? false;
-    this.document.documentElement.dataset["theme"] = activeTheme(
-      mode,
-      prefersDark,
-    );
+    this.themeService.setTheme(mode);
   }
   startNew(): void {
     this.editingId.set(null);

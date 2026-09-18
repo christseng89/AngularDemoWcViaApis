@@ -50,6 +50,11 @@ const fakeDocument = {
     download: "",
   })),
 };
+const fakeTheme = testSignal<"system" | "light" | "dark">("system");
+const fakeThemeService = {
+  theme: fakeTheme,
+  setTheme: jest.fn((mode: "system" | "light" | "dark") => fakeTheme.set(mode)),
+};
 
 const fakeHttp = {
   get: jest.fn((url: string) => {
@@ -420,6 +425,8 @@ jest.doMock("@angular/core", () => ({
   inject: (token: unknown) => {
     if (token === documentToken) return fakeDocument;
     if (token === ChangeDetectorRefToken) return { detectChanges: jest.fn() };
+    if ((token as { name?: string }).name === "ThemeService")
+      return fakeThemeService;
     return fakeHttp;
   },
   signal: testSignal,
@@ -614,9 +621,8 @@ describe("portal component behavior", () => {
   });
 
   it("deduplicates concurrent SWIFT Data WIP release attempts", async () => {
-    const { SwiftDataCrudComponent } = await import(
-      "./swift-data-crud.component"
-    );
+    const { SwiftDataCrudComponent } =
+      await import("./swift-data-crud.component");
     const component = new SwiftDataCrudComponent();
     component.contract.set({
       info: { title: "test", version: "1" },
@@ -1492,7 +1498,10 @@ describe("portal component behavior", () => {
     )?.[0];
     expect(listRequest).toBeDefined();
     expect(listRequest).not.toContain("counterpartyId=");
+    fakeThemeService.setTheme.mockClear();
+    fakeTheme.set("system");
     component.setTheme("dark");
+    expect(fakeThemeService.setTheme).toHaveBeenCalledWith("dark");
     expect(component.theme()).toBe("dark");
   });
 
