@@ -1,19 +1,18 @@
 # MT1xx / pacs.008 SR2026 SSI Memory — v2
 
-**Status:** CONTROLLED CANDIDATE — MEMORY SAME-SHA BA／QA REVIEW PENDING；PRODUCT OWNER EXACT-BUNDLE APPROVAL PENDING；IMPLEMENTATION NOT AUTHORIZED  
+**Status:** CONTROLLED CANDIDATE — SAME-CANDIDATE BA／QA REVIEW PENDING；PRODUCT OWNER APPROVAL PENDING；IMPLEMENTATION NOT AUTHORIZED
 **Prepared:** 2026-09-16  
 **Supersedes after approval:** archived `qa-archived/mt1/memory/v1/swift-mt1xx-pacs008-v1.md`  
 **Predecessor raw SHA-256:** `83049678223128C4E8A0E379C18C54AF4FAC316107A71B7B37C645F838C222FC`  
 **MT1 artifact index:** [`memory/mt1/README.md`](mt1/README.md)  
 **Proposal basis:** [`memory/mt1/MT1XX_PACS008_CUSTOMER_PAYMENT_INSTRUCTIONS_PROPOSAL_v0.6_DRAFT.md`](mt1/MT1XX_PACS008_CUSTOMER_PAYMENT_INSTRUCTIONS_PROPOSAL_v0.6_DRAFT.md)  
-**Proposal raw SHA-256:** `3FD37199BAAB210B17BEED96DDD1143995454308C73D218B1DBA798EE84D88A5`  
 **OPEN-01 Matrix SHA-256:** `F18FEC54B2A61B2DFF9607543294D447BB323F31A95F75A572A49FDED68998D2`  
 **OPEN-02 Matrix SHA-256:** `E409BE0882A1D3FB9873AE3D5C835A097D4D9CFE8DB13D4E81A048824F760C0F`  
 **Matrix BA／QA Review SHA-256:** `23F87D36C696F6C5D4B70B76A36E9CA2BD85E88A27ECF9E82A6AF2D764A80092`  
-**Governance:** `memory/lc-ssi-wc-operating-model-zh-v2.md` v2.8.23, canonical LF SHA-256 `9CDA18AF27C683E019DF4B1084A68A85179F5C9BCB937D37EBD9610A762D4584`
+**Governance:** `memory/lc-ssi-wc-operating-model-zh-v2.md` v2.8.24
 **Architecture:** `Controlled OAS / Typed Contract + Controlled Parameters / DB -> Domain Policy / API -> Page Parameter Model -> Generic UI`
 
-> This memory records the frozen v0.6 MT1xx Bank SSI scope and deterministic matrices. Proposal/OPEN-01/OPEN-02 already have BA/Independent-BA/QA same-SHA PASS. This Memory v2 still requires its own BA Maker, Independent BA Checker and QA same-SHA review, followed by Product Owner exact-bundle approval. It does not yet authorize implementation, TDD, OAS, Page Parameters, DB changes or release.
+> This memory records the frozen v0.6 MT1xx Bank SSI scope and deterministic matrices. Historical Proposal/OPEN-01/OPEN-02 review evidence remains preserved. This Memory v2 still requires BA Maker, Independent BA Checker and QA review of the same external Git candidate commit, followed by Product Owner approval. It does not yet authorize implementation, TDD, OAS, Page Parameters, DB changes or release.
 
 ## 1. Executive ruling
 
@@ -245,20 +244,20 @@ The controlled local Angular/Browser UAT endpoint is `http://localhost:4600`; po
 
 ## 14. Approval and implementation gate
 
-| Role | Artifact SHA | Verdict | Date |
+| Role | Artifact identity | Verdict | Date |
 | --- | --- | --- | --- |
-| BA Maker | This Memory v2 exact SHA | PENDING | — |
-| Independent BA Checker | This Memory v2 exact SHA | PENDING | — |
-| QA Checker | This Memory v2 exact SHA | PENDING | — |
+| BA Maker | This Memory v2 repo path／semantic version in the external candidate commit | PENDING | — |
+| Independent BA Checker | Same external candidate commit | PENDING | — |
+| QA Checker | Same external candidate commit | PENDING | — |
 | Product Owner | External approval record / bundle manifest | OPEN | — |
 
-Controlled-memory acceptance and implementation authorization are separate. This file becomes the active v2 Memory only after BA Maker, Independent BA Checker, QA Checker and Product Owner sign its exact SHA. Phase 1 implementation additionally requires:
+Controlled-memory acceptance and implementation authorization are separate. This file becomes the active v2 Memory only after BA Maker, Independent BA Checker, QA Checker and Product Owner approve the same externally recorded Git candidate commit. Phase 1 implementation additionally requires:
 
-The archived `qa-archived/mt1/proposals/v0.6-matrix-review/MT1XX_PACS008_v0.6.bundle.json` was created as a matrix-review bundle and binds the retired `memory/swift-mt1xx-pacs008-v2-draft.md` SHA `B74B46E1A5962DEE7E629CA61B9C0E5A4B208AD0290724BBF8F36301AA5CC080`. It must not receive Product Owner approval. The final bundle in `memory/mt1/` must bind the actual `memory/swift-mt1xx-pacs008-v2.md` SHA.
+The archived `qa-archived/mt1/proposals/v0.6-matrix-review/MT1XX_PACS008_v0.6.bundle.json` and `memory/mt1/MT1XX_PACS008_v0.6_FINAL.bundle.json` are frozen historical evidence and are excluded from the active identity chain. They must not receive new Product Owner approval or be rewritten. Active repository identity now comes from repo path＋semantic version, with the exact Git candidate commit recorded externally.
 
 1. Product Owner approves the frozen OPEN-01/OPEN-02 matrix artifacts already passed by BA/QA.
-2. A final bundle manifest records the exact Proposal, Memory v2, matrices and review SHA values.
-3. Every reviewer signs each artifact's exact SHA; any artifact change invalidates the whole bundle.
-4. Signatures/verdicts are stored in external checker reports and the bundle manifest, never written back into this hashed artifact.
+2. External handoff evidence records the exact base／candidate Git commits and the applicable non-Git source identities.
+3. Every reviewer verifies the same candidate commit; any repository artifact change invalidates the review.
+4. Signatures／verdicts remain in external checker reports and are never written back into this controlled artifact.
 
 Until all four conditions hold, status remains **IMPLEMENTATION NOT AUTHORIZED**.

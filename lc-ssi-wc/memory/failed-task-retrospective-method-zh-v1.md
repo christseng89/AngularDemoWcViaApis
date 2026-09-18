@@ -4,7 +4,7 @@
 **狀態：** ACTIVE  
 **記錄日期：** 2026-09-18  
 **適用範圍：** 所有 `FAILED`、`REJECTED`、`ROLLED BACK`、進入 `RECOVERY`，或同類問題重複發生的任務  
-**上位規則：** [lc-ssi-wc 全專案作業模式與交付治理 v2.8.23](./lc-ssi-wc-operating-model-zh-v2.md)，特別是第 2.1、3.0.1、12 與 15 節。
+**上位規則：** [lc-ssi-wc 全專案作業模式與交付治理 v2.8.24](./lc-ssi-wc-operating-model-zh-v2.md)，特別是第 2.1、3.0.1、12 與 15 節。
 
 ## 1. 目的與原則
 

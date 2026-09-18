@@ -1,11 +1,11 @@
 # lc-ssi-wc 全專案作業模式與交付治理 — 中文版 v2
 
 **狀態：CONTROLLED**  
-**文件版本：v2.8.23**
+**文件版本：v2.8.24**
 **生效日期：2026-09-18**
 **適用範圍：MT1／pacs.008、MT2／pacs.009 plain/COV/ADV、MT3＋MT4＋MT7（MT347）及未來所有 Message Family**
 
-**文件定位：本檔是整個 `lc-ssi-wc` 的持續維護（Living）作業治理基準。** 所有角色、工作分派、協作、4-EYES、API 參數驅動 UI、DB、QA、品質門檻與交付流程均以本檔為準；流程持續改善時必須修改本檔、記錄原因並重新產生 SHA-256，不得只留在口頭、聊天或單次報告中。
+**文件定位：本檔是整個 `lc-ssi-wc` 的持續維護（Living）作業治理基準。** 所有角色、工作分派、協作、4-EYES、API 參數驅動 UI、DB、QA、品質門檻與交付流程均以本檔為準；流程持續改善時必須修改本檔、升級語意版本並由 Git 保存歷史，不得只留在口頭、聊天或單次報告中。
 
 ## 1. 不可違反的總原則
 
@@ -26,7 +26,7 @@
 15. 所有 Message Family 的 Counterparty Picker 與 Resolve SSI 必須共用同一個受控 eligibility contract、context identity 及資料快照。對相同 Message／Scenario／Currency／Booking Entity／Value Date，任何顯示為可選的 Counterparty 必須可由 Resolve SSI 接受並執行；不符合資格者必須在選取前排除或明確標示 unavailable 與 governed reason，不得先允許選取，再以 fixture／Bank Service／版本不一致拒絕。
 16. 所有 Message Family 的 SSI scope、角色、Tag／Option、required／conditional／omission、eligibility、帳戶與路徑裁定，必須依 Message Family／Scenario 適用性參照適用版本的 SWIFT Message Reference Guide（MRG）、Network Validated Rules（NVR）、其他受控 SSI 來源，以及僅在已核准 MT↔MX scope 適用的 ISO 20022／CBPR+ Usage Guideline／mapping 文件；MT347 對 ISO 20022／CBPR+／mapping 記為 `N/A` 並附原因，不得新增 converter／pacs gate。只擷取會改變 SSI resolution 或治理判定的部分，並保存來源版本、檔名、頁碼／rule ID 與 SHA。不得因參照完整報文標準而把非 SSI 欄位、完整報文建檔、translation 或外部 FIN／network validation 擴入本微服務。SSI-scope 來源衝突、缺頁或無 authoritative evidence 時依 Source Register 與 NVR owner 規則標示 `OPEN`／`NOT_PROVEN`／`NOT_EXECUTED`；未執行的完整 FIN／network validator 固定標示 `OUT_OF_SCOPE — CLOSED` 與 `FIN_VALIDATION=NOT_EVALUATED`，不得成為 SSI `OPEN`／`BLOCKED`。
 17. Counterparty SSI 與 Own SSI／Nostro／Account Master 必須維持獨立資料 ownership，但在 resolution 前必須由 API eligibility 組成不可拆分、版本鎖定的完整 settlement route。此規則適用 MT2、MT3、MT4、MT7 及後續 family；每個 Scenario 的受控 policy 必須宣告 Counterparty／Receiver SSI bank 與 Own Nostro account servicer 的關係為 `SAME`、`DIFFERENT` 或 `NOT_APPLICABLE`。Resolver 必須以該關係淘汰不合格候選並決定 53／54／56／57／58 disposition；UI 不得自行比較 BIC 或推導 Tag。第一段 discovery 以幣別、booking entity、value date、message／scenario 等 context 回傳所有完整 route candidates、唯一推薦候選及 opaque snapshot；只有完整 route 唯一時才可自動選取。多個 eligible debit／credit／57A 組合時，UI 必須讓使用者選擇整條 route，不得逐欄混搭，也不得由 backend 依 UUID、版本、建檔時間或資料列順序靜默任取。第二段 resolve 只接受 selected route identity、discovery snapshot 與交易／冪等識別，重新驗證後原子回傳 Counterparty SSI、Own Nostro、MT 與 MX 同源結果；snapshot stale 時 fail closed，不得改選其他 route。
-18. 本規範對所有參與者具強制力，包括主代理、子代理、BA Maker／Checker、QA、API／Backend、UI、Data／DB、Security、Reviewer、臨時專家及後續新增組員。每位成員開始任何分析、修改、測試、掃描或簽核前，必須讀取本規範與 Manifest，核對當前版本及 SHA-256，並在交付中聲明所依據的版本／SHA。未核對、使用舊 SHA、只依聊天摘要或與本規範衝突的成果，一律不得合併、不得標示 PASS，也不得作為 4-EYES 證據。
+18. 本規範對所有參與者具強制力，包括主代理、子代理、BA Maker／Checker、QA、API／Backend、UI、Data／DB、Security、Reviewer、臨時專家及後續新增組員。每位成員開始任何分析、修改、測試、掃描或簽核前，必須讀取本規範與 Manifest，核對 active repo path 與 semantic version；exact base／candidate Git commit 只記錄於外部任務交接與 review evidence，不嵌入規範或 manifest。未核對、使用舊版本、只依聊天摘要或與本規範衝突的成果，一律不得合併、不得標示 PASS，也不得作為 4-EYES 證據。
 19. RMA 是針對 chosen route 的實際 Receiver、service/channel、direction、exact message profile 與有效日所作的授權 Gate，不是 SSI route、MT↔MX mapping、顯示格式或預設 transport 的選擇器。受控 Message Profile／Delivery Policy 先決定正常 transport；SSI／Nostro 再決定 executable route 與 `actualReceiverBic`；RMA 最後逐 route 驗證。對 MT2／pacs.009，正常 default 為 FINPLUS／MX `pacs.009.001.08`（Core `swift.cbprplus.04`、COV `swift.cbprplus.cov.04`）；FIN／MT 僅能在正式 contingency policy、明確 intent／reason、權限與 4-EYES 下使用。FIN 與 FINPLUS 同時授權時仍不得由 RMA 任意選擇或自動偏好 FIN；只有 FIN 授權時不得靜默降級，正常 MX resolution 必須 fail closed。`displayFormat`（MX 或 MT compatibility view）必須與 `executionTransport`（FINPLUS 或 FIN）分離；切換 compatibility view 不得重跑 SSI、改 route／RMA／Nostro 或 snapshot hash。
 20. 工作組必須配置獨立 DBA／Database Performance Engineer，且資料量增加時 DBA review 為強制 Gate。Operational、QA API 與 Browser UI 必須使用同一版本化 seed、fixture binding、logical snapshot 與 eligibility projection；QA-only／negative／boundary 資料必須隔離，不得滲入 Operational Picker。每個啟用幣別至少提供三條完整、RMA-authorised、可 Resolve 的 SSI route，API 依受控排序回傳唯一最佳預設。高頻 eligibility／route discovery／Resolve 查詢必須由 DB 先完成 filter／join／sort，只把候選結果交給中台；禁止每次請求全表讀取 JSON 後在 application memory 篩選。DBA 必須保存 row count、index／query plan、冷熱延遲、p50／p95／max、payload、WAL／lock 與 reload 前後 snapshot 證據；QA 必須以相同 snapshot 驗證 API 候選、default、UI 顯示與 Resolve 結果完全一致。資料、索引、SQL、seed 或 snapshot 任一變更，都使既有 DBA／QA 簽認失效並要求同 SHA／snapshot 重測。
 21. MT1／pacs.008 Customer Payment domain 必須明確區分 Customer Party Master、Payment Instruction Profile、transaction-scoped Customer Payment Instructions（CPI）、Bank SSI、Clearing／Network Reference、Routing／Settlement Policy 與 Executable Payment Instruction。Customer 提供付款意圖、party/account、amount/currency、purpose/remittance 及受控 routing constraint；Customer data 不得標為 Bank SSI，Customer UI 不得顯示 `SSI Count` 或 `governed SSI record`。Own／Counterparty SSI、Nostro／Vostro、reimbursement agents/accounts、RMA 與 settlement method 均由銀行受控來源／政策解析。原始 customer intent 必須 immutable 並保留 provenance；bank enrichment 不得靜默覆寫。MT103／pacs.008 先限 Phase 1，其他 MT1xx 必須逐 Message 另做 MRG／NVR ruling。Serial／Cover、chain topology 與 INDA／INGA／COVE／CLRG 是不同維度；未有 current SR2026／CBPR+／PMPG 精確證據及 BA OPEN 裁決前，不得推定 populate／omit、correlation、UETR copying 或合法組合，必須 fail closed。
@@ -55,11 +55,13 @@
 ### 工作分配
 
 - 每一階段由整合負責人先拆成可獨立交付、檔案範圍不重疊的工作線，例如 API Contract、Backend Adapter、Generic UI、DB/Fixture、QA Gate、BA Review。
-- 每一條工作線必須明確記錄：負責人、可修改目錄、禁止修改範圍、輸入版本/SHA、預期輸出、測試命令、交接條件及風險。
+- 每一條工作線必須明確記錄：負責人、可修改目錄、禁止修改範圍、輸入版本／路徑、外部交接中的 base commit、預期輸出、測試命令、交接條件及風險。
 - 所有 TDD 工程必須在獨立 Git branch 執行，建議同時使用獨立 worktree；禁止直接在共用 dirty working tree 實作 production code 或測試。
 - TDD 開始前必須記錄 exact base HEAD、既有 dirty-file manifest，以及每一項既有變更的 owner；未能證明 ownership 的重疊 hunk 必須標為 `CONFLICT`，不得覆寫或撤銷。
-- 每個 candidate 必須提供 exact candidate SHA、同 SHA 4-EYES 證據及可恢復 patch；禁止使用 `reset`、`checkout`、`stash`、`clean` 或等效操作影響他人工作。
+- 每個 candidate 必須在外部交接提供 exact candidate Git commit、同 commit 4-EYES 證據及可恢復 patch；禁止把 commit 寫回受控文件形成自我參照，也禁止使用 `reset`、`checkout`、`stash`、`clean` 或等效操作影響他人工作。
+- **Main 受流程保護**：禁止直接修改 Main 或直接在 Main commit。每一項受控變更，包括 code、governance document、API、DB migration、configuration、fixture 與 test，都必須經 Task Branch、適用測試與 4-EYES 後才可進入 Main；緊急變更必須使用 Hotfix Branch，仍不得直接修改 Main。
 - 共用接線檔由整合負責人最後修改；只有在獨立 branch／worktree 的 candidate 通過驗證後，才可按受控整合流程合併。
+- 受控整合順序固定為：Designer／QA 對同一 Git candidate commit 完成 4-EYES PASS 後，先檢查 Main 是否已改變。若 Main 已改變，必須 **rebase latest Main -> re-test -> 對新 commit 重新執行完整 4-EYES**；若 Main 未改變，才可 fast-forward Main。核心不變量是 Designer／QA 審查的 commit 必須與進入 Main 的 commit 完全相同，禁止「QA reviewed A, merged B」。之後依序完成 Main integration validation PASS、建立本機 Baseline／Release Tag、明確確認 Main sealing 完成；只有以上步驟全部完成，才可移除**本任務已合併**的 branch／worktree。禁止移除未合併、失敗、因調查而保留，或任何其他成員的 branch／worktree；全流程 local commit／no push。
 - 工作完成時，交接內容至少包含 changed files、tests、coverage、known gaps、integration points；不得只回覆「完成」。
 - QA 與 BA 在工程期間持續參與：規格問題找 BA；資料、oracle、evidence 問題找 QA；架構與接線衝突找整合負責人。
 
@@ -69,7 +71,7 @@
 - Maker 與 Checker 必須是不同角色／不同執行人；Checker 不得只閱讀 Maker 摘要，必須回到相同的官方來源獨立覆核。
 - **不得自行核准（no self-approval）**：同一人或同一代理即使重新執行，也不得同時擔任同一受控交付物的 Maker 與 Checker；程式作者亦不得擔任該變更的最終 QA／Sonar／Release Approver。
 - 每一項受控規則、TDD、OAS／Page Parameter contract、DB seed/fixture、QA evidence 與 release decision 都必須明確記錄 Maker 與 Independent Checker；缺少任一角色即為 `NOT_ACCEPTED`。
-- 兩人必須檢查**同一個檔案 SHA-256**。檔案在任一方簽認後被修改，原簽認立即失效，必須針對新 SHA 重做。
+- 對 repository 內容，兩人必須檢查外部交接指定的**同一個 exact Git candidate commit 與 repo path**；對非 Git 外部證據則使用其受控 identity／checksum。內容在任一方簽認後被修改，原簽認立即失效，必須針對新 candidate 重做。
 - Maker 提交：來源登錄、規則／案例、計數、公式、OPEN、假設與證據。
 - Checker 提交：獨立計數、來源頁碼查證、規則抽樣／全量核對、公式與 cached value/recalc 檢查、未證實項目清單及最終 verdict。
 - 只有兩方均為 `PASS/CONFIRMED` 的項目才能進入正式實作或最終驗收；任何 `CORRECT`、`OPEN`、`NOT_PROVEN` 均不得被包裝成 PASS。
@@ -80,10 +82,10 @@
 ### 同步節點
 
 1. Source Register 完成後：BA Maker/Checker 確認來源版本。
-2. TDD 初稿完成後：同 SHA 4-EYES，解除設計開工 Gate。
+2. TDD 初稿完成後：對同一 exact Git candidate commit 完成 4-EYES，解除設計開工 Gate。
 3. 每段 API/UI/DB 完成後：QA 立即測該段並回饋，不等全案完成。
 4. DB Reload 後：QA 驗證 snapshot、正負向 fixture 與 MT family regression。
-5. Release Candidate 形成後：BA 與 QA 對相同 code SHA、TDD SHA、DB snapshot、Sonar scan 與 evidence manifest 簽認。
+5. Release Candidate 形成後：BA 與 QA 對外部交接中的相同 exact Git candidate commit、DB snapshot、Sonar scan 與 evidence manifest 簽認。
 
 ## 3. 標準工作流程
 
@@ -91,14 +93,14 @@
 2. **Source Register**：每份 MRG／UG／工作簿記錄檔名、SHA-256、版本、頁碼與用途。
 3. **BA 分析**：區分 normative rule、BA ruling、QA invariant、product policy；列出 OPEN。
 4. **TDD Maker**：建立正向、負向、邊界、NVR、資料品質、HTTP、UI、回歸與 evidence 案例。
-5. **TDD Checker**：對同一 SHA 做獨立覆核；Maker/Checker 都簽認後才進入正式開發。
+5. **TDD Checker**：對外部交接中的同一 exact Git candidate commit 做獨立覆核；Maker/Checker 都簽認後才進入正式開發。
 6. **Red**：先建立會失敗的 unit／contract／integration／browser test 或 machine oracle。
 7. **Green**：以最小通用設計完成 API、page parameter、UI 與配置資料。
 8. **Refactor**：移除重複與 hard-code，維持 OOD/OOP/SOLID 與共用原則。
 9. **DB Reload**：配置有變更時清除受控開發資料，重新匯入完整 canonical＋negative fixture；驗證失敗須保留原資料或 rollback。
 10. **Incremental QA**：每完成一段即測 API、UI、DB 與受影響 regression，不等全案完成。
 11. **Full Acceptance**：BA 與 QA 共同以 UI 跑完全部可執行正向、負向及邊界交易，再完成 API、NVR、MT/MX、DB、SonarQube、Coverage 與回歸。
-12. **BA/QA Final Sign-off**：以同一 release candidate SHA、TDD SHA、DB logical snapshot 與 evidence manifest 簽認。
+12. **BA/QA Final Sign-off**：以外部交接中的同一 exact Git candidate commit、DB logical snapshot 與 evidence manifest 簽認。
 
 ### 3.0.1 TDD 強制工程標準
 
@@ -108,7 +110,7 @@
 - Green 後必須執行受影響的 unit、contract、integration、architecture 及 browser/UI tests；Refactor 後再跑相同範圍與專案標準 `npm run verify`。
 - 不得先寫 production code 再補測試，不得刪除／放寬 assertion 來取得 PASS，也不得以手動 UI 操作取代可自動化的測試。
 - 緊急修復若因事故處置必須先隔離風險，狀態仍為 `NOT_ACCEPTED`；補齊缺陷重現測試、Red/Green/Refactor evidence、回歸與 4-EYES 前不得進入 Release Candidate。
-- TDD Red／Green／Refactor 必須在獨立 Git branch（建議獨立 worktree）完成。開始前保存 base HEAD、dirty manifest／owner；完成時保存 candidate SHA、同 SHA 4-EYES 與 rollback patch。不得在共用 dirty working tree 直接實作，也不得以 `reset`／`checkout`／`stash`／`clean` 破壞或隱藏他人變更。
+- TDD Red／Green／Refactor 必須在獨立 Git branch（建議獨立 worktree）完成。開始前在外部交接保存 base commit、dirty manifest／owner；完成時在外部交接保存 candidate commit、同 commit 4-EYES 與 rollback patch。不得把 exact commit 嵌回受控文件，也不得在共用 dirty working tree直接實作或以 `reset`／`checkout`／`stash`／`clean` 破壞或隱藏他人變更。
 
 ### 3.1 端到端工作配合與交接流程
 
@@ -125,7 +127,7 @@
 | 品質門檻       | Sonar Reviewer          | 工程、QA                           | 同一 release candidate SHA                     | build、lint、test、coverage、duplication、security、Sonar 全數符合門檻            |
 | 最終驗收       | 整合負責人              | BA Maker/Checker、QA、各工程 owner | code/TDD/DB/evidence 的受控身分                | Browser UAT、API、DB、NVR、回歸通過；BA/QA 以相同 evidence manifest 簽認          |
 
-交接不得只傳結論。每次交接至少包含：輸入 SHA、輸出 SHA、修改檔案、已執行測試、未執行項目、OPEN/BLOCKED、風險、下一位 owner 與可重跑命令。前一階段出口條件未滿足時，下一階段可以準備但不得宣告正式通過。
+交接不得只傳結論。每次外部交接至少包含：base／candidate Git commit、修改檔案、已執行測試、未執行項目、OPEN/BLOCKED、風險、下一位 owner 與可重跑命令；非 Git 證據另附其受控 identity／checksum。前一階段出口條件未滿足時，下一階段可以準備但不得宣告正式通過。
 
 ## 4. API 參數驅動 UI／Screen 設計要求
 
@@ -297,7 +299,7 @@ MT347 已實作且可供所有 Message Family 重用的完整 normative pattern�
 - 正式結構使用 `qa/<message-family>/`，例如 `qa/mt1/`、`qa/mt2/`、`qa/mt347/`。
 - `tdd/`、`reports/`、`test_cases/`、`uat/`、`fixtures/` 均置於各自 family 下，避免不同系列互相封存或覆蓋。
 - 本機 workspace 內只保留最新版與正式 FINAL；DRAFT、被取代版本及舊 evidence 移至 `C:\Users\samfi\Downloads\outputs\lc-ssi-wc\docs\archive\<message-family>\...`。除非 Product Owner 另行明確授權，本機 governance、Proposal、Checker report 與 SHA evidence 不 commit、不 push 到 Git remote。
-- 「最新版」由狀態、語意版本、受控 SHA 與 supersession 記錄共同判斷，不得只依檔案日期；尚未被新版取代且為現行 runner/config 的檔案不因名稱較舊而自動封存。
+- 「最新版」對 active repository 文件由狀態、repo path、語意版本、Git 歷史與 supersession 記錄共同判斷；對非 Git 外部證據才使用其受控 checksum。不得只依檔案日期；尚未被新版取代且為現行 runner/config 的檔案不因名稱較舊而自動封存。
 - `qa` 保留各 family 最新受控 TDD、FINAL 報告、現行 fixture/config、runner 及必要 evidence；DRAFT、superseded、舊 run 與 migration backup 送封存。
 - 封存前後產生 archive manifest，記錄原路徑、新路徑、SHA-256、狀態、原因與日期；不得刪除稽核軌跡。
 - `qa-archived` 必須位於 Git repository 外，不得被追蹤或提交；各 family 使用獨立子目錄，避免互相覆蓋。
@@ -392,7 +394,7 @@ Block 一經發現立即回報，格式固定如下：
 只有同時滿足以下條件才能宣告完成：
 
 - 受控來源、Memory、TDD 與 release candidate 身分可追溯。
-- BA Maker 與 BA Checker 對同一 TDD SHA 簽認。
+- BA Maker 與 BA Checker 對外部交接中的同一 exact Git candidate commit 簽認。
 - API -> Page Parameter -> Generic UI lossless trace 通過，UI hard-code gate 通過。
 - 配置／DB seed、Reload、rollback、positive/negative/boundary fixture 通過。
 - 所有可執行 API 與 Browser UAT 正向／負向交易完成；所有 `IN_SCOPE_SSI_TAG_NVR` 有受控來源與可重現 SSI evidence，缺證則 SSI release 為 `BLOCKED`。`OUT_OF_SCOPE_FULL_FIN_NVR` 固定 `OUT_OF_SCOPE — CLOSED`／`FIN_VALIDATION=NOT_EVALUATED`，不阻擋 SSI release；外部 validator 屬獨立下游 workflow。
@@ -420,11 +422,11 @@ Block 一經發現立即回報，格式固定如下：
 每次修改須遵守：
 
 1. 說明變更原因、影響範圍、提出者、Reviewer 與生效日期。
-2. 變更後產生新的 SHA-256；原有 4-EYES 簽認不得沿用到新 SHA。
+2. 變更後升級 semantic version 並提交至隔離 branch；原有 4-EYES 簽認不得沿用到新的 Git candidate commit。
 3. 涉及 SWIFT 語意、TDD、DB fixture 或 release gate 時，須由 Maker + Independent Checker 重新確認。
 4. 同步檢查 `CLAUDE.md`、ADR、各 family Memory/TDD 與 QA template 是否需要更新；以連結引用為主，避免複製出多套規則。
 5. 舊版移至 repo 外 `qa-archived/governance/` 備查；Git repo 內只保留最新 CONTROLLED 版本。
-6. 修改完成後，在文件的變更紀錄登錄版本、日期、SHA、摘要與簽認狀態。
+6. 修改完成後，在文件的變更紀錄登錄 semantic version、日期、摘要與簽認狀態；exact Git commit 只留在外部交接／review evidence。
 
 ### 15.1 變更紀錄
 
@@ -464,3 +466,4 @@ Block 一經發現立即回報，格式固定如下：
 | v2.8.21 | 2026-09-16 | 依 Product Owner 指示，所有 Index Title 強制支援可存取 ASC/DESC；sort/page/filter/search 必須由 UI 經 BFF 傳至 Backend/DB 白名單 ORDER BY 並附唯一鍵穩定排序；Checker/Audit 沿用原交易 Index title/order/search/sort，只追加 Maker/Checker Datetime | Maker `/root`；v2.8.20 簽認因新 SHA 失效，待 Independent Architecture／DBA／QA Checker 對 v2.8.21 同 SHA 重驗 |
 | v2.8.22 | 2026-09-18 | 依 Product Owner 指示新增 TDD Git 隔離治理：所有 TDD 在獨立 branch、建議獨立 worktree；開工前記錄 base HEAD 與 dirty manifest／owner；candidate 提供 exact SHA、同 SHA 4-EYES 與 rollback patch；禁止以 reset／checkout／stash／clean 影響他人 | Maker `/root`；先前簽認因正文 SHA 改變而失效，待 Independent QA／Governance Checker 對 v2.8.22 同 SHA 重驗 |
 | v2.8.23 | 2026-09-18 | 治理身分一致性修正：同步正文 header、AGENTS／CLAUDE active references、MT1 v2 governance identity、manifest 與 canonical LF SHA sidecar chain；修復失效的受控文件連結，不改寫 frozen historical evidence | Governance Maker `/root/angular_lazy_defer_engineer`；待 Independent Governance／QA Checker 對 exact candidate SHA 重驗，未簽認前為 NOT_ACCEPTED |
+| v2.8.24 | 2026-09-18 | 依 Product Owner 簡化治理：active repository 文件以 repo path＋semantic version 識別，由 Git 保存版本歷史；移除手工 document／manifest SHA chain。Main 禁止直接修改／commit，所有受控變更經 Task Branch（緊急時 Hotfix Branch）、適用測試與 4-EYES。Exact base／candidate commit 僅放外部交接與 4-EYES evidence。流程固定為獨立 branch/worktree、explicit staging、local commit/no push；Designer／QA 對同一 commit PASS 後檢查 Main：Main 有變即 rebase、re-test 並對新 commit 重跑完整 4-EYES，未變才 fast-forward，確保 reviewed commit 就是進入 Main 的 commit；之後 Main integration PASS、local Baseline／Release Tag、明確 Main sealed，最後才 cleanup 本任務已合併 branch/worktree，且禁止移除未合併、失敗、調查保留或他人 branch/worktree | Governance Maker `/root/angular_lazy_defer_engineer`；待 Independent Governance／QA Checker 對同一外部 candidate commit 重驗，未簽認前為 NOT_ACCEPTED |

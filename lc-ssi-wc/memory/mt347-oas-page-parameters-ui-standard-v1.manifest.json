@@ -2,8 +2,7 @@
   "artifact": "memory/mt347-oas-page-parameters-ui-standard-v1.md",
   "version": "v1",
   "status": "CONTROLLED_PENDING_4_EYES_REVALIDATION",
-  "canonicalization": "UTF-8 without BOM; CRLF and CR normalized to LF",
-  "sha256": "49802BC555A7609CDFF60C7B868C2C81FFE9A14977468E4EB61321A0842F5184",
+  "identityPolicy": "REPO_PATH_AND_SEMANTIC_VERSION",
   "effectiveDate": "2026-09-15",
   "manifestMaker": "/root/angular_lazy_defer_engineer",
   "approval": "PENDING_INDEPENDENT_CHECKER"

@@ -2,8 +2,7 @@
   "artifact": "memory/failed-task-retrospective-method-zh-v1.md",
   "version": "v1.4",
   "status": "ACTIVE",
-  "canonicalization": "UTF-8 without BOM; CRLF and CR normalized to LF",
-  "sha256": "F6B524CD88F9323369A6DAC8B4385A465A8E99AF1457AC98BF6785F5B2B12333",
+  "identityPolicy": "REPO_PATH_AND_SEMANTIC_VERSION",
   "effectiveDate": "2026-09-18",
   "manifestMaker": "/root/angular_lazy_defer_engineer",
   "approval": "PENDING_INDEPENDENT_CHECKER"

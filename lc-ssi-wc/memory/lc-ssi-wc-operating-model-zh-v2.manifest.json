@@ -1,21 +1,19 @@
 {
   "schemaVersion": "1.0",
   "artifact": "memory/lc-ssi-wc-operating-model-zh-v2.md",
-  "version": "v2.8.23",
+  "version": "v2.8.24",
   "effectiveDate": "2026-09-18",
-  "canonicalization": "UTF-8 without BOM; CRLF and CR normalized to LF",
-  "sha256": "9CDA18AF27C683E019DF4B1084A68A85179F5C9BCB937D37EBD9610A762D4584",
-  "changeReason": "Reconcile the controlled document identity chain without rewriting v2.8.22 history: synchronize the header, active AGENTS/CLAUDE and MT1 v2 references, manifests, and canonical LF SHA sidecars; repair broken controlled links; retain all approvals as pending independent review.",
+  "identityPolicy": "REPO_PATH_AND_SEMANTIC_VERSION",
+  "changeReason": "Migrate active governance identity from manually maintained document SHA chains to repository path plus semantic version, with Git history and externally recorded exact commits providing review traceability; adopt the Product Owner approved isolated local-commit, independent-review, main-integration, tag, sealing, and cleanup sequence.",
   "scope": "All current and future SSI Resolution Message Families and their Generic UI consumers.",
-  "maker": "/root",
+  "maker": "/root/angular_lazy_defer_engineer",
   "independentChecker": "PENDING_ASSIGNMENT",
   "checkerStatus": "PENDING_REVIEW",
   "checkedAt": null,
   "referencedArtifacts": [
     {
       "artifact": "memory/mt347-oas-page-parameters-ui-standard-v1.md",
-      "version": "v1",
-      "sha256": "49802BC555A7609CDFF60C7B868C2C81FFE9A14977468E4EB61321A0842F5184"
+      "version": "v1"
     }
   ],
   "reviewEvidence": {
