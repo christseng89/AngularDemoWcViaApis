@@ -1,0 +1,19 @@
+{
+  "artifact": "memory/swift-mt1xx-pacs008-v2.md",
+  "version": "v2",
+  "status": "CONTROLLED_CANDIDATE",
+  "canonicalization": "UTF-8 without BOM; CRLF and CR normalized to LF",
+  "sha256": "8B422EB1C3BFDB84BCECACEA90311AD3C91B1B83213A0079E80DA28EA1914D2B",
+  "preparedDate": "2026-09-16",
+  "governance": {
+    "artifact": "memory/lc-ssi-wc-operating-model-zh-v2.md",
+    "version": "v2.8.23",
+    "sha256": "9CDA18AF27C683E019DF4B1084A68A85179F5C9BCB937D37EBD9610A762D4584"
+  },
+  "manifestMaker": "/root/angular_lazy_defer_engineer",
+  "baMakerStatus": "PENDING",
+  "independentBaCheckerStatus": "PENDING",
+  "qaCheckerStatus": "PENDING",
+  "productOwnerApproval": "OPEN",
+  "implementationAuthorization": "NOT_AUTHORIZED"
+}

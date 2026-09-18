@@ -10,7 +10,7 @@
 **OPEN-01 Matrix SHA-256:** `F18FEC54B2A61B2DFF9607543294D447BB323F31A95F75A572A49FDED68998D2`  
 **OPEN-02 Matrix SHA-256:** `E409BE0882A1D3FB9873AE3D5C835A097D4D9CFE8DB13D4E81A048824F760C0F`  
 **Matrix BA／QA Review SHA-256:** `23F87D36C696F6C5D4B70B76A36E9CA2BD85E88A27ECF9E82A6AF2D764A80092`  
-**Governance:** `memory/lc-ssi-wc-operating-model-zh-v2.md` v2.8.20, canonical LF SHA-256 `1E8E964FBB30885739F8A78B71CFD170EDF329026BD075A6C0D83A995B7D9DDF`  
+**Governance:** `memory/lc-ssi-wc-operating-model-zh-v2.md` v2.8.23, canonical LF SHA-256 `9CDA18AF27C683E019DF4B1084A68A85179F5C9BCB937D37EBD9610A762D4584`
 **Architecture:** `Controlled OAS / Typed Contract + Controlled Parameters / DB -> Domain Policy / API -> Page Parameter Model -> Generic UI`
 
 > This memory records the frozen v0.6 MT1xx Bank SSI scope and deterministic matrices. Proposal/OPEN-01/OPEN-02 already have BA/Independent-BA/QA same-SHA PASS. This Memory v2 still requires its own BA Maker, Independent BA Checker and QA same-SHA review, followed by Product Owner exact-bundle approval. It does not yet authorize implementation, TDD, OAS, Page Parameters, DB changes or release.

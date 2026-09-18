@@ -1,7 +1,7 @@
 # lc-ssi-wc 全專案作業模式與交付治理 — 中文版 v2
 
 **狀態：CONTROLLED**  
-**文件版本：v2.8.22**
+**文件版本：v2.8.23**
 **生效日期：2026-09-18**
 **適用範圍：MT1／pacs.008、MT2／pacs.009 plain/COV/ADV、MT3＋MT4＋MT7（MT347）及未來所有 Message Family**
 
@@ -463,3 +463,4 @@ Block 一經發現立即回報，格式固定如下：
 | v2.8.20 | 2026-09-16 | 依 Product Owner 指示將 Page-by-page 升格為全產品強制設計模式：Browser/BFF 禁止全量假分頁；API/DB 回傳本頁 projection 與 total metadata；Frontend/Backend 工程師須有設計模式認證或等價 competency assessment，並以 contract、Query Plan、latency、payload、Browser UAT 作為 Gate | Maker `/root`；任何先前治理簽認因新版本與 SHA 失效，待 Independent Architecture／DBA／QA Checker 對 v2.8.20 同 SHA 重驗 |
 | v2.8.21 | 2026-09-16 | 依 Product Owner 指示，所有 Index Title 強制支援可存取 ASC/DESC；sort/page/filter/search 必須由 UI 經 BFF 傳至 Backend/DB 白名單 ORDER BY 並附唯一鍵穩定排序；Checker/Audit 沿用原交易 Index title/order/search/sort，只追加 Maker/Checker Datetime | Maker `/root`；v2.8.20 簽認因新 SHA 失效，待 Independent Architecture／DBA／QA Checker 對 v2.8.21 同 SHA 重驗 |
 | v2.8.22 | 2026-09-18 | 依 Product Owner 指示新增 TDD Git 隔離治理：所有 TDD 在獨立 branch、建議獨立 worktree；開工前記錄 base HEAD 與 dirty manifest／owner；candidate 提供 exact SHA、同 SHA 4-EYES 與 rollback patch；禁止以 reset／checkout／stash／clean 影響他人 | Maker `/root`；先前簽認因正文 SHA 改變而失效，待 Independent QA／Governance Checker 對 v2.8.22 同 SHA 重驗 |
+| v2.8.23 | 2026-09-18 | 治理身分一致性修正：同步正文 header、AGENTS／CLAUDE active references、MT1 v2 governance identity、manifest 與 canonical LF SHA sidecar chain；修復失效的受控文件連結，不改寫 frozen historical evidence | Governance Maker `/root/angular_lazy_defer_engineer`；待 Independent Governance／QA Checker 對 exact candidate SHA 重驗，未簽認前為 NOT_ACCEPTED |

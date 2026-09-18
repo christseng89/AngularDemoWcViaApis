@@ -4,7 +4,7 @@
 
 - 開工、分派、設計、DB Reload、QA、SonarQube、Excel TDD、封存及 Block 回報，一律遵守 `memory/lc-ssi-wc-operating-model-zh-v2.md`。
 - SSI Resolver 的產品責任與結案邊界一律遵守 `memory/ssi-resolver-service-boundary-v1.md`：第三方 FIN Validator／完整 FIN NVR／SWIFT Network 為 `OUT_OF_SCOPE — CLOSED`，不得建立 SSI Open／Block，禁止 scope creeping。
-- MT1／pacs.008 的受控知識入口為 `memory/swift-mt1xx-pacs008-v1.md`；未完成 BA/QA 簽認的 OPEN 不得當作已核准規則。
+- MT1／pacs.008 的受控知識入口為 `memory/swift-mt1xx-pacs008-v2.md`；未完成 BA/QA 簽認的 OPEN 不得當作已核准規則。
 
 ## 全專案強制架構要求
 
