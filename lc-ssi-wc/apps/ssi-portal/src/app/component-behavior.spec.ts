@@ -493,6 +493,156 @@ describe("portal component behavior", () => {
     expect(refresh).toHaveBeenCalledTimes(1);
   });
 
+  it("reloads the volatile Checker queue when returning after an SSI submit", async () => {
+    const { AppComponent } = await import("./app.component");
+    const component = new AppComponent();
+    const refresh = jest.spyOn(component, "refresh").mockResolvedValue();
+    const loadGovernedPending = jest
+      .spyOn(component as never, "loadGovernedPending" as never)
+      .mockResolvedValue(undefined as never);
+
+    component.navigate("checker");
+    await (
+      component as unknown as {
+        ensureFeatureData(view: "checker"): Promise<void>;
+      }
+    ).ensureFeatureData("checker");
+
+    component.navigate("dashboard");
+    await (
+      component as unknown as {
+        ensureFeatureData(view: "dashboard"): Promise<void>;
+      }
+    ).ensureFeatureData("dashboard");
+    await component.act(
+      {
+        id: "SSI-REVISION",
+        counterpartyId: "BANK-1",
+        scope: "STANDING",
+        status: "DRAFT",
+        maker: "maker.revision",
+        route: { currency: "USD" },
+        version: 2,
+      },
+      "submit",
+    );
+
+    component.navigate("checker");
+    await (
+      component as unknown as {
+        ensureFeatureData(view: "checker"): Promise<void>;
+      }
+    ).ensureFeatureData("checker");
+
+    expect(loadGovernedPending).toHaveBeenCalledTimes(2);
+    expect(refresh).toHaveBeenCalledTimes(4);
+  });
+
+  it("revalidates SSI rows after Checker has used its independent queue", async () => {
+    const { AppComponent } = await import("./app.component");
+    const component = new AppComponent();
+    const refresh = jest.spyOn(component, "refresh").mockResolvedValue();
+    jest
+      .spyOn(component as never, "loadGovernedPending" as never)
+      .mockResolvedValue(undefined as never);
+
+    component.navigate("dashboard");
+    await (
+      component as unknown as {
+        ensureFeatureData(view: "dashboard"): Promise<void>;
+      }
+    ).ensureFeatureData("dashboard");
+    component.navigate("checker");
+    await (
+      component as unknown as {
+        ensureFeatureData(view: "checker"): Promise<void>;
+      }
+    ).ensureFeatureData("checker");
+    component.navigate("dashboard");
+    await (
+      component as unknown as {
+        ensureFeatureData(view: "dashboard"): Promise<void>;
+      }
+    ).ensureFeatureData("dashboard");
+
+    expect(refresh).toHaveBeenCalledTimes(3);
+  });
+
+  it("releases SSI WIP before route navigation and fails closed on release error", async () => {
+    const { AppComponent } = await import("./app.component");
+    const revision = {
+      id: "SSI-WIP-1",
+      counterpartyId: "BANK-1",
+      scope: "STANDING",
+      status: "ACTIVE",
+      maker: "maker.revision",
+      route: { currency: "USD" },
+      version: 1,
+    } as const;
+
+    const successful = new AppComponent();
+    successful.view.set("maker");
+    successful.editingId.set(revision.id);
+    successful.revisionSource.set(revision);
+    const successfulPosts = fakeHttp.post.mock.calls.length;
+    const [firstSuccess, secondSuccess] = await Promise.all([
+      successful.canDeactivate(),
+      successful.canDeactivate(),
+    ]);
+    expect([firstSuccess, secondSuccess]).toEqual([true, true]);
+    expect(fakeHttp.post.mock.calls.length - successfulPosts).toBe(1);
+    expect(successful.editingId()).toBeNull();
+
+    const blocked = new AppComponent();
+    blocked.view.set("maker");
+    blocked.editingId.set(revision.id);
+    blocked.revisionSource.set(revision);
+    rejectHttp = true;
+    try {
+      const failedPosts = fakeHttp.post.mock.calls.length;
+      const [firstFailure, secondFailure] = await Promise.all([
+        blocked.canDeactivate(),
+        blocked.canDeactivate(),
+      ]);
+      expect([firstFailure, secondFailure]).toEqual([false, false]);
+      expect(fakeHttp.post.mock.calls.length - failedPosts).toBe(1);
+      expect(blocked.editingId()).toBe(revision.id);
+      expect(blocked.notice()?.text).toContain("In Progress");
+    } finally {
+      rejectHttp = false;
+    }
+  });
+
+  it("deduplicates concurrent SWIFT Data WIP release attempts", async () => {
+    const { SwiftDataCrudComponent } = await import(
+      "./swift-data-crud.component"
+    );
+    const component = new SwiftDataCrudComponent();
+    component.contract.set({
+      info: { title: "test", version: "1" },
+      "x-standards-baseline": {},
+      "x-ui-resources": [
+        {
+          id: "rma",
+          label: "RMA",
+          endpoint: "rma-authorisations",
+          description: "RMA",
+          columns: [],
+          fields: [],
+          "x-lifecycle": [],
+        },
+      ],
+    } as never);
+    component.revisionReservationId.set("RMA-WIP-1");
+    const deletes = fakeHttp.delete.mock.calls.length;
+    const [first, second] = await Promise.all([
+      component.canDeactivate(),
+      component.canDeactivate(),
+    ]);
+    expect([first, second]).toEqual([true, true]);
+    expect(fakeHttp.delete.mock.calls.length - deletes).toBe(1);
+  });
+
   it("clears a stale global notice when navigation provides its own page-level status", async () => {
     const { AppComponent } = await import("./app.component");
     const component = new AppComponent();
@@ -1719,7 +1869,7 @@ describe("portal component behavior", () => {
       validTo: "9999-12-31",
       version: 1,
     };
-    component.rows.set([
+    const workspaceRows = [
       {
         id: "SSI-OWN",
         counterpartyId: "BARCGB22",
@@ -1758,7 +1908,9 @@ describe("portal component behavior", () => {
         route: { currency: "USD", counterpartyBic: "ANY" },
         version: 1,
       },
-    ]);
+    ];
+    // Simulate the ACTIVE/OWN page already filtered by the authoritative API.
+    component.rows.set([workspaceRows[0]!]);
     component.counterpartyDirectory.set([
       {
         counterpartyId: "CUST-1",
@@ -1805,6 +1957,9 @@ describe("portal component behavior", () => {
     component.selectedCounterpartyId.set("CUST-1");
     expect(component.counterpartyInbox()).toHaveLength(1);
     expect(component.selectedCounterparty()?.counterpartyId).toBe("CUST-1");
+    // Restore non-Index workspace records for the remaining derived-state checks.
+    component.rows.set(workspaceRows);
+    component.checkerRows.set(workspaceRows);
     component.ssiSummary.set({
       currentOwn: 1,
       pendingApproval: 1,
@@ -2073,6 +2228,7 @@ describe("portal component behavior", () => {
   it("keeps the SSI index in a loading state until Draft rows arrive", async () => {
     const { AppComponent } = await import("./app.component");
     const component = new AppComponent();
+    component.ownershipStatus.set("DRAFT");
     pendingSsiResponse = new Subject<unknown>();
 
     const refresh = component.refresh();
@@ -2106,8 +2262,6 @@ describe("portal component behavior", () => {
     ]);
     pendingSsiResponse.complete();
     await refresh;
-    component.ownershipStatus.set("DRAFT");
-
     expect(component.ssiIndexLoading()).toBe(false);
     expect(component.visibleRows().map((row) => row.id)).toEqual([
       "SSI-EUR-DRAFT",

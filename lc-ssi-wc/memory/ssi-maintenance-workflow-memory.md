@@ -1,7 +1,9 @@
 # SSI-related File Maintenance Workflow — Persistent Decision Record
 
-**Status:** Normative project memory  
-**Latest confirmation:** 2026-09-16  
+**Status:** Normative project memory
+
+**Latest confirmation:** 2026-09-18
+
 **Read before:** answering maintenance lifecycle questions or changing SSI, RMA, Entities, Nostro, SWIFT Data, shared Maker／Checker UI, API, repository, tests, fixtures, or `.env` configuration.
 
 ## API／parameter／screen consistency standard
@@ -34,7 +36,7 @@
 ## Canonical multi-user revision workflow
 
 1. Selecting `Revise` on an eligible Active record must atomically create a server-side `WIP` reservation.
-2. The Active record remains the effective record, but its Revision Status displays `In Progress` and other users cannot start another Revise or Suppress operation.
+2. The Active record remains the effective record, but its server-derived Current Status displays `In Progress` and other users cannot start another Revise or Suppress operation.
 3. Existing `WIP`, `DRAFT`, `PENDING_APPROVAL`, or `APPROVED` open revisions block another Revise. The server is authoritative; hiding a UI button is not concurrency control.
 4. `WIP / In Progress` is transient work and must not appear in the Draft tab.
 5. Closing the editor uses only `×` or `Esc`; do not add a separate `Cancel` button.
@@ -46,9 +48,25 @@
 ## WIP expiry
 
 - Configuration key: `REVISION_WIP_TTL_MINUTES`.
-- Current environment decision: **5 minutes**. This supersedes the earlier 30-minute decision.
+- The configured value is authoritative. When the environment key is unset, the governed default is **30 minutes**.
 - After the configured inactivity period, the server must logically cancel the abandoned WIP, preserve audit evidence, and release the source record lock.
 - `DRAFT` and `PENDING_APPROVAL` do not expire through the WIP timeout.
+
+## Server-derived Current Status contract
+
+`Current Status` is a typed read projection derived by the server from the source record's authoritative open child. It is not inferred by the browser and is not a second persisted lifecycle field.
+
+| Open child state／type                                                        | `currentStatus` | Exact UI label |
+| ----------------------------------------------------------------------------- | --------------- | -------------- |
+| No open child                                                                 | `EMPTY`         | Empty cell     |
+| Ordinary or suppression reservation in `WIP`                                  | `IN_PROGRESS`   | `In Progress`  |
+| Ordinary `REVISION` in `DRAFT`, `PENDING_APPROVAL`, or legacy-open `APPROVED` | `DRAFTED`       | `Drafted`      |
+| `SUPPRESSION` in `DRAFT`, `PENDING_APPROVAL`, or legacy-open `APPROVED`       | `SUPPRESSED`    | `Suppressed`   |
+
+- The projection applies identically to RMA, Entity, Nostro, and SSI list responses. A custom grouped index must derive the projection from the grouped source member's actual open child, including that child's `changeType`.
+- An Active row exposes `Revise` and `Suppress` only when `currentStatus=EMPTY`. Missing, unknown, or non-empty Current Status fails closed with zero mutation actions.
+- First `Revise` atomically reserves WIP. A competing `Revise` or `Suppress` must be rejected by the server even when two requests race before either browser refreshes.
+- `×`／`Esc` before Save Draft releases the server WIP; Save Draft converts WIP to `DRAFT`; the configured TTL logically expires abandoned WIP. Refresh and list APIs must immediately reflect the resulting Current Status.
 
 ## State summary
 
@@ -57,7 +75,7 @@ ACTIVE (no open revision)
   └─ Revise → WIP / In Progress (server lock acquired)
        ├─ Save Draft → DRAFT
        ├─ × / Esc → WIP cancelled → ACTIVE unlocked
-       └─ 5-minute inactivity → WIP expired → ACTIVE unlocked
+       └─ configured inactivity TTL (default 30 minutes) → WIP expired → ACTIVE unlocked
 
 DRAFT
   ├─ Edit → Save Draft → DRAFT
@@ -68,6 +86,23 @@ PENDING_APPROVAL
   ├─ Approve → ACTIVE (new version)
   └─ Reject → DRAFT
 ```
+
+## Product Owner index action matrix
+
+This matrix is the final Product Owner ruling for record-level actions in SSI-related maintenance indexes. It is presentation guidance only; server-side lifecycle and concurrency checks remain authoritative.
+
+| Record state／revision condition           | Visible record actions                  |
+| ------------------------------------------ | --------------------------------------- |
+| `ACTIVE` with no open revision             | `Revise`, `Suppress`                    |
+| `ACTIVE` with any non-empty Current Status | None                                    |
+| Ordinary `DRAFT` (`ADD`／`REVISION`)       | `Submit`, `Edit`, `Revoke Draft`        |
+| `SUPPRESSION` `DRAFT`                      | `Submit`, `Revoke Draft`; **no `Edit`** |
+| `SUPPRESSED`                               | None                                    |
+| `ALL` tab                                  | None                                    |
+
+- In every tab, clicking a row or pressing `Enter`／`Space` opens **View Record**.
+- Header／global `Add`, `Export`, `Import`, and `Dry-run` controls are outside this record-action matrix.
+- Checker actions are outside this record-action matrix.
 
 ## Historical decisions that must not be reinterpreted
 

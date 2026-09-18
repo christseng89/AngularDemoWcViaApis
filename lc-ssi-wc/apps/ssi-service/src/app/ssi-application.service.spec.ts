@@ -250,6 +250,17 @@ describe("SsiApplicationService governed lifecycle", () => {
       find: jest.fn((id: string) => records.find((item) => item.id === id)),
       listApplicability: jest.fn(() => applicabilityRows),
       replaceApplicability: jest.fn((_id, rows) => rows),
+      approveWithApplicability: jest.fn((id: string, actor: string) => {
+        const current = records.find((item) => item.id === id);
+        return current
+          ? {
+              ...current,
+              status: "ACTIVE",
+              checker: actor,
+              version: current.version + 1,
+            }
+          : undefined;
+      }),
       save: jest.fn(),
       audit: jest.fn(() => [{ action: "CREATED" }]),
     };
@@ -473,18 +484,52 @@ describe("SsiApplicationService governed lifecycle", () => {
     repository.listApplicability.mockImplementation((id?: string) =>
       id === pending.id ? [] : [applicability],
     );
-    repository.replaceApplicability.mockReturnValue([
-      { ...applicability, id: `${pending.id}:APPL:1`, ssiId: pending.id },
-    ]);
-
     expect(current.transition(pending.id, "APPROVE", "checker")).toMatchObject({
       status: "ACTIVE",
       checker: "checker",
     });
-    expect(repository.replaceApplicability).toHaveBeenCalledWith(
+    expect(repository.listApplicability).toHaveBeenCalledWith("SSI-1");
+    expect(repository.replaceApplicability).not.toHaveBeenCalled();
+    expect(repository.approveWithApplicability).toHaveBeenCalledWith(
       pending.id,
-      [expect.objectContaining({ status: "ACTIVE" })],
       "checker",
+    );
+  });
+
+  it("approves a submitted SSI and its draft applicability as one governed transition", () => {
+    const pending = {
+      ...record,
+      id: "SSI-PENDING",
+      status: "PENDING_APPROVAL",
+      amendmentOfId: "SSI-1",
+      maker: "maker.datafix",
+    };
+    const draftApplicability = {
+      ...applicability,
+      id: `${pending.id}:APPL:1`,
+      ssiId: pending.id,
+      status: "DRAFT" as const,
+    };
+    const { service: current, repository } = harness(
+      [{ ...record, status: "ACTIVE" }, pending],
+      [draftApplicability as unknown as typeof applicability],
+    );
+
+    expect(
+      current.transition(pending.id, "APPROVE", "checker.demo"),
+    ).toMatchObject({
+      id: pending.id,
+      status: "ACTIVE",
+      checker: "checker.demo",
+    });
+    expect(repository.approveWithApplicability).toHaveBeenCalledWith(
+      pending.id,
+      "checker.demo",
+    );
+    expect(repository.save).not.toHaveBeenCalledWith(
+      expect.objectContaining({ id: pending.id }),
+      "APPROVE",
+      "checker.demo",
     );
   });
 

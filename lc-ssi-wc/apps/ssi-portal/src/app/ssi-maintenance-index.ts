@@ -144,6 +144,7 @@ export interface SortableSsiRow {
   changeType?: "REVISION" | "SUPPRESSION";
   hasOpenRevision?: boolean;
   openRevisionStatus?: string;
+  currentStatus?: "EMPTY" | "IN_PROGRESS" | "DRAFTED" | "SUPPRESSED";
   route: Readonly<Record<string, string>>;
 }
 
@@ -206,10 +207,8 @@ export function sortSsiOwnershipRows<T extends SortableSsiRow>(
         Number(left["priority"] || Number.MAX_SAFE_INTEGER) -
           Number(right["priority"] || Number.MAX_SAFE_INTEGER),
     ),
-    EFFECTIVE_PERIOD: routeComparator(
-      (left, right) =>
-        compareDate(left["validFrom"], right["validFrom"]) ||
-        compareDate(left["validTo"], right["validTo"]),
+    EFFECTIVE_PERIOD: routeComparator((left, right) =>
+      compareDate(left["validTo"], right["validTo"]),
     ),
     STATUS: (left, right) => compareText(left.status, right.status),
     VERSION: (left, right) => left.version - right.version,
@@ -219,21 +218,21 @@ export function sortSsiOwnershipRows<T extends SortableSsiRow>(
         right.changeType ?? (right.amendmentOfId ? "REVISION" : "NEW"),
       ),
     REVISION_STATUS: (left, right) =>
-      compareText(left.openRevisionStatus, right.openRevisionStatus),
+      compareText(left.currentStatus, right.currentStatus),
     SUBMIT: (left, right) =>
       Number(left.status === "DRAFT") - Number(right.status === "DRAFT"),
     EDIT_REVISE: (left, right) =>
       Number(
         left.status === "DRAFT" ||
-          (left.status === "ACTIVE" && !left.hasOpenRevision),
+          (left.status === "ACTIVE" && left.currentStatus === "EMPTY"),
       ) -
       Number(
         right.status === "DRAFT" ||
-          (right.status === "ACTIVE" && !right.hasOpenRevision),
+          (right.status === "ACTIVE" && right.currentStatus === "EMPTY"),
       ),
     SUPPRESS: (left, right) =>
-      Number(left.status === "ACTIVE" && !left.hasOpenRevision) -
-      Number(right.status === "ACTIVE" && !right.hasOpenRevision),
+      Number(left.status === "ACTIVE" && left.currentStatus === "EMPTY") -
+      Number(right.status === "ACTIVE" && right.currentStatus === "EMPTY"),
     REVOKE_DRAFT: (left, right) =>
       Number(left.status === "DRAFT") - Number(right.status === "DRAFT"),
   };

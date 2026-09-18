@@ -56,7 +56,10 @@
 
 - 每一階段由整合負責人先拆成可獨立交付、檔案範圍不重疊的工作線，例如 API Contract、Backend Adapter、Generic UI、DB/Fixture、QA Gate、BA Review。
 - 每一條工作線必須明確記錄：負責人、可修改目錄、禁止修改範圍、輸入版本/SHA、預期輸出、測試命令、交接條件及風險。
-- 多人共用同一 worktree 時不得同時修改同一檔案；共用接線檔由整合負責人最後修改。
+- 所有 TDD 工程必須在獨立 Git branch 執行，建議同時使用獨立 worktree；禁止直接在共用 dirty working tree 實作 production code 或測試。
+- TDD 開始前必須記錄 exact base HEAD、既有 dirty-file manifest，以及每一項既有變更的 owner；未能證明 ownership 的重疊 hunk 必須標為 `CONFLICT`，不得覆寫或撤銷。
+- 每個 candidate 必須提供 exact candidate SHA、同 SHA 4-EYES 證據及可恢復 patch；禁止使用 `reset`、`checkout`、`stash`、`clean` 或等效操作影響他人工作。
+- 共用接線檔由整合負責人最後修改；只有在獨立 branch／worktree 的 candidate 通過驗證後，才可按受控整合流程合併。
 - 工作完成時，交接內容至少包含 changed files、tests、coverage、known gaps、integration points；不得只回覆「完成」。
 - QA 與 BA 在工程期間持續參與：規格問題找 BA；資料、oracle、evidence 問題找 QA；架構與接線衝突找整合負責人。
 
@@ -105,6 +108,7 @@
 - Green 後必須執行受影響的 unit、contract、integration、architecture 及 browser/UI tests；Refactor 後再跑相同範圍與專案標準 `npm run verify`。
 - 不得先寫 production code 再補測試，不得刪除／放寬 assertion 來取得 PASS，也不得以手動 UI 操作取代可自動化的測試。
 - 緊急修復若因事故處置必須先隔離風險，狀態仍為 `NOT_ACCEPTED`；補齊缺陷重現測試、Red/Green/Refactor evidence、回歸與 4-EYES 前不得進入 Release Candidate。
+- TDD Red／Green／Refactor 必須在獨立 Git branch（建議獨立 worktree）完成。開始前保存 base HEAD、dirty manifest／owner；完成時保存 candidate SHA、同 SHA 4-EYES 與 rollback patch。不得在共用 dirty working tree 直接實作，也不得以 `reset`／`checkout`／`stash`／`clean` 破壞或隱藏他人變更。
 
 ### 3.1 端到端工作配合與交接流程
 
@@ -458,3 +462,4 @@ Block 一經發現立即回報，格式固定如下：
 | v2.8.19 | 2026-09-16 | 依 Product Owner 指示將唯一主目錄改為 `C:\Users\samfi\Downloads\outputs\lc-ssi-wc`，本機交付物不推送 remote；新增 MT1／pacs.008 CPI 與 Bank SSI 強制分域、Customer UI 禁止 SSI 語意、intent provenance、三軸拆分及 current-rule/OPEN fail-closed Gate | Maker `/root`；待 Independent BA／QA Checker 對 v2.8.19 同 SHA 重驗，簽認前為 NOT_ACCEPTED |
 | v2.8.20 | 2026-09-16 | 依 Product Owner 指示將 Page-by-page 升格為全產品強制設計模式：Browser/BFF 禁止全量假分頁；API/DB 回傳本頁 projection 與 total metadata；Frontend/Backend 工程師須有設計模式認證或等價 competency assessment，並以 contract、Query Plan、latency、payload、Browser UAT 作為 Gate | Maker `/root`；任何先前治理簽認因新版本與 SHA 失效，待 Independent Architecture／DBA／QA Checker 對 v2.8.20 同 SHA 重驗 |
 | v2.8.21 | 2026-09-16 | 依 Product Owner 指示，所有 Index Title 強制支援可存取 ASC/DESC；sort/page/filter/search 必須由 UI 經 BFF 傳至 Backend/DB 白名單 ORDER BY 並附唯一鍵穩定排序；Checker/Audit 沿用原交易 Index title/order/search/sort，只追加 Maker/Checker Datetime | Maker `/root`；v2.8.20 簽認因新 SHA 失效，待 Independent Architecture／DBA／QA Checker 對 v2.8.21 同 SHA 重驗 |
+| v2.8.22 | 2026-09-18 | 依 Product Owner 指示新增 TDD Git 隔離治理：所有 TDD 在獨立 branch、建議獨立 worktree；開工前記錄 base HEAD 與 dirty manifest／owner；candidate 提供 exact SHA、同 SHA 4-EYES 與 rollback patch；禁止以 reset／checkout／stash／clean 影響他人 | Maker `/root`；先前簽認因正文 SHA 改變而失效，待 Independent QA／Governance Checker 對 v2.8.22 同 SHA 重驗 |

@@ -25,6 +25,16 @@ import {
   BankServicePickerDialogComponent,
   type BankServicePickerItem,
 } from "./bank-service-picker-dialog.component";
+import {
+  createMaintenanceIndexActionAdapter,
+  type MaintenanceIndexActionId,
+  type MaintenanceIndexTab,
+} from "./maintenance-index-action-policy";
+import { assertMaintenanceServerPage } from "./maintenance-index-server-page";
+import {
+  currentStatusLabel,
+  type CurrentStatus,
+} from "./current-status-contract";
 
 interface UiColumn {
   path?: string;
@@ -178,25 +188,22 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
   );
   readonly rows = signal<readonly Row[]>([]);
   readonly statusFilter = signal<StatusFilter>("ACTIVE");
+  readonly actionAdapter = computed(() =>
+    createMaintenanceIndexActionAdapter(this.resourceId()),
+  );
+  readonly actionColumns = computed(() =>
+    this.checkerMode()
+      ? []
+      : this.actionAdapter().columnsFor(
+          this.statusFilter() as MaintenanceIndexTab,
+        ),
+  );
   readonly indexSearch = signal("");
   readonly page = signal(1);
   readonly pageSize = 8;
   readonly totalItems = signal(0);
   readonly serverTotalPages = signal(1);
-  readonly filteredRows = computed(() => {
-    const resource = this.resource();
-    const query = this.indexSearch().trim().toLocaleUpperCase();
-    const statusRows =
-      this.statusFilter() === "ALL"
-        ? this.rows()
-        : this.rows().filter((row) => row.status === this.statusFilter());
-    if (!resource || !query) return statusRows;
-    return statusRows.filter((row) =>
-      resource.columns.some((column) =>
-        this.columnValue(row, column).toLocaleUpperCase().includes(query),
-      ),
-    );
-  });
+  readonly filteredRows = computed(() => this.rows());
   readonly sortPath = signal<string | null>(null);
   readonly sortDirection = signal<"asc" | "desc">("asc");
   readonly sortedRows = computed(() => {
@@ -265,6 +272,7 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
     string,
     readonly string[]
   >();
+  private pendingDeactivation: Promise<boolean> | null = null;
   readonly bankPage = signal<BankPage>({
     items: [],
     page: 1,
@@ -408,6 +416,7 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
             hasNext: false,
           }
         : response;
+      assertMaintenanceServerPage(result.items, this.statusFilter());
       this.rows.set(result.items);
       this.cacheRmaDirectionMessageTypes(result.items);
       this.totalItems.set(result.totalItems);
@@ -496,9 +505,30 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
     }
   }
 
-  private async releaseRevisionReservation(id: string): Promise<void> {
+  async canDeactivate(): Promise<boolean> {
+    if (this.pendingDeactivation) return this.pendingDeactivation;
+    const attempt = this.performCanDeactivate().finally(() => {
+      if (this.pendingDeactivation === attempt) this.pendingDeactivation = null;
+    });
+    this.pendingDeactivation = attempt;
+    return attempt;
+  }
+
+  private async performCanDeactivate(): Promise<boolean> {
+    const reservationId = this.revisionReservationId();
+    if (!reservationId) return true;
+    const released = await this.releaseRevisionReservation(reservationId);
+    if (released) {
+      this.revisionReservationId.set(null);
+      this.formVisible.set(false);
+      this.editingId.set(null);
+    }
+    return released;
+  }
+
+  private async releaseRevisionReservation(id: string): Promise<boolean> {
     const resource = this.resource();
-    if (!resource) return;
+    if (!resource) return false;
     try {
       await firstValueFrom(
         this.http.delete(`${this.api}/${resource.endpoint}/${id}`, {
@@ -513,12 +543,14 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
         text: "Revise 已取消；ACTIVE 紀錄已解除修訂註記。",
       });
       await this.refresh();
+      return true;
     } catch {
       this.notice.set({
         kind: "error",
         text: "取消 Revise 失敗；資料狀態已改變，請重新整理。",
       });
       await this.refresh();
+      return false;
     }
   }
   async view(row: Row): Promise<void> {
@@ -1031,12 +1063,10 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
   displayStatus(status: string): string {
     return status === "PENDING_APPROVAL" ? "SUBMITTED" : status;
   }
-  openRevisionLabel(row: Row): string {
-    const status = row["openRevisionStatus"];
-    if (status === "WIP") return "In progress";
-    if (status === "PENDING_APPROVAL") return "Submitted";
-    if (status === "APPROVED") return "Approved (legacy)";
-    return "Drafted";
+  currentStatusLabel(row: Row): string {
+    return currentStatusLabel(
+      (row["currentStatus"] ?? "EMPTY") as CurrentStatus,
+    );
   }
   workflowActionLabel(row: Row): string {
     if (this.canAct(row, "submit")) return "Submit";
@@ -1049,14 +1079,18 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
       row["changeType"] !== "SUPPRESSION"
     )
       return "Edit";
-    if (row.status === "ACTIVE" && !row.hasOpenRevision) return "Revise";
+    if (row.status === "ACTIVE" && row["currentStatus"] === "EMPTY")
+      return "Revise";
     return "";
   }
   canSuppress(row: Row): boolean {
-    return row.status === "ACTIVE" && !row.hasOpenRevision;
+    return row.status === "ACTIVE" && row["currentStatus"] === "EMPTY";
   }
   canRevokeDraft(row: Row): boolean {
     return row.status === "DRAFT";
+  }
+  isActionPresented(action: MaintenanceIndexActionId, row: Row): boolean {
+    return this.actionAdapter().isPresented(action, row);
   }
   requestTypeLabel(row: Row): "ADD" | "EDIT" | "SUPPRESSED" {
     const changeType = row["changeType"];
@@ -1083,8 +1117,7 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
   }
   private sortValue(row: Row, path: string): unknown {
     if (path === "__requestType") return this.requestTypeLabel(row);
-    if (path === "__openRevisionStatus")
-      return row.hasOpenRevision ? this.openRevisionLabel(row) : "";
+    if (path === "__openRevisionStatus") return this.currentStatusLabel(row);
     if (path === "__workflowAction") return this.workflowActionLabel(row);
     if (path === "__editAction") return this.editActionLabel(row);
     if (path === "__revokeAction")
@@ -1094,6 +1127,15 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
     return this.getPath(row, path);
   }
   setStatusFilter(filter: StatusFilter): void {
+    if (
+      !this.actionAdapter().isVisibleSort(
+        filter as MaintenanceIndexTab,
+        this.sortPath(),
+      )
+    ) {
+      this.sortPath.set(null);
+      this.sortDirection.set("asc");
+    }
     this.statusFilter.set(filter);
     this.page.set(1);
     this.detailTarget.set(null);

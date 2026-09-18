@@ -834,9 +834,19 @@
     "/rma-authorisations": {
       "get": {
         "operationId": "listRma",
+        "parameters": [
+          { "$ref": "#/components/parameters/MaintenanceIndexStatus" }
+        ],
         "responses": {
           "200": {
-            "description": "RMA records"
+            "description": "RMA records with server-derived Current Status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MaintenanceIndexListResponse"
+                }
+              }
+            }
           }
         }
       },
@@ -915,9 +925,19 @@
     "/ssis": {
       "get": {
         "operationId": "listSsi",
+        "parameters": [
+          { "$ref": "#/components/parameters/MaintenanceIndexStatus" }
+        ],
         "responses": {
           "200": {
-            "description": "SSI records"
+            "description": "SSI records with server-derived Current Status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MaintenanceIndexListResponse"
+                }
+              }
+            }
           }
         }
       },
@@ -983,6 +1003,26 @@
         }
       }
     },
+    "/booking-branch-entities": {
+      "get": {
+        "operationId": "listBookingBranchEntities",
+        "parameters": [
+          { "$ref": "#/components/parameters/MaintenanceIndexStatus" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Booking branch entity records with server-derived Current Status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MaintenanceIndexListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/booking-branch-entities/{id}/suppress": {
       "post": {
         "operationId": "createEntitySuppressionDraft",
@@ -1002,9 +1042,19 @@
     "/nostro-accounts": {
       "get": {
         "operationId": "listNostro",
+        "parameters": [
+          { "$ref": "#/components/parameters/MaintenanceIndexStatus" }
+        ],
         "responses": {
           "200": {
-            "description": "Nostro records"
+            "description": "Nostro records with server-derived Current Status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MaintenanceIndexListResponse"
+                }
+              }
+            }
           }
         }
       },
@@ -1885,6 +1935,16 @@
   },
   "components": {
     "parameters": {
+      "MaintenanceIndexStatus": {
+        "name": "status",
+        "in": "query",
+        "required": false,
+        "description": "Maintenance Index tab filter. ALL (and omission) returns ACTIVE plus SUPPRESSED records only; DRAFT, WIP, PENDING_APPROVAL, APPROVED, REVOKED, SUPERSEDED, and historical versions are excluded.",
+        "schema": {
+          "type": "string",
+          "enum": ["ACTIVE", "DRAFT", "SUPPRESSED", "ALL"]
+        }
+      },
       "Id": {
         "name": "id",
         "in": "path",
@@ -2516,6 +2576,63 @@
       "SwiftMessageType": {
         "type": "string",
         "pattern": "^(MT[0-9]{3}(COV)?|pacs\\.[A-Za-z0-9.]+|\\*)$"
+      },
+      "CurrentStatus": {
+        "type": "string",
+        "enum": ["EMPTY", "IN_PROGRESS", "DRAFTED", "SUPPRESSED"],
+        "description": "Server-derived maintenance status. EMPTY means no open child; IN_PROGRESS means an active WIP reservation; DRAFTED means an ordinary open DRAFT/PENDING_APPROVAL/APPROVED child; SUPPRESSED means an open SUPPRESSION child."
+      },
+      "MaintenanceIndexRecordProjection": {
+        "type": "object",
+        "required": ["currentStatus", "hasOpenRevision"],
+        "properties": {
+          "currentStatus": { "$ref": "#/components/schemas/CurrentStatus" },
+          "hasOpenRevision": { "type": "boolean" },
+          "openRevisionId": { "type": "string" },
+          "openRevisionStatus": {
+            "type": "string",
+            "enum": ["WIP", "DRAFT", "PENDING_APPROVAL", "APPROVED"]
+          },
+          "openRevisionChangeType": {
+            "type": "string",
+            "enum": ["REVISION", "SUPPRESSION"]
+          }
+        },
+        "additionalProperties": true
+      },
+      "MaintenanceIndexListResponse": {
+        "oneOf": [
+          {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MaintenanceIndexRecordProjection"
+            }
+          },
+          {
+            "type": "object",
+            "required": [
+              "items",
+              "page",
+              "pageSize",
+              "totalItems",
+              "totalPages"
+            ],
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/MaintenanceIndexRecordProjection"
+                }
+              },
+              "page": { "type": "integer", "minimum": 1 },
+              "pageSize": { "type": "integer", "minimum": 1 },
+              "totalItems": { "type": "integer", "minimum": 0 },
+              "totalPages": { "type": "integer", "minimum": 1 },
+              "hasPrevious": { "type": "boolean" },
+              "hasNext": { "type": "boolean" }
+            }
+          }
+        ]
       },
       "RmaCommand": {
         "type": "object",

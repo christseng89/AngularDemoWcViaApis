@@ -6,6 +6,7 @@ import {
   inject,
   type OnInit,
   signal,
+  viewChild,
 } from "@angular/core";
 import { HttpClient } from "@angular/common/http";
 import { scalarText } from "./scalar-text";
@@ -15,6 +16,15 @@ import { FormlyForm, type FormlyFieldConfig } from "@ngx-formly/core";
 import { readonlyFormFields, ssiFormModel } from "./ssi-form-presentation";
 import { firstValueFrom } from "rxjs";
 import { SwiftDataCrudComponent } from "./swift-data-crud.component";
+import {
+  createMaintenanceIndexActionAdapter,
+  type MaintenanceIndexActionId,
+} from "./maintenance-index-action-policy";
+import { assertMaintenanceServerPage } from "./maintenance-index-server-page";
+import {
+  currentStatusLabel,
+  type CurrentStatus,
+} from "./current-status-contract";
 import { GovernedRecordViewComponent } from "./governed-record-view.component";
 import { presentOfficialFieldName } from "./official-field-name";
 import { hasManualRouteOverride } from "./resolution-route-selection";
@@ -190,6 +200,8 @@ interface SsiRow {
   hasOpenRevision?: boolean;
   openRevisionId?: string;
   openRevisionStatus?: "WIP" | "DRAFT" | "PENDING_APPROVAL" | "APPROVED";
+  openRevisionChangeType?: "REVISION" | "SUPPRESSION";
+  currentStatus?: CurrentStatus;
   changeType?: "REVISION" | "SUPPRESSION";
   suppressionReason?: string;
   rejectionReason?: string;
@@ -1499,6 +1511,7 @@ export class AppComponent implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly document = inject(DOCUMENT);
   private readonly changeDetector = inject(ChangeDetectorRef);
+  private readonly swiftDataCrud = viewChild(SwiftDataCrudComponent);
   private readonly api = "http://localhost:3100/api";
   readonly finResolutionCatalogue = signal<
     readonly FinResolutionCatalogueItem[]
@@ -1514,6 +1527,9 @@ export class AppComponent implements OnInit {
   readonly view = signal<View>(this.savedView());
   readonly theme = signal<ThemeMode>("system");
   readonly rows = signal<readonly SsiRow[]>([]);
+  // Checker is an independent transactional projection. It must never replace
+  // the SSI Maintenance collection while its PENDING queue is loading.
+  readonly checkerRows = signal<readonly SsiRow[]>([]);
   readonly ssiIndexTotalItems = signal(0);
   readonly ssiIndexTotalPages = signal(1);
   readonly ssiIndexDistinctCurrencyCount = signal(0);
@@ -1527,6 +1543,10 @@ export class AppComponent implements OnInit {
   readonly ownershipSearch = signal("");
   readonly ownershipStatus = signal<"ACTIVE" | "DRAFT" | "SUPPRESSED" | "ALL">(
     "ACTIVE",
+  );
+  readonly ownershipActionAdapter = createMaintenanceIndexActionAdapter("ssi");
+  readonly ownershipActionColumns = computed(() =>
+    this.ownershipActionAdapter.columnsFor(this.ownershipStatus()),
   );
   readonly ownershipSort = signal<SsiOwnershipSort>("BOOKING_ENTITY");
   readonly ownershipSortDirection = signal<SortDirection>("ASC");
@@ -1549,38 +1569,7 @@ export class AppComponent implements OnInit {
     (row.route["counterpartyBic"] === "ANY" ? "OWN" : "COUNTERPARTY");
   readonly visibleRows = computed(() =>
     sortSsiOwnershipRows(
-      this.rows()
-        .filter((row) => row.status !== "REVOKED")
-        .filter((row) => this.ownershipOf(row) === this.ownershipTab())
-        .filter(
-          (row) =>
-            this.ownershipTab() !== "COUNTERPARTY" ||
-            !this.selectedCounterpartyId() ||
-            (row.route["counterpartyBic"] || row.ownerParty) ===
-              this.selectedCounterpartyId(),
-        )
-        .filter((row) =>
-          this.ownershipStatus() === "ALL"
-            ? true
-            : row.status === this.ownershipStatus(),
-        )
-        .filter((row) => {
-          const query = this.ownershipSearch().trim().toLowerCase();
-          return (
-            !query ||
-            [
-              row.id,
-              row.ownerParty,
-              row.publisherParty,
-              row.counterpartyId,
-              row.route["currency"],
-              row.route["accountWithBic"],
-              row.route["accountId"],
-              row.route["businessFunction"],
-              row.status,
-            ].some((value) => scalarText(value).toLowerCase().includes(query))
-          );
-        }),
+      this.rows(),
       this.ownershipSort(),
       this.ownershipSortDirection(),
     ),
@@ -1661,7 +1650,7 @@ export class AppComponent implements OnInit {
     return "操作完成";
   }
   readonly pending = computed(() =>
-    this.rows().filter((row) => row.status === "PENDING_APPROVAL"),
+    this.checkerRows().filter((row) => row.status === "PENDING_APPROVAL"),
   );
   readonly checkerTab = signal<GovernanceTab>("rma");
   readonly checkerIndexSortPath = signal<string | null>(null);
@@ -2392,6 +2381,7 @@ export class AppComponent implements OnInit {
   pseudoContent = FULL_TAG_SCENARIOS[0]!.content;
   private readonly loadedFeatureData = new Set<string>();
   private readonly featureDataLoads = new Map<string, Promise<void>>();
+  private pendingDeactivation: Promise<boolean> | null = null;
 
   constructor() {
     const saved = this.document.defaultView?.localStorage.getItem("ssi-theme");
@@ -2489,11 +2479,19 @@ export class AppComponent implements OnInit {
             ).size,
           }
         : response;
+      assertMaintenanceServerPage(
+        page.items,
+        checkerView ? "PENDING_APPROVAL" : this.ownershipStatus(),
+      );
       if (requestSequence !== this.refreshRequestSequence) return;
-      this.rows.set(page.items);
-      this.ssiIndexTotalItems.set(page.totalItems);
-      this.ssiIndexTotalPages.set(Math.max(1, page.totalPages));
-      this.ssiIndexDistinctCurrencyCount.set(page.distinctCurrencyCount);
+      if (checkerView) {
+        this.checkerRows.set(page.items);
+      } else {
+        this.rows.set(page.items);
+        this.ssiIndexTotalItems.set(page.totalItems);
+        this.ssiIndexTotalPages.set(Math.max(1, page.totalPages));
+        this.ssiIndexDistinctCurrencyCount.set(page.distinctCurrencyCount);
+      }
       this.ssiSummary.set(summary);
       this.indexPage.set(
         Math.min(this.indexPage(), Math.max(1, page.totalPages)),
@@ -2540,12 +2538,18 @@ export class AppComponent implements OnInit {
   private ensureFeatureData(view: View): Promise<void> {
     const key =
       view === "treasury" || view === "tradefinance" ? "fin-resolution" : view;
-    if (this.loadedFeatureData.has(key)) return Promise.resolve();
+    // Checker is a transactional queue: a Maker submit can change it at any
+    // time, so returning to the view must re-query its authoritative APIs.
+    // Keep the in-flight map below to deduplicate concurrent navigation loads,
+    // but never retain Checker in the one-time feature cache.
+    const cacheAfterLoad = key !== "checker" && key !== "dashboard";
+    if (cacheAfterLoad && this.loadedFeatureData.has(key))
+      return Promise.resolve();
     const existing = this.featureDataLoads.get(key);
     if (existing) return existing;
     const load = this.loadFeatureData(view)
       .then(() => {
-        this.loadedFeatureData.add(key);
+        if (cacheAfterLoad) this.loadedFeatureData.add(key);
       })
       .finally(() => this.featureDataLoads.delete(key));
     this.featureDataLoads.set(key, load);
@@ -2976,6 +2980,14 @@ export class AppComponent implements OnInit {
   selectOwnershipStatus(
     status: "ACTIVE" | "DRAFT" | "SUPPRESSED" | "ALL",
   ): void {
+    if (
+      !this.ownershipActionAdapter.isVisibleSort(status, this.ownershipSort())
+    ) {
+      this.ownershipSort.set(
+        this.ownershipTab() === "OWN" ? "BOOKING_ENTITY" : "CURRENCY",
+      );
+      this.ownershipSortDirection.set("ASC");
+    }
     this.ownershipStatus.set(status);
     this.indexPage.set(1);
     void this.refresh();
@@ -3088,6 +3100,41 @@ export class AppComponent implements OnInit {
     this.view.set("dashboard");
   }
 
+  async canDeactivate(): Promise<boolean> {
+    if (this.pendingDeactivation) return this.pendingDeactivation;
+    const attempt = this.performCanDeactivate().finally(() => {
+      if (this.pendingDeactivation === attempt) this.pendingDeactivation = null;
+    });
+    this.pendingDeactivation = attempt;
+    return attempt;
+  }
+
+  private async performCanDeactivate(): Promise<boolean> {
+    const swiftData = this.swiftDataCrud();
+    if (swiftData && !(await swiftData.canDeactivate())) return false;
+    const revisionId =
+      this.view() === "maker" && this.revisionSource()
+        ? this.editingId()
+        : null;
+    if (!revisionId) return true;
+    try {
+      await firstValueFrom(
+        this.http.post(`${this.api}/ssis/${revisionId}/cancel-revision`, {
+          actor: String(this.model["maker"] ?? "maker.revision"),
+        }),
+      );
+      this.editingId.set(null);
+      this.revisionSource.set(null);
+      return true;
+    } catch {
+      this.notice.set({
+        kind: "error",
+        text: "無法取消修訂；In Progress 鎖定仍保留，請重試。",
+      });
+      return false;
+    }
+  }
+
   async create(): Promise<void> {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
@@ -3146,6 +3193,17 @@ export class AppComponent implements OnInit {
     this.model = this.modelForRow(row);
     this.view.set("maker");
     this.ensureMakerCurrencies();
+  }
+
+  isOwnershipActionPresented(
+    action: MaintenanceIndexActionId,
+    row: SsiRow,
+  ): boolean {
+    return this.ownershipActionAdapter.isPresented(action, row);
+  }
+
+  ownershipCurrentStatusLabel(row: SsiRow): string {
+    return currentStatusLabel(row.currentStatus ?? "EMPTY");
   }
 
   private ensureMakerCurrencies(): void {

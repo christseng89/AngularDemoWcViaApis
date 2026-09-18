@@ -191,19 +191,28 @@
                 </button>
               </th>
               @if (!checkerMode()) {
-                @for (
-                  actionColumn of [
-                    { path: "__openRevisionStatus", label: "Revision Status" },
-                    { path: "__workflowAction", label: "Submit" },
-                    { path: "__editAction", label: "Edit / Revise" },
-                    { path: "__revokeAction", label: "Suppress" },
-                    { path: "__revokeDraftAction", label: "Revoke Draft" },
-                  ];
-                  track actionColumn.path
-                ) {
+                <th
+                  [attr.aria-sort]="
+                    sortPath() === '__openRevisionStatus'
+                      ? sortDirection() === 'asc'
+                        ? 'ascending'
+                        : 'descending'
+                      : 'none'
+                  "
+                >
+                  <button
+                    class="sort-header"
+                    type="button"
+                    (click)="toggleSort('__openRevisionStatus')"
+                  >
+                    Current Status
+                    <span>{{ sortIndicator("__openRevisionStatus") }}</span>
+                  </button>
+                </th>
+                @for (actionColumn of actionColumns(); track actionColumn.id) {
                   <th
                     [attr.aria-sort]="
-                      sortPath() === actionColumn.path
+                      sortPath() === actionColumn.sortPath
                         ? sortDirection() === 'asc'
                           ? 'ascending'
                           : 'descending'
@@ -213,10 +222,10 @@
                     <button
                       class="sort-header"
                       type="button"
-                      (click)="toggleSort(actionColumn.path)"
+                      (click)="toggleSort(actionColumn.sortPath)"
                     >
                       {{ actionColumn.label }}
-                      <span>{{ sortIndicator(actionColumn.path) }}</span>
+                      <span>{{ sortIndicator(actionColumn.sortPath) }}</span>
                     </button>
                   </th>
                 }
@@ -265,80 +274,78 @@
                 </td>
                 @if (!checkerMode()) {
                   <td class="revision-action-cell">
-                    @if (row.status === "ACTIVE" && row.hasOpenRevision) {
+                    @if (currentStatusLabel(row)) {
                       <span class="revision-state">{{
-                        openRevisionLabel(row)
+                        currentStatusLabel(row)
                       }}</span>
                     }
                   </td>
-                  <td class="workflow-action-cell">
-                    @if (canAct(row, "submit")) {
-                      <button
-                        class="primary lifecycle-action"
-                        (click)="$event.stopPropagation(); act(row, 'submit')"
-                      >
-                        Submit
-                      </button>
-                    }
-                    @if (canAct(row, "approve")) {
-                      <button
-                        class="primary lifecycle-action"
-                        (click)="$event.stopPropagation(); act(row, 'approve')"
-                      >
-                        Approve
-                      </button>
-                    }
-                  </td>
-                  <td class="edit-action-cell">
-                    @if (
-                      (row.status === "DRAFT" || row.status === "WIP") &&
-                      row["changeType"] !== "SUPPRESSION"
-                    ) {
-                      <button
-                        class="ghost edit-action"
-                        (click)="$event.stopPropagation(); edit(row)"
-                      >
-                        Edit
-                      </button>
-                    }
-                    @if (row.status === "ACTIVE" && !row.hasOpenRevision) {
-                      <button
-                        class="ghost edit-action"
-                        (click)="$event.stopPropagation(); revise(row)"
-                      >
-                        Revise
-                      </button>
-                    }
-                  </td>
-                  <td class="revoke-action-cell">
-                    @if (canSuppress(row)) {
-                      <button
-                        class="danger revoke-action"
-                        (click)="$event.stopPropagation(); requestSuppress(row)"
-                      >
-                        Suppress
-                      </button>
-                    }
-                  </td>
-                  <td class="revoke-action-cell">
-                    @if (canRevokeDraft(row)) {
-                      <button
-                        class="danger revoke-action"
-                        (click)="
-                          $event.stopPropagation(); requestDraftRevoke(row)
-                        "
-                      >
-                        Revoke Draft
-                      </button>
-                    }
-                  </td>
+                  @for (
+                    actionColumn of actionColumns();
+                    track actionColumn.id
+                  ) {
+                    <td [class]="actionColumn.cellClass">
+                      @if (isActionPresented(actionColumn.id, row)) {
+                        @switch (actionColumn.id) {
+                          @case ("SUBMIT") {
+                            <button
+                              class="primary lifecycle-action"
+                              (click)="
+                                $event.stopPropagation(); act(row, 'submit')
+                              "
+                            >
+                              Submit
+                            </button>
+                          }
+                          @case ("EDIT") {
+                            <button
+                              class="ghost edit-action"
+                              (click)="$event.stopPropagation(); edit(row)"
+                            >
+                              Edit
+                            </button>
+                          }
+                          @case ("REVISE") {
+                            <button
+                              class="ghost edit-action"
+                              (click)="$event.stopPropagation(); revise(row)"
+                            >
+                              Revise
+                            </button>
+                          }
+                          @case ("SUPPRESS") {
+                            <button
+                              class="danger revoke-action"
+                              (click)="
+                                $event.stopPropagation(); requestSuppress(row)
+                              "
+                            >
+                              Suppress
+                            </button>
+                          }
+                          @case ("REVOKE_DRAFT") {
+                            <button
+                              class="danger revoke-action"
+                              (click)="
+                                $event.stopPropagation();
+                                requestDraftRevoke(row)
+                              "
+                            >
+                              Revoke Draft
+                            </button>
+                          }
+                        }
+                      }
+                    </td>
+                  }
                 }
               </tr>
             } @empty {
               <tr>
                 <td
                   [attr.colspan]="
-                    current.columns.length + (checkerMode() ? 1 : 6)
+                    current.columns.length +
+                    (checkerMode() ? 1 : 2 + actionColumns().length)
                   "
                   class="empty"
                 >

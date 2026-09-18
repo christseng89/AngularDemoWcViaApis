@@ -580,15 +580,29 @@ export class SsiApplicationService {
       !current.route["transactionBindingReference"]?.trim()
     )
       throw new ConflictException("TRANSACTION_BINDING_REQUIRED");
-    const applicability = activates
-      ? this.ensureRevisionApplicability(current, actor)
-      : [];
-    if (activates && !applicability.some((row) => row.status === "ACTIVE"))
+    const applicability =
+      action === "APPROVE"
+        ? this.applicabilityForApproval(current)
+        : activates
+          ? this.ensureRevisionApplicability(current, actor)
+          : [];
+    if (
+      activates &&
+      !applicability.some(
+        (row) =>
+          row.status === "ACTIVE" ||
+          (action === "APPROVE" && row.status === "DRAFT"),
+      )
+    )
       throw new ConflictException("ACTIVE_SSI_APPLICABILITY_REQUIRED");
     if (activates) this.validateRoute(current.route);
+    if (action === "APPROVE") {
+      const approved = this.repository.approveWithApplicability(id, actor);
+      if (!approved) throw new ConflictException("APPROVAL_STATE_CHANGED");
+      return approved;
+    }
     const status = {
       SUBMIT: "PENDING_APPROVAL",
-      APPROVE: "ACTIVE",
       REJECT: "DRAFT",
       ACTIVATE: "ACTIVE",
     }[action];
@@ -598,7 +612,6 @@ export class SsiApplicationService {
       status,
       version: current.version + 1,
       updatedAt: new Date().toISOString(),
-      ...(action === "APPROVE" ? { checker: actor } : {}),
       ...(action === "REJECT"
         ? { checker: actor, rejectionReason: reason.trim() }
         : {}),
@@ -614,6 +627,14 @@ export class SsiApplicationService {
     const current = this.repository.listApplicability(record.id);
     if (current.length > 0 || !record.amendmentOfId) return current;
     return this.copyApplicability(record.amendmentOfId, record.id, actor);
+  }
+
+  private applicabilityForApproval(
+    record: SsiRecord,
+  ): ReturnType<SqliteSsiRepository["listApplicability"]> {
+    const current = this.repository.listApplicability(record.id);
+    if (current.length > 0 || !record.amendmentOfId) return current;
+    return this.repository.listApplicability(record.amendmentOfId);
   }
 
   private copyApplicability(

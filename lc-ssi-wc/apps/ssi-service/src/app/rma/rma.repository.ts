@@ -5,6 +5,13 @@ import {
   SqliteGovernedRepository,
   type GovernedRecord,
 } from "../shared/sqlite-governed.repository";
+import {
+  currentStatusProjection,
+  type OpenRevisionChangeType,
+  type OpenRevisionProjection,
+  type OpenRevisionStatus,
+} from "../shared/current-status-projection";
+import { maintenanceIndexStatuses } from "../shared/maintenance-index-status";
 
 export type RmaDirection = "INBOUND" | "OUTBOUND";
 export interface RmaMessageTypeChanges {
@@ -148,6 +155,7 @@ export class RmaRepository extends SqliteGovernedRepository<RmaRecord> {
   }
 
   listIndexPage(request: PageRequest): PagedResult<RmaRecord> {
+    this.expireRevisionWorkInProgress();
     const page = Math.max(1, Math.trunc(request.page ?? 1));
     const pageSize = Math.min(
       100,
@@ -155,10 +163,11 @@ export class RmaRepository extends SqliteGovernedRepository<RmaRecord> {
     );
     const clauses: string[] = [];
     const parameters: (string | number)[] = [];
-    if (request.status && request.status !== "ALL") {
-      clauses.push("json_extract(payload,'$.status')=?");
-      parameters.push(request.status);
-    }
+    const statuses = maintenanceIndexStatuses(request.status);
+    clauses.push(
+      `json_extract(payload,'$.status') IN (${statuses.map(() => "?").join(",")})`,
+    );
+    parameters.push(...statuses);
     const search = request.search?.trim();
     if (search) {
       clauses.push("payload LIKE ? ESCAPE '\\'");
@@ -219,11 +228,15 @@ export class RmaRepository extends SqliteGovernedRepository<RmaRecord> {
       ];
       const service: RmaRecord["service"] =
         services.length === 2 ? "FIN / FINPLUS" : services[0]!;
+      const openRevision = this.openRevisionForSourceIds(
+        members.map((member) => member.id),
+      );
       return {
         ...representative,
         messageTypes,
         services,
         service,
+        ...currentStatusProjection(openRevision),
       };
     });
     const totalItems = rows.length ? Number(rows[0]!["total_items"]) : 0;
@@ -236,6 +249,35 @@ export class RmaRepository extends SqliteGovernedRepository<RmaRecord> {
       totalPages,
       hasPrevious: page > 1,
       hasNext: page < totalPages,
+    };
+  }
+
+  private openRevisionForSourceIds(
+    sourceIds: readonly string[],
+  ): OpenRevisionProjection | undefined {
+    if (!sourceIds.length) return undefined;
+    const placeholders = sourceIds.map(() => "?").join(",");
+    const row = this.queryRows(
+      `SELECT id,
+          json_extract(payload,'$.status') AS status,
+          COALESCE(json_extract(payload,'$.changeType'),'REVISION') AS change_type
+       FROM rma_authorisation
+       WHERE json_extract(payload,'$.amendmentOfId') IN (${placeholders})
+         AND json_extract(payload,'$.status') IN ('WIP','DRAFT','PENDING_APPROVAL','APPROVED')
+       ORDER BY CASE json_extract(payload,'$.status')
+         WHEN 'APPROVED' THEN 4
+         WHEN 'PENDING_APPROVAL' THEN 3
+         WHEN 'DRAFT' THEN 2
+         ELSE 1
+       END DESC, updated_at DESC, id DESC
+       LIMIT 1`,
+      ...sourceIds,
+    )[0];
+    if (!row) return undefined;
+    return {
+      id: String(row["id"]),
+      status: String(row["status"]) as OpenRevisionStatus,
+      changeType: String(row["change_type"]) as OpenRevisionChangeType,
     };
   }
 

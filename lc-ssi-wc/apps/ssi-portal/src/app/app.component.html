@@ -720,7 +720,7 @@
                                 type="button"
                                 (click)="sortOwnershipIndex('BOOKING_ENTITY')"
                               >
-                                Booking／Legal Entity
+                                Account Owner
                                 <span aria-hidden="true">{{
                                   ownershipSortIndicator("BOOKING_ENTITY")
                                 }}</span>
@@ -736,25 +736,9 @@
                                 type="button"
                                 (click)="sortOwnershipIndex('ACCOUNT_SERVICER')"
                               >
-                                Account Owner／Servicer
+                                Servicer
                                 <span aria-hidden="true">{{
                                   ownershipSortIndicator("ACCOUNT_SERVICER")
-                                }}</span>
-                              </button>
-                            </th>
-                            <th
-                              [attr.aria-sort]="
-                                ownershipAriaSort('ACCOUNT_REF')
-                              "
-                            >
-                              <button
-                                class="sort-header"
-                                type="button"
-                                (click)="sortOwnershipIndex('ACCOUNT_REF')"
-                              >
-                                Account Ref
-                                <span aria-hidden="true">{{
-                                  ownershipSortIndicator("ACCOUNT_REF")
                                 }}</span>
                               </button>
                             </th>
@@ -822,22 +806,6 @@
                           }
                           <th
                             [attr.aria-sort]="
-                              ownershipAriaSort('ROUTE_PRIORITY')
-                            "
-                          >
-                            <button
-                              class="sort-header"
-                              type="button"
-                              (click)="sortOwnershipIndex('ROUTE_PRIORITY')"
-                            >
-                              Route Class／Priority
-                              <span aria-hidden="true">{{
-                                ownershipSortIndicator("ROUTE_PRIORITY")
-                              }}</span>
-                            </button>
-                          </th>
-                          <th
-                            [attr.aria-sort]="
                               ownershipAriaSort('EFFECTIVE_PERIOD')
                             "
                           >
@@ -846,7 +814,7 @@
                               type="button"
                               (click)="sortOwnershipIndex('EFFECTIVE_PERIOD')"
                             >
-                              Effective Period
+                              Effective Date
                               <span aria-hidden="true">{{
                                 ownershipSortIndicator("EFFECTIVE_PERIOD")
                               }}</span>
@@ -900,64 +868,39 @@
                               type="button"
                               (click)="sortOwnershipIndex('REVISION_STATUS')"
                             >
-                              Revision Status
+                              Current Status
                               <span aria-hidden="true">{{
                                 ownershipSortIndicator("REVISION_STATUS")
                               }}</span>
                             </button>
                           </th>
-                          <th [attr.aria-sort]="ownershipAriaSort('SUBMIT')">
-                            <button
-                              class="sort-header"
-                              type="button"
-                              (click)="sortOwnershipIndex('SUBMIT')"
+                          @for (
+                            actionColumn of ownershipActionColumns();
+                            track actionColumn.id
+                          ) {
+                            <th
+                              [attr.aria-sort]="
+                                ownershipAriaSort($any(actionColumn.sortPath))
+                              "
                             >
-                              Submit
-                              <span aria-hidden="true">{{
-                                ownershipSortIndicator("SUBMIT")
-                              }}</span>
-                            </button>
-                          </th>
-                          <th
-                            [attr.aria-sort]="ownershipAriaSort('EDIT_REVISE')"
-                          >
-                            <button
-                              class="sort-header"
-                              type="button"
-                              (click)="sortOwnershipIndex('EDIT_REVISE')"
-                            >
-                              Edit / Revise
-                              <span aria-hidden="true">{{
-                                ownershipSortIndicator("EDIT_REVISE")
-                              }}</span>
-                            </button>
-                          </th>
-                          <th [attr.aria-sort]="ownershipAriaSort('SUPPRESS')">
-                            <button
-                              class="sort-header"
-                              type="button"
-                              (click)="sortOwnershipIndex('SUPPRESS')"
-                            >
-                              Suppress
-                              <span aria-hidden="true">{{
-                                ownershipSortIndicator("SUPPRESS")
-                              }}</span>
-                            </button>
-                          </th>
-                          <th
-                            [attr.aria-sort]="ownershipAriaSort('REVOKE_DRAFT')"
-                          >
-                            <button
-                              class="sort-header"
-                              type="button"
-                              (click)="sortOwnershipIndex('REVOKE_DRAFT')"
-                            >
-                              Revoke Draft
-                              <span aria-hidden="true">{{
-                                ownershipSortIndicator("REVOKE_DRAFT")
-                              }}</span>
-                            </button>
-                          </th>
+                              <button
+                                class="sort-header"
+                                type="button"
+                                (click)="
+                                  sortOwnershipIndex(
+                                    $any(actionColumn.sortPath)
+                                  )
+                                "
+                              >
+                                {{ actionColumn.label }}
+                                <span aria-hidden="true">{{
+                                  ownershipSortIndicator(
+                                    $any(actionColumn.sortPath)
+                                  )
+                                }}</span>
+                              </button>
+                            </th>
+                          }
                         </tr>
                       </thead>
                       <tbody>
@@ -975,24 +918,16 @@
                             "
                           >
                             <td>
-                              <b>{{ row.counterpartyId }}</b
-                              ><small>{{ row.id }}</small>
+                              <b>{{ row.counterpartyId }}</b>
                             </td>
                             @if (ownershipTab() === "OWN") {
                               <td>
                                 <b>{{
                                   row.route["bookingEntity"] || row.ownerParty
-                                }}</b
-                                ><small>{{ row.ownerParty }}</small>
+                                }}</b>
                               </td>
                               <td>
-                                <b>{{
-                                  row.route["accountOwner"] || row.ownerParty
-                                }}</b
-                                ><code>{{ row.route["accountWithBic"] }}</code>
-                              </td>
-                              <td>
-                                <code>{{ row.route["accountId"] || "—" }}</code>
+                                <code>{{ row.route["accountWithBic"] }}</code>
                               </td>
                             } @else {
                               <td>
@@ -1018,17 +953,7 @@
                             @if (ownershipTab() === "OWN") {
                               <td>{{ row.route["currency"] }}</td>
                             }
-                            <td>
-                              {{
-                                row.route["routePreference"] ||
-                                  row.route["routeType"] ||
-                                  "—"
-                              }}／{{ row.route["priority"] || "—" }}
-                            </td>
-                            <td>
-                              {{ row.route["validFrom"] || "—" }} →
-                              {{ row.route["validTo"] || "—" }}
-                            </td>
+                            <td>{{ row.route["validTo"] || "—" }}</td>
                             <td>
                               <span
                                 class="status"
@@ -1043,93 +968,90 @@
                               }}</span>
                             </td>
                             <td class="revision-status-cell">
-                              @if (row.hasOpenRevision) {
+                              @if (ownershipCurrentStatusLabel(row)) {
                                 <span class="revision-state">
-                                  @switch (row.openRevisionStatus) {
-                                    @case ("WIP") {
-                                      In progress
-                                    }
-                                    @case ("PENDING_APPROVAL") {
-                                      Submitted
-                                    }
-                                    @case ("APPROVED") {
-                                      Approved (legacy)
-                                    }
-                                    @default {
-                                      Drafted
-                                    }
-                                  }
+                                  {{ ownershipCurrentStatusLabel(row) }}
                                 </span>
                               }
                             </td>
-                            <td class="submit-action-cell">
-                              @if (
-                                row.status === "DRAFT" &&
-                                row.changeType !== "SUPPRESSION"
-                              ) {
-                                <button
-                                  class="primary"
-                                  (click)="
-                                    $event.stopPropagation(); act(row, 'submit')
-                                  "
-                                >
-                                  Submit
-                                </button>
-                              }
-                            </td>
-                            <td class="edit-action-cell">
-                              @if (row.status === "DRAFT") {
-                                <button
-                                  class="ghost"
-                                  (click)="$event.stopPropagation(); edit(row)"
-                                >
-                                  Edit
-                                </button>
-                              }
-                              @if (
-                                row.status === "ACTIVE" && !row.hasOpenRevision
-                              ) {
-                                <button
-                                  class="ghost"
-                                  (click)="
-                                    $event.stopPropagation(); revise(row)
-                                  "
-                                >
-                                  Revise
-                                </button>
-                              }
-                            </td>
-                            <td class="revoke-action-cell">
-                              @if (
-                                row.status === "ACTIVE" && !row.hasOpenRevision
-                              ) {
-                                <button
-                                  class="danger"
-                                  (click)="
-                                    $event.stopPropagation(); requestDelete(row)
-                                  "
-                                >
-                                  Suppress
-                                </button>
-                              }
-                            </td>
-                            <td class="revoke-action-cell">
-                              @if (row.status === "DRAFT") {
-                                <button
-                                  class="danger"
-                                  (click)="
-                                    $event.stopPropagation();
-                                    requestDraftRevoke(row)
-                                  "
-                                >
-                                  Revoke Draft
-                                </button>
-                              }
-                            </td>
+                            @for (
+                              actionColumn of ownershipActionColumns();
+                              track actionColumn.id
+                            ) {
+                              <td [class]="actionColumn.cellClass">
+                                @if (
+                                  isOwnershipActionPresented(
+                                    actionColumn.id,
+                                    row
+                                  )
+                                ) {
+                                  @switch (actionColumn.id) {
+                                    @case ("SUBMIT") {
+                                      <button
+                                        class="primary"
+                                        (click)="
+                                          $event.stopPropagation();
+                                          act(row, 'submit')
+                                        "
+                                      >
+                                        Submit
+                                      </button>
+                                    }
+                                    @case ("EDIT") {
+                                      <button
+                                        class="ghost"
+                                        (click)="
+                                          $event.stopPropagation(); edit(row)
+                                        "
+                                      >
+                                        Edit
+                                      </button>
+                                    }
+                                    @case ("REVISE") {
+                                      <button
+                                        class="ghost"
+                                        (click)="
+                                          $event.stopPropagation(); revise(row)
+                                        "
+                                      >
+                                        Revise
+                                      </button>
+                                    }
+                                    @case ("SUPPRESS") {
+                                      <button
+                                        class="danger"
+                                        (click)="
+                                          $event.stopPropagation();
+                                          requestDelete(row)
+                                        "
+                                      >
+                                        Suppress
+                                      </button>
+                                    }
+                                    @case ("REVOKE_DRAFT") {
+                                      <button
+                                        class="danger"
+                                        (click)="
+                                          $event.stopPropagation();
+                                          requestDraftRevoke(row)
+                                        "
+                                      >
+                                        Revoke Draft
+                                      </button>
+                                    }
+                                  }
+                                }
+                              </td>
+                            }
                           </tr>
                         } @empty {
                           <tr>
-                            <td colspan="14" class="empty">
+                            <td
+                              [attr.colspan]="
+                                9 + ownershipActionColumns().length
+                              "
+                              class="empty"
+                            >
                               尚無目前有效資料。按「＋新增 SSI」建立第一筆。
                             </td>
                           </tr>

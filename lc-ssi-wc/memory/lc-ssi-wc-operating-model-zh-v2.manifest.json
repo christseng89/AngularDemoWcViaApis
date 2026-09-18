@@ -1,15 +1,15 @@
 {
   "schemaVersion": "1.0",
   "artifact": "memory/lc-ssi-wc-operating-model-zh-v2.md",
-  "version": "v2.8.21",
-  "effectiveDate": "2026-09-16",
-  "sha256": "EA77F1C77441928E02AFB18221C9AB71CAE266B4FB384AE73B8C1D0404EB6626",
-  "changeReason": "Require accessible ASC/DESC sorting for every Index title; pass sort, page, filter, and search through UI and BFF to a backend/DB whitelist ORDER BY with unique-key stable ordering; require Checker and Audit to reuse the transaction Index title/order/search/sort and append only Maker/Checker Datetime.",
+  "version": "v2.8.22",
+  "effectiveDate": "2026-09-18",
+  "sha256": "4A2BA0D47E6A06D54FFB9B8801EA95DA3A95C7B443E7836E605D8E088E6B1E50",
+  "changeReason": "Require every TDD implementation to use an isolated Git branch, preferably an isolated worktree; record base HEAD and dirty manifest ownership before work; provide exact candidate SHA, same-SHA four-eyes evidence, and a rollback patch; prohibit reset, checkout, stash, or clean operations that can affect another owner's work.",
   "scope": "All current and future SSI Resolution Message Families and their Generic UI consumers.",
   "maker": "/root",
-  "independentChecker": "/root/governance_v2821_checker",
-  "checkerStatus": "PASS",
-  "checkedAt": "2026-09-16T16:46:03+08:00",
+  "independentChecker": "PENDING_ASSIGNMENT",
+  "checkerStatus": "PENDING_REVIEW",
+  "checkedAt": null,
   "referencedArtifacts": [
     {
       "artifact": "memory/mt347-oas-page-parameters-ui-standard-v1.md",

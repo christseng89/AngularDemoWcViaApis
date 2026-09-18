@@ -4,6 +4,13 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { onlineAuditCutoffUtc } from "../audit-retention/audit-retention.policy";
+import {
+  currentStatusProjection,
+  type CurrentStatus,
+  type OpenRevisionChangeType,
+  type OpenRevisionStatus,
+} from "./current-status-projection";
+import { maintenanceIndexStatuses } from "./maintenance-index-status";
 
 export interface GovernedRecord {
   id: string;
@@ -16,6 +23,8 @@ export interface GovernedRecord {
   hasOpenRevision?: boolean;
   openRevisionId?: string;
   openRevisionStatus?: "WIP" | "DRAFT" | "PENDING_APPROVAL" | "APPROVED";
+  openRevisionChangeType?: OpenRevisionChangeType;
+  currentStatus?: CurrentStatus;
   revisionWipExpiresAt?: string;
   amendmentOfId?: string;
   changeType?: "REVISION" | "SUPPRESSION";
@@ -85,15 +94,43 @@ export abstract class SqliteGovernedRepository<
       CREATE TABLE IF NOT EXISTS swift_data_outbox (id INTEGER PRIMARY KEY AUTOINCREMENT, event_id TEXT UNIQUE NOT NULL, aggregate_type TEXT NOT NULL, event_type TEXT NOT NULL, payload TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'PENDING', created_at TEXT NOT NULL);`);
   }
   list(status?: string): T[] {
+    this.expireRevisionWorkInProgress();
+    const openRevision = `(
+      SELECT json_object(
+        'id', revision.id,
+        'status', json_extract(revision.payload,'$.status'),
+        'changeType', COALESCE(json_extract(revision.payload,'$.changeType'),'REVISION')
+      ) FROM ${this.table} revision
+      WHERE json_extract(revision.payload,'$.amendmentOfId')=base.id
+        AND json_extract(revision.payload,'$.status') IN ('WIP','DRAFT','PENDING_APPROVAL','APPROVED')
+      ORDER BY CASE json_extract(revision.payload,'$.status')
+        WHEN 'APPROVED' THEN 4
+        WHEN 'PENDING_APPROVAL' THEN 3
+        WHEN 'DRAFT' THEN 2
+        ELSE 1
+      END DESC, revision.updated_at DESC
+      LIMIT 1
+    )`;
     const sql = status
-      ? `SELECT payload FROM ${this.table} WHERE json_extract(payload,'$.status')=? ORDER BY updated_at DESC`
-      : `SELECT payload FROM ${this.table} ORDER BY updated_at DESC`;
+      ? `SELECT base.payload, ${openRevision} AS open_revision FROM ${this.table} base WHERE json_extract(base.payload,'$.status')=? ORDER BY base.updated_at DESC`
+      : `SELECT base.payload, ${openRevision} AS open_revision FROM ${this.table} base ORDER BY base.updated_at DESC`;
     return this.db
       .prepare(sql)
       .all(...(status ? [status] : []))
-      .map(
-        (row) => JSON.parse(String((row as { payload: unknown }).payload)) as T,
-      );
+      .map((row) => {
+        const value = row as { payload: unknown; open_revision?: string };
+        const revision = value.open_revision
+          ? (JSON.parse(value.open_revision) as {
+              id: string;
+              status: OpenRevisionStatus;
+              changeType: OpenRevisionChangeType;
+            })
+          : undefined;
+        return {
+          ...(JSON.parse(String(value.payload)) as T),
+          ...currentStatusProjection(revision),
+        };
+      });
   }
   find(id: string): T | undefined {
     const row = this.db
@@ -347,10 +384,11 @@ export abstract class SqliteGovernedRepository<
     );
     const clauses: string[] = [];
     const parameters: (string | number)[] = [];
-    if (request.status && request.status !== "ALL") {
-      clauses.push("json_extract(payload,'$.status')=?");
-      parameters.push(request.status);
-    }
+    const statuses = maintenanceIndexStatuses(request.status);
+    clauses.push(
+      `json_extract(payload,'$.status') IN (${statuses.map(() => "?").join(",")})`,
+    );
+    parameters.push(...statuses);
     const search = request.search?.trim();
     if (search) {
       clauses.push("payload LIKE ? ESCAPE '\\'");
@@ -372,7 +410,8 @@ export abstract class SqliteGovernedRepository<
           (
             SELECT json_object(
               'id', revision.id,
-              'status', json_extract(revision.payload,'$.status')
+              'status', json_extract(revision.payload,'$.status'),
+              'changeType', COALESCE(json_extract(revision.payload,'$.changeType'),'REVISION')
             ) FROM ${this.table} revision
             WHERE json_extract(revision.payload,'$.amendmentOfId')=base.id
               AND json_extract(revision.payload,'$.status') IN ('WIP','DRAFT','PENDING_APPROVAL','APPROVED')
@@ -394,18 +433,13 @@ export abstract class SqliteGovernedRepository<
         const openRevision = rawOpenRevision
           ? (JSON.parse(rawOpenRevision) as {
               id: string;
-              status: GovernedRecord["openRevisionStatus"];
+              status: OpenRevisionStatus;
+              changeType: OpenRevisionChangeType;
             })
           : undefined;
         return {
           ...(JSON.parse(String((row as { payload: unknown }).payload)) as T),
-          hasOpenRevision: Boolean(openRevision),
-          ...(openRevision
-            ? {
-                openRevisionId: openRevision.id,
-                openRevisionStatus: openRevision.status,
-              }
-            : {}),
+          ...currentStatusProjection(openRevision),
         };
       });
     const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
@@ -431,7 +465,7 @@ export abstract class SqliteGovernedRepository<
       .get(id) as { found: number } | undefined;
     return row?.found === 1;
   }
-  private expireRevisionWorkInProgress(): void {
+  protected expireRevisionWorkInProgress(): void {
     const now = new Date();
     const expired = this.selectPayloads(
       `SELECT payload FROM ${this.table}

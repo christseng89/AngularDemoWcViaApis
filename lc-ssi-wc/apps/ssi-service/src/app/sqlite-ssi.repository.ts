@@ -8,6 +8,13 @@ import {
   revisionWipCutoffAt,
   type PagedResult,
 } from "./shared/sqlite-governed.repository";
+import {
+  currentStatusProjection,
+  type CurrentStatus,
+  type OpenRevisionChangeType,
+  type OpenRevisionStatus,
+} from "./shared/current-status-projection";
+import { maintenanceIndexStatuses } from "./shared/maintenance-index-status";
 
 export interface SsiRecord {
   id: string;
@@ -32,6 +39,8 @@ export interface SsiRecord {
   hasOpenRevision?: boolean;
   openRevisionId?: string;
   openRevisionStatus?: "WIP" | "DRAFT" | "PENDING_APPROVAL" | "APPROVED";
+  openRevisionChangeType?: OpenRevisionChangeType;
+  currentStatus?: CurrentStatus;
   fixtureFamily?: string;
   usageGroup?: string;
   fixtureBindingIds?: string[];
@@ -68,7 +77,7 @@ export interface SsiApplicabilityRecord {
   businessFunction: string;
   paymentLeg: string;
   direction: string;
-  status: "ACTIVE" | "INACTIVE";
+  status: "ACTIVE" | "INACTIVE" | "DRAFT";
   validFrom: string;
   validTo: string;
   version: number;
@@ -200,10 +209,11 @@ export class SqliteSsiRepository implements OnModuleDestroy {
         ELSE 'COUNTERPARTY'
       END
     )`;
-    if (request.status && request.status !== "ALL") {
-      clauses.push("json_extract(payload,'$.status')=?");
-      parameters.push(request.status);
-    }
+    const statuses = maintenanceIndexStatuses(request.status);
+    clauses.push(
+      `json_extract(payload,'$.status') IN (${statuses.map(() => "?").join(",")})`,
+    );
+    parameters.push(...statuses);
     if (request.ownershipType) {
       clauses.push(`${ownershipExpression}=?`);
       parameters.push(request.ownershipType);
@@ -232,11 +242,16 @@ export class SqliteSsiRepository implements OnModuleDestroy {
       INSTRUCTED_ROUTE: "json_extract(payload,'$.route.accountWithBic')",
       ROUTE_PRIORITY:
         "CAST(COALESCE(json_extract(payload,'$.route.priority'),'999999') AS INTEGER)",
-      EFFECTIVE_PERIOD: "json_extract(payload,'$.route.validFrom')",
+      EFFECTIVE_PERIOD: "json_extract(payload,'$.route.validTo')",
       STATUS: "json_extract(payload,'$.status')",
       VERSION: "CAST(json_extract(payload,'$.version') AS INTEGER)",
       REQUEST_TYPE: `COALESCE(json_extract(payload,'$.changeType'),CASE WHEN json_extract(payload,'$.amendmentOfId') IS NOT NULL THEN 'REVISION' ELSE 'NEW' END)`,
-      REVISION_STATUS: `COALESCE(json_extract(${this.openRevisionSelectSql("base")},'$.status'),'')`,
+      REVISION_STATUS: `CASE
+        WHEN ${this.openRevisionSelectSql("base")} IS NULL THEN 'EMPTY'
+        WHEN json_extract(${this.openRevisionSelectSql("base")},'$.status')='WIP' THEN 'IN_PROGRESS'
+        WHEN json_extract(${this.openRevisionSelectSql("base")},'$.changeType')='SUPPRESSION' THEN 'SUPPRESSED'
+        ELSE 'DRAFTED'
+      END`,
       SUBMIT:
         "CASE WHEN json_extract(payload,'$.status')='DRAFT' THEN 1 ELSE 0 END",
       EDIT_REVISE: `CASE WHEN json_extract(payload,'$.status')='DRAFT' OR (json_extract(payload,'$.status')='ACTIVE' AND ${this.openRevisionSelectSql("base")} IS NULL) THEN 1 ELSE 0 END`,
@@ -381,7 +396,8 @@ export class SqliteSsiRepository implements OnModuleDestroy {
     return `(
       SELECT json_object(
         'id', revision.id,
-        'status', json_extract(revision.payload,'$.status')
+        'status', json_extract(revision.payload,'$.status'),
+        'changeType', COALESCE(json_extract(revision.payload,'$.changeType'),'REVISION')
       )
       FROM ssi revision
       WHERE json_extract(revision.payload,'$.amendmentOfId')=${baseAlias}.id
@@ -399,16 +415,16 @@ export class SqliteSsiRepository implements OnModuleDestroy {
   private withOpenRevision(row: unknown): SsiRecord {
     const result = row as { payload: unknown; open_revision?: string | null };
     const record = JSON.parse(String(result.payload)) as SsiRecord;
-    if (!result.open_revision) return record;
+    if (!result.open_revision)
+      return { ...record, ...currentStatusProjection(undefined) };
     const revision = JSON.parse(result.open_revision) as {
       id: string;
-      status: NonNullable<SsiRecord["openRevisionStatus"]>;
+      status: OpenRevisionStatus;
+      changeType: OpenRevisionChangeType;
     };
     return {
       ...record,
-      hasOpenRevision: true,
-      openRevisionId: revision.id,
-      openRevisionStatus: revision.status,
+      ...currentStatusProjection(revision),
     };
   }
 
@@ -663,6 +679,179 @@ export class SqliteSsiRepository implements OnModuleDestroy {
       throw error;
     }
   }
+
+  approveWithApplicability(id: string, actor: string): SsiRecord | undefined {
+    const now = new Date().toISOString();
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const requestRow = this.db
+        .prepare("SELECT payload FROM ssi WHERE id=?")
+        .get(id) as { payload: unknown } | undefined;
+      const request = requestRow
+        ? (JSON.parse(String(requestRow.payload)) as SsiRecord)
+        : undefined;
+      if (
+        !request ||
+        request.status !== "PENDING_APPROVAL" ||
+        request.changeType === "SUPPRESSION" ||
+        !actor ||
+        request.maker === actor
+      ) {
+        this.db.exec("ROLLBACK");
+        return undefined;
+      }
+
+      let applicabilityRows = this.db
+        .prepare(
+          "SELECT payload FROM ssi_applicability WHERE ssi_id=? ORDER BY id",
+        )
+        .all(id)
+        .map(
+          (row) =>
+            JSON.parse(
+              String((row as { payload: unknown }).payload),
+            ) as SsiApplicabilityRecord,
+        );
+      if (applicabilityRows.length === 0 && request.amendmentOfId) {
+        applicabilityRows = this.db
+          .prepare(
+            "SELECT payload FROM ssi_applicability WHERE ssi_id=? ORDER BY id",
+          )
+          .all(request.amendmentOfId)
+          .map(
+            (row) =>
+              JSON.parse(
+                String((row as { payload: unknown }).payload),
+              ) as SsiApplicabilityRecord,
+          );
+      }
+      if (
+        !applicabilityRows.some(
+          ({ status }) => status === "ACTIVE" || status === "DRAFT",
+        )
+      ) {
+        this.db.exec("ROLLBACK");
+        return undefined;
+      }
+
+      const applicabilityVersion =
+        Math.max(0, ...applicabilityRows.map(({ version }) => version)) + 1;
+      const approvedApplicability = applicabilityRows.map(
+        (row, index): SsiApplicabilityRecord => ({
+          ...row,
+          id: `${id}:APPL:${index + 1}`,
+          ssiId: id,
+          status: row.status === "DRAFT" ? "ACTIVE" : row.status,
+          version: applicabilityVersion,
+          createdAt: row.ssiId === id ? row.createdAt : now,
+          updatedAt: now,
+        }),
+      );
+      const insertApplicability = this.db.prepare(
+        "INSERT INTO ssi_applicability(id,ssi_id,payload,updated_at) VALUES(?,?,?,?)",
+      );
+      this.db.prepare("DELETE FROM ssi_applicability WHERE ssi_id=?").run(id);
+      for (const row of approvedApplicability)
+        insertApplicability.run(row.id, id, JSON.stringify(row), now);
+      this.db
+        .prepare(
+          "INSERT INTO audit_event(ssi_id,action,actor,payload,occurred_at) VALUES(?,?,?,?,?)",
+        )
+        .run(
+          id,
+          "APPLICABILITY_APPROVED",
+          actor,
+          JSON.stringify(approvedApplicability),
+          now,
+        );
+      this.db
+        .prepare(
+          "INSERT INTO outbox(event_id,event_type,payload,created_at) VALUES(?,?,?,?)",
+        )
+        .run(
+          randomUUID(),
+          "SSI_APPLICABILITY_APPROVED",
+          JSON.stringify({ ssiId: id, records: approvedApplicability }),
+          now,
+        );
+
+      const logicalSsiCode = request.route["ssiCode"];
+      const previousActive = this.db
+        .prepare(
+          "SELECT payload FROM ssi WHERE id<>? AND json_extract(payload,'$.status')='ACTIVE'",
+        )
+        .all(id)
+        .map(
+          (row) =>
+            JSON.parse(
+              String((row as { payload: unknown }).payload),
+            ) as SsiRecord,
+        )
+        .filter(
+          (candidate) =>
+            candidate.id === request.amendmentOfId ||
+            (logicalSsiCode && candidate.route["ssiCode"] === logicalSsiCode),
+        );
+      const approved: SsiRecord = {
+        ...request,
+        status: "ACTIVE",
+        checker: actor,
+        version: request.version + 1,
+        updatedAt: now,
+      };
+      const saveRecord = this.db.prepare(
+        "INSERT INTO ssi(id,payload,updated_at) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload,updated_at=excluded.updated_at",
+      );
+      const auditRecord = this.db.prepare(
+        "INSERT INTO audit_event(ssi_id,action,actor,payload,occurred_at) VALUES(?,?,?,?,?)",
+      );
+      const outboxRecord = this.db.prepare(
+        "INSERT INTO outbox(event_id,event_type,payload,created_at) VALUES(?,?,?,?)",
+      );
+      for (const previous of previousActive) {
+        const superseded: SsiRecord = {
+          ...previous,
+          status: "SUPERSEDED",
+          version: previous.version + 1,
+          updatedAt: now,
+        };
+        saveRecord.run(superseded.id, JSON.stringify(superseded), now);
+        auditRecord.run(
+          superseded.id,
+          "SUPERSEDED",
+          actor,
+          JSON.stringify(superseded),
+          now,
+        );
+        outboxRecord.run(
+          randomUUID(),
+          "SSI_SUPERSEDED",
+          JSON.stringify(superseded),
+          now,
+        );
+      }
+      saveRecord.run(approved.id, JSON.stringify(approved), now);
+      auditRecord.run(
+        approved.id,
+        "APPROVE",
+        actor,
+        JSON.stringify(approved),
+        now,
+      );
+      outboxRecord.run(
+        randomUUID(),
+        "SSI_APPROVE",
+        JSON.stringify(approved),
+        now,
+      );
+      this.db.exec("COMMIT");
+      return approved;
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
   save(record: SsiRecord, action: string, actor: string): void {
     const now = new Date().toISOString();
     this.db.exec("BEGIN IMMEDIATE");

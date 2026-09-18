@@ -131,21 +131,29 @@ describe("Counterparty Inbox query model", () => {
     expect(inbox[0]).not.toHaveProperty("bic");
   });
 
-  it("sorts SSI priorities and versions numerically and effective periods chronologically", () => {
+  it("sorts SSI priorities and versions numerically and effective dates by validTo", () => {
     const rows = [
       {
         id: "b",
         scope: "PAYMENT",
         status: "ACTIVE",
         version: 10,
-        route: { priority: "10", validFrom: "2026-10-01" },
+        route: {
+          priority: "10",
+          validFrom: "2026-02-01",
+          validTo: "2029-12-31",
+        },
       },
       {
         id: "a",
         scope: "PAYMENT",
         status: "ACTIVE",
         version: 2,
-        route: { priority: "2", validFrom: "2026-02-01" },
+        route: {
+          priority: "2",
+          validFrom: "2026-10-01",
+          validTo: "2027-12-31",
+        },
       },
     ];
     expect(
