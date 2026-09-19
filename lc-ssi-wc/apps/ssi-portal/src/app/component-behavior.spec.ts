@@ -574,6 +574,74 @@ describe("portal component behavior", () => {
     fakeDocument.defaultView.location.pathname = "/";
   });
 
+  it.each([
+    ["/resolution/payment", "resolver"],
+    ["/resolution/treasury", "treasury"],
+    ["/resolution/trade-finance", "tradefinance"],
+  ] as const)(
+    "takes direct %s URL as authoritative without parent business preloads",
+    async (path, target) => {
+      routerEvents = new Subject<unknown>();
+      fakeDocument.defaultView.location.pathname = path;
+      fakeHttp.get.mockClear();
+      const { AppComponent } = await import("./app.component");
+      const component = new AppComponent();
+      expect(component.view()).toBe(target);
+      component.ngOnInit();
+      expect(fakeHttp.get).not.toHaveBeenCalled();
+      component.ngOnDestroy();
+      fakeDocument.defaultView.location.pathname = "/";
+    },
+  );
+
+  it("waits for the existing guard before committing a Resolution route and restores the legacy view on history back", async () => {
+    routerEvents = new Subject<unknown>();
+    fakeRouter.navigateByUrl.mockClear();
+    fakeDocument.defaultView.localStorage.setItem.mockClear();
+    const { AppComponent } = await import("./app.component");
+    const component = new AppComponent();
+    component.view.set("maker");
+    component.navigate("treasury");
+    expect(fakeRouter.navigateByUrl).toHaveBeenCalledWith(
+      "/resolution/treasury",
+    );
+    expect(component.view()).toBe("maker");
+    expect(
+      fakeDocument.defaultView.localStorage.setItem,
+    ).not.toHaveBeenCalled();
+    routerEvents.next(new NavigationStartEvent(301, "/resolution/treasury"));
+    routerEvents.next(
+      new NavigationEndEvent(
+        301,
+        "/resolution/treasury",
+        "/resolution/treasury",
+      ),
+    );
+    expect(component.view()).toBe("treasury");
+    routerEvents.next(new NavigationStartEvent(302, "/"));
+    routerEvents.next(new NavigationEndEvent(302, "/", "/"));
+    expect(component.view()).toBe("maker");
+    component.ngOnDestroy();
+  });
+
+  it("keeps Maker WIP when the guarded Resolution route is denied", async () => {
+    routerEvents = new Subject<unknown>();
+    const { AppComponent } = await import("./app.component");
+    const component = new AppComponent();
+    component.view.set("maker");
+    component.editingId.set("SSI-WIP-RESOLUTION");
+    component.revisionSource.set({ id: "SSI-WIP-RESOLUTION" } as never);
+    component.navigate("resolver");
+    expect(component.view()).toBe("maker");
+    routerEvents.next(new NavigationStartEvent(303, "/resolution/payment"));
+    fakeRouteGuardBridge.consumeDenied.mockReturnValueOnce(true);
+    routerEvents.next(new NavigationCancelEvent(303));
+    expect(component.view()).toBe("maker");
+    expect(component.editingId()).toBe("SSI-WIP-RESOLUTION");
+    expect(component.routeLoading()).toBe(false);
+    component.ngOnDestroy();
+  });
+
   it("closes an invalid Maker editor if the route fails after WIP release", async () => {
     routerEvents = new Subject<unknown>();
     const { AppComponent } = await import("./app.component");
@@ -794,18 +862,36 @@ describe("portal component behavior", () => {
   });
 
   it("does not download the full SSI register when opening resolution indexes", async () => {
+    routerEvents = new Subject<unknown>();
     const { AppComponent } = await import("./app.component");
     const component = new AppComponent();
     const refresh = jest.spyOn(component, "refresh").mockResolvedValue();
 
     component.navigate("resolver");
+    routerEvents.next(new NavigationStartEvent(311, "/resolution/payment"));
+    routerEvents.next(
+      new NavigationEndEvent(311, "/resolution/payment", "/resolution/payment"),
+    );
     component.navigate("tradefinance");
+    routerEvents.next(
+      new NavigationStartEvent(312, "/resolution/trade-finance"),
+    );
+    routerEvents.next(
+      new NavigationEndEvent(
+        312,
+        "/resolution/trade-finance",
+        "/resolution/trade-finance",
+      ),
+    );
 
     expect(refresh).not.toHaveBeenCalled();
 
     component.navigate("dashboard");
+    routerEvents.next(new NavigationStartEvent(313, "/"));
+    routerEvents.next(new NavigationEndEvent(313, "/", "/"));
 
     expect(refresh).toHaveBeenCalledTimes(1);
+    component.ngOnDestroy();
   });
 
   it("reloads the volatile Checker queue when returning after an SSI submit", async () => {
@@ -958,13 +1044,19 @@ describe("portal component behavior", () => {
   });
 
   it("clears a stale global notice when navigation provides its own page-level status", async () => {
+    routerEvents = new Subject<unknown>();
     const { AppComponent } = await import("./app.component");
     const component = new AppComponent();
     component.notice.set({ kind: "warning", text: "stale dependency warning" });
 
     component.navigate("resolver");
-
+    expect(component.notice()?.text).toBe("stale dependency warning");
+    routerEvents.next(new NavigationStartEvent(314, "/resolution/payment"));
+    routerEvents.next(
+      new NavigationEndEvent(314, "/resolution/payment", "/resolution/payment"),
+    );
     expect(component.notice()).toBeNull();
+    component.ngOnDestroy();
   });
 
   it("loads Currency options when New or Edit enters Maker without navigation", async () => {

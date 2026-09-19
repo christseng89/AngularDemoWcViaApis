@@ -77,7 +77,7 @@ describe("payment message index interaction contract", () => {
       ),
       "utf8",
     );
-    expect(formTemplate).toContain('} @else if (field.lookup) {');
+    expect(formTemplate).toContain("} @else if (field.lookup) {");
     expect(formTemplate).not.toContain(
       'field.dataType === "SWIFT_BIC" && field.lookup',
     );
@@ -117,10 +117,29 @@ describe("payment message index interaction contract", () => {
       join(process.cwd(), "apps/ssi-portal/src/app/app.component.html"),
       "utf8",
     );
+    const routeSource = readFileSync(
+      join(process.cwd(), "apps/ssi-portal/src/app/app.routes.ts"),
+      "utf8",
+    );
+    const hostSource = readFileSync(
+      join(
+        process.cwd(),
+        "apps/ssi-portal/src/app/resolution-route.component.ts",
+      ),
+      "utf8",
+    );
 
-    expect(appTemplate).toContain('@if (view() === "resolver")');
-    expect(appTemplate).toContain('[businessDomain]="\'PAYMENT\'"');
-    expect(appTemplate).not.toContain('<table aria-label="Payment Message Index">');
+    expect(appTemplate).toContain("<router-outlet");
+    expect(appTemplate).not.toContain("<ssi-page-definition-index-workspace");
+    expect(routeSource).toContain('path: "resolution/payment"');
+    expect(routeSource).toContain('data: { businessDomain: "PAYMENT" }');
+    expect(routeSource).toContain('import("./resolution-route.component")');
+    expect(hostSource).toMatch(
+      /<ssi-page-definition-index-workspace\s+\[businessDomain\]="businessDomain"\s*\/>/,
+    );
+    expect(appTemplate).not.toContain(
+      '<table aria-label="Payment Message Index">',
+    );
     expect(appTemplate).not.toContain(
       '<table aria-label="Payment Message Scenario Index">',
     );

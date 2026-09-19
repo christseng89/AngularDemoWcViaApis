@@ -12,4 +12,19 @@ describe("portal routes", () => {
     expect(root?.canActivate).toHaveLength(1);
     expect(unknown?.redirectTo).toBe("");
   });
+
+  it.each([
+    ["resolution/payment", "PAYMENT"],
+    ["resolution/treasury", "TREASURY"],
+    ["resolution/trade-finance", "TRADE_FINANCE"],
+  ])(
+    "guards and lazy-loads the %s ResolutionPageDefinition feature",
+    (path, domain) => {
+      const route = APP_ROUTES.find((item) => item.path === path);
+      expect(route?.loadComponent).toEqual(expect.any(Function));
+      expect(route?.component).toBeUndefined();
+      expect(route?.canActivate).toHaveLength(1);
+      expect(route?.data?.["businessDomain"]).toBe(domain);
+    },
+  );
 });

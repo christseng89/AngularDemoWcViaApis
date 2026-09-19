@@ -99,7 +99,6 @@ import {
 import { OperationalIssueComponent } from "./operational-issue.component";
 import { APP_ROUTE_GUARD_BRIDGE } from "./app-route-guard";
 import { AlertComponent } from "./alert.component";
-import { PageDefinitionIndexWorkspaceComponent } from "./resolution-workbench/page-definition-index-workspace.component";
 import {
   BankServicePickerDialogComponent,
   type BankServicePickerItem,
@@ -146,6 +145,36 @@ import {
 } from "./fin-5x-catalog";
 import { ThemeService } from "./theme.service";
 import { AppShellComponent } from "./app-shell.component";
+
+type RoutedView = "settings" | "resolver" | "treasury" | "tradefinance";
+type LegacyView = Exclude<View, RoutedView>;
+
+const routePathForView = (view: View): string | null => {
+  switch (view) {
+    case "settings":
+      return "/settings";
+    case "resolver":
+      return "/resolution/payment";
+    case "treasury":
+      return "/resolution/treasury";
+    case "tradefinance":
+      return "/resolution/trade-finance";
+    default:
+      return null;
+  }
+};
+
+const isLegacyView = (view: View): view is LegacyView =>
+  routePathForView(view) === null;
+
+const routeViewFromUrl = (url: string): View | null => {
+  const path = url.split(/[?#]/, 1)[0];
+  return (
+    (["settings", "resolver", "treasury", "tradefinance"] as const).find(
+      (view) => routePathForView(view) === path,
+    ) ?? null
+  );
+};
 
 interface SsiRow {
   id: string;
@@ -514,7 +543,6 @@ interface ControlledFixtureResponse {
     OperationalIssueComponent,
     RouterOutlet,
     AlertComponent,
-    PageDefinitionIndexWorkspaceComponent,
     BankServicePickerDialogComponent,
     GovernanceIndexTableComponent,
     LoadingStateComponent,
@@ -551,8 +579,7 @@ export class AppComponent implements OnInit, OnDestroy {
   readonly ssiIndexLoading = signal(false);
   readonly view = signal<View>(this.savedView());
   readonly routeLoading = signal(false);
-  private lastWorkbenchView: Exclude<View, "settings"> =
-    this.savedWorkbenchView();
+  private lastWorkbenchView: LegacyView = this.savedWorkbenchView();
   private pendingRouteTarget: View | null = null;
   private latestNavigationId = 0;
   private releasedMakerWipDuringNavigation = false;
@@ -1542,14 +1569,18 @@ export class AppComponent implements OnInit, OnDestroy {
 
   navigate(view: View): void {
     if (this.pendingRouteTarget !== null) return;
-    if (view === "settings" || this.view() === "settings") {
-      if (view === this.view()) return;
+    const targetPath = routePathForView(view);
+    if (targetPath || routePathForView(this.view())) {
+      if (view === this.view()) {
+        if (view === "treasury" || view === "tradefinance")
+          this.enterFinResolution(view);
+        return;
+      }
       this.pendingRouteTarget = view;
-      void this.router
-        .navigateByUrl(view === "settings" ? "/settings" : "/")
-        .catch(() => undefined);
+      void this.router.navigateByUrl(targetPath ?? "/").catch(() => undefined);
       return;
     }
+    if (!isLegacyView(view)) return;
     this.notice.set(null);
     this.view.set(view);
     this.document.defaultView?.localStorage.setItem("ssi-active-view", view);
@@ -1558,35 +1589,28 @@ export class AppComponent implements OnInit, OnDestroy {
       "ssi-last-workbench-view",
       view,
     );
-    if (view === "treasury" || view === "tradefinance")
-      this.enterFinResolution(view);
     void this.ensureFeatureData(view);
   }
 
   private savedView(): View {
-    if (this.document.defaultView?.location?.pathname === "/settings")
-      return "settings";
+    const routed = routeViewFromUrl(
+      this.document.defaultView?.location?.pathname ?? "/",
+    );
+    if (routed) return routed;
     return this.savedWorkbenchView();
   }
 
-  private savedWorkbenchView(): Exclude<View, "settings"> {
+  private savedWorkbenchView(): LegacyView {
     const saved =
       this.document.defaultView?.localStorage.getItem("ssi-active-view");
     const previous = this.document.defaultView?.localStorage.getItem(
       "ssi-last-workbench-view",
     );
-    const candidate = saved === "settings" ? previous : saved;
-    return [
-      "swiftdata",
-      "dashboard",
-      "maker",
-      "checker",
-      "resolver",
-      "treasury",
-      "tradefinance",
-      "audit",
-    ].includes(candidate ?? "")
-      ? (candidate as Exclude<View, "settings">)
+    const candidate = routePathForView(saved as View) ? previous : saved;
+    return ["swiftdata", "dashboard", "maker", "checker", "audit"].includes(
+      candidate ?? "",
+    )
+      ? (candidate as LegacyView)
       : "swiftdata";
   }
 
@@ -1649,15 +1673,16 @@ export class AppComponent implements OnInit, OnDestroy {
           "dashboard",
         );
       }
-      const target: View = event.urlAfterRedirects.startsWith("/settings")
-        ? "settings"
+      const routed = routeViewFromUrl(event.urlAfterRedirects);
+      const target: View = routed
+        ? routed
         : released
           ? "dashboard"
-          : this.pendingRouteTarget && this.pendingRouteTarget !== "settings"
+          : this.pendingRouteTarget && isLegacyView(this.pendingRouteTarget)
             ? this.pendingRouteTarget
             : this.lastWorkbenchView;
       const previousView = this.view();
-      if (target === "settings" && previousView !== "settings" && !released) {
+      if (routed && isLegacyView(previousView) && !released) {
         this.lastWorkbenchView = previousView;
         this.document.defaultView?.localStorage.setItem(
           "ssi-last-workbench-view",
@@ -1708,7 +1733,7 @@ export class AppComponent implements OnInit, OnDestroy {
     this.notice.set(null);
     this.view.set(view);
     this.document.defaultView?.localStorage.setItem("ssi-active-view", view);
-    if (view !== "settings") {
+    if (isLegacyView(view)) {
       this.lastWorkbenchView = view;
       this.document.defaultView?.localStorage.setItem(
         "ssi-last-workbench-view",

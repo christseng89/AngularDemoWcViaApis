@@ -11,6 +11,33 @@ export class LegacyRouteAnchorComponent {}
 
 export const APP_ROUTES: Routes = [
   {
+    path: "resolution/payment",
+    canActivate: [appRouteCanActivate],
+    data: { businessDomain: "PAYMENT" },
+    loadComponent: () =>
+      import("./resolution-route.component").then(
+        (module) => module.ResolutionRouteComponent,
+      ),
+  },
+  {
+    path: "resolution/treasury",
+    canActivate: [appRouteCanActivate],
+    data: { businessDomain: "TREASURY" },
+    loadComponent: () =>
+      import("./resolution-route.component").then(
+        (module) => module.ResolutionRouteComponent,
+      ),
+  },
+  {
+    path: "resolution/trade-finance",
+    canActivate: [appRouteCanActivate],
+    data: { businessDomain: "TRADE_FINANCE" },
+    loadComponent: () =>
+      import("./resolution-route.component").then(
+        (module) => module.ResolutionRouteComponent,
+      ),
+  },
+  {
     path: "settings",
     canActivate: [appRouteCanActivate],
     loadComponent: () =>

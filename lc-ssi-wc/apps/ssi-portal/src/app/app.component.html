@@ -1081,25 +1081,6 @@
       <ssi-loading-state label="Loading Checker…" />
     }
 
-    @defer (
-      when view() === "resolver" ||
-          view() === "treasury" ||
-          view() === "tradefinance";
-      prefetch on timer(3s)
-    ) {
-      @if (view() === "resolver") {
-        <ssi-page-definition-index-workspace [businessDomain]="'PAYMENT'" />
-      } @else if (view() === "treasury" || view() === "tradefinance") {
-        <ssi-page-definition-index-workspace
-          [businessDomain]="
-            view() === 'treasury' ? 'TREASURY' : 'TRADE_FINANCE'
-          "
-        />
-      }
-    } @loading (after 100ms; minimum 300ms) {
-      <ssi-loading-state label="Loading SSI Resolution workspace…" />
-    }
-
     @if (false && (view() === "treasury" || view() === "tradefinance")) {
       <section class="workspace-intro">
         <div>
@@ -1951,9 +1932,16 @@
       <ssi-loading-state label="Loading Audit…" />
     }
     @if (routeLoading()) {
-      <ssi-loading-state label="Loading Settings…" />
+      <ssi-loading-state label="Loading workspace…" />
     }
-    <div [hidden]="view() !== 'settings'">
+    <div
+      [hidden]="
+        view() !== 'settings' &&
+        view() !== 'resolver' &&
+        view() !== 'treasury' &&
+        view() !== 'tradefinance'
+      "
+    >
       <router-outlet
         (activate)="onSettingsActivated($event)"
         (deactivate)="onSettingsDeactivated()"
