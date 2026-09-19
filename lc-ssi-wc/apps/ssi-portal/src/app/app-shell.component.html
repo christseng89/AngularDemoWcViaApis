@@ -1,0 +1,111 @@
+<div class="shell">
+  <aside>
+    <div class="brand">
+      <span>SSI</span>
+      <div>Control Room<small>Prototype · SR2026</small></div>
+    </div>
+    <nav aria-label="Primary navigation">
+      <button
+        (click)="requestNavigation('swiftdata')"
+        [class.active]="view() === 'swiftdata'"
+      >
+        SWIFT Data Service
+      </button>
+      <button
+        (click)="requestNavigation('dashboard')"
+        [class.active]="view() === 'dashboard' || view() === 'maker'"
+      >
+        SSI Maintenance
+      </button>
+      <button
+        (click)="requestNavigation('checker')"
+        [class.active]="view() === 'checker'"
+      >
+        Checker <em>{{ checkerCount() }}</em>
+      </button>
+      <button
+        (click)="requestNavigation('treasury')"
+        [class.active]="view() === 'treasury'"
+      >
+        Treasury SSI Resolution
+      </button>
+      <button
+        (click)="requestNavigation('tradefinance')"
+        [class.active]="view() === 'tradefinance'"
+      >
+        Trade Finance SSI Resolution
+      </button>
+      <button
+        (click)="requestNavigation('resolver')"
+        [class.active]="view() === 'resolver'"
+      >
+        Payment SSI Resolution
+      </button>
+      <button
+        (click)="requestNavigation('audit')"
+        [class.active]="view() === 'audit'"
+      >
+        Audit
+      </button>
+      <button
+        (click)="requestNavigation('settings')"
+        [class.active]="view() === 'settings'"
+      >
+        Settings
+      </button>
+    </nav>
+    <p class="scope">
+      Prototype SSI field subset<br />SR2026 parameter baseline<br /><b
+        >非 SWIFT 網路訊息</b
+      >
+    </p>
+  </aside>
+  <main>
+    <header>
+      <div>
+        <p class="eyebrow">ENTERPRISE SETTLEMENT DATA</p>
+        <h1>
+          @if (detailOpen()) {
+            SSI 唯讀檢視
+          } @else {
+            @switch (view()) {
+              @case ("dashboard") {
+                SSI 維護總覽
+              }
+              @case ("maker") {
+                新增／修訂 SSI
+              }
+              @case ("checker") {
+                四眼審批
+              }
+              @case ("resolver") {
+                SSI Resolution
+              }
+              @case ("treasury") {
+                Treasury SSI Resolution
+              }
+              @case ("tradefinance") {
+                Trade Finance SSI Resolution
+              }
+              @case ("swiftdata") {
+                SWIFT Data Service
+              }
+              @case ("audit") {
+                稽核軌跡
+              }
+              @case ("settings") {
+                Settings
+              }
+            }
+          }
+        </h1>
+      </div>
+      <div class="header-actions">
+        @if (!detailOpen() && !auditDetailOpen() && view() !== "swiftdata") {
+          <button class="ghost" (click)="requestRefresh()">Refresh</button>
+        }
+      </div>
+    </header>
+    <ng-content />
+  </main>
+</div>

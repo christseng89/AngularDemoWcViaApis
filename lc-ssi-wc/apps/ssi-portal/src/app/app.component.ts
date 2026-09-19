@@ -135,6 +135,7 @@ import {
   type TagMessageCatalogItem,
 } from "./fin-5x-catalog";
 import { ThemeService } from "./theme.service";
+import { AppShellComponent } from "./app-shell.component";
 
 interface SsiRow {
   id: string;
@@ -509,6 +510,7 @@ interface ControlledFixtureResponse {
     LoadingStateComponent,
     DeferredFeatureShellComponent,
     GovernedRecordViewComponent,
+    AppShellComponent,
   ],
   templateUrl: "./app.component.html",
   host: {
