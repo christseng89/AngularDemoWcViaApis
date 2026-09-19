@@ -34,4 +34,11 @@ describe("portal routes", () => {
     expect(route?.component).toBeUndefined();
     expect(route?.canActivate).toHaveLength(1);
   });
+
+  it("guards and lazy-loads the Checker feature", () => {
+    const route = APP_ROUTES.find((item) => item.path === "checker");
+    expect(route?.loadComponent).toEqual(expect.any(Function));
+    expect(route?.component).toBeUndefined();
+    expect(route?.canActivate).toHaveLength(1);
+  });
 });

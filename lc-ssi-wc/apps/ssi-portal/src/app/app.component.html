@@ -945,77 +945,6 @@
       <ssi-loading-state label="Loading SSI Maintenance…" />
     }
 
-    @defer (when view() === "checker"; prefetch on timer(2s)) {
-      @if (view() === "checker") {
-        <nav class="catalog-tabs" aria-label="Checker resource">
-          <button
-            type="button"
-            [class.active]="checkerTab() === 'rma'"
-            (click)="selectCheckerTab('rma')"
-          >
-            RMA
-          </button>
-          <button
-            type="button"
-            [class.active]="checkerTab() === 'entity'"
-            (click)="selectCheckerTab('entity')"
-          >
-            Entities
-          </button>
-          <button
-            type="button"
-            [class.active]="checkerTab() === 'nostro'"
-            (click)="selectCheckerTab('nostro')"
-          >
-            Nostro
-          </button>
-          <button
-            type="button"
-            [class.active]="checkerTab() === 'ssi'"
-            (click)="selectCheckerTab('ssi')"
-          >
-            SSI
-          </button>
-        </nav>
-        <section class="intro-card">
-          <p class="kicker">FOUR-EYES CONTROL</p>
-          <h2>Checker 要做甚麼？</h2>
-          <p>
-            核對 Maker、Bank/BIC、Currency、Account With、Intermediary 與
-            Scope。Checker 不可與 Maker 相同；核准後即成為 Active，供 Resolution
-            使用。
-          </p>
-        </section>
-        @if (checkerTab() !== "ssi") {
-          <ssi-swift-data-crud
-            [initialResourceId]="checkerTab()"
-            [checkerMode]="true"
-          />
-        } @else {
-          <ssi-governance-index-table
-            ariaLabel="SSI pending approval index"
-            kicker="PENDING APPROVAL INDEX"
-            instruction="單擊資料列或按 Enter 查看原輸入畫面"
-            emptyText="沒有等待審批的項目。請從 SSI Maintenance 選擇 DRAFT 並提交。"
-            [columns]="checkerIndexColumns()"
-            [trailingColumns]="['Maker', 'Maker Datetime']"
-            [rows]="checkerIndexRows()"
-            [sortPath]="checkerIndexSortPath()"
-            [sortDirection]="checkerSortDirection()"
-            [currentPage]="checkerCurrentPage()"
-            [totalPages]="checkerTotalPages()"
-            [totalRecords]="pending().length"
-            [pageSize]="checkerPageSize"
-            (sortRequested)="sortCheckerIndex($event)"
-            (rowOpened)="reviewForChecker($any($event))"
-            (pageRequested)="moveCheckerPage($event)"
-          />
-        }
-      }
-    } @loading (after 100ms; minimum 300ms) {
-      <ssi-loading-state label="Loading Checker…" />
-    }
-
     @if (false && (view() === "treasury" || view() === "tradefinance")) {
       <section class="workspace-intro">
         <div>
@@ -1769,7 +1698,8 @@
         view() !== 'resolver' &&
         view() !== 'treasury' &&
         view() !== 'tradefinance' &&
-        view() !== 'audit')
+        view() !== 'audit' &&
+        view() !== 'checker')
     "
   >
     <router-outlet

@@ -31,10 +31,13 @@ import {
   type MaintenanceIndexActionId,
 } from "./maintenance-index-action-policy";
 import { assertMaintenanceServerPage } from "./maintenance-index-server-page";
-import {
-  currentStatusLabel,
-  type CurrentStatus,
-} from "./current-status-contract";
+import { currentStatusLabel } from "./current-status-contract";
+import type {
+  SsiApplicability,
+  SsiIndexSummary,
+  SsiPage,
+  SsiRow,
+} from "./ssi-maintenance.types";
 import { presentOfficialFieldName } from "./official-field-name";
 import { hasManualRouteOverride } from "./resolution-route-selection";
 import {
@@ -101,27 +104,16 @@ import {
   BankServicePickerDialogComponent,
   type BankServicePickerItem,
 } from "./bank-service-picker-dialog.component";
-import { GovernanceIndexTableComponent } from "./governance-index-table.component";
-import {
-  governanceRecordValue,
-  requestTypeLabel as presentRequestTypeLabel,
-} from "./governance-record-value";
-import type { AuditSortDirection } from "./audit-presentation";
+import { requestTypeLabel as presentRequestTypeLabel } from "./governance-record-value";
 import { LoadingStateComponent } from "./loading-state.component";
 import { DeferredFeatureShellComponent } from "./deferred-feature-shell.component";
 import {
   ariaSortDirection,
-  auditIndexColumns,
   localCalendarDate,
   paymentSourceLabel,
   sortDirectionIndicator,
 } from "./app-presentation";
-import type {
-  AppView as View,
-  BicTarget,
-  GovernanceTab,
-  ThemeMode,
-} from "./app-view.models";
+import type { AppView as View, BicTarget, ThemeMode } from "./app-view.models";
 import {
   BIC_PATTERN,
   BUSINESS_FUNCTION_DEFINITIONS,
@@ -139,7 +131,7 @@ import { ThemeService } from "./theme.service";
 import { AppShellComponent } from "./app-shell.component";
 
 type RoutedView =
-  "settings" | "resolver" | "treasury" | "tradefinance" | "audit";
+  "settings" | "resolver" | "treasury" | "tradefinance" | "audit" | "checker";
 type LegacyView = Exclude<View, RoutedView>;
 
 const routePathForView = (view: View): string | null => {
@@ -148,6 +140,8 @@ const routePathForView = (view: View): string | null => {
       return "/settings";
     case "audit":
       return "/audit";
+    case "checker":
+      return "/checker";
     case "resolver":
       return "/resolution/payment";
     case "treasury":
@@ -166,70 +160,18 @@ const routeViewFromUrl = (url: string): View | null => {
   const path = url.split(/[?#]/, 1)[0];
   return (
     (
-      ["settings", "resolver", "treasury", "tradefinance", "audit"] as const
+      [
+        "settings",
+        "resolver",
+        "treasury",
+        "tradefinance",
+        "audit",
+        "checker",
+      ] as const
     ).find((view) => routePathForView(view) === path) ?? null
   );
 };
 
-interface SsiRow {
-  id: string;
-  counterpartyId: string;
-  scope: string;
-  status: string;
-  maker: string;
-  checker?: string;
-  route: Record<string, string>;
-  version: number;
-  amendmentOfId?: string;
-  hasOpenRevision?: boolean;
-  openRevisionId?: string;
-  openRevisionStatus?: "WIP" | "DRAFT" | "PENDING_APPROVAL" | "APPROVED";
-  openRevisionChangeType?: "REVISION" | "SUPPRESSION";
-  currentStatus?: CurrentStatus;
-  changeType?: "REVISION" | "SUPPRESSION";
-  suppressionReason?: string;
-  rejectionReason?: string;
-  createdAt?: string;
-  updatedAt?: string;
-  ownershipType?: "OWN" | "COUNTERPARTY";
-  ownerParty?: string;
-  publisherParty?: string;
-  applicability?: readonly SsiApplicability[];
-}
-interface SsiPage {
-  items: readonly SsiRow[];
-  page: number;
-  pageSize: number;
-  totalItems: number;
-  totalPages: number;
-  hasPrevious: boolean;
-  hasNext: boolean;
-  distinctCurrencyCount: number;
-}
-interface SsiIndexSummary {
-  currentOwn: number;
-  pendingApproval: number;
-  active: number;
-  archived: number;
-}
-interface CheckerResourceContract {
-  id: string;
-  label: string;
-  endpoint: string;
-  "x-lifecycle": readonly string[];
-}
-interface CheckerOpenApiContract {
-  "x-ui-resources": readonly CheckerResourceContract[];
-}
-interface GovernedPendingRow {
-  resourceId: string;
-  resourceLabel: string;
-  endpoint: string;
-  id: string;
-  status: string;
-  maker: string;
-  version: number;
-}
 interface CurrencyReference {
   code: string;
   decimals: number;
@@ -328,19 +270,6 @@ interface ResolutionEvidence {
   expected: string;
   actual: string;
   reasonCode: string;
-}
-interface SsiApplicability {
-  id: string;
-  ssiId: string;
-  consumer: string;
-  product: string;
-  businessFunction: string;
-  paymentLeg: string;
-  direction: string;
-  status: string;
-  validFrom: string;
-  validTo: string;
-  version: number;
 }
 interface RankedResolutionRoute {
   ssiId: string;
@@ -510,7 +439,6 @@ interface ControlledFixtureResponse {
     RouterOutlet,
     AlertComponent,
     BankServicePickerDialogComponent,
-    GovernanceIndexTableComponent,
     LoadingStateComponent,
     DeferredFeatureShellComponent,
     AppShellComponent,
@@ -535,6 +463,15 @@ export class AppComponent implements OnInit, OnDestroy {
     ((options: readonly { code: string; decimals: number }[]) => void) | null =
     null;
   private readonly swiftDataCrud = viewChild(SwiftDataCrudComponent);
+  private activeCheckerRoute: {
+    canDeactivate(): Promise<boolean>;
+    refresh(): Promise<void>;
+    decide(
+      row: SsiRow,
+      decision: "approve" | "reject",
+      reason: string,
+    ): Promise<boolean>;
+  } | null = null;
   private readonly api = "http://localhost:3100/api";
   readonly finResolutionCatalogue = signal<
     readonly FinResolutionCatalogueItem[]
@@ -557,9 +494,6 @@ export class AppComponent implements OnInit, OnDestroy {
   private settingsReloadSubscription: { unsubscribe(): void } | null = null;
   readonly theme = this.themeService.theme;
   readonly rows = signal<readonly SsiRow[]>([]);
-  // Checker is an independent transactional projection. It must never replace
-  // the SSI Maintenance collection while its PENDING queue is loading.
-  readonly checkerRows = signal<readonly SsiRow[]>([]);
   readonly ssiIndexTotalItems = signal(0);
   readonly ssiIndexTotalPages = signal(1);
   readonly ssiIndexDistinctCurrencyCount = signal(0);
@@ -679,54 +613,10 @@ export class AppComponent implements OnInit, OnDestroy {
     if (kind === "warning") return "請注意";
     return "操作完成";
   }
-  readonly pending = computed(() =>
-    this.checkerRows().filter((row) => row.status === "PENDING_APPROVAL"),
-  );
-  readonly checkerTab = signal<GovernanceTab>("rma");
-  readonly checkerIndexSortPath = signal<string | null>(null);
-  readonly checkerSortDirection = signal<AuditSortDirection>("asc");
-  readonly checkerCurrentPage = signal(1);
-  readonly checkerPageSize = 10;
-  readonly governedPending = signal<readonly GovernedPendingRow[]>([]);
+  private readonly routedCheckerCount = signal<number | null>(null);
   readonly checkerCount = computed(
-    () => this.ssiSummary().pendingApproval + this.governedPending().length,
+    () => this.routedCheckerCount() ?? this.ssiSummary().pendingApproval,
   );
-  readonly checkerIndexColumns = computed(() =>
-    auditIndexColumns(this.checkerTab()),
-  );
-  readonly sortedCheckerSsiRows = computed(() => {
-    const path = this.checkerIndexSortPath();
-    if (!path) return this.pending();
-    const direction = this.checkerSortDirection() === "asc" ? 1 : -1;
-    return [...this.pending()].sort(
-      (left, right) =>
-        governanceRecordValue(left, path).localeCompare(
-          governanceRecordValue(right, path),
-          undefined,
-          { numeric: true, sensitivity: "base" },
-        ) * direction,
-    );
-  });
-  readonly checkerTotalPages = computed(() =>
-    Math.max(
-      1,
-      Math.ceil(this.sortedCheckerSsiRows().length / this.checkerPageSize),
-    ),
-  );
-  readonly checkerIndexRows = computed(() => {
-    const start = (this.checkerCurrentPage() - 1) * this.checkerPageSize;
-    return this.sortedCheckerSsiRows()
-      .slice(start, start + this.checkerPageSize)
-      .map((record) => ({
-        id: record.id,
-        record,
-        cells: this.checkerIndexColumns().map((column) =>
-          governanceRecordValue(record, column.path),
-        ),
-        trailing: [record.maker, record.updatedAt || record.createdAt || "—"],
-        source: record,
-      }));
-  });
   readonly activeCount = computed(() => this.ssiSummary().active);
   readonly form: FormGroup = new FormGroup({});
   model: Record<string, unknown> = {
@@ -1323,7 +1213,8 @@ export class AppComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     // SWIFT Data owns its own resource loading. A persisted SSI view loads only
     // SSI data, so browser refresh does not create or query the RMA component.
-    if (this.view() !== "swiftdata") void this.ensureFeatureData(this.view());
+    if (isLegacyView(this.view()) && this.view() !== "swiftdata")
+      void this.ensureFeatureData(this.view());
   }
 
   private async loadWorkspaceData(): Promise<void> {
@@ -1351,6 +1242,8 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   refresh(): Promise<void> {
+    if (this.view() === "checker")
+      return this.activeCheckerRoute?.refresh() ?? Promise.resolve();
     return this.performRefresh(++this.refreshRequestSequence);
   }
 
@@ -1363,21 +1256,18 @@ export class AppComponent implements OnInit, OnDestroy {
       this.ssiIndexDistinctCurrencyCount.set(0);
     }
     try {
-      const checkerView = this.view() === "checker";
       const query = new URLSearchParams({
-        status: checkerView ? "PENDING_APPROVAL" : this.ownershipStatus(),
-        page: checkerView ? "1" : String(this.indexPage()),
-        pageSize: checkerView ? "100" : String(this.indexPageSize),
-        sortBy: checkerView ? "STATUS" : this.ownershipSort(),
-        sortDirection: checkerView ? "ASC" : this.ownershipSortDirection(),
+        status: this.ownershipStatus(),
+        page: String(this.indexPage()),
+        pageSize: String(this.indexPageSize),
+        sortBy: this.ownershipSort(),
+        sortDirection: this.ownershipSortDirection(),
       });
-      if (!checkerView) {
-        query.set("ownershipType", this.ownershipTab());
-        const search = this.ownershipSearch().trim();
-        if (search) query.set("search", search);
-        if (this.selectedCounterpartyId())
-          query.set("counterpartyId", this.selectedCounterpartyId());
-      }
+      query.set("ownershipType", this.ownershipTab());
+      const search = this.ownershipSearch().trim();
+      if (search) query.set("search", search);
+      if (this.selectedCounterpartyId())
+        query.set("counterpartyId", this.selectedCounterpartyId());
       const [response, summary] = await Promise.all([
         firstValueFrom(
           this.http.get<SsiPage | SsiRow[]>(
@@ -1402,19 +1292,12 @@ export class AppComponent implements OnInit, OnDestroy {
             ).size,
           }
         : response;
-      assertMaintenanceServerPage(
-        page.items,
-        checkerView ? "PENDING_APPROVAL" : this.ownershipStatus(),
-      );
+      assertMaintenanceServerPage(page.items, this.ownershipStatus());
       if (requestSequence !== this.refreshRequestSequence) return;
-      if (checkerView) {
-        this.checkerRows.set(page.items);
-      } else {
-        this.rows.set(page.items);
-        this.ssiIndexTotalItems.set(page.totalItems);
-        this.ssiIndexTotalPages.set(Math.max(1, page.totalPages));
-        this.ssiIndexDistinctCurrencyCount.set(page.distinctCurrencyCount);
-      }
+      this.rows.set(page.items);
+      this.ssiIndexTotalItems.set(page.totalItems);
+      this.ssiIndexTotalPages.set(Math.max(1, page.totalPages));
+      this.ssiIndexDistinctCurrencyCount.set(page.distinctCurrencyCount);
       this.ssiSummary.set(summary);
       this.indexPage.set(
         Math.min(this.indexPage(), Math.max(1, page.totalPages)),
@@ -1471,9 +1354,7 @@ export class AppComponent implements OnInit, OnDestroy {
       "ssi-last-workbench-view",
     );
     const candidate = routePathForView(saved as View) ? previous : saved;
-    return ["swiftdata", "dashboard", "maker", "checker"].includes(
-      candidate ?? "",
-    )
+    return ["swiftdata", "dashboard", "maker"].includes(candidate ?? "")
       ? (candidate as LegacyView)
       : "swiftdata";
   }
@@ -1523,7 +1404,51 @@ export class AppComponent implements OnInit, OnDestroy {
       tabChanged?: {
         subscribe(callback: () => void): { unsubscribe(): void };
       };
+      canDeactivate?: () => Promise<boolean>;
+      refresh?: () => Promise<void>;
+      decide?: (
+        row: SsiRow,
+        decision: "approve" | "reject",
+        reason: string,
+      ) => Promise<boolean>;
+      reviewRequested?: {
+        subscribe(callback: (row: SsiRow) => void): { unsubscribe(): void };
+      };
+      countChanged?: {
+        subscribe(callback: (count: number) => void): { unsubscribe(): void };
+      };
+      noticeRaised?: {
+        subscribe(
+          callback: (notice: { kind: "warning"; text: string }) => void,
+        ): {
+          unsubscribe(): void;
+        };
+      };
     };
+    this.activeCheckerRoute =
+      route.canDeactivate && route.refresh && route.decide
+        ? {
+            canDeactivate: route.canDeactivate.bind(route),
+            refresh: route.refresh.bind(route),
+            decide: route.decide.bind(route),
+          }
+        : null;
+    if (route.reviewRequested)
+      this.auditRouteSubscriptions.push(
+        route.reviewRequested.subscribe(
+          (row) => void this.reviewForChecker(row),
+        ),
+      );
+    if (route.countChanged)
+      this.auditRouteSubscriptions.push(
+        route.countChanged.subscribe((count) =>
+          this.routedCheckerCount.set(count),
+        ),
+      );
+    if (route.noticeRaised)
+      this.auditRouteSubscriptions.push(
+        route.noticeRaised.subscribe((notice) => this.notice.set(notice)),
+      );
     this.activeAuditCurrencyOptionsConsumer =
       route.setCurrencyOptions?.bind(route) ?? null;
     this.activeAuditCurrencyOptionsConsumer?.(this.currencies());
@@ -1550,6 +1475,7 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   onSettingsDeactivated(): void {
+    this.activeCheckerRoute = null;
     this.activeAuditCurrencyOptionsConsumer = null;
     this.settingsReloadSubscription?.unsubscribe();
     this.settingsReloadSubscription = null;
@@ -1654,11 +1580,7 @@ export class AppComponent implements OnInit, OnDestroy {
   private ensureFeatureData(view: View): Promise<void> {
     const key =
       view === "treasury" || view === "tradefinance" ? "fin-resolution" : view;
-    // Checker is a transactional queue: a Maker submit can change it at any
-    // time, so returning to the view must re-query its authoritative APIs.
-    // Keep the in-flight map below to deduplicate concurrent navigation loads,
-    // but never retain Checker in the one-time feature cache.
-    const cacheAfterLoad = key !== "checker" && key !== "dashboard";
+    const cacheAfterLoad = key !== "dashboard";
     if (cacheAfterLoad && this.loadedFeatureData.has(key))
       return Promise.resolve();
     const existing = this.featureDataLoads.get(key);
@@ -1673,11 +1595,8 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   private async loadFeatureData(view: View): Promise<void> {
-    if (view === "swiftdata" || view === "settings") return;
-    if (view === "checker") {
-      await Promise.all([this.refresh(), this.loadGovernedPending()]);
+    if (view === "swiftdata" || view === "settings" || view === "checker")
       return;
-    }
     if (view === "dashboard") {
       await Promise.all([this.refresh(), this.loadCounterpartyDirectory()]);
       return;
@@ -1695,79 +1614,6 @@ export class AppComponent implements OnInit, OnDestroy {
     // The parameter-driven Resolution workspace loads only the selected page
     // definition and its own dependent lookups. The legacy parent workspace
     // must not preload unrelated reference services or emit duplicate alerts.
-  }
-
-  private async loadGovernedPending(): Promise<void> {
-    try {
-      const contract = await firstValueFrom(
-        this.http.get<CheckerOpenApiContract>(
-          "/openapi/swift-data-service.v1.json",
-        ),
-      );
-      const resources = contract["x-ui-resources"].filter(
-        (resource) =>
-          resource.id !== "ssi" && resource["x-lifecycle"].includes("approve"),
-      );
-      const rows = await Promise.all(
-        resources.map(async (resource) => ({
-          resource,
-          rows: await firstValueFrom(
-            this.http.get<
-              Array<{
-                id: string;
-                status: string;
-                maker: string;
-                version: number;
-              }>
-            >(`${this.api}/${resource.endpoint}?status=PENDING_APPROVAL`),
-          ),
-        })),
-      );
-      this.governedPending.set(
-        rows.flatMap(({ resource, rows: resourceRows }) =>
-          resourceRows
-            .filter(({ status }) => status === "PENDING_APPROVAL")
-            .map((row) => ({
-              ...row,
-              resourceId: resource.id,
-              resourceLabel: resource.label,
-              endpoint: resource.endpoint,
-            })),
-        ),
-      );
-    } catch {
-      this.governedPending.set([]);
-      this.notice.set({
-        kind: "warning",
-        text: "Checker Queue 暫時無法載入全部受控資料資源。",
-      });
-    }
-  }
-
-  async approveGoverned(row: GovernedPendingRow): Promise<void> {
-    try {
-      await firstValueFrom(
-        this.http.post(`${this.api}/${row.endpoint}/${row.id}/approve`, {
-          actor: "checker.demo",
-        }),
-      );
-      this.notice.set({
-        kind: "info",
-        text: `${row.resourceLabel} 已由獨立 Checker 核准並生效。`,
-      });
-      await Promise.all([this.loadGovernedPending(), this.refresh()]);
-    } catch {
-      this.notice.set({
-        kind: "error",
-        text: `${row.resourceLabel} Checker Approve 被生命週期／四眼控制拒絕。`,
-      });
-    }
-  }
-
-  reviewGoverned(row: GovernedPendingRow): void {
-    this.governedReviewResourceId.set(row.resourceId);
-    this.governedReviewRecordId.set(row.id);
-    this.navigate("swiftdata");
   }
 
   async reviewForChecker(row: SsiRow): Promise<void> {
@@ -1788,15 +1634,12 @@ export class AppComponent implements OnInit, OnDestroy {
       return;
     }
     try {
-      await firstValueFrom(
-        this.http.post(`${this.api}/ssis/${row.id}/${decision}`, {
-          actor: "checker.demo",
-          ...(decision === "reject" ? { reason } : {}),
-        }),
-      );
+      if (!this.activeCheckerRoute)
+        throw new Error("Checker route is not active");
+      if (!(await this.activeCheckerRoute.decide(row, decision, reason)))
+        return;
       this.detailTarget.set(null);
       this.checkerRejectReason.set("");
-      await Promise.all([this.refresh(), this.loadGovernedPending()]);
       this.notice.set({
         kind: "info",
         text:
@@ -2147,6 +1990,11 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   private async performCanDeactivate(): Promise<boolean> {
+    if (
+      this.activeCheckerRoute &&
+      !(await this.activeCheckerRoute.canDeactivate())
+    )
+      return false;
     const swiftData = this.swiftDataCrud();
     if (swiftData && !(await swiftData.canDeactivate())) return false;
     const revisionId =
@@ -3113,27 +2961,6 @@ export class AppComponent implements OnInit, OnDestroy {
     } finally {
       this.customersLoading.set(false);
     }
-  }
-  selectCheckerTab(tab: GovernanceTab): void {
-    this.checkerTab.set(tab);
-    this.checkerIndexSortPath.set(null);
-    this.checkerCurrentPage.set(1);
-  }
-  sortCheckerIndex(path: string): void {
-    if (this.checkerIndexSortPath() === path)
-      this.checkerSortDirection.update((direction) =>
-        direction === "asc" ? "desc" : "asc",
-      );
-    else {
-      this.checkerIndexSortPath.set(path);
-      this.checkerSortDirection.set("asc");
-    }
-    this.checkerCurrentPage.set(1);
-  }
-  moveCheckerPage(delta: number): void {
-    this.checkerCurrentPage.update((page) =>
-      Math.min(this.checkerTotalPages(), Math.max(1, page + delta)),
-    );
   }
   displayStatus(status: string): string {
     return status === "PENDING_APPROVAL" ? "SUBMITTED" : status;

@@ -627,6 +627,39 @@ describe("portal component behavior", () => {
     fakeDocument.defaultView.location.pathname = "/";
   });
 
+  it("waits for the existing guard before committing Checker navigation", async () => {
+    routerEvents = new Subject<unknown>();
+    fakeRouter.navigateByUrl.mockClear();
+    fakeDocument.defaultView.localStorage.setItem.mockClear();
+    const { AppComponent } = await import("./app.component");
+    const component = new AppComponent();
+    component.view.set("maker");
+    component.navigate("checker");
+    expect(fakeRouter.navigateByUrl).toHaveBeenCalledWith("/checker");
+    expect(component.view()).toBe("maker");
+    expect(
+      fakeDocument.defaultView.localStorage.setItem,
+    ).not.toHaveBeenCalled();
+    routerEvents.next(new NavigationStartEvent(316, "/checker"));
+    fakeRouteGuardBridge.consumeDenied.mockReturnValueOnce(true);
+    routerEvents.next(new NavigationCancelEvent(316));
+    expect(component.view()).toBe("maker");
+    component.ngOnDestroy();
+  });
+
+  it("takes direct Checker URL without parent queue preloads", async () => {
+    routerEvents = new Subject<unknown>();
+    fakeDocument.defaultView.location.pathname = "/checker";
+    fakeHttp.get.mockClear();
+    const { AppComponent } = await import("./app.component");
+    const component = new AppComponent();
+    expect(component.view()).toBe("checker");
+    component.ngOnInit();
+    expect(fakeHttp.get).not.toHaveBeenCalled();
+    component.ngOnDestroy();
+    fakeDocument.defaultView.location.pathname = "/";
+  });
+
   it("waits for the existing guard before committing a Resolution route and restores the legacy view on history back", async () => {
     routerEvents = new Subject<unknown>();
     fakeRouter.navigateByUrl.mockClear();
@@ -944,20 +977,10 @@ describe("portal component behavior", () => {
     component.ngOnDestroy();
   });
 
-  it("reloads the volatile Checker queue when returning after an SSI submit", async () => {
+  it("revalidates SSI rows after visiting the lazy Checker route", async () => {
     const { AppComponent } = await import("./app.component");
     const component = new AppComponent();
     const refresh = jest.spyOn(component, "refresh").mockResolvedValue();
-    const loadGovernedPending = jest
-      .spyOn(component as never, "loadGovernedPending" as never)
-      .mockResolvedValue(undefined as never);
-
-    component.navigate("checker");
-    await (
-      component as unknown as {
-        ensureFeatureData(view: "checker"): Promise<void>;
-      }
-    ).ensureFeatureData("checker");
 
     component.navigate("dashboard");
     await (
@@ -965,58 +988,32 @@ describe("portal component behavior", () => {
         ensureFeatureData(view: "dashboard"): Promise<void>;
       }
     ).ensureFeatureData("dashboard");
-    await component.act(
-      {
-        id: "SSI-REVISION",
-        counterpartyId: "BANK-1",
-        scope: "STANDING",
-        status: "DRAFT",
-        maker: "maker.revision",
-        route: { currency: "USD" },
-        version: 2,
-      },
-      "submit",
-    );
-
     component.navigate("checker");
+    expect(fakeRouter.navigateByUrl).toHaveBeenCalledWith("/checker");
+    component.navigate("dashboard");
     await (
       component as unknown as {
-        ensureFeatureData(view: "checker"): Promise<void>;
+        ensureFeatureData(view: "dashboard"): Promise<void>;
       }
-    ).ensureFeatureData("checker");
+    ).ensureFeatureData("dashboard");
 
-    expect(loadGovernedPending).toHaveBeenCalledTimes(2);
-    expect(refresh).toHaveBeenCalledTimes(4);
+    expect(refresh).toHaveBeenCalledTimes(2);
   });
 
-  it("revalidates SSI rows after Checker has used its independent queue", async () => {
+  it("asks routed Checker maintenance to release WIP before navigation", async () => {
     const { AppComponent } = await import("./app.component");
     const component = new AppComponent();
-    const refresh = jest.spyOn(component, "refresh").mockResolvedValue();
-    jest
-      .spyOn(component as never, "loadGovernedPending" as never)
-      .mockResolvedValue(undefined as never);
+    const canDeactivate = jest.fn().mockResolvedValue(false);
+    component.onSettingsActivated({
+      canDeactivate,
+      refresh: jest.fn().mockResolvedValue(undefined),
+      decide: jest.fn().mockResolvedValue(true),
+    });
 
-    component.navigate("dashboard");
-    await (
-      component as unknown as {
-        ensureFeatureData(view: "dashboard"): Promise<void>;
-      }
-    ).ensureFeatureData("dashboard");
-    component.navigate("checker");
-    await (
-      component as unknown as {
-        ensureFeatureData(view: "checker"): Promise<void>;
-      }
-    ).ensureFeatureData("checker");
-    component.navigate("dashboard");
-    await (
-      component as unknown as {
-        ensureFeatureData(view: "dashboard"): Promise<void>;
-      }
-    ).ensureFeatureData("dashboard");
-
-    expect(refresh).toHaveBeenCalledTimes(3);
+    expect(await component.canDeactivate()).toBe(false);
+    expect(canDeactivate).toHaveBeenCalledTimes(1);
+    component.onSettingsDeactivated();
+    component.ngOnDestroy();
   });
 
   it("releases SSI WIP before route navigation and fails closed on release error", async () => {
@@ -2153,7 +2150,6 @@ describe("portal component behavior", () => {
     expect(component.pagedVisibleRows()).toEqual([]);
     expect(component.activeRows()).toEqual([]);
     expect(component.archivedCount()).toBe(0);
-    expect(component.pending()).toEqual([]);
     expect(component.activeCount()).toBe(0);
     expect(component.hasPreviousBankPage()).toBe(false);
     expect(component.hasNextBankPage()).toBe(false);
@@ -2382,7 +2378,6 @@ describe("portal component behavior", () => {
     expect(component.selectedCounterparty()?.counterpartyId).toBe("CUST-1");
     // Restore non-Index workspace records for the remaining derived-state checks.
     component.rows.set(workspaceRows);
-    component.checkerRows.set(workspaceRows);
     component.ssiSummary.set({
       currentOwn: 1,
       pendingApproval: 1,
@@ -2391,7 +2386,6 @@ describe("portal component behavior", () => {
     });
     expect(component.activeCount()).toBe(1);
     expect(component.archivedCount()).toBe(1);
-    expect(component.pending()).toHaveLength(1);
     component.deleteReason.set("valid reason");
     expect(component.canConfirmDelete()).toBe(true);
 

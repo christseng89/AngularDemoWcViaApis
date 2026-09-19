@@ -1,0 +1,65 @@
+<nav class="catalog-tabs" aria-label="Checker resource">
+  <button
+    type="button"
+    [class.active]="checker.tab() === 'rma'"
+    (click)="selectTab('rma')"
+  >
+    RMA
+  </button>
+  <button
+    type="button"
+    [class.active]="checker.tab() === 'entity'"
+    (click)="selectTab('entity')"
+  >
+    Entities
+  </button>
+  <button
+    type="button"
+    [class.active]="checker.tab() === 'nostro'"
+    (click)="selectTab('nostro')"
+  >
+    Nostro
+  </button>
+  <button
+    type="button"
+    [class.active]="checker.tab() === 'ssi'"
+    (click)="selectTab('ssi')"
+  >
+    SSI
+  </button>
+</nav>
+<section class="intro-card">
+  <p class="kicker">FOUR-EYES CONTROL</p>
+  <h2>Checker 要做甚麼？</h2>
+  <p>
+    核對 Maker、Bank/BIC、Currency、Account With、Intermediary 與 Scope。Checker
+    不可與 Maker 相同；核准後即成為 Active，供 Resolution 使用。
+  </p>
+</section>
+@if (checker.tab() !== "ssi") {
+  <ssi-swift-data-crud
+    [initialResourceId]="checker.tab()"
+    [checkerMode]="true"
+  />
+} @else if (checker.loading() && checker.rows().length === 0) {
+  <ssi-loading-state label="Loading Checker…" />
+} @else {
+  <ssi-governance-index-table
+    ariaLabel="SSI pending approval index"
+    kicker="PENDING APPROVAL INDEX"
+    instruction="單擊資料列或按 Enter 查看原輸入畫面"
+    emptyText="沒有等待審批的項目。請從 SSI Maintenance 選擇 DRAFT 並提交。"
+    [columns]="checker.indexColumns()"
+    [trailingColumns]="['Maker', 'Maker Datetime']"
+    [rows]="checker.indexRows()"
+    [sortPath]="checker.sortPath()"
+    [sortDirection]="checker.sortDirection()"
+    [currentPage]="checker.currentPage()"
+    [totalPages]="checker.totalPages()"
+    [totalRecords]="checker.pending().length"
+    [pageSize]="checker.pageSize"
+    (sortRequested)="checker.sortIndex($event)"
+    (rowOpened)="openReview($any($event))"
+    (pageRequested)="checker.movePage($event)"
+  />
+}

@@ -11,6 +11,14 @@ export class LegacyRouteAnchorComponent {}
 
 export const APP_ROUTES: Routes = [
   {
+    path: "checker",
+    canActivate: [appRouteCanActivate],
+    loadComponent: () =>
+      import("./checker-feature/checker-route.component").then(
+        (module) => module.CheckerRouteComponent,
+      ),
+  },
+  {
     path: "audit",
     canActivate: [appRouteCanActivate],
     loadComponent: () =>
