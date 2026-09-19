@@ -13,7 +13,7 @@ describe("AppComponent shell integration", () => {
     expect(html).toContain('[view]="view()"');
     expect(html).toContain('[checkerCount]="checkerCount()"');
     expect(html).toContain('[detailOpen]="!!detailTarget()"');
-    expect(html).toContain('[auditDetailOpen]="!!auditDetail()"');
+    expect(html).toContain('[auditDetailOpen]="routedAuditDetailOpen()"');
     expect(html).toContain('(navigationRequested)="navigate($event)"');
     expect(html).toContain('(refreshRequested)="refresh()"');
     expect(component()).toContain("AppShellComponent,");
@@ -29,5 +29,13 @@ describe("AppComponent shell integration", () => {
     expect(html.indexOf("<ssi-alert")).toBeLessThan(close);
     expect(html.indexOf("<ssi-swift-data-crud")).toBeLessThan(close);
     expect(html.indexOf("@if (deleteTarget(); as row)")).toBeGreaterThan(close);
+  });
+
+  it("keeps the lazy feature outlet mounted while the shared SSI detail is open", () => {
+    const html = template();
+    expect(html).toMatch(
+      /\n {2}}\n {2}<div\s+\[hidden\]="\s+!!detailTarget\(\) \|\|/,
+    );
+    expect(html).toContain("<router-outlet");
   });
 });

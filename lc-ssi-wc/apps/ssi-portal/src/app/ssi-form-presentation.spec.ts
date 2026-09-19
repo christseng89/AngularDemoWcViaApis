@@ -68,8 +68,8 @@ describe("SSI form presentation", () => {
   });
 
   it("keeps audit and SWIFT Data views on the same governed record component", () => {
-    const appTemplate = readFileSync(
-      join(__dirname, "app.component.html"),
+    const auditTemplate = readFileSync(
+      join(__dirname, "audit-feature", "audit-route.component.html"),
       "utf8",
     );
     const swiftDataTemplate = readFileSync(
@@ -77,7 +77,7 @@ describe("SSI form presentation", () => {
       "utf8",
     );
 
-    expect(appTemplate).toContain("<ssi-governed-record-view");
+    expect(auditTemplate).toContain("<ssi-governed-record-view");
     expect(swiftDataTemplate).toContain("<ssi-governed-record-view");
   });
 });

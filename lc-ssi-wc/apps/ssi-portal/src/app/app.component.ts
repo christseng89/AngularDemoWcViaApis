@@ -35,7 +35,6 @@ import {
   currentStatusLabel,
   type CurrentStatus,
 } from "./current-status-contract";
-import { GovernedRecordViewComponent } from "./governed-record-view.component";
 import { presentOfficialFieldName } from "./official-field-name";
 import { hasManualRouteOverride } from "./resolution-route-selection";
 import {
@@ -96,25 +95,18 @@ import {
   presentOperationalIssue,
   presentResolutionIssue,
 } from "./operational-issue";
-import { OperationalIssueComponent } from "./operational-issue.component";
 import { APP_ROUTE_GUARD_BRIDGE } from "./app-route-guard";
 import { AlertComponent } from "./alert.component";
 import {
   BankServicePickerDialogComponent,
   type BankServicePickerItem,
 } from "./bank-service-picker-dialog.component";
-import {
-  auditGovernedSnapshot,
-  auditPage,
-  presentAuditEvent,
-  auditSsiSnapshot,
-  sortAuditRows,
-  type AuditPresentation,
-  type AuditRow,
-  type AuditSortDirection,
-  type AuditSortKey,
-} from "./audit-presentation";
 import { GovernanceIndexTableComponent } from "./governance-index-table.component";
+import {
+  governanceRecordValue,
+  requestTypeLabel as presentRequestTypeLabel,
+} from "./governance-record-value";
+import type { AuditSortDirection } from "./audit-presentation";
 import { LoadingStateComponent } from "./loading-state.component";
 import { DeferredFeatureShellComponent } from "./deferred-feature-shell.component";
 import {
@@ -146,13 +138,16 @@ import {
 import { ThemeService } from "./theme.service";
 import { AppShellComponent } from "./app-shell.component";
 
-type RoutedView = "settings" | "resolver" | "treasury" | "tradefinance";
+type RoutedView =
+  "settings" | "resolver" | "treasury" | "tradefinance" | "audit";
 type LegacyView = Exclude<View, RoutedView>;
 
 const routePathForView = (view: View): string | null => {
   switch (view) {
     case "settings":
       return "/settings";
+    case "audit":
+      return "/audit";
     case "resolver":
       return "/resolution/payment";
     case "treasury":
@@ -170,9 +165,9 @@ const isLegacyView = (view: View): view is LegacyView =>
 const routeViewFromUrl = (url: string): View | null => {
   const path = url.split(/[?#]/, 1)[0];
   return (
-    (["settings", "resolver", "treasury", "tradefinance"] as const).find(
-      (view) => routePathForView(view) === path,
-    ) ?? null
+    (
+      ["settings", "resolver", "treasury", "tradefinance", "audit"] as const
+    ).find((view) => routePathForView(view) === path) ?? null
   );
 };
 
@@ -221,28 +216,7 @@ interface CheckerResourceContract {
   id: string;
   label: string;
   endpoint: string;
-  fields?: readonly AuditParameterField[];
   "x-lifecycle": readonly string[];
-}
-interface AuditParameterField {
-  key: string;
-  label: string;
-  type: string;
-  required?: boolean;
-  inputType?: string;
-  description?: string;
-  pattern?: string;
-  minLength?: number;
-  maxLength?: number;
-  minimum?: number;
-  maximum?: number;
-  options?: readonly string[];
-  optionsSource?: string;
-}
-interface AuditMessageTypeChanges {
-  readonly unchanged: readonly string[];
-  readonly added: readonly string[];
-  readonly suppressed: readonly string[];
 }
 interface CheckerOpenApiContract {
   "x-ui-resources": readonly CheckerResourceContract[];
@@ -338,13 +312,6 @@ interface CustomerPage {
   total: number;
   totalPages: number;
   disclaimer?: string;
-}
-interface AuditLifecycleHealth {
-  status: "UP" | "DOWN";
-  onlineQueryDays: number;
-  archiveAfterDays: number;
-  archiveRetentionDays: number;
-  scheduleIntervalHours: number;
 }
 interface CounterpartyReference {
   counterpartyId: string;
@@ -540,14 +507,12 @@ interface ControlledFixtureResponse {
     ReactiveFormsModule,
     FormlyForm,
     SwiftDataCrudComponent,
-    OperationalIssueComponent,
     RouterOutlet,
     AlertComponent,
     BankServicePickerDialogComponent,
     GovernanceIndexTableComponent,
     LoadingStateComponent,
     DeferredFeatureShellComponent,
-    GovernedRecordViewComponent,
     AppShellComponent,
   ],
   templateUrl: "./app.component.html",
@@ -564,6 +529,8 @@ export class AppComponent implements OnInit, OnDestroy {
   private readonly themeService = inject(ThemeService);
   private readonly router = inject(Router);
   private readonly routeGuardBridge = inject(APP_ROUTE_GUARD_BRIDGE);
+  readonly routedAuditDetailOpen = signal(false);
+  private auditRouteSubscriptions: Array<{ unsubscribe(): void }> = [];
   private readonly swiftDataCrud = viewChild(SwiftDataCrudComponent);
   private readonly api = "http://localhost:3100/api";
   readonly finResolutionCatalogue = signal<
@@ -717,7 +684,6 @@ export class AppComponent implements OnInit, OnDestroy {
   readonly checkerSortDirection = signal<AuditSortDirection>("asc");
   readonly checkerCurrentPage = signal(1);
   readonly checkerPageSize = 10;
-  readonly auditTab = signal<GovernanceTab>("rma");
   readonly governedPending = signal<readonly GovernedPendingRow[]>([]);
   readonly checkerCount = computed(
     () => this.ssiSummary().pendingApproval + this.governedPending().length,
@@ -731,8 +697,8 @@ export class AppComponent implements OnInit, OnDestroy {
     const direction = this.checkerSortDirection() === "asc" ? 1 : -1;
     return [...this.pending()].sort(
       (left, right) =>
-        this.auditRecordValue(left, path).localeCompare(
-          this.auditRecordValue(right, path),
+        governanceRecordValue(left, path).localeCompare(
+          governanceRecordValue(right, path),
           undefined,
           { numeric: true, sensitivity: "base" },
         ) * direction,
@@ -752,7 +718,7 @@ export class AppComponent implements OnInit, OnDestroy {
         id: record.id,
         record,
         cells: this.checkerIndexColumns().map((column) =>
-          this.auditRecordValue(record, column.path),
+          governanceRecordValue(record, column.path),
         ),
         trailing: [record.maker, record.updatedAt || record.createdAt || "—"],
         source: record,
@@ -1333,111 +1299,6 @@ export class AppComponent implements OnInit, OnDestroy {
   readonly visibleTagSupportRows = computed(() =>
     this.tagSupportRows().filter(isVisibleSsiResolutionRow),
   );
-  readonly auditRows = signal<readonly AuditRow[]>([]);
-  readonly auditDetail = signal<AuditPresentation | null>(null);
-  readonly auditParameterFields = signal<readonly AuditParameterField[]>([]);
-  readonly auditDetailRecord = computed<Readonly<Record<string, unknown>>>(
-    () => {
-      const detail = this.auditDetail();
-      return detail
-        ? (this.auditObject(auditGovernedSnapshot(detail)) ?? {})
-        : {};
-    },
-  );
-  readonly auditDetailStatus = computed(() =>
-    scalarText(this.auditDetailRecord()["status"]),
-  );
-  readonly auditDetailVersion = computed(() =>
-    Number(this.auditDetailRecord()["version"] ?? 0),
-  );
-  readonly auditDetailModel = computed<Record<string, unknown>>(() => {
-    const record = this.auditDetailRecord();
-    return {
-      ...record,
-      ...(Array.isArray(record["messageTypes"])
-        ? { messageTypes: record["messageTypes"].join(", ") }
-        : {}),
-    };
-  });
-  readonly auditDetailFields = computed<FormlyFieldConfig[]>(() =>
-    this.auditParameterFields().map((field) => ({
-      key: field.key,
-      type: field.type,
-      props: this.auditFieldProps(field),
-    })),
-  );
-  readonly auditResourceLabel = computed(() => {
-    const labels: Record<GovernanceTab, string> = {
-      rma: "RMA",
-      entity: "Entities",
-      nostro: "Nostro",
-      ssi: "SSI",
-    };
-    return labels[this.auditTab()];
-  });
-  readonly auditOnlineQueryDays = signal(7);
-  readonly auditArchiveAfterDays = signal(14);
-  readonly auditArchiveRetentionDays = signal(365);
-  readonly auditScheduleIntervalHours = signal(12);
-  readonly auditLoading = signal(false);
-  readonly auditError = signal("");
-  readonly auditIssue = computed(() =>
-    this.auditError() ? presentOperationalIssue(this.auditError()) : null,
-  );
-  readonly auditSortKey = signal<AuditSortKey>("title");
-  readonly auditSortDirection = signal<AuditSortDirection>("asc");
-  readonly auditIndexSortPath = signal<string | null>(null);
-  readonly auditCurrentPage = signal(1);
-  readonly auditPageSize = 10;
-  readonly sortedAuditRows = computed(() => {
-    const rows = sortAuditRows(
-      this.auditRows(),
-      this.auditSortKey(),
-      this.auditSortDirection(),
-    ).map(presentAuditEvent);
-    const path = this.auditIndexSortPath();
-    if (!path) return rows;
-    const direction = this.auditSortDirection() === "asc" ? 1 : -1;
-    return [...rows].sort(
-      (left, right) =>
-        this.auditRecordValue(this.auditRecord(left), path).localeCompare(
-          this.auditRecordValue(this.auditRecord(right), path),
-          undefined,
-          { numeric: true, sensitivity: "base" },
-        ) * direction,
-    );
-  });
-  readonly auditTotalPages = computed(() =>
-    Math.max(1, Math.ceil(this.sortedAuditRows().length / this.auditPageSize)),
-  );
-  readonly pagedAuditRows = computed(() =>
-    auditPage(
-      this.sortedAuditRows(),
-      this.auditCurrentPage(),
-      this.auditPageSize,
-    ),
-  );
-  readonly auditIndexColumns = computed(() =>
-    auditIndexColumns(this.auditTab()),
-  );
-  readonly auditIndexRows = computed(() =>
-    this.pagedAuditRows().map((event) => {
-      const record = this.auditRecord(event);
-      return {
-        id: event.eventId,
-        cells: this.auditIndexColumns().map((column) =>
-          this.auditRecordValue(record, column.path),
-        ),
-        trailing: [
-          scalarText(record["maker"]),
-          scalarText(record["createdAt"] ?? record["updatedAt"]),
-          scalarText(record["checker"]),
-          record["checker"] ? event.occurredAt : "",
-        ],
-        source: event,
-      };
-    }),
-  );
   pseudoContent = FULL_TAG_SCENARIOS[0]!.content;
   private readonly loadedFeatureData = new Set<string>();
   private readonly featureDataLoads = new Map<string, Promise<void>>();
@@ -1607,7 +1468,7 @@ export class AppComponent implements OnInit, OnDestroy {
       "ssi-last-workbench-view",
     );
     const candidate = routePathForView(saved as View) ? previous : saved;
-    return ["swiftdata", "dashboard", "maker", "checker", "audit"].includes(
+    return ["swiftdata", "dashboard", "maker", "checker"].includes(
       candidate ?? "",
     )
       ? (candidate as LegacyView)
@@ -1637,11 +1498,46 @@ export class AppComponent implements OnInit, OnDestroy {
 
   onSettingsActivated(component: unknown): void {
     this.settingsReloadSubscription?.unsubscribe();
+    for (const subscription of this.auditRouteSubscriptions)
+      subscription.unsubscribe();
+    this.auditRouteSubscriptions = [];
+    this.routedAuditDetailOpen.set(false);
     const route = component as {
       dataReloaded?: {
         subscribe(callback: () => void): { unsubscribe(): void };
       };
+      setCurrencyOptions?: (
+        options: readonly { code: string; decimals: number }[],
+      ) => void;
+      detailOpenChange?: {
+        subscribe(callback: (open: boolean) => void): { unsubscribe(): void };
+      };
+      ssiDetailRequested?: {
+        subscribe(callback: (snapshot: unknown) => void): {
+          unsubscribe(): void;
+        };
+      };
+      tabChanged?: {
+        subscribe(callback: () => void): { unsubscribe(): void };
+      };
     };
+    route.setCurrencyOptions?.(this.currencies());
+    if (route.detailOpenChange)
+      this.auditRouteSubscriptions.push(
+        route.detailOpenChange.subscribe((open) =>
+          this.routedAuditDetailOpen.set(open),
+        ),
+      );
+    if (route.ssiDetailRequested)
+      this.auditRouteSubscriptions.push(
+        route.ssiDetailRequested.subscribe((snapshot) =>
+          this.detailTarget.set(snapshot as SsiRow),
+        ),
+      );
+    if (route.tabChanged)
+      this.auditRouteSubscriptions.push(
+        route.tabChanged.subscribe(() => this.detailTarget.set(null)),
+      );
     this.settingsReloadSubscription =
       route.dataReloaded?.subscribe(() => {
         void this.refreshAfterDevelopmentReload();
@@ -1651,6 +1547,10 @@ export class AppComponent implements OnInit, OnDestroy {
   onSettingsDeactivated(): void {
     this.settingsReloadSubscription?.unsubscribe();
     this.settingsReloadSubscription = null;
+    for (const subscription of this.auditRouteSubscriptions)
+      subscription.unsubscribe();
+    this.auditRouteSubscriptions = [];
+    this.routedAuditDetailOpen.set(false);
   }
 
   private onRouterEvent(event: unknown): void {
@@ -1768,10 +1668,6 @@ export class AppComponent implements OnInit, OnDestroy {
 
   private async loadFeatureData(view: View): Promise<void> {
     if (view === "swiftdata" || view === "settings") return;
-    if (view === "audit") {
-      await this.loadAudit();
-      return;
-    }
     if (view === "checker") {
       await Promise.all([this.refresh(), this.loadGovernedPending()]);
       return;
@@ -2040,66 +1936,6 @@ export class AppComponent implements OnInit, OnDestroy {
     );
   }
 
-  sortAuditBy(key: AuditSortKey): void {
-    if (this.auditSortKey() === key) {
-      this.auditSortDirection.update((direction) =>
-        direction === "asc" ? "desc" : "asc",
-      );
-    } else {
-      this.auditSortKey.set(key);
-      this.auditSortDirection.set("asc");
-    }
-    this.auditCurrentPage.set(1);
-  }
-
-  auditAriaSort(key: AuditSortKey): "ascending" | "descending" | "none" {
-    if (this.auditSortKey() !== key) return "none";
-    return this.auditSortDirection() === "asc" ? "ascending" : "descending";
-  }
-
-  moveAuditPage(delta: number): void {
-    this.auditCurrentPage.set(
-      Math.min(
-        this.auditTotalPages(),
-        Math.max(1, this.auditCurrentPage() + delta),
-      ),
-    );
-  }
-
-  openAuditDetail(detail: AuditPresentation): void {
-    if (this.auditTab() === "ssi") {
-      const snapshot = auditSsiSnapshot(detail);
-      if (snapshot) {
-        this.detailTarget.set(snapshot as SsiRow);
-        return;
-      }
-    }
-    this.auditDetail.set(detail);
-  }
-
-  auditSnapshot(detail: AuditPresentation): unknown {
-    return auditGovernedSnapshot(detail);
-  }
-
-  auditMessageTypeChanges(
-    detail: AuditPresentation,
-  ): AuditMessageTypeChanges | null {
-    const changedFields = this.auditObject(detail.changedFields);
-    const messageTypes = this.auditObject(changedFields?.["messageTypes"]);
-    if (!messageTypes) return null;
-    const values = (key: string): readonly string[] =>
-      Array.isArray(messageTypes[key])
-        ? messageTypes[key].filter(
-            (value): value is string => typeof value === "string",
-          )
-        : [];
-    return {
-      unchanged: values("unchanged"),
-      added: values("added"),
-      suppressed: values("suppressed"),
-    };
-  }
-
   async closeOverlayOnEscape(): Promise<void> {
     if (this.bicPickerTarget()) {
       this.closeBicPicker();
@@ -2111,10 +1947,6 @@ export class AppComponent implements OnInit, OnDestroy {
     }
     if (this.paymentTransactionOpen()) {
       this.closePaymentTransaction();
-      return;
-    }
-    if (this.auditDetail()) {
-      this.auditDetail.set(null);
       return;
     }
     if (this.deleteTarget()) {
@@ -2411,9 +2243,7 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   requestTypeLabel(row: SsiRow): "ADD" | "EDIT" | "SUPPRESSED" {
-    if (row.changeType === "SUPPRESSION") return "SUPPRESSED";
-    if (row.changeType === "REVISION" || row.amendmentOfId) return "EDIT";
-    return "ADD";
+    return presentRequestTypeLabel(row);
   }
 
   private modelForRow(row: SsiRow): Record<string, unknown> {
@@ -3277,57 +3107,6 @@ export class AppComponent implements OnInit, OnDestroy {
       this.customersLoading.set(false);
     }
   }
-  async loadAudit(): Promise<void> {
-    this.auditLoading.set(true);
-    this.auditError.set("");
-    try {
-      const auditPath: Record<GovernanceTab, string> = {
-        rma: "rma-authorisations/audit/events",
-        entity: "booking-branch-entities/audit/events",
-        nostro: "nostro-accounts/audit/events",
-        ssi: "audit",
-      };
-      const [rows, lifecycle, contract] = await Promise.all([
-        firstValueFrom(
-          this.http.get<AuditRow[]>(
-            `${this.api}/${auditPath[this.auditTab()]}`,
-          ),
-        ),
-        firstValueFrom(
-          this.http.get<AuditLifecycleHealth>(
-            `${this.api}/health/audit-retention`,
-          ),
-        ),
-        firstValueFrom(
-          this.http.get<CheckerOpenApiContract>(
-            "/openapi/swift-data-service.v1.json",
-          ),
-        ),
-      ]);
-      this.auditRows.set(rows);
-      this.auditParameterFields.set(
-        contract["x-ui-resources"].find(
-          (resource) => resource.id === this.auditTab(),
-        )?.fields ?? [],
-      );
-      this.auditOnlineQueryDays.set(lifecycle.onlineQueryDays);
-      this.auditArchiveAfterDays.set(lifecycle.archiveAfterDays);
-      this.auditArchiveRetentionDays.set(lifecycle.archiveRetentionDays);
-      this.auditScheduleIntervalHours.set(lifecycle.scheduleIntervalHours);
-      this.auditCurrentPage.set(1);
-    } catch {
-      this.auditError.set("AUDIT_SERVICE_UNAVAILABLE");
-    } finally {
-      this.auditLoading.set(false);
-    }
-  }
-  selectAuditTab(tab: GovernanceTab): void {
-    this.auditDetail.set(null);
-    this.detailTarget.set(null);
-    this.auditTab.set(tab);
-    this.auditIndexSortPath.set(null);
-    void this.loadAudit();
-  }
   selectCheckerTab(tab: GovernanceTab): void {
     this.checkerTab.set(tab);
     this.checkerIndexSortPath.set(null);
@@ -3348,86 +3127,6 @@ export class AppComponent implements OnInit, OnDestroy {
     this.checkerCurrentPage.update((page) =>
       Math.min(this.checkerTotalPages(), Math.max(1, page + delta)),
     );
-  }
-  sortAuditIndex(path: string): void {
-    if (this.auditIndexSortPath() === path)
-      this.auditSortDirection.update((direction) =>
-        direction === "asc" ? "desc" : "asc",
-      );
-    else {
-      this.auditIndexSortPath.set(path);
-      this.auditSortDirection.set("asc");
-    }
-    this.auditCurrentPage.set(1);
-  }
-  private auditRecord(
-    event: AuditPresentation,
-  ): Readonly<Record<string, unknown>> {
-    const value = auditGovernedSnapshot(event);
-    return value !== null && typeof value === "object" && !Array.isArray(value)
-      ? (value as Readonly<Record<string, unknown>>)
-      : {};
-  }
-  private auditRecordValue(record: object, path: string): string {
-    if (path === "__requestType")
-      return this.requestTypeLabel(record as SsiRow);
-    if (path.includes("|"))
-      return (
-        path
-          .split("|")
-          .map((part) => this.auditRecordValue(record, part))
-          .filter((part) => part !== "—")
-          .join(" / ") || "—"
-      );
-    let value: unknown = record;
-    for (const key of path.split(".")) {
-      if (value === null || typeof value !== "object" || Array.isArray(value))
-        return "—";
-      value = (value as Readonly<Record<string, unknown>>)[key];
-    }
-    if (path === "status" && value === "PENDING_APPROVAL") return "SUBMITTED";
-    return Array.isArray(value) ? value.join(", ") : scalarText(value) || "—";
-  }
-  private auditObject(
-    value: unknown,
-  ): Readonly<Record<string, unknown>> | null {
-    return value !== null && typeof value === "object" && !Array.isArray(value)
-      ? (value as Readonly<Record<string, unknown>>)
-      : null;
-  }
-  private auditFieldProps(
-    field: AuditParameterField,
-  ): NonNullable<FormlyFieldConfig["props"]> {
-    const props: NonNullable<FormlyFieldConfig["props"]> = {
-      label: field.label,
-      required: Boolean(field.required),
-      showPicker: false,
-      options:
-        field.optionsSource === "reference/currencies"
-          ? this.currencies().map(({ code, decimals }) => ({
-              label: `${code} · ${decimals} decimals`,
-              value: code,
-            }))
-          : (field.options ?? []).map((value) => ({ label: value, value })),
-    };
-    const description =
-      field.type === "multicheckbox"
-        ? "受控 Message Types；按 View Message Types 查看完整選擇。"
-        : field.description;
-    const optionalProps: Array<
-      [keyof NonNullable<FormlyFieldConfig["props"]>, unknown]
-    > = [
-      ["type", field.inputType],
-      ["description", description],
-      ["pattern", field.pattern],
-      ["minLength", field.minLength],
-      ["maxLength", field.maxLength],
-      ["min", field.minimum],
-      ["max", field.maximum],
-    ];
-    for (const [key, value] of optionalProps)
-      if (value !== undefined) props[key] = value as never;
-    return props;
   }
   displayStatus(status: string): string {
     return status === "PENDING_APPROVAL" ? "SUBMITTED" : status;

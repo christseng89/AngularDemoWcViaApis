@@ -2,7 +2,7 @@
   [view]="view()"
   [checkerCount]="checkerCount()"
   [detailOpen]="!!detailTarget()"
-  [auditDetailOpen]="!!auditDetail()"
+  [auditDetailOpen]="routedAuditDetailOpen()"
   (navigationRequested)="navigate($event)"
   (refreshRequested)="refresh()"
 >
@@ -13,71 +13,6 @@
       [dismissible]="true"
       (dismiss)="notice.set(null)"
     />
-  }
-
-  @if (auditDetail(); as detail) {
-    <ssi-governed-record-view
-      [label]="auditResourceLabel()"
-      [recordId]="detail.ssiId"
-      [version]="auditDetailVersion()"
-      [status]="auditDetailStatus()"
-      [fields]="auditDetailFields()"
-      [model]="auditDetailModel()"
-      (closed)="auditDetail.set(null)"
-    >
-      <dl class="audit-detail-meta inline-audit-meta">
-        <div>
-          <dt>Event ID</dt>
-          <dd>{{ detail.eventId }}</dd>
-        </div>
-        <div>
-          <dt>Action</dt>
-          <dd>{{ detail.action }}</dd>
-        </div>
-        <div>
-          <dt>Actor</dt>
-          <dd>{{ detail.actor }}</dd>
-        </div>
-        <div>
-          <dt>Occurred At</dt>
-          <dd>{{ detail.occurredAt }}</dd>
-        </div>
-      </dl>
-      @if (auditMessageTypeChanges(detail); as changes) {
-        <section class="audit-message-type-delta">
-          <div>
-            <span>UNCHANGED</span>
-            <p>
-              @for (value of changes.unchanged; track value) {
-                <b>{{ value }}</b>
-              } @empty {
-                <em>None</em>
-              }
-            </p>
-          </div>
-          <div class="added-types">
-            <span>ADDED</span>
-            <p>
-              @for (value of changes.added; track value) {
-                <b>{{ value }}</b>
-              } @empty {
-                <em>None</em>
-              }
-            </p>
-          </div>
-          <div class="suppressed-types">
-            <span>SUPPRESSED</span>
-            <p>
-              @for (value of changes.suppressed; track value) {
-                <b>{{ value }}</b>
-              } @empty {
-                <em>None</em>
-              }
-            </p>
-          </div>
-        </section>
-      }
-    </ssi-governed-record-view>
   }
 
   @if (detailTarget(); as row) {
@@ -1816,137 +1751,9 @@
       </section>
     }
 
-    @defer (when view() === "audit"; prefetch on timer(4s)) {
-      @if (view() === "audit" && !auditDetail()) {
-        <nav class="catalog-tabs" aria-label="Audit resource">
-          <button
-            type="button"
-            [class.active]="auditTab() === 'rma'"
-            (click)="selectAuditTab('rma')"
-          >
-            RMA
-          </button>
-          <button
-            type="button"
-            [class.active]="auditTab() === 'entity'"
-            (click)="selectAuditTab('entity')"
-          >
-            Entities
-          </button>
-          <button
-            type="button"
-            [class.active]="auditTab() === 'nostro'"
-            (click)="selectAuditTab('nostro')"
-          >
-            Nostro
-          </button>
-          <button
-            type="button"
-            [class.active]="auditTab() === 'ssi'"
-            (click)="selectAuditTab('ssi')"
-          >
-            SSI
-          </button>
-        </nav>
-        <section class="workspace-intro audit-intro">
-          <div>
-            <p class="kicker">RETENTION-GOVERNED EVIDENCE</p>
-            <h2>{{ auditResourceLabel() }} 稽核軌跡</h2>
-            <p>
-              逐頁檢視誰在何時做了什麼。事件不可變；線上查詢保留
-              {{ auditOnlineQueryDays() }} 天，滿
-              {{ auditArchiveAfterDays() }} 天轉入封存，封存後保留
-              {{ auditArchiveRetentionDays() }} 天再永久清除；系統每
-              {{ auditScheduleIntervalHours() }} 小時執行一次 lifecycle。
-            </p>
-          </div>
-          <dl class="audit-overview">
-            <div>
-              <dt>Events</dt>
-              <dd>{{ auditRows().length }}</dd>
-            </div>
-            <div>
-              <dt>Sort</dt>
-              <dd>Title</dd>
-            </div>
-            <div>
-              <dt>Lifecycle</dt>
-              <dd>
-                {{ auditOnlineQueryDays() }}d online ·
-                {{ auditArchiveAfterDays() }}d archive ·
-                {{ auditArchiveRetentionDays() }}d retain ·
-                {{ auditScheduleIntervalHours() }}h schedule
-              </dd>
-            </div>
-          </dl>
-        </section>
-        @if (auditLoading()) {
-          <section class="panel audit-console">
-            <div class="catalog-loading" aria-live="polite">
-              <span aria-hidden="true"></span>
-              <div>
-                <b>正在讀取稽核證據</b><small>原始事件不會被修改。</small>
-              </div>
-            </div>
-          </section>
-        } @else if (auditIssue(); as issue) {
-          <section class="panel audit-console">
-            <ssi-operational-issue
-              [issue]="issue"
-              [busy]="auditLoading()"
-              (retry)="loadAudit()"
-            />
-          </section>
-        } @else {
-          <ssi-governance-index-table
-            [ariaLabel]="auditResourceLabel() + ' audit event history'"
-            kicker="EVENT REGISTER"
-            instruction="單擊資料列或按 Enter 查看完整明細"
-            [emptyText]="
-              '尚無 ' +
-              auditResourceLabel() +
-              ' 稽核事件；建立或核准資料後，事件會依序顯示。'
-            "
-            recordLabel="events"
-            [columns]="auditIndexColumns()"
-            [trailingColumns]="[
-              'Maker',
-              'Maker Datetime',
-              'Checker',
-              'Checker Datetime',
-            ]"
-            [rows]="auditIndexRows()"
-            [sortPath]="auditIndexSortPath()"
-            [sortDirection]="auditSortDirection()"
-            [currentPage]="auditCurrentPage()"
-            [totalPages]="auditTotalPages()"
-            [totalRecords]="auditRows().length"
-            [pageSize]="auditPageSize"
-            (sortRequested)="sortAuditIndex($event)"
-            (rowOpened)="openAuditDetail($any($event))"
-            (pageRequested)="moveAuditPage($event)"
-          />
-        }
-      }
-    } @loading (after 100ms; minimum 300ms) {
-      <ssi-loading-state label="Loading Audit…" />
-    }
     @if (routeLoading()) {
       <ssi-loading-state label="Loading workspace…" />
     }
-    <div
-      [hidden]="
-        view() !== 'settings' &&
-        view() !== 'resolver' &&
-        view() !== 'treasury' &&
-        view() !== 'tradefinance'
-      "
-    >
-      <router-outlet
-        (activate)="onSettingsActivated($event)"
-        (deactivate)="onSettingsDeactivated()"
-      />
-    </div>
     @if (view() === "swiftdata") {
       <ssi-swift-data-crud
         [initialResourceId]="governedReviewResourceId()"
@@ -1955,6 +1762,21 @@
       />
     }
   }
+  <div
+    [hidden]="
+      !!detailTarget() ||
+      (view() !== 'settings' &&
+        view() !== 'resolver' &&
+        view() !== 'treasury' &&
+        view() !== 'tradefinance' &&
+        view() !== 'audit')
+    "
+  >
+    <router-outlet
+      (activate)="onSettingsActivated($event)"
+      (deactivate)="onSettingsDeactivated()"
+    />
+  </div>
 </ssi-app-shell>
 
 @if (deleteTarget(); as row) {

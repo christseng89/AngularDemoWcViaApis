@@ -11,6 +11,14 @@ export class LegacyRouteAnchorComponent {}
 
 export const APP_ROUTES: Routes = [
   {
+    path: "audit",
+    canActivate: [appRouteCanActivate],
+    loadComponent: () =>
+      import("./audit-feature/audit-route.component").then(
+        (module) => module.AuditRouteComponent,
+      ),
+  },
+  {
     path: "resolution/payment",
     canActivate: [appRouteCanActivate],
     data: { businessDomain: "PAYMENT" },

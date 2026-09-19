@@ -594,6 +594,39 @@ describe("portal component behavior", () => {
     },
   );
 
+  it("waits for the guard before committing Audit navigation", async () => {
+    routerEvents = new Subject<unknown>();
+    fakeRouter.navigateByUrl.mockClear();
+    fakeDocument.defaultView.localStorage.setItem.mockClear();
+    const { AppComponent } = await import("./app.component");
+    const component = new AppComponent();
+    component.view.set("maker");
+    component.navigate("audit");
+    expect(fakeRouter.navigateByUrl).toHaveBeenCalledWith("/audit");
+    expect(component.view()).toBe("maker");
+    expect(
+      fakeDocument.defaultView.localStorage.setItem,
+    ).not.toHaveBeenCalled();
+    routerEvents.next(new NavigationStartEvent(315, "/audit"));
+    fakeRouteGuardBridge.consumeDenied.mockReturnValueOnce(true);
+    routerEvents.next(new NavigationCancelEvent(315));
+    expect(component.view()).toBe("maker");
+    component.ngOnDestroy();
+  });
+
+  it("takes direct Audit URL without parent business preloads", async () => {
+    routerEvents = new Subject<unknown>();
+    fakeDocument.defaultView.location.pathname = "/audit";
+    fakeHttp.get.mockClear();
+    const { AppComponent } = await import("./app.component");
+    const component = new AppComponent();
+    expect(component.view()).toBe("audit");
+    component.ngOnInit();
+    expect(fakeHttp.get).not.toHaveBeenCalled();
+    component.ngOnDestroy();
+    fakeDocument.defaultView.location.pathname = "/";
+  });
+
   it("waits for the existing guard before committing a Resolution route and restores the legacy view on history back", async () => {
     routerEvents = new Subject<unknown>();
     fakeRouter.navigateByUrl.mockClear();
@@ -1958,42 +1991,6 @@ describe("portal component behavior", () => {
     ).toEqual(["CUST-1"]);
   });
 
-  it("sorts, paginates and opens API-backed audit evidence", async () => {
-    const { AppComponent } = await import("./app.component");
-    const component = new AppComponent();
-    await Promise.resolve();
-    component.auditTab.set("ssi");
-    component.auditRows.set(
-      Array.from({ length: 11 }, (_, index) => ({
-        id: index + 1,
-        ssi_id: `SSI-${index + 1}`,
-        action: index % 2 === 0 ? "UPDATED" : "ACTIVATE",
-        actor: `operator.${index + 1}`,
-        occurred_at: `2026-09-10T00:${String(index).padStart(2, "0")}:00Z`,
-        payload: JSON.stringify({
-          id: `SSI-${index + 1}`,
-          counterpartyId: `BANK-${index + 1}`,
-          scope: "STANDING",
-          status: "ACTIVE",
-          maker: `operator.${index + 1}`,
-          route: { currency: "USD", counterpartyType: "BANK" },
-          version: 1,
-        }),
-      })),
-    );
-
-    expect(component.auditTotalPages()).toBe(2);
-    component.sortAuditBy("actor");
-    expect(component.auditAriaSort("actor")).toBe("ascending");
-    component.moveAuditPage(1);
-    expect(component.auditCurrentPage()).toBe(2);
-    const detail = component.pagedAuditRows()[0]!;
-    component.openAuditDetail(detail);
-    expect(component.detailTarget()?.id).toBe(detail.ssiId);
-    component.closeOverlayOnEscape();
-    expect(component.detailTarget()).toBeNull();
-  });
-
   it("drives payment, SSI maintenance, resolution, and tag-selection state", async () => {
     const { AppComponent } = await import("./app.component");
     const component = new AppComponent();
@@ -2622,10 +2619,6 @@ describe("portal component behavior", () => {
       await component.moveBankPage(1);
       await component.searchCustomers("customer");
       await component.moveCustomerPage(1);
-      component.navigate("audit");
-      await component.loadAudit();
-
-      expect(component.auditError()).toBe("AUDIT_SERVICE_UNAVAILABLE");
       expect(component.resolutionLoading()).toBe(false);
       expect(component.resolutionConfirming()).toBe(false);
       expect(component.tagLoading()).toBe(false);

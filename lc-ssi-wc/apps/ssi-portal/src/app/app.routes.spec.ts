@@ -27,4 +27,11 @@ describe("portal routes", () => {
       expect(route?.data?.["businessDomain"]).toBe(domain);
     },
   );
+
+  it("guards and lazy-loads the Audit feature", () => {
+    const route = APP_ROUTES.find((item) => item.path === "audit");
+    expect(route?.loadComponent).toEqual(expect.any(Function));
+    expect(route?.component).toBeUndefined();
+    expect(route?.canActivate).toHaveLength(1);
+  });
 });

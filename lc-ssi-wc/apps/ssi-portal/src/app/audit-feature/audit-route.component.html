@@ -1,0 +1,174 @@
+@if (audit.detail(); as detail) {
+  <ssi-governed-record-view
+    [label]="audit.resourceLabel()"
+    [recordId]="detail.ssiId"
+    [version]="audit.detailVersion()"
+    [status]="audit.detailStatus()"
+    [fields]="audit.detailFields()"
+    [model]="audit.detailModel()"
+    (closed)="closeDetail()"
+  >
+    <dl class="audit-detail-meta inline-audit-meta">
+      <div>
+        <dt>Event ID</dt>
+        <dd>{{ detail.eventId }}</dd>
+      </div>
+      <div>
+        <dt>Action</dt>
+        <dd>{{ detail.action }}</dd>
+      </div>
+      <div>
+        <dt>Actor</dt>
+        <dd>{{ detail.actor }}</dd>
+      </div>
+      <div>
+        <dt>Occurred At</dt>
+        <dd>{{ detail.occurredAt }}</dd>
+      </div>
+    </dl>
+    @if (audit.messageTypeChanges(detail); as changes) {
+      <section class="audit-message-type-delta">
+        <div>
+          <span>UNCHANGED</span>
+          <p>
+            @for (value of changes.unchanged; track value) {
+              <b>{{ value }}</b>
+            } @empty {
+              <em>None</em>
+            }
+          </p>
+        </div>
+        <div class="added-types">
+          <span>ADDED</span>
+          <p>
+            @for (value of changes.added; track value) {
+              <b>{{ value }}</b>
+            } @empty {
+              <em>None</em>
+            }
+          </p>
+        </div>
+        <div class="suppressed-types">
+          <span>SUPPRESSED</span>
+          <p>
+            @for (value of changes.suppressed; track value) {
+              <b>{{ value }}</b>
+            } @empty {
+              <em>None</em>
+            }
+          </p>
+        </div>
+      </section>
+    }
+  </ssi-governed-record-view>
+}
+
+@if (!audit.detail()) {
+  <nav class="catalog-tabs" aria-label="Audit resource">
+    <button
+      type="button"
+      [class.active]="audit.tab() === 'rma'"
+      (click)="selectTab('rma')"
+    >
+      RMA
+    </button>
+    <button
+      type="button"
+      [class.active]="audit.tab() === 'entity'"
+      (click)="selectTab('entity')"
+    >
+      Entities
+    </button>
+    <button
+      type="button"
+      [class.active]="audit.tab() === 'nostro'"
+      (click)="selectTab('nostro')"
+    >
+      Nostro
+    </button>
+    <button
+      type="button"
+      [class.active]="audit.tab() === 'ssi'"
+      (click)="selectTab('ssi')"
+    >
+      SSI
+    </button>
+  </nav>
+  <section class="workspace-intro audit-intro">
+    <div>
+      <p class="kicker">RETENTION-GOVERNED EVIDENCE</p>
+      <h2>{{ audit.resourceLabel() }} 稽核軌跡</h2>
+      <p>
+        逐頁檢視誰在何時做了什麼。事件不可變；線上查詢保留
+        {{ audit.onlineQueryDays() }} 天，滿
+        {{ audit.archiveAfterDays() }} 天轉入封存，封存後保留
+        {{ audit.archiveRetentionDays() }} 天再永久清除；系統每
+        {{ audit.scheduleIntervalHours() }} 小時執行一次 lifecycle。
+      </p>
+    </div>
+    <dl class="audit-overview">
+      <div>
+        <dt>Events</dt>
+        <dd>{{ audit.rows().length }}</dd>
+      </div>
+      <div>
+        <dt>Sort</dt>
+        <dd>Title</dd>
+      </div>
+      <div>
+        <dt>Lifecycle</dt>
+        <dd>
+          {{ audit.onlineQueryDays() }}d online ·
+          {{ audit.archiveAfterDays() }}d archive ·
+          {{ audit.archiveRetentionDays() }}d retain ·
+          {{ audit.scheduleIntervalHours() }}h schedule
+        </dd>
+      </div>
+    </dl>
+  </section>
+  @if (audit.loading()) {
+    <section class="panel audit-console">
+      <div class="catalog-loading" aria-live="polite">
+        <span aria-hidden="true"></span>
+        <div><b>正在讀取稽核證據</b><small>原始事件不會被修改。</small></div>
+      </div>
+    </section>
+  } @else if (audit.issue(); as issue) {
+    <section class="panel audit-console">
+      <ssi-operational-issue
+        [issue]="issue"
+        [busy]="audit.loading()"
+        (retry)="audit.load()"
+      />
+    </section>
+  } @else {
+    <ssi-governance-index-table
+      [ariaLabel]="audit.resourceLabel() + ' audit event history'"
+      kicker="EVENT REGISTER"
+      instruction="單擊資料列或按 Enter 查看完整明細"
+      [emptyText]="
+        '尚無 ' +
+        audit.resourceLabel() +
+        ' 稽核事件；建立或核准資料後，事件會依序顯示。'
+      "
+      recordLabel="events"
+      [columns]="audit.indexColumns()"
+      [trailingColumns]="[
+        'Maker',
+        'Maker Datetime',
+        'Checker',
+        'Checker Datetime',
+      ]"
+      [rows]="audit.indexRows()"
+      [sortPath]="audit.indexSortPath()"
+      [sortDirection]="audit.sortDirection()"
+      [currentPage]="audit.currentPage()"
+      [totalPages]="audit.totalPages()"
+      [totalRecords]="audit.rows().length"
+      [pageSize]="audit.pageSize"
+      (sortRequested)="audit.sortIndex($event)"
+      (rowOpened)="openDetail($any($event))"
+      (pageRequested)="audit.movePage($event)"
+    />
+  }
+}
