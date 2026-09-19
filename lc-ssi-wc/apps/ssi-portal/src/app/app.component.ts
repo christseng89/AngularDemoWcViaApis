@@ -9,10 +9,9 @@ import {
   viewChild,
 } from "@angular/core";
 import { DOCUMENT } from "@angular/common";
-import { ReactiveFormsModule, FormGroup } from "@angular/forms";
+import { ReactiveFormsModule } from "@angular/forms";
 import { FormlyForm } from "@ngx-formly/core";
-import { readonlyFormFields, ssiFormModel } from "./ssi-form-presentation";
-import { firstValueFrom, type Subscription } from "rxjs";
+import type { Subscription } from "rxjs";
 import {
   NavigationCancel,
   NavigationEnd,
@@ -24,15 +23,13 @@ import {
 } from "@angular/router";
 import { SwiftDataCrudComponent } from "./swift-data-crud.component";
 import type { SsiRow } from "./ssi-maintenance.types";
-import { ReferenceLookupApiService } from "./reference-lookup-api.service";
-import { buildSsiMakerFields } from "./ssi-maintenance-feature/ssi-maker-fields";
+import { SsiSharedDetailPresenter } from "./ssi-shared-detail.presenter";
 import {
   SsiMaintenanceShellBridge,
   type SsiMaintenanceShellPort,
 } from "./ssi-maintenance-shell-port";
 import { APP_ROUTE_GUARD_BRIDGE } from "./app-route-guard";
 import { AlertComponent } from "./alert.component";
-import { requestTypeLabel as presentRequestTypeLabel } from "./governance-record-value";
 import { LoadingStateComponent } from "./loading-state.component";
 import type { AppView as View, ThemeMode } from "./app-view.models";
 import { ThemeService } from "./theme.service";
@@ -96,11 +93,6 @@ const routeViewFromUrl = (url: string): View | null => {
   );
 };
 
-interface CurrencyReference {
-  code: string;
-  decimals: number;
-  standard: string;
-}
 @Component({
   selector: "ssi-root",
   standalone: true,
@@ -113,6 +105,7 @@ interface CurrencyReference {
     LoadingStateComponent,
     AppShellComponent,
   ],
+  providers: [SsiSharedDetailPresenter],
   templateUrl: "./app.component.html",
   host: {
     "(document:keydown.escape)": "closeOverlayOnEscape()",
@@ -120,8 +113,7 @@ interface CurrencyReference {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AppComponent implements OnInit, OnDestroy {
-  private readonly referenceApi = inject(ReferenceLookupApiService);
-
+  readonly detail = inject(SsiSharedDetailPresenter);
   private readonly ssiShellBridge = inject(SsiMaintenanceShellBridge);
   private readonly shellPort = this.maintenanceShellPort();
   private readonly document = inject(DOCUMENT);
@@ -131,9 +123,6 @@ export class AppComponent implements OnInit, OnDestroy {
   private readonly routeGuardBridge = inject(APP_ROUTE_GUARD_BRIDGE);
   readonly routedAuditDetailOpen = signal(false);
   private auditRouteSubscriptions: Array<{ unsubscribe(): void }> = [];
-  private activeAuditCurrencyOptionsConsumer:
-    ((options: readonly { code: string; decimals: number }[]) => void) | null =
-    null;
   private readonly swiftDataCrud = viewChild(SwiftDataCrudComponent);
   private activeCheckerRoute: {
     canDeactivate(): Promise<boolean>;
@@ -186,12 +175,9 @@ export class AppComponent implements OnInit, OnDestroy {
       checkerCount: () => this.checkerCount(),
       navigate: (view) => this.navigate(view),
       notify: (notice) => this.notice.set(notice),
-      openDetail: (row) => this.reviewForChecker(row),
-      closeDetail: () => this.detailTarget.set(null),
-      acceptCurrencies: (items) => {
-        this.currencies.set(items);
-        this.activeAuditCurrencyOptionsConsumer?.(items);
-      },
+      openDetail: (row) => this.detail.open(row),
+      closeDetail: () => this.detail.close(),
+      acceptCurrencies: (items) => this.detail.acceptCurrencies(items),
       acceptPendingApprovalCount: () => undefined,
       restoreDashboardAfterReleasedWip: (notice) => {
         this.lastWorkbenchView = "dashboard";
@@ -209,23 +195,9 @@ export class AppComponent implements OnInit, OnDestroy {
     () =>
       this.routedCheckerCount() ?? this.ssiShellBridge.pendingApprovalCount(),
   );
-  readonly currenciesLoading = signal(false);
-  readonly currencies = signal<readonly CurrencyReference[]>([]);
-  readonly readonlyFields = computed(() =>
-    readonlyFormFields(buildSsiMakerFields(this.currencies(), () => undefined)),
-  );
-  readonly detailTarget = signal<SsiRow | null>(null);
-  readonly detailForm = new FormGroup({});
-  readonly detailModel = computed<Record<string, unknown>>(() => {
-    const row = this.detailTarget();
-    return row ? this.modelForRow(row) : {};
-  });
-  readonly checkerRejectReason = signal("");
+  // Swift Data host selectors remain unchanged until the Phase 10 owner moves them.
   readonly governedReviewResourceId = signal<string | null>(null);
   readonly governedReviewRecordId = signal<string | null>(null);
-  private readonly loadedFeatureData = new Set<string>();
-  private readonly featureDataLoads = new Map<string, Promise<void>>();
-  private featureDataGeneration = 0;
   private readonly routeGuardHost = {
     canDeactivate: (targetUrl?: string) => this.canDeactivate(targetUrl),
     hasActiveMakerRevision: () =>
@@ -237,6 +209,7 @@ export class AppComponent implements OnInit, OnDestroy {
   };
 
   constructor() {
+    this.detail.setNoticeSink((notice) => this.notice.set(notice));
     this.ssiShellBridge.attach(this.shellPort);
     this.routeGuardBridge.register(this.routeGuardHost);
     this.routerEventsSubscription = this.router.events.subscribe((event) =>
@@ -266,10 +239,6 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   async refreshAfterDevelopmentReload(): Promise<void> {
-    this.featureDataGeneration += 1;
-    this.loadedFeatureData.clear();
-    this.featureDataLoads.clear();
-    if (this.view() !== "settings") await this.ensureFeatureData(this.view());
     this.notice.set({
       kind: "info",
       text: "Development Test Data 已重新載入；所有工作區資料已更新。",
@@ -313,7 +282,6 @@ export class AppComponent implements OnInit, OnDestroy {
       "ssi-last-workbench-view",
       view,
     );
-    void this.ensureFeatureData(view);
     return Promise.resolve(true);
   }
 
@@ -411,7 +379,7 @@ export class AppComponent implements OnInit, OnDestroy {
     if (route.reviewRequested)
       this.auditRouteSubscriptions.push(
         route.reviewRequested.subscribe(
-          (row) => void this.reviewForChecker(row),
+          (row) => void this.detail.open(row),
         ),
       );
     if (route.countChanged)
@@ -424,9 +392,10 @@ export class AppComponent implements OnInit, OnDestroy {
       this.auditRouteSubscriptions.push(
         route.noticeRaised.subscribe((notice) => this.notice.set(notice)),
       );
-    this.activeAuditCurrencyOptionsConsumer =
-      route.setCurrencyOptions?.bind(route) ?? null;
-    this.activeAuditCurrencyOptionsConsumer?.(this.currencies());
+    this.detail.setCurrencyConsumer(
+      route.setCurrencyOptions?.bind(route) ?? null,
+    );
+    this.detail.setDecisionPort(this.activeCheckerRoute?.decide ?? null);
     if (route.detailOpenChange)
       this.auditRouteSubscriptions.push(
         route.detailOpenChange.subscribe((open) =>
@@ -436,12 +405,12 @@ export class AppComponent implements OnInit, OnDestroy {
     if (route.ssiDetailRequested)
       this.auditRouteSubscriptions.push(
         route.ssiDetailRequested.subscribe((snapshot) =>
-          this.detailTarget.set(snapshot as SsiRow),
+          this.detail.showSnapshot(snapshot as SsiRow),
         ),
       );
     if (route.tabChanged)
       this.auditRouteSubscriptions.push(
-        route.tabChanged.subscribe(() => this.detailTarget.set(null)),
+        route.tabChanged.subscribe(() => this.detail.close()),
       );
     this.settingsReloadSubscription =
       route.dataReloaded?.subscribe(() => {
@@ -453,7 +422,8 @@ export class AppComponent implements OnInit, OnDestroy {
     this.activeCheckerRoute = null;
     this.activeRoutedRefresh = null;
     this.activeMaintenanceWipPort = null;
-    this.activeAuditCurrencyOptionsConsumer = null;
+    this.detail.setCurrencyConsumer(null);
+    this.detail.setDecisionPort(null);
     this.settingsReloadSubscription?.unsubscribe();
     this.settingsReloadSubscription = null;
     for (const subscription of this.auditRouteSubscriptions)
@@ -566,82 +536,11 @@ export class AppComponent implements OnInit, OnDestroy {
         view,
       );
     }
-    if (view !== "dashboard" && view !== "maker")
-      void this.ensureFeatureData(view);
-  }
-
-  private ensureFeatureData(view: View): Promise<void> {
-    const key =
-      view === "treasury" || view === "tradefinance" ? "fin-resolution" : view;
-    const cacheAfterLoad = true;
-    if (cacheAfterLoad && this.loadedFeatureData.has(key))
-      return Promise.resolve();
-    const existing = this.featureDataLoads.get(key);
-    if (existing) return existing;
-    const generation = this.featureDataGeneration;
-    const load = this.loadFeatureData(view)
-      .then(() => {
-        if (cacheAfterLoad && generation === this.featureDataGeneration)
-          this.loadedFeatureData.add(key);
-      })
-      .finally(() => {
-        if (this.featureDataLoads.get(key) === load)
-          this.featureDataLoads.delete(key);
-      });
-    this.featureDataLoads.set(key, load);
-    return load;
-  }
-
-  private async loadFeatureData(view: View): Promise<void> {
-    if (view === "swiftdata" || view === "settings" || view === "checker")
-      return;
-    // The parameter-driven Resolution workspace loads only the selected page
-    // definition and its own dependent lookups. The legacy parent workspace
-    // must not preload unrelated reference services or emit duplicate alerts.
-  }
-
-  async reviewForChecker(row: SsiRow): Promise<void> {
-    if (this.currencies().length === 0 && !this.currenciesLoading())
-      await this.loadCurrencies();
-    this.detailForm.reset(this.modelForRow(row));
-    this.checkerRejectReason.set("");
-    this.detailTarget.set(row);
-  }
-
-  async decideSsi(row: SsiRow, decision: "approve" | "reject"): Promise<void> {
-    const reason = this.checkerRejectReason().trim();
-    if (decision === "reject" && reason.length < 5) {
-      this.notice.set({
-        kind: "warning",
-        text: "Reject 必須輸入至少 5 個字元的退回原因。",
-      });
-      return;
-    }
-    try {
-      if (!this.activeCheckerRoute)
-        throw new Error("Checker route is not active");
-      if (!(await this.activeCheckerRoute.decide(row, decision, reason)))
-        return;
-      this.detailTarget.set(null);
-      this.checkerRejectReason.set("");
-      this.notice.set({
-        kind: "info",
-        text:
-          decision === "approve"
-            ? "SSI 已由獨立 Checker 核准並啟用。"
-            : "SSI 已退回 Maker 的 DRAFT 工作清單。",
-      });
-    } catch {
-      this.notice.set({
-        kind: "error",
-        text: `Checker ${decision === "approve" ? "Approve" : "Reject"} 被生命週期／四眼控制拒絕。`,
-      });
-    }
   }
 
   async closeOverlayOnEscape(): Promise<void> {
     if (await this.activeMaintenanceWipPort?.closeOverlayOnEscape()) return;
-    if (this.detailTarget()) this.detailTarget.set(null);
+    if (this.detail.target()) this.detail.close();
   }
 
   setTheme(mode: ThemeMode): void {
@@ -661,35 +560,4 @@ export class AppComponent implements OnInit, OnDestroy {
     );
   }
 
-  requestTypeLabel(row: SsiRow): "ADD" | "EDIT" | "SUPPRESSED" {
-    return presentRequestTypeLabel(row);
-  }
-
-  private modelForRow(row: SsiRow): Record<string, unknown> {
-    const ownership =
-      row.ownershipType ??
-      (row.route["counterpartyBic"] === "ANY" ? "OWN" : "COUNTERPARTY");
-    return ssiFormModel(row, ownership);
-  }
-
-  private async loadCurrencies(): Promise<void> {
-    this.currenciesLoading.set(true);
-    try {
-      const currencies = await firstValueFrom(
-        this.referenceApi.currencies<CurrencyReference[]>(),
-      );
-      this.currencies.set(currencies);
-      this.activeAuditCurrencyOptionsConsumer?.(currencies);
-    } catch {
-      this.notice.set({
-        kind: "warning",
-        text: "Currency 參考服務暫時不可用。",
-      });
-    } finally {
-      this.currenciesLoading.set(false);
-    }
-  }
-  displayStatus(status: string): string {
-    return status === "PENDING_APPROVAL" ? "SUBMITTED" : status;
-  }
 }

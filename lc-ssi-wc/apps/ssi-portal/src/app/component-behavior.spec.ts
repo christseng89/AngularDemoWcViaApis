@@ -428,6 +428,8 @@ jest.doMock("@angular/core", () => ({
       return new (token as new () => unknown)();
     if ((token as { name?: string }).name === "FinResolutionApiService")
       return new (token as new () => unknown)();
+    if ((token as { name?: string }).name === "SsiSharedDetailPresenter")
+      return new (token as new () => unknown)();
     if ((token as { name?: string }).name === "ReferenceLookupApiService")
       return new (token as new () => unknown)();
     if (
@@ -1047,43 +1049,20 @@ describe("portal component behavior", () => {
     component.ngOnDestroy();
   });
 
-  it("invalidates feature data after Settings reload without preloading unentered workspaces", async () => {
+  it("keeps Settings reload notification without preloading unentered workspaces", async () => {
     const { AppComponent } = await import("./app.component");
     const component = new AppComponent();
     component.view.set("settings");
-    component["loadedFeatureData"].add("maker");
-    component["loadedFeatureData"].add("fin-resolution");
     fakeHttp.get.mockClear();
     fakeHttp.post.mockClear();
 
     await component.refreshAfterDevelopmentReload();
 
-    expect(component["loadedFeatureData"].size).toBe(0);
+    expect(component.notice()?.text).toBe(
+      "Development Test Data 已重新載入；所有工作區資料已更新。",
+    );
     expect(fakeHttp.get).not.toHaveBeenCalled();
     expect(fakeHttp.post).not.toHaveBeenCalled();
-    component.ngOnDestroy();
-  });
-
-  it("does not cache an in-flight pre-reload feature response as current data", async () => {
-    const { AppComponent } = await import("./app.component");
-    const component = new AppComponent();
-    component.view.set("settings");
-    let finishOldLoad: (() => void) | undefined;
-    const oldLoad = new Promise<void>((resolve) => {
-      finishOldLoad = resolve;
-    });
-    const load = jest
-      .spyOn(component, "loadFeatureData" as never)
-      .mockReturnValue(oldLoad as never);
-    const pending = component["ensureFeatureData"]("maker");
-
-    await component.refreshAfterDevelopmentReload();
-    finishOldLoad!();
-    await pending;
-
-    expect(component["loadedFeatureData"].has("maker")).toBe(false);
-    expect(component["featureDataLoads"].has("maker")).toBe(false);
-    load.mockRestore();
     component.ngOnDestroy();
   });
 
@@ -1093,14 +1072,100 @@ describe("portal component behavior", () => {
     const setCurrencyOptions = jest.fn();
     component.onSettingsActivated({ setCurrencyOptions });
     expect(setCurrencyOptions).toHaveBeenCalledWith([]);
-    await component["loadCurrencies"]();
+    await component.detail.loadCurrencies();
     expect(setCurrencyOptions).toHaveBeenLastCalledWith([
       { code: "USD", decimals: 2, standard: "ISO 4217" },
     ]);
     component.onSettingsDeactivated();
     setCurrencyOptions.mockClear();
-    await component["loadCurrencies"]();
+    await component.detail.loadCurrencies();
     expect(setCurrencyOptions).not.toHaveBeenCalled();
+    component.ngOnDestroy();
+  });
+
+  it("forwards Maintenance Currency updates to an active Audit route", async () => {
+    const { AppComponent } = await import("./app.component");
+    const component = new AppComponent();
+    const setCurrencyOptions = jest.fn();
+    component.onSettingsActivated({ setCurrencyOptions });
+    setCurrencyOptions.mockClear();
+
+    component.maintenanceShellPort().acceptCurrencies([
+      { code: "USD", decimals: 2, standard: "ISO 4217" },
+    ]);
+
+    expect(setCurrencyOptions).toHaveBeenCalledWith([
+      { code: "USD", decimals: 2, standard: "ISO 4217" },
+    ]);
+    component.ngOnDestroy();
+  });
+
+  it("opens Audit SSI snapshots synchronously and does not reopen them after tab close", async () => {
+    const { AppComponent } = await import("./app.component");
+    const component = new AppComponent();
+    const ssiDetailRequested = new Subject<unknown>();
+    const tabChanged = new Subject<void>();
+    const row = {
+      id: "SSI-AUDIT-1",
+      counterpartyId: "BANK-1",
+      scope: "STANDING",
+      status: "ACTIVE",
+      maker: "maker.demo",
+      route: { currency: "USD" },
+      version: 1,
+    };
+    fakeHttp.get.mockClear();
+    component.onSettingsActivated({ ssiDetailRequested, tabChanged });
+
+    ssiDetailRequested.next(row);
+    expect(component.detail.target()).toBe(row);
+    tabChanged.next();
+    await Promise.resolve();
+    expect(component.detail.target()).toBeNull();
+    expect(fakeHttp.get).not.toHaveBeenCalled();
+    component.onSettingsDeactivated();
+    ssiDetailRequested.next(row);
+    expect(component.detail.target()).toBeNull();
+    component.ngOnDestroy();
+  });
+
+  it("keeps Checker decisions behind the active route port and closes the shared detail only on success", async () => {
+    const { AppComponent } = await import("./app.component");
+    const component = new AppComponent();
+    const row = {
+      id: "SSI-PENDING-1",
+      counterpartyId: "BANK-1",
+      scope: "STANDING",
+      status: "PENDING_APPROVAL",
+      maker: "maker.demo",
+      route: { currency: "USD" },
+      version: 1,
+    };
+    const checkerRoute = {
+      canDeactivate: async () => true,
+      refresh: async () => undefined,
+      decisionCount: 0,
+      async decide() {
+        this.decisionCount += 1;
+        return true;
+      },
+    };
+    const decide = jest.spyOn(checkerRoute, "decide");
+    component.onSettingsActivated(checkerRoute);
+    component.detail.target.set(row);
+    component.detail.checkerRejectReason.set("bad");
+
+    await component.detail.decide(row, "reject");
+    expect(decide).not.toHaveBeenCalled();
+    expect(component.detail.target()).toBe(row);
+    expect(component.notice()?.kind).toBe("warning");
+
+    component.detail.checkerRejectReason.set("wrong account");
+    await component.detail.decide(row, "reject");
+    expect(decide).toHaveBeenCalledWith(row, "reject", "wrong account");
+    expect(checkerRoute.decisionCount).toBe(1);
+    expect(component.detail.target()).toBeNull();
+    expect(component.notice()?.kind).toBe("info");
     component.ngOnDestroy();
   });
 
@@ -1349,9 +1414,9 @@ describe("portal component behavior", () => {
     const { AppComponent } = await import("./app.component");
     const component = new AppComponent();
     const loadCurrencies = jest
-      .spyOn(component as never, "loadCurrencies" as never)
+      .spyOn(component.detail, "loadCurrencies")
       .mockImplementation(async () => {
-        component.currencies.set([{ code: "SGD", decimals: 2 }]);
+        component.detail.currencies.set([{ code: "SGD", decimals: 2, standard: "ISO 4217" }]);
       });
     const activeRow = {
       id: "SSI-ACTIVE",
@@ -1364,9 +1429,9 @@ describe("portal component behavior", () => {
       version: 9,
     };
 
-    await component.reviewForChecker(activeRow);
+    await component.detail.open(activeRow);
     expect(loadCurrencies).toHaveBeenCalledTimes(1);
-    expect(component.detailModel()).toMatchObject({
+    expect(component.detail.model()).toMatchObject({
       route: { currency: "SGD" },
     });
 

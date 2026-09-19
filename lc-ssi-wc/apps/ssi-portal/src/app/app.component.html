@@ -1,7 +1,7 @@
 <ssi-app-shell
   [view]="view()"
   [checkerCount]="checkerCount()"
-  [detailOpen]="!!detailTarget()"
+  [detailOpen]="!!detail.target()"
   [auditDetailOpen]="routedAuditDetailOpen()"
   (navigationRequested)="navigate($event)"
   (refreshRequested)="refresh()"
@@ -15,7 +15,7 @@
     />
   }
 
-  @if (detailTarget(); as row) {
+  @if (detail.target(); as row) {
     <section class="panel readonly-page" aria-labelledby="detail-title">
       <div class="panel-title">
         <div>
@@ -29,21 +29,21 @@
             class="request-type-badge"
             [class.edit-request]="row.changeType !== 'SUPPRESSION'"
             [class.suppress-request]="row.changeType === 'SUPPRESSION'"
-            [attr.aria-label]="'Request Type ' + requestTypeLabel(row)"
+            [attr.aria-label]="'Request Type ' + detail.requestTypeLabel(row)"
           >
-            {{ requestTypeLabel(row) }}
+            {{ detail.requestTypeLabel(row) }}
           </div>
           <div
             class="decision-pass"
-            [attr.aria-label]="'Record Status ' + displayStatus(row.status)"
+            [attr.aria-label]="'Record Status ' + detail.displayStatus(row.status)"
           >
-            {{ displayStatus(row.status) }}
+            {{ detail.displayStatus(row.status) }}
           </div>
           <button
             type="button"
             class="icon-button"
             aria-label="Cancel"
-            (click)="detailTarget.set(null)"
+            (click)="detail.close()"
           >
             ×
           </button>
@@ -51,9 +51,9 @@
       </div>
       <section class="readonly-editor" aria-label="SSI 唯讀檢視">
         <formly-form
-          [form]="detailForm"
-          [fields]="readonlyFields()"
-          [model]="detailModel()"
+          [form]="detail.form"
+          [fields]="detail.readonlyFields()"
+          [model]="detail.model()"
         />
       </section>
       @if (row.changeType === "SUPPRESSION") {
@@ -76,16 +76,16 @@
             Reject 原因
             <input
               type="text"
-              [value]="checkerRejectReason()"
-              (input)="checkerRejectReason.set($any($event.target).value)"
+              [value]="detail.checkerRejectReason()"
+              (input)="detail.checkerRejectReason.set($any($event.target).value)"
               placeholder="退回 Maker 的具體原因（至少 5 字元）"
             />
           </label>
-          @if (checkerRejectReason().trim().length >= 5) {
+          @if (detail.checkerRejectReason().trim().length >= 5) {
             <button
               type="button"
               class="danger"
-              (click)="decideSsi(row, 'reject')"
+              (click)="detail.decide(row, 'reject')"
             >
               Reject
             </button>
@@ -93,7 +93,7 @@
             <button
               type="button"
               class="primary"
-              (click)="decideSsi(row, 'approve')"
+              (click)="detail.decide(row, 'approve')"
             >
               Approve
             </button>
@@ -115,7 +115,7 @@
   }
   <div
     [hidden]="
-      !!detailTarget() ||
+      !!detail.target() ||
       (view() !== 'settings' &&
         view() !== 'dashboard' &&
         view() !== 'maker' &&
