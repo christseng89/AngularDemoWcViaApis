@@ -1950,17 +1950,15 @@
     } @loading (after 100ms; minimum 300ms) {
       <ssi-loading-state label="Loading Audit…" />
     }
-    @defer (when view() === "settings"; prefetch on timer(6s)) {
-      @if (view() === "settings") {
-        <ssi-settings-page
-          [theme]="theme()"
-          (themeChange)="setTheme($event)"
-          (dataReloaded)="refreshAfterDevelopmentReload()"
-        />
-      }
-    } @loading (after 100ms; minimum 300ms) {
+    @if (routeLoading()) {
       <ssi-loading-state label="Loading Settings…" />
     }
+    <div [hidden]="view() !== 'settings'">
+      <router-outlet
+        (activate)="onSettingsActivated($event)"
+        (deactivate)="onSettingsDeactivated()"
+      />
+    </div>
     @if (view() === "swiftdata") {
       <ssi-swift-data-crud
         [initialResourceId]="governedReviewResourceId()"

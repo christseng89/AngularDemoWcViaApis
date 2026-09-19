@@ -20,6 +20,45 @@ function testSignal<T>(initial: T): TestSignal<T> {
 const documentToken = Symbol("DOCUMENT");
 class ChangeDetectorRefToken {}
 class HttpClientToken {}
+class RouterToken {}
+class NavigationStartEvent {
+  constructor(
+    public id: number,
+    public url: string,
+  ) {}
+}
+class NavigationEndEvent {
+  constructor(
+    public id: number,
+    public url: string,
+    public urlAfterRedirects: string,
+  ) {}
+}
+class NavigationCancelEvent {
+  constructor(public id: number) {}
+}
+class NavigationErrorEvent {
+  constructor(public id: number) {}
+}
+class NavigationSkippedEvent {
+  constructor(public id: number) {}
+}
+const routeGuardBridgeToken = Symbol("APP_ROUTE_GUARD_BRIDGE");
+let routerEvents = new Subject<unknown>();
+const fakeRouter = {
+  get events() {
+    return routerEvents;
+  },
+  navigateByUrl: jest.fn(async (_url: string) => true),
+};
+const fakeRouteGuardBridge = {
+  register: jest.fn(),
+  unregister: jest.fn(),
+  consumeReleasedMakerWip: jest.fn((_id: number) => false),
+  consumeDenied: jest.fn((_id: number) => false),
+  markNavigationTerminated: jest.fn((_id: number) => undefined),
+  isGuardPending: jest.fn((_id: number) => false),
+};
 let rejectHttp = false;
 let nextResolutionResponse: unknown;
 let nextResolutionError: unknown;
@@ -29,6 +68,7 @@ let pendingSsiResponse: Subject<unknown> | undefined;
 
 const fakeDocument = {
   defaultView: {
+    location: { pathname: "/" },
     localStorage: { getItem: jest.fn(() => null), setItem: jest.fn() },
     matchMedia: jest.fn(() => ({ addEventListener: jest.fn() })),
     URL: {
@@ -421,10 +461,15 @@ jest.doMock("@angular/core", () => ({
     () =>
     <T>(target: T): T =>
       target,
+  InjectionToken: class {
+    constructor(_name: string, _options?: unknown) {}
+  },
   computed: <T>(compute: () => T): (() => T) => compute,
   inject: (token: unknown) => {
     if (token === documentToken) return fakeDocument;
     if (token === ChangeDetectorRefToken) return { detectChanges: jest.fn() };
+    if (token === RouterToken) return fakeRouter;
+    if (token === routeGuardBridgeToken) return fakeRouteGuardBridge;
     if ((token as { name?: string }).name === "ThemeService")
       return fakeThemeService;
     return fakeHttp;
@@ -438,6 +483,18 @@ jest.doMock("@angular/core", () => ({
 }));
 
 jest.doMock("@angular/common/http", () => ({ HttpClient: HttpClientToken }));
+jest.doMock("@angular/router", () => ({
+  Router: RouterToken,
+  RouterOutlet: class {},
+  NavigationStart: NavigationStartEvent,
+  NavigationEnd: NavigationEndEvent,
+  NavigationCancel: NavigationCancelEvent,
+  NavigationError: NavigationErrorEvent,
+  NavigationSkipped: NavigationSkippedEvent,
+}));
+jest.doMock("./app-route-guard", () => ({
+  APP_ROUTE_GUARD_BRIDGE: routeGuardBridgeToken,
+}));
 jest.doMock("@angular/common", () => ({
   DOCUMENT: documentToken,
   JsonPipe: class {},
@@ -466,6 +523,254 @@ jest.doMock(
 );
 
 describe("portal component behavior", () => {
+  it("does not commit Settings until Router succeeds and preserves Maker WIP on guard denial", async () => {
+    routerEvents = new Subject<unknown>();
+    fakeRouter.navigateByUrl.mockClear();
+    fakeDocument.defaultView.localStorage.setItem.mockClear();
+    const { AppComponent } = await import("./app.component");
+    const component = new AppComponent();
+    component.view.set("maker");
+    component.editingId.set("SSI-WIP-1");
+    component.revisionSource.set({ id: "SSI-WIP-1" } as never);
+    component.navigate("settings");
+    expect(fakeRouter.navigateByUrl).toHaveBeenCalledWith("/settings");
+    expect(component.view()).toBe("maker");
+    expect(
+      fakeDocument.defaultView.localStorage.setItem,
+    ).not.toHaveBeenCalled();
+    routerEvents.next(new NavigationStartEvent(101, "/settings"));
+    fakeRouteGuardBridge.consumeDenied.mockReturnValueOnce(true);
+    routerEvents.next(new NavigationCancelEvent(101));
+    expect(component.view()).toBe("maker");
+    expect(component.editingId()).toBe("SSI-WIP-1");
+    expect(component.routeLoading()).toBe(false);
+    component.ngOnDestroy();
+  });
+
+  it("does not bypass a pending route guard through a second sidebar click", async () => {
+    routerEvents = new Subject<unknown>();
+    const { AppComponent } = await import("./app.component");
+    const component = new AppComponent();
+    component.view.set("maker");
+    component.navigate("settings");
+    component.navigate("swiftdata");
+    expect(component.view()).toBe("maker");
+    component.ngOnDestroy();
+  });
+
+  it("takes direct Settings URL as authoritative and avoids eager business API load", async () => {
+    routerEvents = new Subject<unknown>();
+    fakeDocument.defaultView.location.pathname = "/settings";
+    fakeHttp.get.mockClear();
+    const { AppComponent } = await import("./app.component");
+    const component = new AppComponent();
+    expect(component.view()).toBe("settings");
+    component.ngOnInit();
+    expect(fakeHttp.get).not.toHaveBeenCalled();
+    routerEvents.next(new NavigationStartEvent(103, "/"));
+    routerEvents.next(new NavigationEndEvent(103, "/", "/"));
+    expect(component.view()).toBe("swiftdata");
+    component.ngOnDestroy();
+    fakeDocument.defaultView.location.pathname = "/";
+  });
+
+  it("closes an invalid Maker editor if the route fails after WIP release", async () => {
+    routerEvents = new Subject<unknown>();
+    const { AppComponent } = await import("./app.component");
+    const component = new AppComponent();
+    component.view.set("maker");
+    component.navigate("settings");
+    routerEvents.next(new NavigationStartEvent(102, "/settings"));
+    fakeRouteGuardBridge.consumeReleasedMakerWip.mockReturnValueOnce(true);
+    routerEvents.next(new NavigationErrorEvent(102));
+    expect(component.view()).toBe("dashboard");
+    expect(component.form.reset).toHaveBeenCalled();
+    component.ngOnDestroy();
+  });
+
+  it("clears route loading on NavigationSkipped", async () => {
+    routerEvents = new Subject<unknown>();
+    const { AppComponent } = await import("./app.component");
+    const component = new AppComponent();
+    routerEvents.next(new NavigationStartEvent(105, "/settings"));
+    routerEvents.next(new NavigationSkippedEvent(105));
+    expect(component.routeLoading()).toBe(false);
+    component.ngOnDestroy();
+  });
+
+  it("returns to the actual source workbench after Settings history navigation", async () => {
+    routerEvents = new Subject<unknown>();
+    const { AppComponent } = await import("./app.component");
+    const component = new AppComponent();
+    component.view.set("maker");
+    component.navigate("settings");
+    routerEvents.next(new NavigationStartEvent(106, "/settings"));
+    routerEvents.next(new NavigationEndEvent(106, "/settings", "/settings"));
+    expect(component.view()).toBe("settings");
+    routerEvents.next(new NavigationStartEvent(107, "/"));
+    routerEvents.next(new NavigationEndEvent(107, "/", "/"));
+    expect(component.view()).toBe("maker");
+    component.ngOnDestroy();
+  });
+
+  it("converges safely when WIP release finishes after NavigationCancel", async () => {
+    routerEvents = new Subject<unknown>();
+    const { AppComponent } = await import("./app.component");
+    const component = new AppComponent();
+    component.view.set("maker");
+    component.editingId.set("SSI-WIP-LATE");
+    component.revisionSource.set({ id: "SSI-WIP-LATE" } as never);
+    component.navigate("settings");
+    routerEvents.next(new NavigationStartEvent(104, "/settings"));
+    fakeRouteGuardBridge.isGuardPending.mockReturnValueOnce(true);
+    routerEvents.next(new NavigationCancelEvent(104));
+    expect(component.view()).toBe("maker");
+    component.revisionSource.set(null);
+    component.editingId.set(null);
+    component.onLateMakerWipRelease(104);
+    expect(component.view()).toBe("dashboard");
+    expect(component.form.reset).toHaveBeenCalled();
+    component.ngOnDestroy();
+  });
+
+  it("couples delayed HTTP WIP cleanup to cancellation without stale editor", async () => {
+    routerEvents = new Subject<unknown>();
+    let navigationId = 204;
+    const { AppRouteGuardBridge } =
+      jest.requireActual<typeof import("./app-route-guard")>(
+        "./app-route-guard",
+      );
+    const bridge = new AppRouteGuardBridge(() => navigationId);
+    fakeRouteGuardBridge.register.mockImplementation((host) =>
+      bridge.register(host),
+    );
+    fakeRouteGuardBridge.unregister.mockImplementation((host) =>
+      bridge.unregister(host),
+    );
+    fakeRouteGuardBridge.consumeReleasedMakerWip.mockImplementation((id) =>
+      bridge.consumeReleasedMakerWip(id),
+    );
+    fakeRouteGuardBridge.consumeDenied.mockImplementation((id) =>
+      bridge.consumeDenied(id),
+    );
+    fakeRouteGuardBridge.isGuardPending.mockImplementation((id) =>
+      bridge.isGuardPending(id),
+    );
+    fakeRouteGuardBridge.markNavigationTerminated.mockImplementation((id) =>
+      bridge.markNavigationTerminated(id),
+    );
+    const cleanup = new Subject<unknown>();
+    fakeHttp.post.mockImplementationOnce(() => cleanup);
+    const { AppComponent } = await import("./app.component");
+    const component = new AppComponent();
+    try {
+      component.view.set("maker");
+      component.editingId.set("SSI-WIP-RACE");
+      component.revisionSource.set({ id: "SSI-WIP-RACE" } as never);
+      routerEvents.next(new NavigationStartEvent(204, "/settings"));
+      const activation = bridge.canActivate();
+      routerEvents.next(new NavigationCancelEvent(204));
+      navigationId = 205;
+      cleanup.next({});
+      cleanup.complete();
+      expect(await activation).toBe(true);
+      expect(component.view()).toBe("dashboard");
+      expect(bridge.consumeReleasedMakerWip(205)).toBe(false);
+    } finally {
+      // Consume an unused one-shot HTTP override on the RED baseline so it
+      // cannot bleed into an unrelated pre-existing test.
+      fakeHttp.post("test");
+      fakeHttp.post.mockClear();
+      component.ngOnDestroy?.();
+      fakeRouteGuardBridge.register.mockImplementation(() => undefined);
+      fakeRouteGuardBridge.unregister.mockImplementation(() => undefined);
+      fakeRouteGuardBridge.consumeReleasedMakerWip.mockImplementation(
+        () => false,
+      );
+      fakeRouteGuardBridge.consumeDenied.mockImplementation(() => false);
+      fakeRouteGuardBridge.isGuardPending.mockImplementation(() => false);
+      fakeRouteGuardBridge.markNavigationTerminated.mockImplementation(
+        () => undefined,
+      );
+    }
+  });
+
+  it("keeps Maker WIP and form when deferred server cleanup rejects", async () => {
+    routerEvents = new Subject<unknown>();
+    const { AppRouteGuardBridge } =
+      jest.requireActual<typeof import("./app-route-guard")>(
+        "./app-route-guard",
+      );
+    const bridge = new AppRouteGuardBridge(() => 211);
+    fakeRouteGuardBridge.register.mockImplementation((host) =>
+      bridge.register(host),
+    );
+    fakeRouteGuardBridge.unregister.mockImplementation((host) =>
+      bridge.unregister(host),
+    );
+    fakeRouteGuardBridge.consumeReleasedMakerWip.mockImplementation((id) =>
+      bridge.consumeReleasedMakerWip(id),
+    );
+    fakeRouteGuardBridge.consumeDenied.mockImplementation((id) =>
+      bridge.consumeDenied(id),
+    );
+    fakeRouteGuardBridge.isGuardPending.mockImplementation((id) =>
+      bridge.isGuardPending(id),
+    );
+    fakeRouteGuardBridge.markNavigationTerminated.mockImplementation((id) =>
+      bridge.markNavigationTerminated(id),
+    );
+    const cleanup = new Subject<unknown>();
+    fakeHttp.post.mockImplementationOnce(() => cleanup);
+    const { AppComponent } = await import("./app.component");
+    const component = new AppComponent();
+    try {
+      component.view.set("maker");
+      component.editingId.set("SSI-WIP-REJECT");
+      component.revisionSource.set({ id: "SSI-WIP-REJECT" } as never);
+      routerEvents.next(new NavigationStartEvent(211, "/settings"));
+      const activation = bridge.canActivate();
+      cleanup.error(new Error("server rejected"));
+      expect(await activation).toBe(false);
+      routerEvents.next(new NavigationCancelEvent(211));
+      expect(component.view()).toBe("maker");
+      expect(component.editingId()).toBe("SSI-WIP-REJECT");
+      expect(component.form.reset).not.toHaveBeenCalled();
+      expect(bridge.consumeReleasedMakerWip(211)).toBe(false);
+    } finally {
+      fakeHttp.post("test");
+      fakeHttp.post.mockClear();
+      component.ngOnDestroy();
+      fakeRouteGuardBridge.register.mockImplementation(() => undefined);
+      fakeRouteGuardBridge.unregister.mockImplementation(() => undefined);
+      fakeRouteGuardBridge.consumeReleasedMakerWip.mockImplementation(
+        () => false,
+      );
+      fakeRouteGuardBridge.consumeDenied.mockImplementation(() => false);
+      fakeRouteGuardBridge.isGuardPending.mockImplementation(() => false);
+      fakeRouteGuardBridge.markNavigationTerminated.mockImplementation(
+        () => undefined,
+      );
+    }
+  });
+
+  it("tears down the Settings reload output subscription on deactivation", async () => {
+    routerEvents = new Subject<unknown>();
+    const { AppComponent } = await import("./app.component");
+    const component = new AppComponent();
+    const reload = new Subject<void>();
+    const reloadSpy = jest
+      .spyOn(component, "refreshAfterDevelopmentReload")
+      .mockResolvedValue();
+    component.onSettingsActivated({ dataReloaded: reload });
+    reload.next();
+    expect(reloadSpy).toHaveBeenCalledTimes(1);
+    component.onSettingsDeactivated();
+    reload.next();
+    expect(reloadSpy).toHaveBeenCalledTimes(1);
+    component.ngOnDestroy();
+  });
+
   it("does not eagerly request parent workspace data or submit settlement POSTs during application startup", async () => {
     fakeHttp.get.mockClear();
     fakeHttp.post.mockClear();

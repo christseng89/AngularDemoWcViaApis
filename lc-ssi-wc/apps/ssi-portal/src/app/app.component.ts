@@ -5,6 +5,7 @@ import {
   computed,
   inject,
   type OnInit,
+  type OnDestroy,
   signal,
   viewChild,
 } from "@angular/core";
@@ -14,7 +15,16 @@ import { DOCUMENT } from "@angular/common";
 import { ReactiveFormsModule, FormGroup } from "@angular/forms";
 import { FormlyForm, type FormlyFieldConfig } from "@ngx-formly/core";
 import { readonlyFormFields, ssiFormModel } from "./ssi-form-presentation";
-import { firstValueFrom } from "rxjs";
+import { firstValueFrom, type Subscription } from "rxjs";
+import {
+  NavigationCancel,
+  NavigationEnd,
+  NavigationError,
+  NavigationSkipped,
+  NavigationStart,
+  Router,
+  RouterOutlet,
+} from "@angular/router";
 import { SwiftDataCrudComponent } from "./swift-data-crud.component";
 import {
   createMaintenanceIndexActionAdapter,
@@ -87,7 +97,7 @@ import {
   presentResolutionIssue,
 } from "./operational-issue";
 import { OperationalIssueComponent } from "./operational-issue.component";
-import { SettingsPageComponent } from "./settings-page.component";
+import { APP_ROUTE_GUARD_BRIDGE } from "./app-route-guard";
 import { AlertComponent } from "./alert.component";
 import { PageDefinitionIndexWorkspaceComponent } from "./resolution-workbench/page-definition-index-workspace.component";
 import {
@@ -502,7 +512,7 @@ interface ControlledFixtureResponse {
     FormlyForm,
     SwiftDataCrudComponent,
     OperationalIssueComponent,
-    SettingsPageComponent,
+    RouterOutlet,
     AlertComponent,
     PageDefinitionIndexWorkspaceComponent,
     BankServicePickerDialogComponent,
@@ -518,12 +528,14 @@ interface ControlledFixtureResponse {
   },
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class AppComponent implements OnInit {
+export class AppComponent implements OnInit, OnDestroy {
   readonly presentOfficialFieldName = presentOfficialFieldName;
   private readonly http = inject(HttpClient);
   private readonly document = inject(DOCUMENT);
   private readonly changeDetector = inject(ChangeDetectorRef);
   private readonly themeService = inject(ThemeService);
+  private readonly router = inject(Router);
+  private readonly routeGuardBridge = inject(APP_ROUTE_GUARD_BRIDGE);
   private readonly swiftDataCrud = viewChild(SwiftDataCrudComponent);
   private readonly api = "http://localhost:3100/api";
   readonly finResolutionCatalogue = signal<
@@ -538,6 +550,14 @@ export class AppComponent implements OnInit {
   private refreshRequestSequence = 0;
   readonly ssiIndexLoading = signal(false);
   readonly view = signal<View>(this.savedView());
+  readonly routeLoading = signal(false);
+  private lastWorkbenchView: Exclude<View, "settings"> =
+    this.savedWorkbenchView();
+  private pendingRouteTarget: View | null = null;
+  private latestNavigationId = 0;
+  private releasedMakerWipDuringNavigation = false;
+  private readonly routerEventsSubscription: Subscription;
+  private settingsReloadSubscription: { unsubscribe(): void } | null = null;
   readonly theme = this.themeService.theme;
   readonly rows = signal<readonly SsiRow[]>([]);
   // Checker is an independent transactional projection. It must never replace
@@ -1396,6 +1416,19 @@ export class AppComponent implements OnInit {
   private readonly featureDataLoads = new Map<string, Promise<void>>();
   private pendingDeactivation: Promise<boolean> | null = null;
 
+  constructor() {
+    this.routeGuardBridge.register(this);
+    this.routerEventsSubscription = this.router.events.subscribe((event) =>
+      this.onRouterEvent(event),
+    );
+  }
+
+  ngOnDestroy(): void {
+    this.settingsReloadSubscription?.unsubscribe();
+    this.routerEventsSubscription.unsubscribe();
+    this.routeGuardBridge.unregister(this);
+  }
+
   ngOnInit(): void {
     // SWIFT Data owns its own resource loading. A persisted SSI view loads only
     // SSI data, so browser refresh does not create or query the RMA component.
@@ -1508,17 +1541,41 @@ export class AppComponent implements OnInit {
   }
 
   navigate(view: View): void {
+    if (this.pendingRouteTarget !== null) return;
+    if (view === "settings" || this.view() === "settings") {
+      if (view === this.view()) return;
+      this.pendingRouteTarget = view;
+      void this.router
+        .navigateByUrl(view === "settings" ? "/settings" : "/")
+        .catch(() => undefined);
+      return;
+    }
     this.notice.set(null);
     this.view.set(view);
     this.document.defaultView?.localStorage.setItem("ssi-active-view", view);
+    this.lastWorkbenchView = view;
+    this.document.defaultView?.localStorage.setItem(
+      "ssi-last-workbench-view",
+      view,
+    );
     if (view === "treasury" || view === "tradefinance")
       this.enterFinResolution(view);
     void this.ensureFeatureData(view);
   }
 
   private savedView(): View {
+    if (this.document.defaultView?.location?.pathname === "/settings")
+      return "settings";
+    return this.savedWorkbenchView();
+  }
+
+  private savedWorkbenchView(): Exclude<View, "settings"> {
     const saved =
       this.document.defaultView?.localStorage.getItem("ssi-active-view");
+    const previous = this.document.defaultView?.localStorage.getItem(
+      "ssi-last-workbench-view",
+    );
+    const candidate = saved === "settings" ? previous : saved;
     return [
       "swiftdata",
       "dashboard",
@@ -1528,10 +1585,139 @@ export class AppComponent implements OnInit {
       "treasury",
       "tradefinance",
       "audit",
-      "settings",
-    ].includes(saved ?? "")
-      ? (saved as View)
+    ].includes(candidate ?? "")
+      ? (candidate as Exclude<View, "settings">)
       : "swiftdata";
+  }
+
+  hasActiveMakerRevision(): boolean {
+    return (
+      this.view() === "maker" && !!this.revisionSource() && !!this.editingId()
+    );
+  }
+
+  onLateMakerWipRelease(navigationId: number): void {
+    this.routeGuardBridge.consumeReleasedMakerWip(navigationId);
+    this.form.reset();
+    this.lastWorkbenchView = "dashboard";
+    this.document.defaultView?.localStorage.setItem(
+      "ssi-last-workbench-view",
+      "dashboard",
+    );
+    if (this.view() === "maker") this.commitRouteView("dashboard");
+    this.notice.set({
+      kind: "error",
+      text: "頁面切換已取消，但修訂 WIP 隨後釋放；編輯內容已關閉，請重新進入。",
+    });
+  }
+
+  onSettingsActivated(component: unknown): void {
+    this.settingsReloadSubscription?.unsubscribe();
+    const route = component as {
+      dataReloaded?: {
+        subscribe(callback: () => void): { unsubscribe(): void };
+      };
+    };
+    this.settingsReloadSubscription =
+      route.dataReloaded?.subscribe(() => {
+        void this.refreshAfterDevelopmentReload();
+      }) ?? null;
+  }
+
+  onSettingsDeactivated(): void {
+    this.settingsReloadSubscription?.unsubscribe();
+    this.settingsReloadSubscription = null;
+  }
+
+  private onRouterEvent(event: unknown): void {
+    if (event instanceof NavigationStart) {
+      this.latestNavigationId = event.id;
+      this.routeLoading.set(true);
+      return;
+    }
+    if (event instanceof NavigationEnd) {
+      const released =
+        this.routeGuardBridge.consumeReleasedMakerWip(event.id) ||
+        this.releasedMakerWipDuringNavigation;
+      this.releasedMakerWipDuringNavigation = false;
+      this.routeGuardBridge.consumeDenied(event.id);
+      if (released) {
+        this.form.reset();
+        this.lastWorkbenchView = "dashboard";
+        this.document.defaultView?.localStorage.setItem(
+          "ssi-last-workbench-view",
+          "dashboard",
+        );
+      }
+      const target: View = event.urlAfterRedirects.startsWith("/settings")
+        ? "settings"
+        : released
+          ? "dashboard"
+          : this.pendingRouteTarget && this.pendingRouteTarget !== "settings"
+            ? this.pendingRouteTarget
+            : this.lastWorkbenchView;
+      const previousView = this.view();
+      if (target === "settings" && previousView !== "settings" && !released) {
+        this.lastWorkbenchView = previousView;
+        this.document.defaultView?.localStorage.setItem(
+          "ssi-last-workbench-view",
+          this.lastWorkbenchView,
+        );
+      }
+      this.pendingRouteTarget = null;
+      this.commitRouteView(target);
+      this.routeLoading.set(false);
+      return;
+    }
+    if (event instanceof NavigationSkipped) {
+      if (event.id === this.latestNavigationId) {
+        this.pendingRouteTarget = null;
+        this.routeLoading.set(false);
+      }
+      return;
+    }
+    if (event instanceof NavigationCancel || event instanceof NavigationError) {
+      const guardPending = this.routeGuardBridge.isGuardPending(event.id);
+      this.routeGuardBridge.markNavigationTerminated(event.id);
+      const released = this.routeGuardBridge.consumeReleasedMakerWip(event.id);
+      const denied = this.routeGuardBridge.consumeDenied(event.id);
+      if (event.id !== this.latestNavigationId) {
+        this.releasedMakerWipDuringNavigation ||= released;
+        return;
+      }
+      this.pendingRouteTarget = null;
+      this.routeLoading.set(false);
+      if (released || this.releasedMakerWipDuringNavigation) {
+        this.releasedMakerWipDuringNavigation = false;
+        this.form.reset();
+        this.commitRouteView("dashboard");
+        this.notice.set({
+          kind: "error",
+          text: "頁面切換失敗；修訂 WIP 已釋放，編輯內容已關閉，請重新進入。",
+        });
+      } else if (!denied && !guardPending) {
+        this.notice.set({
+          kind: "error",
+          text: "頁面切換失敗；目前畫面與未儲存內容保持不變，請重試。",
+        });
+      }
+    }
+  }
+
+  private commitRouteView(view: View): void {
+    this.notice.set(null);
+    this.view.set(view);
+    this.document.defaultView?.localStorage.setItem("ssi-active-view", view);
+    if (view !== "settings") {
+      this.lastWorkbenchView = view;
+      this.document.defaultView?.localStorage.setItem(
+        "ssi-last-workbench-view",
+        view,
+      );
+    }
+    if (view === "treasury" || view === "tradefinance")
+      this.enterFinResolution(view);
+    void this.ensureFeatureData(view);
   }
 
   private ensureFeatureData(view: View): Promise<void> {

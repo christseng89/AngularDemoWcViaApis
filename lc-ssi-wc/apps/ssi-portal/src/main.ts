@@ -3,6 +3,8 @@ import { provideHttpClient } from "@angular/common/http";
 import { provideZonelessChangeDetection } from "@angular/core";
 import { provideFormlyCore } from "@ngx-formly/core";
 import { AppComponent } from "./app/app.component";
+import { provideRouter } from "@angular/router";
+import { APP_ROUTES } from "./app/app.routes";
 import {
   BicInputType,
   MessageTypeTagsType,
@@ -14,6 +16,7 @@ void bootstrapApplication(AppComponent, {
   providers: [
     provideHttpClient(),
     provideZonelessChangeDetection(),
+    provideRouter(APP_ROUTES),
     provideFormlyCore({
       types: [
         { name: "input", component: NativeInputType },
