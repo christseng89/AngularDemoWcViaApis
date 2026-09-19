@@ -1,7 +1,10 @@
+const loadRuntime = jest.fn().mockResolvedValue(undefined);
+
 jest.mock("@angular/core", () => ({
   Component: () => (target: unknown) => target,
   inject: () => ({ theme: () => "dark", setTheme: jest.fn() }),
   output: () => ({ emit: jest.fn() }),
+  viewChild: () => () => ({ loadRuntime }),
   ChangeDetectionStrategy: { OnPush: "OnPush" },
 }));
 jest.mock("./settings-page.component", () => ({
@@ -18,5 +21,11 @@ describe("SettingsRouteComponent", () => {
     route.dataReloaded.emit();
     expect(route.dataReloaded.emit).toHaveBeenCalledTimes(1);
     expect("http" in route).toBe(false);
+  });
+
+  it("refreshes only the current Settings page runtime metadata", async () => {
+    const route = new SettingsRouteComponent();
+    await route.refresh();
+    expect(loadRuntime).toHaveBeenCalledTimes(1);
   });
 });

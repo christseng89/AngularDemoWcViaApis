@@ -89,4 +89,22 @@ describe("SsiMaintenanceApiService", () => {
       ],
     ]);
   });
+
+  it("preserves Maker Bank and Customer picker query URLs", () => {
+    const api = new SsiMaintenanceApiService();
+    api.lookupBanks(2, 10, "A B").subscribe();
+    api.lookupCustomers(3, "C D").subscribe();
+    expect(get.mock.calls.map(([url]) => url)).toEqual([
+      "http://localhost:3100/api/reference/banks?page=2&pageSize=10&query=A%20B",
+      "http://localhost:3100/api/reference/customers?page=3&pageSize=5&query=C%20D",
+    ]);
+  });
+
+  it("preserves the Dashboard counterparty directory lookup URL", () => {
+    const api = new SsiMaintenanceApiService();
+    api.lookupCounterparties().subscribe();
+    expect(get.mock.calls.map(([url]) => url)).toEqual([
+      "http://localhost:3100/api/reference/counterparties",
+    ]);
+  });
 });

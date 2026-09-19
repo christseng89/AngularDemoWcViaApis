@@ -1,0 +1,201 @@
+<section class="panel form-panel">
+  <div class="form-heading">
+    <div>
+      <p class="kicker">MAKER WORKSPACE · PARAMETER-DRIVEN FORMLY</p>
+      <h2>
+        {{
+          maker.makerEditing() ? "編輯 SSI 草稿" : "新增 Settlement Instruction"
+        }}
+      </h2>
+      <p>
+        {{
+          maker.makerEditing()
+            ? "您正在修改 DRAFT。儲存後仍須提交獨立 Checker；原 Active 版本不受影響。"
+            : "建立新 DRAFT，完成後回到清單提交。"
+        }}
+      </p>
+      @if (maker.revisionSourceIdentity(); as sourceIdentity) {
+        <p>
+          原 SSI：<b>{{ sourceIdentity }}</b>
+        </p>
+      }
+    </div>
+    <button
+      class="drawer-close"
+      type="button"
+      aria-label="Close SSI editor"
+      (click)="actions.close()"
+    >
+      ×
+    </button>
+  </div>
+  <form [formGroup]="maker.form" (ngSubmit)="actions.save()">
+    <formly-form
+      [form]="maker.form"
+      [fields]="maker.fields()"
+      [model]="maker.model"
+    />
+    <p class="data-disclaimer compact-warning">
+      <b>資料界線：</b>BIC reference 可由欄位右側 Bank Service 選取；Demo
+      Account／SSI routing 為虛構資料，Production 必須經授權 Master 驗證。
+    </p>
+    <div class="actions">
+      <button class="primary" type="submit">Save Draft</button>
+    </div>
+  </form>
+</section>
+@defer (when maker.bicPickerTarget(); prefetch on timer(5s)) {
+  @if (maker.bicPickerTarget()) {
+    @if (maker.identityPickerSource() === "BANK") {
+      <ssi-bank-service-picker-dialog
+        [title]="maker.bicPickerTitle()"
+        [items]="maker.bankPickerItems()"
+        [loading]="maker.banksLoading()"
+        [error]="maker.bankPickerError()"
+        [query]="maker.bankQuery()"
+        [page]="maker.bankPage().page"
+        [total]="maker.bankPage().total"
+        [totalPages]="maker.bankPage().totalPages"
+        (searchRequested)="maker.searchBanks($event)"
+        (pageRequested)="maker.moveBankToPage($event)"
+        (selected)="maker.selectBankPickerItem($event)"
+        (cancelled)="maker.closeBicPicker()"
+      />
+    } @else {
+      <div
+        class="modal-backdrop"
+        role="presentation"
+        (click)="maker.closeBicPicker()"
+        (keydown.escape)="maker.closeBicPicker()"
+      >
+        <dialog
+          class="bic-dialog"
+          open
+          aria-modal="true"
+          [attr.aria-label]="maker.bicPickerTitle()"
+          (click)="$event.stopPropagation()"
+          (keydown.escape)="maker.closeBicPicker()"
+        >
+          <div class="dialog-header">
+            <div>
+              <p class="kicker">
+                {{
+                  maker.identityPickerSource() === "CUSTOMER"
+                    ? "PSEUDO CUSTOMER SERVICE"
+                    : "MOCK BANK REFERENCE SERVICE"
+                }}
+              </p>
+              <h2>{{ maker.bicPickerTitle() }}</h2>
+            </div>
+            <button
+              type="button"
+              class="icon-button"
+              aria-label="Cancel"
+              (click)="maker.closeBicPicker()"
+            >
+              ×
+            </button>
+          </div>
+          <div class="data-disclaimer">
+            <b>Reference boundary：</b>此為 Pseudo Customer Service
+            測試資料；Customer ID 不得當成銀行 BIC 或 settlement agent。
+          </div>
+          <label class="search"
+            ><span>搜尋 Customer ID、客戶名稱或國家</span
+            ><input
+              #customerSearch
+              type="search"
+              [value]="maker.customerQuery()"
+              placeholder="例如 CUST-00001、HK"
+              (keyup.enter)="maker.searchCustomers(customerSearch.value)"
+            /><button
+              type="button"
+              class="primary"
+              (click)="maker.searchCustomers(customerSearch.value)"
+            >
+              Search
+            </button></label
+          >
+          @if (
+            maker.customersLoading() && maker.customerPage().items.length === 0
+          ) {
+            <p class="empty">正在載入 Customer Reference…</p>
+          } @else {
+            <div class="table-scroll">
+              <table>
+                <caption class="visually-hidden">
+                  Customer reference search results
+                </caption>
+                <thead>
+                  <tr>
+                    <th>Customer ID</th>
+                    <th>Customer Name</th>
+                    <th>Country</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (
+                    customer of maker.customerPage().items;
+                    track customer.customerId
+                  ) {
+                    <tr>
+                      <td>
+                        <b>{{ customer.customerId }}</b>
+                      </td>
+                      <td>{{ customer.name }}</td>
+                      <td>{{ customer.country }}</td>
+                      <td>
+                        <button
+                          type="button"
+                          class="primary"
+                          (click)="maker.selectCustomer(customer)"
+                        >
+                          Select
+                        </button>
+                      </td>
+                    </tr>
+                  } @empty {
+                    <tr>
+                      <td colspan="4" class="empty">沒有符合條件的客戶。</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+          <div class="pager">
+            <span
+              >共 {{ maker.customerPage().total }} 筆 · 第
+              {{ maker.customerPage().page }} /
+              {{ maker.customerPage().totalPages || 1 }} 頁</span
+            >
+            <div>
+              <button
+                type="button"
+                class="ghost"
+                [disabled]="
+                  !maker.hasPreviousCustomerPage() || maker.customersLoading()
+                "
+                (click)="maker.moveCustomerPage(-1)"
+              >
+                Previous</button
+              ><button
+                type="button"
+                class="ghost"
+                [disabled]="
+                  !maker.hasNextCustomerPage() || maker.customersLoading()
+                "
+                (click)="maker.moveCustomerPage(1)"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </dialog>
+      </div>
+    }
+  }
+} @loading (after 100ms; minimum 300ms) {
+  <ssi-loading-state label="Loading reference picker…" />
+}

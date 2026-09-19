@@ -39,6 +39,10 @@ export class AuditRouteComponent implements OnInit {
     void this.audit.load();
   }
 
+  refresh(): Promise<void> {
+    return this.audit.load();
+  }
+
   setCurrencyOptions(
     options: readonly { code: string; decimals: number }[],
   ): void {

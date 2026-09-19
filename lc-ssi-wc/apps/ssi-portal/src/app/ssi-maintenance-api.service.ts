@@ -3,6 +3,11 @@ import { Injectable, inject } from "@angular/core";
 import type { Observable } from "rxjs";
 import type { SsiIndexSummary, SsiPage, SsiRow } from "./ssi-maintenance.types";
 import type { CounterpartySsiSummarySource } from "./ssi-maintenance-index";
+import type {
+  SsiBankPage,
+  SsiCustomerPage,
+  SsiCounterpartyReference,
+} from "./ssi-maintenance-feature/ssi-reference.types";
 
 @Injectable({ providedIn: "root" })
 export class SsiMaintenanceApiService {
@@ -20,6 +25,30 @@ export class SsiMaintenanceApiService {
   counterpartyCoverage(): Observable<readonly CounterpartySsiSummarySource[]> {
     return this.http.get<readonly CounterpartySsiSummarySource[]>(
       `${this.api}/counterparty-coverage?status=ACTIVE`,
+    );
+  }
+
+  lookupCounterparties(): Observable<{
+    items: readonly SsiCounterpartyReference[];
+  }> {
+    return this.http.get<{ items: readonly SsiCounterpartyReference[] }>(
+      "http://localhost:3100/api/reference/counterparties",
+    );
+  }
+
+  lookupBanks(
+    page: number,
+    pageSize: number,
+    query: string,
+  ): Observable<SsiBankPage> {
+    return this.http.get<SsiBankPage>(
+      `http://localhost:3100/api/reference/banks?page=${page}&pageSize=${pageSize}&query=${encodeURIComponent(query)}`,
+    );
+  }
+
+  lookupCustomers(page: number, query: string): Observable<SsiCustomerPage> {
+    return this.http.get<SsiCustomerPage>(
+      `http://localhost:3100/api/reference/customers?page=${page}&pageSize=5&query=${encodeURIComponent(query)}`,
     );
   }
 

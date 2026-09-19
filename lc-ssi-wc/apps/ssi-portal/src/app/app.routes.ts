@@ -1,5 +1,5 @@
 import { Component } from "@angular/core";
-import type { Routes } from "@angular/router";
+import type { CanMatchFn, Routes } from "@angular/router";
 import { appRouteCanActivate } from "./app-route-guard";
 
 @Component({
@@ -9,7 +9,18 @@ import { appRouteCanActivate } from "./app-route-guard";
 })
 export class LegacyRouteAnchorComponent {}
 
+const matchesSsiMaintenance: CanMatchFn = (_route, segments) =>
+  segments[0]?.path === "dashboard" || segments[0]?.path === "maker";
+
 export const APP_ROUTES: Routes = [
+  {
+    path: "",
+    canMatch: [matchesSsiMaintenance],
+    loadChildren: () =>
+      import("./ssi-maintenance-feature/ssi.routes").then(
+        (module) => module.SSI_MAINTENANCE_ROUTES,
+      ),
+  },
   {
     path: "checker",
     canActivate: [appRouteCanActivate],

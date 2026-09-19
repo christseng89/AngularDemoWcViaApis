@@ -3,7 +3,14 @@ import { join } from "node:path";
 import { createMaintenanceIndexActionAdapter } from "./maintenance-index-action-policy";
 
 describe("SSI SUPPRESSION Draft submit contract", () => {
-  const template = readFileSync(join(__dirname, "app.component.html"), "utf8");
+  const template = readFileSync(
+    join(
+      __dirname,
+      "ssi-maintenance-feature",
+      "dashboard-route.component.html",
+    ),
+    "utf8",
+  );
   const tableStart = template.indexOf(
     '<div class="table-scroll">',
     template.indexOf("Search current ownership index"),
@@ -22,7 +29,7 @@ describe("SSI SUPPRESSION Draft submit contract", () => {
         changeType: "SUPPRESSION",
       }),
     ).toBe(true);
-    expect(indexTable).toContain("act(row, 'submit')");
+    expect(indexTable).toContain("host.act(row, 'submit')");
   });
 
   it("does not expose Submit outside Draft status", () => {

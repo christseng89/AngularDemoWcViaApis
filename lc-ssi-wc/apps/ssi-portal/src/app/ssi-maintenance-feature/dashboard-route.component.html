@@ -1,0 +1,825 @@
+@if (index.ssiIndexLoading() && index.rows().length === 0) {
+  <ssi-loading-state label="Loading SSI records…" />
+} @else {
+  <section class="metrics">
+    <article>
+      <small>目前 SSI</small
+      ><strong>{{ index.ssiSummary().currentOwn }}</strong>
+    </article>
+    <article>
+      <small>等待 Checker</small><strong>{{ host.checkerCount() }}</strong>
+    </article>
+    <article>
+      <small>Active</small><strong>{{ index.activeCount() }}</strong>
+    </article>
+    <article>
+      <small>歷史／已撤銷</small><strong>{{ index.archivedCount() }}</strong>
+    </article>
+  </section>
+  <section class="guidance">
+    <span>1</span>
+    <div><b>新增</b><small>使用右方「＋新增 SSI」建立 DRAFT。</small></div>
+    <span>2</span>
+    <div>
+      <b>編輯／修訂</b
+      ><small>DRAFT 直接編輯；Active 使用「建立修訂」保留舊版本。</small>
+    </div>
+    <span>3</span>
+    <div><b>四眼控制</b><small>Submit → Checker Approve → Active。</small></div>
+  </section>
+  <section class="panel">
+    <div class="panel-title">
+      <div>
+        <p class="kicker">CURRENT OPERATING RECORDS</p>
+        <h2>Settlement Instructions</h2>
+        <p class="subtitle">
+          預設隱藏 REVOKED／SUPERSEDED；完整歷史可在「稽核與事件」查看。
+        </p>
+      </div>
+      <button class="primary" (click)="host.startNew()">Add SSI</button>
+    </div>
+    <div class="catalog-tabs" aria-label="SSI ownership indexes">
+      <button
+        type="button"
+        [class.active]="index.ownershipTab() === 'OWN'"
+        (click)="host.selectOwnershipTab('OWN')"
+      >
+        Own SSI
+      </button>
+      <button
+        type="button"
+        [class.active]="index.ownershipTab() === 'COUNTERPARTY'"
+        (click)="host.selectOwnershipTab('COUNTERPARTY')"
+      >
+        Counterparty SSI
+      </button>
+    </div>
+    @if (
+      index.ownershipTab() === "COUNTERPARTY" && !index.selectedCounterparty()
+    ) {
+      <section
+        class="counterparty-inbox"
+        aria-labelledby="counterparty-inbox-title"
+      >
+        <div class="inbox-heading">
+          <div>
+            <p class="kicker">COUNTERPARTY DIRECTORY × SSI COVERAGE</p>
+            <h3 id="counterparty-inbox-title">Counterparty Inbox</h3>
+            <p class="subtitle">
+              每個對手行只顯示一次；選擇後才載入該對手行的 SSI。
+            </p>
+          </div>
+          <span class="status" aria-live="polite">
+            @if (
+              index.counterpartyDirectoryLoading() || index.ssiIndexLoading()
+            ) {
+              Loading counterparties…
+            } @else {
+              {{ index.filteredCounterpartyInbox().length }}
+              counterparties
+            }
+          </span>
+        </div>
+        <fieldset class="catalog-tabs status-tabs">
+          <legend class="visually-hidden">Counterparty Type</legend>
+          <button
+            type="button"
+            [class.active]="index.counterpartyPartyType() === 'BANK_SSI'"
+            (click)="index.selectCounterpartyPartyType('BANK_SSI')"
+          >
+            Bank (SSI)
+          </button>
+          <button
+            type="button"
+            [class.active]="index.counterpartyPartyType() === 'BANK_NO_SSI'"
+            (click)="index.selectCounterpartyPartyType('BANK_NO_SSI')"
+          >
+            Bank (No SSI)
+          </button>
+          <button
+            type="button"
+            [class.active]="index.counterpartyPartyType() === 'CUSTOMER'"
+            (click)="index.selectCounterpartyPartyType('CUSTOMER')"
+          >
+            Customer
+          </button>
+        </fieldset>
+        <div class="index-controls inbox-controls single-control">
+          <label class="control index-search"
+            ><span>Search Counterparty ID, BIC, name or country</span
+            ><input
+              aria-label="Search Counterparty Inbox"
+              [value]="index.counterpartyInboxSearch()"
+              (input)="
+                index.searchCounterpartyInbox($any($event.target).value)
+              "
+          /></label>
+        </div>
+        <div class="table-scroll counterparty-inbox-table">
+          <table>
+            <caption class="visually-hidden">
+              Counterparty SSI inbox
+            </caption>
+            <thead>
+              <tr>
+                <th [attr.aria-sort]="index.counterpartyAriaSort('BIC_NAME')">
+                  <button
+                    class="sort-header"
+                    type="button"
+                    (click)="index.sortCounterpartyInbox('BIC_NAME')"
+                  >
+                    BIC／Name
+                    <span aria-hidden="true">{{
+                      index.counterpartySortIndicator("BIC_NAME")
+                    }}</span>
+                  </button>
+                </th>
+                <th [attr.aria-sort]="index.counterpartyAriaSort('COUNTRY')">
+                  <button
+                    class="sort-header"
+                    type="button"
+                    (click)="index.sortCounterpartyInbox('COUNTRY')"
+                  >
+                    Country
+                    <span aria-hidden="true">{{
+                      index.counterpartySortIndicator("COUNTRY")
+                    }}</span>
+                  </button>
+                </th>
+                <th [attr.aria-sort]="index.counterpartyAriaSort('SSI_COUNT')">
+                  <button
+                    class="sort-header"
+                    type="button"
+                    (click)="index.sortCounterpartyInbox('SSI_COUNT')"
+                  >
+                    SSI Count
+                    <span aria-hidden="true">{{
+                      index.counterpartySortIndicator("SSI_COUNT")
+                    }}</span>
+                  </button>
+                </th>
+                <th
+                  [attr.aria-sort]="
+                    index.counterpartyAriaSort('CURRENCY_COUNT')
+                  "
+                >
+                  <button
+                    class="sort-header"
+                    type="button"
+                    (click)="index.sortCounterpartyInbox('CURRENCY_COUNT')"
+                  >
+                    Currencies
+                    <span aria-hidden="true">{{
+                      index.counterpartySortIndicator("CURRENCY_COUNT")
+                    }}</span>
+                  </button>
+                </th>
+                <th
+                  [attr.aria-sort]="
+                    index.counterpartyAriaSort('STATUS_EVIDENCE')
+                  "
+                >
+                  <button
+                    class="sort-header"
+                    type="button"
+                    (click)="index.sortCounterpartyInbox('STATUS_EVIDENCE')"
+                  >
+                    Status／Evidence
+                    <span aria-hidden="true">{{
+                      index.counterpartySortIndicator("STATUS_EVIDENCE")
+                    }}</span>
+                  </button>
+                </th>
+                <th
+                  [attr.aria-sort]="index.counterpartyAriaSort('LAST_VERIFIED')"
+                >
+                  <button
+                    class="sort-header"
+                    type="button"
+                    (click)="index.sortCounterpartyInbox('LAST_VERIFIED')"
+                  >
+                    Last Verified
+                    <span aria-hidden="true">{{
+                      index.counterpartySortIndicator("LAST_VERIFIED")
+                    }}</span>
+                  </button>
+                </th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              @if (
+                index.counterpartyDirectoryLoading() || index.ssiIndexLoading()
+              ) {
+                <tr>
+                  <td colspan="7" class="empty">
+                    <output aria-live="polite"
+                      >Loading Counterparty Directory…</output
+                    >
+                  </td>
+                </tr>
+              } @else {
+                @for (
+                  party of index.pagedCounterpartyInbox();
+                  track party.counterpartyId
+                ) {
+                  <tr
+                    class="data-row"
+                    tabindex="0"
+                    [attr.data-counterparty-id]="party.counterpartyId"
+                    (dblclick)="host.openCounterpartySsi(party.counterpartyId)"
+                    (keydown.enter)="
+                      host.openCounterpartySsi(party.counterpartyId)
+                    "
+                  >
+                    <td>
+                      <b>{{ party.counterpartyId }}</b>
+                      @if (party.bic && party.bic !== party.counterpartyId) {
+                        <small>SWIFT BIC: {{ party.bic }}</small>
+                      }
+                      <small>{{ party.name }}</small>
+                      <small>{{ party.partyType ?? "BANK" }}</small>
+                    </td>
+                    <td>{{ party.country }}</td>
+                    <td>
+                      <b>{{ party.ssiCount }}</b>
+                    </td>
+                    <td>{{ party.currencyCount }}</td>
+                    <td>
+                      <span
+                        class="status"
+                        [class.active-status]="party.ssiCount > 0"
+                        >{{ party.evidenceSummary }}</span
+                      >
+                    </td>
+                    <td>{{ party.lastVerified || "Never" }}</td>
+                    <td>
+                      @if (party.ssiCount > 0) {
+                        <button
+                          type="button"
+                          class="ghost"
+                          [attr.aria-label]="
+                            'Open ' + party.counterpartyId + ' SSI'
+                          "
+                          (click)="
+                            host.openCounterpartySsi(party.counterpartyId)
+                          "
+                        >
+                          Open
+                        </button>
+                      } @else {
+                        <span class="status">No SSI</span>
+                      }
+                    </td>
+                  </tr>
+                } @empty {
+                  <tr>
+                    <td colspan="7" class="empty">
+                      No counterparties match this search.
+                    </td>
+                  </tr>
+                }
+              }
+            </tbody>
+          </table>
+        </div>
+        <div class="pager" aria-label="Counterparty Inbox pagination">
+          <span
+            >Page {{ index.counterpartyInboxPage() }} /
+            {{ index.counterpartyInboxTotalPages() }} ·
+            {{ index.filteredCounterpartyInbox().length }}
+            counterparties</span
+          >
+          <div>
+            <button
+              class="ghost"
+              type="button"
+              [disabled]="index.counterpartyInboxPage() === 1"
+              (click)="index.moveCounterpartyInboxPage(-1)"
+            >
+              Previous</button
+            ><button
+              class="ghost"
+              type="button"
+              [disabled]="
+                index.counterpartyInboxPage() ===
+                index.counterpartyInboxTotalPages()
+              "
+              (click)="index.moveCounterpartyInboxPage(1)"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      </section>
+    } @else {
+      @if (index.selectedCounterparty(); as party) {
+        <button
+          class="ghost strong index-back-button"
+          type="button"
+          (click)="host.closeCounterpartySsi()"
+        >
+          ← Back
+        </button>
+        <section class="party-detail-header">
+          <p class="kicker">COUNTERPARTY SSI DETAIL</p>
+          <h3>{{ party.counterpartyId }} · {{ party.name }}</h3>
+          @if (index.ssiIndexLoading()) {
+            <p>Loading scoped SSI records…</p>
+          } @else {
+            <p>
+              {{ party.country }} · {{ index.ssiIndexTotalItems() }} SSI ·
+              {{ index.ssiIndexDistinctCurrencyCount() }} currencies ·
+              {{ party.evidenceSummary }}
+            </p>
+          }
+        </section>
+      }
+      <fieldset class="status-options">
+        <legend>Record status</legend>
+        @for (
+          option of [
+            { value: "ACTIVE", label: "Active" },
+            { value: "DRAFT", label: "Draft" },
+            { value: "SUPPRESSED", label: "Suppressed" },
+            { value: "ALL", label: "All" },
+          ];
+          track option.value
+        ) {
+          <label [class.selected]="index.ownershipStatus() === option.value"
+            ><input
+              type="radio"
+              name="ssi-status"
+              [value]="option.value"
+              [checked]="index.ownershipStatus() === option.value"
+              (change)="host.selectOwnershipStatus($any(option.value))"
+            /><span>{{ option.label }}</span></label
+          >
+        }
+      </fieldset>
+      <div class="index-controls single-control">
+        <label class="control"
+          ><span>Search current ownership index</span
+          ><input
+            aria-label="Search SSI ownership index"
+            [value]="index.ownershipSearch()"
+            (input)="host.searchOwnershipIndex($any($event.target).value)"
+        /></label>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <caption class="visually-hidden">
+            {{
+              index.ownershipTab() === "OWN"
+                ? "Own SSI and Nostro ownership index"
+                : "Counterparty SSI ownership index"
+            }}
+          </caption>
+          <thead>
+            <tr>
+              <th [attr.aria-sort]="index.ownershipAriaSort('SSI_ID')">
+                <button
+                  class="sort-header"
+                  type="button"
+                  (click)="host.sortOwnershipIndex('SSI_ID')"
+                >
+                  SSI ID
+                  <span aria-hidden="true">{{
+                    index.ownershipSortIndicator("SSI_ID")
+                  }}</span>
+                </button>
+              </th>
+              @if (index.ownershipTab() === "OWN") {
+                <th
+                  [attr.aria-sort]="index.ownershipAriaSort('BOOKING_ENTITY')"
+                >
+                  <button
+                    class="sort-header"
+                    type="button"
+                    (click)="host.sortOwnershipIndex('BOOKING_ENTITY')"
+                  >
+                    Account Owner
+                    <span aria-hidden="true">{{
+                      index.ownershipSortIndicator("BOOKING_ENTITY")
+                    }}</span>
+                  </button>
+                </th>
+                <th
+                  [attr.aria-sort]="index.ownershipAriaSort('ACCOUNT_SERVICER')"
+                >
+                  <button
+                    class="sort-header"
+                    type="button"
+                    (click)="host.sortOwnershipIndex('ACCOUNT_SERVICER')"
+                  >
+                    Servicer
+                    <span aria-hidden="true">{{
+                      index.ownershipSortIndicator("ACCOUNT_SERVICER")
+                    }}</span>
+                  </button>
+                </th>
+              } @else {
+                <th [attr.aria-sort]="index.ownershipAriaSort('CURRENCY')">
+                  <button
+                    class="sort-header"
+                    type="button"
+                    (click)="host.sortOwnershipIndex('CURRENCY')"
+                  >
+                    Currency
+                    <span aria-hidden="true">{{
+                      index.ownershipSortIndicator("CURRENCY")
+                    }}</span>
+                  </button>
+                </th>
+                <th [attr.aria-sort]="index.ownershipAriaSort('USE_CASE')">
+                  <button
+                    class="sort-header"
+                    type="button"
+                    (click)="host.sortOwnershipIndex('USE_CASE')"
+                  >
+                    Use Case
+                    <span aria-hidden="true">{{
+                      index.ownershipSortIndicator("USE_CASE")
+                    }}</span>
+                  </button>
+                </th>
+                <th
+                  [attr.aria-sort]="index.ownershipAriaSort('INSTRUCTED_ROUTE')"
+                >
+                  <button
+                    class="sort-header"
+                    type="button"
+                    (click)="host.sortOwnershipIndex('INSTRUCTED_ROUTE')"
+                  >
+                    Instructed Route
+                    <span aria-hidden="true">{{
+                      index.ownershipSortIndicator("INSTRUCTED_ROUTE")
+                    }}</span>
+                  </button>
+                </th>
+              }
+              @if (index.ownershipTab() === "OWN") {
+                <th [attr.aria-sort]="index.ownershipAriaSort('CURRENCY')">
+                  <button
+                    class="sort-header"
+                    type="button"
+                    (click)="host.sortOwnershipIndex('CURRENCY')"
+                  >
+                    Currency
+                    <span aria-hidden="true">{{
+                      index.ownershipSortIndicator("CURRENCY")
+                    }}</span>
+                  </button>
+                </th>
+              }
+              <th
+                [attr.aria-sort]="index.ownershipAriaSort('EFFECTIVE_PERIOD')"
+              >
+                <button
+                  class="sort-header"
+                  type="button"
+                  (click)="host.sortOwnershipIndex('EFFECTIVE_PERIOD')"
+                >
+                  Effective Date
+                  <span aria-hidden="true">{{
+                    index.ownershipSortIndicator("EFFECTIVE_PERIOD")
+                  }}</span>
+                </button>
+              </th>
+              <th [attr.aria-sort]="index.ownershipAriaSort('STATUS')">
+                <button
+                  class="sort-header"
+                  type="button"
+                  (click)="host.sortOwnershipIndex('STATUS')"
+                >
+                  Status
+                  <span aria-hidden="true">{{
+                    index.ownershipSortIndicator("STATUS")
+                  }}</span>
+                </button>
+              </th>
+              <th [attr.aria-sort]="index.ownershipAriaSort('VERSION')">
+                <button
+                  class="sort-header"
+                  type="button"
+                  (click)="host.sortOwnershipIndex('VERSION')"
+                >
+                  Version
+                  <span aria-hidden="true">{{
+                    index.ownershipSortIndicator("VERSION")
+                  }}</span>
+                </button>
+              </th>
+              <th [attr.aria-sort]="index.ownershipAriaSort('REQUEST_TYPE')">
+                <button
+                  class="sort-header"
+                  type="button"
+                  (click)="host.sortOwnershipIndex('REQUEST_TYPE')"
+                >
+                  Request Type
+                  <span aria-hidden="true">{{
+                    index.ownershipSortIndicator("REQUEST_TYPE")
+                  }}</span>
+                </button>
+              </th>
+              <th [attr.aria-sort]="index.ownershipAriaSort('REVISION_STATUS')">
+                <button
+                  class="sort-header"
+                  type="button"
+                  (click)="host.sortOwnershipIndex('REVISION_STATUS')"
+                >
+                  Current Status
+                  <span aria-hidden="true">{{
+                    index.ownershipSortIndicator("REVISION_STATUS")
+                  }}</span>
+                </button>
+              </th>
+              @for (
+                actionColumn of index.ownershipActionColumns();
+                track actionColumn.id
+              ) {
+                <th
+                  [attr.aria-sort]="
+                    index.ownershipAriaSort($any(actionColumn.sortPath))
+                  "
+                >
+                  <button
+                    class="sort-header"
+                    type="button"
+                    (click)="
+                      host.sortOwnershipIndex($any(actionColumn.sortPath))
+                    "
+                  >
+                    {{ actionColumn.label }}
+                    <span aria-hidden="true">{{
+                      index.ownershipSortIndicator($any(actionColumn.sortPath))
+                    }}</span>
+                  </button>
+                </th>
+              }
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of index.pagedVisibleRows(); track row.id) {
+              <tr
+                class="data-row"
+                tabindex="0"
+                [attr.aria-label]="'View SSI ' + row.id"
+                [attr.data-ownership-type]="index.ownershipOf(row)"
+                [attr.data-ssi-id]="row.id"
+                (click)="host.reviewForChecker(row)"
+                (keydown.enter)="host.reviewForChecker(row)"
+                (keydown.space)="
+                  $event.preventDefault(); host.reviewForChecker(row)
+                "
+              >
+                <td>
+                  <b>{{ row.counterpartyId }}</b>
+                </td>
+                @if (index.ownershipTab() === "OWN") {
+                  <td>
+                    <b>{{ row.route["bookingEntity"] || row.ownerParty }}</b>
+                  </td>
+                  <td>
+                    <code>{{ row.route["accountWithBic"] }}</code>
+                  </td>
+                } @else {
+                  <td>
+                    <b>{{ row.route["currency"] }}</b>
+                  </td>
+                  <td>
+                    <b>{{ row.route["businessFunction"] || row.scope }}</b
+                    ><small>{{ row.route["instructionPurpose"] || "—" }}</small>
+                  </td>
+                  <td>
+                    <code>{{ row.route["accountWithBic"] || "—" }}</code
+                    ><small>{{
+                      row.route["sourceType"] || "SSI MASTER"
+                    }}</small>
+                  </td>
+                }
+                @if (index.ownershipTab() === "OWN") {
+                  <td>{{ row.route["currency"] }}</td>
+                }
+                <td>{{ row.route["validTo"] || "—" }}</td>
+                <td>
+                  <span
+                    class="status"
+                    [class.active-status]="row.status === 'ACTIVE'"
+                    >{{ row.status }}</span
+                  >
+                </td>
+                <td>v{{ row.version }}</td>
+                <td class="request-type-cell">
+                  <span class="revision-state">{{
+                    index.requestTypeLabel(row)
+                  }}</span>
+                </td>
+                <td class="revision-status-cell">
+                  @if (index.ownershipCurrentStatusLabel(row)) {
+                    <span class="revision-state">
+                      {{ index.ownershipCurrentStatusLabel(row) }}
+                    </span>
+                  }
+                </td>
+                @for (
+                  actionColumn of index.ownershipActionColumns();
+                  track actionColumn.id
+                ) {
+                  <td [class]="actionColumn.cellClass">
+                    @if (
+                      index.isOwnershipActionPresented(actionColumn.id, row)
+                    ) {
+                      @switch (actionColumn.id) {
+                        @case ("SUBMIT") {
+                          <button
+                            class="primary"
+                            (click)="
+                              $event.stopPropagation(); host.act(row, 'submit')
+                            "
+                          >
+                            Submit
+                          </button>
+                        }
+                        @case ("EDIT") {
+                          <button
+                            class="ghost"
+                            (click)="$event.stopPropagation(); host.edit(row)"
+                          >
+                            Edit
+                          </button>
+                        }
+                        @case ("REVISE") {
+                          <button
+                            class="ghost"
+                            (click)="$event.stopPropagation(); host.revise(row)"
+                          >
+                            Revise
+                          </button>
+                        }
+                        @case ("SUPPRESS") {
+                          <button
+                            class="danger"
+                            (click)="
+                              $event.stopPropagation(); index.requestDelete(row)
+                            "
+                          >
+                            Suppress
+                          </button>
+                        }
+                        @case ("REVOKE_DRAFT") {
+                          <button
+                            class="danger"
+                            (click)="
+                              $event.stopPropagation();
+                              index.requestDraftRevoke(row)
+                            "
+                          >
+                            Revoke Draft
+                          </button>
+                        }
+                      }
+                    }
+                  </td>
+                }
+              </tr>
+            } @empty {
+              <tr>
+                <td
+                  [attr.colspan]="9 + index.ownershipActionColumns().length"
+                  class="empty"
+                >
+                  尚無目前有效資料。按「＋新增 SSI」建立第一筆。
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <div
+        class="pager"
+        aria-label="SSI Index pagination"
+        [hidden]="index.ssiIndexLoading()"
+      >
+        <span
+          >Page {{ index.indexPage() }} / {{ index.indexTotalPages() }} ·
+          {{ index.ssiIndexTotalItems() }} records</span
+        >
+        <div>
+          <button
+            class="ghost"
+            type="button"
+            [disabled]="index.indexPage() === 1"
+            (click)="host.moveIndexPage(-1)"
+          >
+            Previous
+          </button>
+          <button
+            class="ghost"
+            type="button"
+            [disabled]="index.indexPage() === index.indexTotalPages()"
+            (click)="host.moveIndexPage(1)"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+    }
+  </section>
+}
+@if (index.deleteTarget(); as row) {
+  <div
+    class="modal-backdrop"
+    role="presentation"
+    (click)="index.closeDeleteDialog()"
+    (keydown.escape)="index.closeDeleteDialog()"
+  >
+    <section
+      class="bic-dialog delete-dialog"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="delete-title"
+      (click)="$event.stopPropagation()"
+      (keydown.escape)="index.closeDeleteDialog()"
+    >
+      <div class="dialog-header">
+        <div>
+          <p class="kicker danger-text">
+            {{
+              row.status === "DRAFT"
+                ? "DRAFT CONTROL"
+                : "FOUR-EYES SSI SUPPRESSION"
+            }}
+          </p>
+          <h2 id="delete-title">
+            {{ row.status === "DRAFT" ? "Revoke Draft SSI" : "Suppress SSI" }}
+          </h2>
+        </div>
+        <button
+          class="ghost"
+          type="button"
+          class="icon-button"
+          aria-label="Cancel"
+          (click)="index.closeDeleteDialog()"
+        >
+          ×
+        </button>
+      </div>
+      <div class="delete-warning">
+        @if (row.status === "DRAFT") {
+          <b>這只會撤銷目前 Draft。</b>
+          <p>原 Active SSI 不變，並恢復 Revise／Suppress 操作。</p>
+        } @else {
+          <b>這不會立即停用 Active SSI。</b>
+          <p>建立 SUPPRESSION DRAFT，Submit 後必須由獨立 Checker 核准。</p>
+        }
+      </div>
+      <dl class="delete-summary">
+        <div>
+          <dt>Counterparty</dt>
+          <dd>{{ row.counterpartyId }}</dd>
+        </div>
+        <div>
+          <dt>Currency</dt>
+          <dd>{{ row.route["currency"] }}</dd>
+        </div>
+        <div>
+          <dt>Account With</dt>
+          <dd>{{ row.route["accountWithBic"] }}</dd>
+        </div>
+        <div>
+          <dt>Status／Version</dt>
+          <dd>{{ row.status }}／v{{ row.version }}</dd>
+        </div>
+      </dl>
+      <label class="delete-reason"
+        ><span
+          >{{ row.status === "DRAFT" ? "Revoke reason" : "Suppression reason" }}
+          <b>*</b></span
+        ><textarea
+          #reasonInput
+          rows="3"
+          placeholder="至少輸入 5 個字元，原因將寫入稽核紀錄"
+          [value]="index.deleteReason()"
+          (input)="index.deleteReason.set(reasonInput.value)"
+        ></textarea
+        ><small
+          >目前 {{ index.deleteReason().trim().length }} 個字元；最低 5
+          個。</small
+        ></label
+      >
+      <div class="actions">
+        <button
+          type="button"
+          class="danger-action"
+          [disabled]="!index.canConfirmDelete()"
+          (click)="host.confirmDelete()"
+        >
+          {{
+            row.status === "DRAFT" ? "Revoke Draft" : "Create Suppression Draft"
+          }}
+        </button>
+      </div>
+    </section>
+  </div>
+}

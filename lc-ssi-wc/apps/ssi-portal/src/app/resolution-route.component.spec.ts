@@ -1,7 +1,10 @@
+const loadIndex = jest.fn().mockResolvedValue(undefined);
+
 jest.mock("@angular/core", () => ({
   Component: () => (target: unknown) => target,
   ChangeDetectionStrategy: { OnPush: "OnPush" },
   inject: () => ({ snapshot: { data: { businessDomain: "TREASURY" } } }),
+  viewChild: () => () => ({ load: loadIndex }),
 }));
 jest.mock("@angular/router", () => ({ ActivatedRoute: class {} }));
 jest.mock(
@@ -19,5 +22,11 @@ describe("ResolutionRouteComponent", () => {
     expect(route.businessDomain).toBe("TREASURY");
     expect("http" in route).toBe(false);
     expect("client" in route).toBe(false);
+  });
+
+  it("refreshes only the active ResolutionPageDefinition workspace", async () => {
+    const route = new ResolutionRouteComponent();
+    await route.refresh();
+    expect(loadIndex).toHaveBeenCalledTimes(1);
   });
 });

@@ -9,11 +9,10 @@ import {
   signal,
   viewChild,
 } from "@angular/core";
-import { HttpClient } from "@angular/common/http";
 import { scalarText } from "./scalar-text";
 import { DOCUMENT } from "@angular/common";
 import { ReactiveFormsModule, FormGroup } from "@angular/forms";
-import { FormlyForm, type FormlyFieldConfig } from "@ngx-formly/core";
+import { FormlyForm } from "@ngx-formly/core";
 import { readonlyFormFields, ssiFormModel } from "./ssi-form-presentation";
 import { firstValueFrom, type Subscription } from "rxjs";
 import {
@@ -26,19 +25,16 @@ import {
   RouterOutlet,
 } from "@angular/router";
 import { SwiftDataCrudComponent } from "./swift-data-crud.component";
+import type { SsiApplicability, SsiRow } from "./ssi-maintenance.types";
+import { PaymentSettlementApiService } from "./payment-settlement-api.service";
+import { FinResolutionApiService } from "./fin-resolution-api.service";
+import { ReferenceLookupApiService } from "./reference-lookup-api.service";
+import { buildSsiMakerFields } from "./ssi-maintenance-feature/ssi-maker-fields";
+import { SSI_RESOLUTION_READ_PORT } from "./ssi-resolution-read-port";
 import {
-  createMaintenanceIndexActionAdapter,
-  type MaintenanceIndexActionId,
-} from "./maintenance-index-action-policy";
-import { assertMaintenanceServerPage } from "./maintenance-index-server-page";
-import { currentStatusLabel } from "./current-status-contract";
-import type {
-  SsiApplicability,
-  SsiIndexSummary,
-  SsiPage,
-  SsiRow,
-} from "./ssi-maintenance.types";
-import { SsiMaintenanceApiService } from "./ssi-maintenance-api.service";
+  SsiMaintenanceShellBridge,
+  type SsiMaintenanceShellPort,
+} from "./ssi-maintenance-shell-port";
 import { presentOfficialFieldName } from "./official-field-name";
 import { hasManualRouteOverride } from "./resolution-route-selection";
 import {
@@ -51,16 +47,6 @@ import {
   isVisibleSsiResolutionRow,
 } from "./fin-5x-route-analysis";
 import {
-  buildCounterpartyInbox,
-  pageItems,
-  queryCounterpartyInbox,
-  sortSsiOwnershipRows,
-  type CounterpartyInboxSort,
-  type CounterpartySsiSummarySource,
-  type SortDirection,
-  type SsiOwnershipSort,
-} from "./ssi-maintenance-index";
-import {
   paymentSettlementProfile,
   renderPaymentSettlement,
   type CanonicalPaymentSettlement,
@@ -71,7 +57,6 @@ import {
   paymentMessageStatusLabel,
   sortPaymentMessageIndex,
   type PaymentMessageIndexItem,
-  type PaymentMessageIndexResponse,
   type PaymentMessageIndexSortKey,
 } from "./payment-message-index";
 import {
@@ -82,7 +67,6 @@ import {
   sortPaymentMessageScenarios,
   type PaymentMessageScenario,
 } from "./payment-message-scenarios";
-import { ssiAccountReferenceCopy } from "./ssi-account-reference-copy";
 import {
   contractAlternatives,
   contractCandidates,
@@ -101,24 +85,12 @@ import {
 } from "./operational-issue";
 import { APP_ROUTE_GUARD_BRIDGE } from "./app-route-guard";
 import { AlertComponent } from "./alert.component";
-import {
-  BankServicePickerDialogComponent,
-  type BankServicePickerItem,
-} from "./bank-service-picker-dialog.component";
 import { requestTypeLabel as presentRequestTypeLabel } from "./governance-record-value";
 import { LoadingStateComponent } from "./loading-state.component";
-import { DeferredFeatureShellComponent } from "./deferred-feature-shell.component";
+import { localCalendarDate, paymentSourceLabel } from "./app-presentation";
+import type { AppView as View, ThemeMode } from "./app-view.models";
 import {
-  ariaSortDirection,
-  localCalendarDate,
-  paymentSourceLabel,
-  sortDirectionIndicator,
-} from "./app-presentation";
-import type { AppView as View, BicTarget, ThemeMode } from "./app-view.models";
-import {
-  BIC_PATTERN,
   BUSINESS_FUNCTION_DEFINITIONS,
-  COUNTERPARTY_ID_PATTERN,
   FULL_TAG_SCENARIOS,
   MT_MESSAGE_NAMES,
   TAG_CATALOG_COLUMNS,
@@ -132,11 +104,23 @@ import { ThemeService } from "./theme.service";
 import { AppShellComponent } from "./app-shell.component";
 
 type RoutedView =
-  "settings" | "resolver" | "treasury" | "tradefinance" | "audit" | "checker";
+  | "settings"
+  | "resolver"
+  | "treasury"
+  | "tradefinance"
+  | "audit"
+  | "checker"
+  | "dashboard"
+  | "maker";
 type LegacyView = Exclude<View, RoutedView>;
+type WorkbenchView = "swiftdata" | "dashboard" | "maker";
 
 const routePathForView = (view: View): string | null => {
   switch (view) {
+    case "dashboard":
+      return "/dashboard";
+    case "maker":
+      return "/maker";
     case "settings":
       return "/settings";
     case "audit":
@@ -156,6 +140,8 @@ const routePathForView = (view: View): string | null => {
 
 const isLegacyView = (view: View): view is LegacyView =>
   routePathForView(view) === null;
+const isWorkbenchView = (view: View): view is WorkbenchView =>
+  view === "swiftdata" || view === "dashboard" || view === "maker";
 
 const routeViewFromUrl = (url: string): View | null => {
   const path = url.split(/[?#]/, 1)[0];
@@ -168,6 +154,8 @@ const routeViewFromUrl = (url: string): View | null => {
         "tradefinance",
         "audit",
         "checker",
+        "dashboard",
+        "maker",
       ] as const
     ).find((view) => routePathForView(view) === path) ?? null
   );
@@ -177,22 +165,6 @@ interface CurrencyReference {
   code: string;
   decimals: number;
   standard: string;
-}
-interface CountryReference {
-  code: string;
-  name: string;
-  standard: string;
-  status: string;
-}
-interface BookingBranchReference {
-  branchCode: string;
-  branchName: string;
-  legalEntityCode: string;
-  legalEntityName: string;
-  countryCode: string;
-  status: string;
-  validFrom: string;
-  validTo: string;
 }
 interface ClearingSystemReference {
   code: string;
@@ -241,29 +213,6 @@ interface BankPage {
   total: number;
   totalPages: number;
   disclaimer?: string;
-}
-interface CustomerReference {
-  customerId: string;
-  name: string;
-  country: string;
-  swiftBic?: string;
-}
-interface CustomerPage {
-  items: readonly CustomerReference[];
-  page: number;
-  pageSize: number;
-  total: number;
-  totalPages: number;
-  disclaimer?: string;
-}
-interface CounterpartyReference {
-  counterpartyId: string;
-  bic?: string;
-  name: string;
-  country: string;
-  partyType: "BANK" | "CUSTOMER";
-  beneficiaryAccountReference?: string;
-  address?: string;
 }
 interface ResolutionEvidence {
   criterion: string;
@@ -439,9 +388,7 @@ interface ControlledFixtureResponse {
     SwiftDataCrudComponent,
     RouterOutlet,
     AlertComponent,
-    BankServicePickerDialogComponent,
     LoadingStateComponent,
-    DeferredFeatureShellComponent,
     AppShellComponent,
   ],
   templateUrl: "./app.component.html",
@@ -452,8 +399,12 @@ interface ControlledFixtureResponse {
 })
 export class AppComponent implements OnInit, OnDestroy {
   readonly presentOfficialFieldName = presentOfficialFieldName;
-  private readonly http = inject(HttpClient);
-  private readonly ssiMaintenanceApi = inject(SsiMaintenanceApiService);
+  private readonly paymentApi = inject(PaymentSettlementApiService);
+  private readonly finApi = inject(FinResolutionApiService);
+  private readonly referenceApi = inject(ReferenceLookupApiService);
+  private readonly ssiResolutionRead = inject(SSI_RESOLUTION_READ_PORT);
+  private readonly ssiShellBridge = inject(SsiMaintenanceShellBridge);
+  private readonly shellPort = this.maintenanceShellPort();
   private readonly document = inject(DOCUMENT);
   private readonly changeDetector = inject(ChangeDetectorRef);
   private readonly themeService = inject(ThemeService);
@@ -474,7 +425,14 @@ export class AppComponent implements OnInit, OnDestroy {
       reason: string,
     ): Promise<boolean>;
   } | null = null;
-  private readonly api = "http://localhost:3100/api";
+  private activeRoutedRefresh: (() => Promise<void>) | null = null;
+  private activeMaintenanceWipPort: {
+    canDeactivate(targetUrl?: string): Promise<boolean>;
+    hasActiveMakerRevision(): boolean;
+    onLateMakerWipRelease(): void;
+    clearReleasedMakerForm(): void;
+    closeOverlayOnEscape(): Promise<boolean>;
+  } | null = null;
   readonly finResolutionCatalogue = signal<
     readonly FinResolutionCatalogueItem[]
   >([]);
@@ -484,117 +442,15 @@ export class AppComponent implements OnInit, OnDestroy {
   private resolutionRequestSequence = 0;
   private resolutionConfirmationRequestSequence = 0;
   private tagGenerationRequestSequence = 0;
-  private refreshRequestSequence = 0;
-  readonly ssiIndexLoading = signal(false);
   readonly view = signal<View>(this.savedView());
   readonly routeLoading = signal(false);
-  private lastWorkbenchView: LegacyView = this.savedWorkbenchView();
+  private lastWorkbenchView: WorkbenchView = this.savedWorkbenchView();
   private pendingRouteTarget: View | null = null;
   private latestNavigationId = 0;
   private releasedMakerWipDuringNavigation = false;
   private readonly routerEventsSubscription: Subscription;
   private settingsReloadSubscription: { unsubscribe(): void } | null = null;
   readonly theme = this.themeService.theme;
-  readonly rows = signal<readonly SsiRow[]>([]);
-  readonly ssiIndexTotalItems = signal(0);
-  readonly ssiIndexTotalPages = signal(1);
-  readonly ssiIndexDistinctCurrencyCount = signal(0);
-  readonly ssiSummary = signal<SsiIndexSummary>({
-    currentOwn: 0,
-    pendingApproval: 0,
-    active: 0,
-    archived: 0,
-  });
-  readonly ownershipTab = signal<"OWN" | "COUNTERPARTY">("OWN");
-  readonly ownershipSearch = signal("");
-  readonly ownershipStatus = signal<"ACTIVE" | "DRAFT" | "SUPPRESSED" | "ALL">(
-    "ACTIVE",
-  );
-  readonly ownershipActionAdapter = createMaintenanceIndexActionAdapter("ssi");
-  readonly ownershipActionColumns = computed(() =>
-    this.ownershipActionAdapter.columnsFor(this.ownershipStatus()),
-  );
-  readonly ownershipSort = signal<SsiOwnershipSort>("BOOKING_ENTITY");
-  readonly ownershipSortDirection = signal<SortDirection>("ASC");
-  readonly counterpartyDirectoryLoading = signal(false);
-  readonly counterpartyDirectory = signal<readonly CounterpartyReference[]>([]);
-  readonly counterpartyCoverage = signal<
-    readonly CounterpartySsiSummarySource[]
-  >([]);
-  readonly selectedCounterpartyId = signal("");
-  readonly counterpartyInboxSearch = signal("");
-  readonly counterpartyPartyType = signal<
-    "BANK_SSI" | "BANK_NO_SSI" | "CUSTOMER"
-  >("BANK_SSI");
-  readonly counterpartyInboxSort = signal<CounterpartyInboxSort>("BIC_NAME");
-  readonly counterpartyInboxSortDirection = signal<SortDirection>("ASC");
-  readonly counterpartyInboxPage = signal(1);
-  readonly counterpartyInboxPageSize = 10;
-  readonly ownershipOf = (row: SsiRow): "OWN" | "COUNTERPARTY" =>
-    row.ownershipType ??
-    (row.route["counterpartyBic"] === "ANY" ? "OWN" : "COUNTERPARTY");
-  readonly visibleRows = computed(() =>
-    sortSsiOwnershipRows(
-      this.rows(),
-      this.ownershipSort(),
-      this.ownershipSortDirection(),
-    ),
-  );
-  readonly counterpartyInbox = computed(() => {
-    const selectedType = this.counterpartyPartyType();
-    const partyType = selectedType === "CUSTOMER" ? "CUSTOMER" : "BANK";
-    const inbox = buildCounterpartyInbox(
-      this.counterpartyDirectory().filter(
-        (party) => (party.partyType ?? "BANK") === partyType,
-      ),
-      this.counterpartyCoverage(),
-    );
-    if (selectedType === "BANK_SSI") {
-      return inbox.filter((party) => party.ssiCount > 0);
-    }
-    if (selectedType === "BANK_NO_SSI") {
-      return inbox.filter((party) => party.ssiCount === 0);
-    }
-    return inbox;
-  });
-  readonly filteredCounterpartyInbox = computed(() =>
-    queryCounterpartyInbox(
-      this.counterpartyInbox(),
-      this.counterpartyInboxSearch(),
-      this.counterpartyInboxSort(),
-      this.counterpartyInboxSortDirection(),
-    ),
-  );
-  readonly counterpartyInboxTotalPages = computed(() =>
-    Math.max(
-      1,
-      Math.ceil(
-        this.filteredCounterpartyInbox().length /
-          this.counterpartyInboxPageSize,
-      ),
-    ),
-  );
-  readonly pagedCounterpartyInbox = computed(() =>
-    pageItems(
-      this.filteredCounterpartyInbox(),
-      this.counterpartyInboxPage(),
-      this.counterpartyInboxPageSize,
-    ),
-  );
-  readonly selectedCounterparty = computed(
-    () =>
-      this.counterpartyInbox().find(
-        (party) => party.counterpartyId === this.selectedCounterpartyId(),
-      ) ?? null,
-  );
-  readonly indexPage = signal(1);
-  readonly indexPageSize = 10;
-  readonly indexTotalPages = computed(() => this.ssiIndexTotalPages());
-  readonly pagedVisibleRows = computed(() => this.visibleRows());
-  readonly activeRows = computed(() =>
-    this.rows().filter((row) => row.status === "ACTIVE"),
-  );
-  readonly archivedCount = computed(() => this.ssiSummary().archived);
   readonly notice = signal<{
     kind: "info" | "warning" | "error";
     text: string;
@@ -615,38 +471,38 @@ export class AppComponent implements OnInit, OnDestroy {
     if (kind === "warning") return "請注意";
     return "操作完成";
   }
+  maintenanceShellPort(): SsiMaintenanceShellPort {
+    return {
+      checkerCount: () => this.checkerCount(),
+      navigate: (view) => this.navigate(view),
+      notify: (notice) => this.notice.set(notice),
+      openDetail: (row) => this.reviewForChecker(row),
+      closeDetail: () => this.detailTarget.set(null),
+      acceptCurrencies: (items) => {
+        this.currencies.set(items);
+        this.activeAuditCurrencyOptionsConsumer?.(items);
+      },
+      onIndexRefreshed: () => this.ensureTagSsiSelection(),
+      acceptPendingApprovalCount: () => undefined,
+      restoreDashboardAfterReleasedWip: (notice) => {
+        this.lastWorkbenchView = "dashboard";
+        this.document.defaultView?.localStorage.setItem(
+          "ssi-last-workbench-view",
+          "dashboard",
+        );
+        if (this.view() === "maker") this.commitRouteView("dashboard");
+        this.restoreDashboardRouteAfterReleasedWip(notice);
+      },
+    };
+  }
   private readonly routedCheckerCount = signal<number | null>(null);
   readonly checkerCount = computed(
-    () => this.routedCheckerCount() ?? this.ssiSummary().pendingApproval,
+    () => this.routedCheckerCount() ?? this.ssiShellBridge.pendingApprovalCount(),
   );
-  readonly activeCount = computed(() => this.ssiSummary().active);
-  readonly form: FormGroup = new FormGroup({});
-  model: Record<string, unknown> = {
-    maker: "maker.demo",
-    scope: "STANDING",
-    ownershipType: "OWN",
-    ownerParty: "HK01",
-    publisherParty: "HK01",
-    counterpartyId: "ANY",
-    route: {
-      currency: "USD",
-      counterpartyType: "ANY_BANK",
-      counterpartyBic: "ANY",
-    },
-  };
   readonly currenciesLoading = signal(false);
   readonly currencies = signal<readonly CurrencyReference[]>([]);
-  readonly countries = signal<readonly CountryReference[]>([]);
-  readonly fields = signal<FormlyFieldConfig[]>(this.buildFields([]));
-  readonly readonlyFields = computed(() => readonlyFormFields(this.fields()));
-  readonly editingId = signal<string | null>(null);
-  readonly revisionSource = signal<SsiRow | null>(null);
-  readonly revisionSourceIdentity = computed(() => {
-    const source = this.revisionSource();
-    return source ? `${source.counterpartyId} · v${source.version}` : null;
-  });
-  readonly makerEditing = computed(
-    () => this.editingId() !== null || this.revisionSource() !== null,
+  readonly readonlyFields = computed(() =>
+    readonlyFormFields(buildSsiMakerFields(this.currencies(), () => undefined)),
   );
   readonly detailTarget = signal<SsiRow | null>(null);
   readonly detailForm = new FormGroup({});
@@ -657,52 +513,6 @@ export class AppComponent implements OnInit, OnDestroy {
   readonly checkerRejectReason = signal("");
   readonly governedReviewResourceId = signal<string | null>(null);
   readonly governedReviewRecordId = signal<string | null>(null);
-  readonly deleteTarget = signal<SsiRow | null>(null);
-  readonly deleteReason = signal("");
-  readonly canConfirmDelete = computed(
-    () => this.deleteReason().trim().length >= 5,
-  );
-  readonly bicPickerTarget = signal<BicTarget | null>(null);
-  readonly bicPickerTitle = signal("");
-  readonly bankPage = signal<BankPage>({
-    items: [],
-    page: 1,
-    pageSize: this.indexPageSize,
-    total: 0,
-    totalPages: 0,
-  });
-  readonly banksLoading = signal(false);
-  readonly bankPickerError = signal<string | null>(null);
-  readonly bankQuery = signal("");
-  readonly hasPreviousBankPage = computed(() => this.bankPage().page > 1);
-  readonly hasNextBankPage = computed(
-    () => this.bankPage().page < this.bankPage().totalPages,
-  );
-  readonly bankPickerItems = computed<readonly BankServicePickerItem[]>(() =>
-    this.bankPage().items.map((bank) => ({
-      bankServiceId: bank.bankServiceId,
-      bic: bank.bic,
-      displayValue: bank.name,
-      location: [bank.city, bank.country].filter(Boolean).join(" · "),
-      standard: bank.standard,
-    })),
-  );
-  readonly identityPickerSource = signal<"BANK" | "CUSTOMER">("BANK");
-  readonly customerPage = signal<CustomerPage>({
-    items: [],
-    page: 1,
-    pageSize: 5,
-    total: 0,
-    totalPages: 0,
-  });
-  readonly customersLoading = signal(false);
-  readonly customerQuery = signal("");
-  readonly hasPreviousCustomerPage = computed(
-    () => this.customerPage().page > 1,
-  );
-  readonly hasNextCustomerPage = computed(
-    () => this.customerPage().page < this.customerPage().totalPages,
-  );
   readonly resolutionConsumer = signal("TRADE_FINANCE");
   readonly paymentMessageStatusLabel = paymentMessageStatusLabel;
   readonly paymentMessageIndex = signal<readonly PaymentMessageIndexItem[]>([]);
@@ -771,8 +581,10 @@ export class AppComponent implements OnInit, OnDestroy {
     ),
   );
   readonly resolutionCustomerId = signal("CUST-00001");
+  private readonly resolutionCounterpartyRead = this.ssiResolutionRead.counterparties;
+  private readonly settlementSsiRead = this.ssiResolutionRead.settlementSsis;
   readonly resolutionCustomers = computed(() =>
-    this.counterpartyDirectory().filter(
+    this.resolutionCounterpartyRead().filter(
       (party) => party.partyType === "CUSTOMER",
     ),
   );
@@ -796,19 +608,19 @@ export class AppComponent implements OnInit, OnDestroy {
   readonly resolutionCoveredCurrencies = computed(
     () =>
       new Set(
-        this.rows()
+        this.settlementSsiRead()
           .filter(
             (row) =>
               row.status === "ACTIVE" &&
-              (row.route["counterpartyBic"] || row.counterpartyId) ===
+              (row.counterpartyBic || row.counterpartyId) ===
                 this.resolutionCounterpartyId() &&
-              (row.route["counterpartyType"] ?? "BANK") ===
+              row.counterpartyType ===
                 this.resolutionCounterpartyType() &&
-              scalarText(row.route["messageTypes"])
+              scalarText(row.messageTypes)
                 .split(",")
                 .map((value) => value.trim())
                 .includes(this.resolutionMessageType()) &&
-              (row.applicability ?? []).some(
+              row.applicability.some(
                 (applicability) =>
                   applicability.status === "ACTIVE" &&
                   ["ANY", this.resolutionConsumer()].includes(
@@ -828,7 +640,7 @@ export class AppComponent implements OnInit, OnDestroy {
                   ),
               ),
           )
-          .map((row) => row.route["currency"])
+          .map((row) => row.currency)
           .filter(Boolean),
       ),
   );
@@ -863,7 +675,6 @@ export class AppComponent implements OnInit, OnDestroy {
   );
   readonly resolutionDirection = signal("OUTBOUND");
   readonly resolutionBookingEntity = signal("HK01");
-  readonly bookingBranches = signal<readonly BookingBranchReference[]>([]);
   readonly resolutionValueDate = signal(localCalendarDate());
   readonly resolutionAmount = signal("1000000");
   readonly resolutionMessageType = signal("pacs.009.001.08");
@@ -1197,133 +1008,88 @@ export class AppComponent implements OnInit, OnDestroy {
   pseudoContent = FULL_TAG_SCENARIOS[0]!.content;
   private readonly loadedFeatureData = new Set<string>();
   private readonly featureDataLoads = new Map<string, Promise<void>>();
-  private pendingDeactivation: Promise<boolean> | null = null;
+  private featureDataGeneration = 0;
+  private readonly routeGuardHost = {
+    canDeactivate: (targetUrl?: string) => this.canDeactivate(targetUrl),
+    hasActiveMakerRevision: () =>
+      this.activeMaintenanceWipPort?.hasActiveMakerRevision() ?? false,
+    onLateMakerWipRelease: (navigationId: number) => {
+      this.routeGuardBridge.consumeReleasedMakerWip(navigationId);
+      this.activeMaintenanceWipPort?.onLateMakerWipRelease();
+    },
+  };
 
   constructor() {
-    this.routeGuardBridge.register(this);
+    this.ssiShellBridge.attach(this.shellPort);
+    this.routeGuardBridge.register(this.routeGuardHost);
     this.routerEventsSubscription = this.router.events.subscribe((event) =>
       this.onRouterEvent(event),
     );
   }
 
   ngOnDestroy(): void {
+    this.ssiShellBridge.detach(this.shellPort);
     this.settingsReloadSubscription?.unsubscribe();
     this.routerEventsSubscription.unsubscribe();
-    this.routeGuardBridge.unregister(this);
+    this.routeGuardBridge.unregister(this.routeGuardHost);
   }
 
   ngOnInit(): void {
-    // SWIFT Data owns its own resource loading. A persisted SSI view loads only
-    // SSI data, so browser refresh does not create or query the RMA component.
-    if (isLegacyView(this.view()) && this.view() !== "swiftdata")
-      void this.ensureFeatureData(this.view());
-  }
-
-  private async loadWorkspaceData(): Promise<void> {
-    await Promise.all([
-      this.refresh(),
-      this.loadCurrencies(),
-      this.loadCountries(),
-      this.loadResolutionBanks(),
-      this.loadOwnNostroAccounts(),
-      this.loadCounterpartyDirectory(),
-      this.loadBookingBranches(),
-      this.loadClearingSystems(),
-      this.loadFinResolutionCatalogue(),
-      this.loadPaymentMessageIndex(),
-    ]);
-    await this.loadControlledTagCandidates();
+    // Canonicalize a persisted Maintenance view; routed features own loading.
+    const savedRoute = routePathForView(this.view());
+    if (
+      (this.view() === "dashboard" || this.view() === "maker") &&
+      this.document.defaultView?.location?.pathname === "/" &&
+      savedRoute
+    ) {
+      this.pendingRouteTarget = this.view();
+      void this.router.navigateByUrl(savedRoute).catch(() => undefined);
+      return;
+    }
   }
 
   async refreshAfterDevelopmentReload(): Promise<void> {
-    await this.loadWorkspaceData();
+    this.featureDataGeneration += 1;
+    this.loadedFeatureData.clear();
+    this.featureDataLoads.clear();
+    if (this.view() !== "settings") await this.ensureFeatureData(this.view());
     this.notice.set({
       kind: "info",
       text: "Development Test Data 已重新載入；所有工作區資料已更新。",
     });
   }
 
-  refresh(): Promise<void> {
-    if (this.view() === "checker")
-      return this.activeCheckerRoute?.refresh() ?? Promise.resolve();
-    return this.performRefresh(++this.refreshRequestSequence);
+  async refresh(): Promise<void> {
+    if (this.view() === "checker") {
+      await this.activeCheckerRoute?.refresh();
+      return;
+    }
+    if (
+      this.view() === "resolver" ||
+      this.view() === "treasury" ||
+      this.view() === "tradefinance" ||
+      this.view() === "settings" ||
+      this.view() === "audit"
+    ) {
+      await this.activeRoutedRefresh?.();
+      return;
+    }
+    await this.activeRoutedRefresh?.();
   }
 
-  private async performRefresh(requestSequence: number): Promise<void> {
-    this.ssiIndexLoading.set(true);
-    if (this.selectedCounterpartyId()) {
-      this.rows.set([]);
-      this.ssiIndexTotalItems.set(0);
-      this.ssiIndexTotalPages.set(1);
-      this.ssiIndexDistinctCurrencyCount.set(0);
-    }
-    try {
-      const query = new URLSearchParams({
-        status: this.ownershipStatus(),
-        page: String(this.indexPage()),
-        pageSize: String(this.indexPageSize),
-        sortBy: this.ownershipSort(),
-        sortDirection: this.ownershipSortDirection(),
-      });
-      query.set("ownershipType", this.ownershipTab());
-      const search = this.ownershipSearch().trim();
-      if (search) query.set("search", search);
-      if (this.selectedCounterpartyId())
-        query.set("counterpartyId", this.selectedCounterpartyId());
-      const [response, summary] = await Promise.all([
-        firstValueFrom(this.ssiMaintenanceApi.list(query)),
-        firstValueFrom(this.ssiMaintenanceApi.summary()),
-      ]);
-      const page: SsiPage = Array.isArray(response)
-        ? {
-            items: response,
-            page: 1,
-            pageSize: response.length || this.indexPageSize,
-            totalItems: response.length,
-            totalPages: 1,
-            hasPrevious: false,
-            hasNext: false,
-            distinctCurrencyCount: new Set(
-              response.map((row) => row.route["currency"]).filter(Boolean),
-            ).size,
-          }
-        : response;
-      assertMaintenanceServerPage(page.items, this.ownershipStatus());
-      if (requestSequence !== this.refreshRequestSequence) return;
-      this.rows.set(page.items);
-      this.ssiIndexTotalItems.set(page.totalItems);
-      this.ssiIndexTotalPages.set(Math.max(1, page.totalPages));
-      this.ssiIndexDistinctCurrencyCount.set(page.distinctCurrencyCount);
-      this.ssiSummary.set(summary);
-      this.indexPage.set(
-        Math.min(this.indexPage(), Math.max(1, page.totalPages)),
-      );
-      this.ensureTagSsiSelection();
-    } catch {
-      this.notice.set({
-        kind: "warning",
-        text: "BFF 尚未啟動；啟動後重新整理即可。",
-      });
-    } finally {
-      if (requestSequence === this.refreshRequestSequence)
-        this.ssiIndexLoading.set(false);
-    }
-  }
-
-  navigate(view: View): void {
-    if (this.pendingRouteTarget !== null) return;
+  navigate(view: View): Promise<boolean> {
+    if (this.pendingRouteTarget !== null) return Promise.resolve(false);
     const targetPath = routePathForView(view);
     if (targetPath || routePathForView(this.view())) {
       if (view === this.view()) {
         if (view === "treasury" || view === "tradefinance")
           this.enterFinResolution(view);
-        return;
+        return Promise.resolve(true);
       }
       this.pendingRouteTarget = view;
-      void this.router.navigateByUrl(targetPath ?? "/").catch(() => undefined);
-      return;
+      return this.router.navigateByUrl(targetPath ?? "/").catch(() => false);
     }
-    if (!isLegacyView(view)) return;
+    if (!isLegacyView(view)) return Promise.resolve(false);
     this.notice.set(null);
     this.view.set(view);
     this.document.defaultView?.localStorage.setItem("ssi-active-view", view);
@@ -1333,6 +1099,7 @@ export class AppComponent implements OnInit, OnDestroy {
       view,
     );
     void this.ensureFeatureData(view);
+    return Promise.resolve(true);
   }
 
   private savedView(): View {
@@ -1343,37 +1110,29 @@ export class AppComponent implements OnInit, OnDestroy {
     return this.savedWorkbenchView();
   }
 
-  private savedWorkbenchView(): LegacyView {
+  private savedWorkbenchView(): WorkbenchView {
     const saved =
       this.document.defaultView?.localStorage.getItem("ssi-active-view");
     const previous = this.document.defaultView?.localStorage.getItem(
       "ssi-last-workbench-view",
     );
-    const candidate = routePathForView(saved as View) ? previous : saved;
+    const candidate = isWorkbenchView(saved as View) ? saved : previous;
     return ["swiftdata", "dashboard", "maker"].includes(candidate ?? "")
-      ? (candidate as LegacyView)
+      ? (candidate as WorkbenchView)
       : "swiftdata";
   }
 
-  hasActiveMakerRevision(): boolean {
-    return (
-      this.view() === "maker" && !!this.revisionSource() && !!this.editingId()
-    );
-  }
-
-  onLateMakerWipRelease(navigationId: number): void {
-    this.routeGuardBridge.consumeReleasedMakerWip(navigationId);
-    this.form.reset();
-    this.lastWorkbenchView = "dashboard";
-    this.document.defaultView?.localStorage.setItem(
-      "ssi-last-workbench-view",
-      "dashboard",
-    );
-    if (this.view() === "maker") this.commitRouteView("dashboard");
-    this.notice.set({
-      kind: "error",
-      text: "頁面切換已取消，但修訂 WIP 隨後釋放；編輯內容已關閉，請重新進入。",
-    });
+  private restoreDashboardRouteAfterReleasedWip(notice: {
+    kind: "error";
+    text: string;
+  }): void {
+    this.notice.set(notice);
+    // The cancelled route still points at Maker while the editor is closed.
+    // Replace it so the visible Dashboard and Angular outlet agree.
+    void this.router
+      .navigateByUrl("/dashboard", { replaceUrl: true })
+      .then(() => this.notice.set(notice))
+      .catch(() => this.notice.set(notice));
   }
 
   onSettingsActivated(component: unknown): void {
@@ -1402,6 +1161,7 @@ export class AppComponent implements OnInit, OnDestroy {
       };
       canDeactivate?: () => Promise<boolean>;
       refresh?: () => Promise<void>;
+      maintenanceWipPort?: NonNullable<AppComponent["activeMaintenanceWipPort"]>;
       decide?: (
         row: SsiRow,
         decision: "approve" | "reject",
@@ -1429,6 +1189,8 @@ export class AppComponent implements OnInit, OnDestroy {
             decide: route.decide.bind(route),
           }
         : null;
+    this.activeRoutedRefresh = route.refresh?.bind(route) ?? null;
+    this.activeMaintenanceWipPort = route.maintenanceWipPort ?? null;
     if (route.reviewRequested)
       this.auditRouteSubscriptions.push(
         route.reviewRequested.subscribe(
@@ -1472,6 +1234,8 @@ export class AppComponent implements OnInit, OnDestroy {
 
   onSettingsDeactivated(): void {
     this.activeCheckerRoute = null;
+    this.activeRoutedRefresh = null;
+    this.activeMaintenanceWipPort = null;
     this.activeAuditCurrencyOptionsConsumer = null;
     this.settingsReloadSubscription?.unsubscribe();
     this.settingsReloadSubscription = null;
@@ -1494,7 +1258,7 @@ export class AppComponent implements OnInit, OnDestroy {
       this.releasedMakerWipDuringNavigation = false;
       this.routeGuardBridge.consumeDenied(event.id);
       if (released) {
-        this.form.reset();
+        this.activeMaintenanceWipPort?.clearReleasedMakerForm();
         this.lastWorkbenchView = "dashboard";
         this.document.defaultView?.localStorage.setItem(
           "ssi-last-workbench-view",
@@ -1510,7 +1274,7 @@ export class AppComponent implements OnInit, OnDestroy {
             ? this.pendingRouteTarget
             : this.lastWorkbenchView;
       const previousView = this.view();
-      if (routed && isLegacyView(previousView) && !released) {
+      if (routed && isWorkbenchView(previousView) && !released) {
         this.lastWorkbenchView = previousView;
         this.document.defaultView?.localStorage.setItem(
           "ssi-last-workbench-view",
@@ -1520,6 +1284,23 @@ export class AppComponent implements OnInit, OnDestroy {
       this.pendingRouteTarget = null;
       this.commitRouteView(target);
       this.routeLoading.set(false);
+      if (
+        event.urlAfterRedirects === "/" &&
+        (target === "dashboard" || target === "maker")
+      ) {
+        // Legacy history entries have no routed Maintenance UI after the
+        // extraction. Replace that entry with the equivalent lazy route.
+        this.pendingRouteTarget = target;
+        void this.router
+          .navigateByUrl(routePathForView(target)!, { replaceUrl: true })
+          .catch(() => {
+            this.pendingRouteTarget = null;
+            this.notice.set({
+              kind: "error",
+              text: "無法返回 SSI 工作區；請重新選擇工作區。",
+            });
+          });
+      }
       return;
     }
     if (event instanceof NavigationSkipped) {
@@ -1542,9 +1323,9 @@ export class AppComponent implements OnInit, OnDestroy {
       this.routeLoading.set(false);
       if (released || this.releasedMakerWipDuringNavigation) {
         this.releasedMakerWipDuringNavigation = false;
-        this.form.reset();
+        this.activeMaintenanceWipPort?.clearReleasedMakerForm();
         this.commitRouteView("dashboard");
-        this.notice.set({
+        this.restoreDashboardRouteAfterReleasedWip({
           kind: "error",
           text: "頁面切換失敗；修訂 WIP 已釋放，編輯內容已關閉，請重新進入。",
         });
@@ -1561,7 +1342,7 @@ export class AppComponent implements OnInit, OnDestroy {
     this.notice.set(null);
     this.view.set(view);
     this.document.defaultView?.localStorage.setItem("ssi-active-view", view);
-    if (isLegacyView(view)) {
+    if (isWorkbenchView(view)) {
       this.lastWorkbenchView = view;
       this.document.defaultView?.localStorage.setItem(
         "ssi-last-workbench-view",
@@ -1570,22 +1351,28 @@ export class AppComponent implements OnInit, OnDestroy {
     }
     if (view === "treasury" || view === "tradefinance")
       this.enterFinResolution(view);
-    void this.ensureFeatureData(view);
+    if (view !== "dashboard" && view !== "maker")
+      void this.ensureFeatureData(view);
   }
 
   private ensureFeatureData(view: View): Promise<void> {
     const key =
       view === "treasury" || view === "tradefinance" ? "fin-resolution" : view;
-    const cacheAfterLoad = key !== "dashboard";
+    const cacheAfterLoad = true;
     if (cacheAfterLoad && this.loadedFeatureData.has(key))
       return Promise.resolve();
     const existing = this.featureDataLoads.get(key);
     if (existing) return existing;
+    const generation = this.featureDataGeneration;
     const load = this.loadFeatureData(view)
       .then(() => {
-        if (cacheAfterLoad) this.loadedFeatureData.add(key);
+        if (cacheAfterLoad && generation === this.featureDataGeneration)
+          this.loadedFeatureData.add(key);
       })
-      .finally(() => this.featureDataLoads.delete(key));
+      .finally(() => {
+        if (this.featureDataLoads.get(key) === load)
+          this.featureDataLoads.delete(key);
+      });
     this.featureDataLoads.set(key, load);
     return load;
   }
@@ -1593,20 +1380,6 @@ export class AppComponent implements OnInit, OnDestroy {
   private async loadFeatureData(view: View): Promise<void> {
     if (view === "swiftdata" || view === "settings" || view === "checker")
       return;
-    if (view === "dashboard") {
-      await Promise.all([this.refresh(), this.loadCounterpartyDirectory()]);
-      return;
-    }
-    if (view === "maker") {
-      await Promise.all([
-        this.refresh(),
-        this.loadCurrencies(),
-        this.loadCountries(),
-        this.loadCounterpartyDirectory(),
-        this.loadBookingBranches(),
-      ]);
-      return;
-    }
     // The parameter-driven Resolution workspace loads only the selected page
     // definition and its own dependent lookups. The legacy parent workspace
     // must not preload unrelated reference services or emit duplicate alerts.
@@ -1674,11 +1447,7 @@ export class AppComponent implements OnInit, OnDestroy {
     this.paymentMessageIndexLoading.set(true);
     this.paymentMessageIndexError.set("");
     try {
-      const response = await firstValueFrom(
-        this.http.get<PaymentMessageIndexResponse>(
-          `${this.api}/settlements/message-index`,
-        ),
-      );
+      const response = await firstValueFrom(this.paymentApi.messageIndex());
       this.paymentMessageIndex.set(response.items);
     } catch {
       this.paymentMessageIndex.set([]);
@@ -1782,24 +1551,13 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   async closeOverlayOnEscape(): Promise<void> {
-    if (this.bicPickerTarget()) {
-      this.closeBicPicker();
-      return;
-    }
+    if (await this.activeMaintenanceWipPort?.closeOverlayOnEscape()) return;
     if (this.tagTransactionOpen()) {
       this.cancelTagTransaction();
       return;
     }
     if (this.paymentTransactionOpen()) {
       this.closePaymentTransaction();
-      return;
-    }
-    if (this.deleteTarget()) {
-      this.closeDeleteDialog();
-      return;
-    }
-    if (this.view() === "maker") {
-      await this.closeMaker();
       return;
     }
     if (this.detailTarget()) this.detailTarget.set(null);
@@ -1812,181 +1570,11 @@ export class AppComponent implements OnInit, OnDestroy {
     this.clearResolution();
     this.changeDetector.detectChanges();
   }
-  moveIndexPage(delta: number): void {
-    this.indexPage.set(
-      Math.min(this.indexTotalPages(), Math.max(1, this.indexPage() + delta)),
-    );
-    void this.refresh();
-  }
-  selectOwnershipTab(tab: "OWN" | "COUNTERPARTY"): void {
-    this.ownershipTab.set(tab);
-    this.ownershipSort.set(tab === "OWN" ? "BOOKING_ENTITY" : "CURRENCY");
-    this.ownershipSortDirection.set("ASC");
-    this.indexPage.set(1);
-    if (tab === "OWN") this.selectedCounterpartyId.set("");
-    if (tab === "COUNTERPARTY") {
-      void Promise.all([this.refresh(), this.loadCounterpartyDirectory()]);
-      return;
-    }
-    void this.refresh();
-  }
-  searchCounterpartyInbox(query: string): void {
-    this.counterpartyInboxSearch.set(query);
-    this.counterpartyInboxPage.set(1);
-  }
-  selectCounterpartyPartyType(
-    partyType: "BANK_SSI" | "BANK_NO_SSI" | "CUSTOMER",
-  ): void {
-    this.counterpartyPartyType.set(partyType);
-    this.selectedCounterpartyId.set("");
-    this.counterpartyInboxPage.set(1);
-  }
-  sortCounterpartyInbox(sort: CounterpartyInboxSort): void {
-    if (this.counterpartyInboxSort() === sort) {
-      this.counterpartyInboxSortDirection.update((direction) =>
-        direction === "ASC" ? "DESC" : "ASC",
-      );
-    } else {
-      this.counterpartyInboxSort.set(sort);
-      this.counterpartyInboxSortDirection.set("ASC");
-    }
-    this.counterpartyInboxPage.set(1);
-  }
-  sortOwnershipIndex(sort: SsiOwnershipSort): void {
-    if (this.ownershipSort() === sort) {
-      this.ownershipSortDirection.update((direction) =>
-        direction === "ASC" ? "DESC" : "ASC",
-      );
-    } else {
-      this.ownershipSort.set(sort);
-      this.ownershipSortDirection.set("ASC");
-    }
-    this.indexPage.set(1);
-    void this.refresh();
-  }
-  selectOwnershipStatus(
-    status: "ACTIVE" | "DRAFT" | "SUPPRESSED" | "ALL",
-  ): void {
-    if (
-      !this.ownershipActionAdapter.isVisibleSort(status, this.ownershipSort())
-    ) {
-      this.ownershipSort.set(
-        this.ownershipTab() === "OWN" ? "BOOKING_ENTITY" : "CURRENCY",
-      );
-      this.ownershipSortDirection.set("ASC");
-    }
-    this.ownershipStatus.set(status);
-    this.indexPage.set(1);
-    void this.refresh();
-  }
-  searchOwnershipIndex(value: string): void {
-    this.ownershipSearch.set(value);
-    this.indexPage.set(1);
-    void this.refresh();
-  }
-  counterpartyAriaSort(
-    sort: CounterpartyInboxSort,
-  ): "ascending" | "descending" | "none" {
-    return ariaSortDirection(
-      this.counterpartyInboxSort() === sort,
-      this.counterpartyInboxSortDirection(),
-    );
-  }
-  ownershipAriaSort(
-    sort: SsiOwnershipSort,
-  ): "ascending" | "descending" | "none" {
-    return ariaSortDirection(
-      this.ownershipSort() === sort,
-      this.ownershipSortDirection(),
-    );
-  }
-  counterpartySortIndicator(sort: CounterpartyInboxSort): string {
-    return sortDirectionIndicator(
-      this.counterpartyInboxSort() === sort,
-      this.counterpartyInboxSortDirection(),
-    );
-  }
-  ownershipSortIndicator(sort: SsiOwnershipSort): string {
-    return sortDirectionIndicator(
-      this.ownershipSort() === sort,
-      this.ownershipSortDirection(),
-    );
-  }
-  moveCounterpartyInboxPage(delta: number): void {
-    this.counterpartyInboxPage.set(
-      Math.min(
-        this.counterpartyInboxTotalPages(),
-        Math.max(1, this.counterpartyInboxPage() + delta),
-      ),
-    );
-  }
-  openCounterpartySsi(counterpartyId: string): void {
-    const party = this.counterpartyInbox().find(
-      (item) => item.counterpartyId === counterpartyId,
-    );
-    if (party?.ssiCount === 0) return;
-    this.selectedCounterpartyId.set(counterpartyId);
-    this.ownershipSearch.set("");
-    this.ownershipStatus.set("ACTIVE");
-    this.ownershipSort.set("CURRENCY");
-    this.ownershipSortDirection.set("ASC");
-    this.indexPage.set(1);
-    this.detailTarget.set(null);
-    void this.refresh();
-  }
-  closeCounterpartySsi(): void {
-    this.selectedCounterpartyId.set("");
-    this.ownershipSearch.set("");
-    this.indexPage.set(1);
-    this.detailTarget.set(null);
-    void this.refresh();
-  }
   setTheme(mode: ThemeMode): void {
     this.themeService.setTheme(mode);
   }
-  startNew(): void {
-    this.editingId.set(null);
-    this.revisionSource.set(null);
-    this.resetMaker();
-    this.view.set("maker");
-    this.ensureMakerCurrencies();
-  }
 
-  async closeMaker(): Promise<void> {
-    const revisionId = this.revisionSource() ? this.editingId() : null;
-    if (revisionId) {
-      try {
-        await firstValueFrom(
-          this.ssiMaintenanceApi.cancelRevision(
-            revisionId,
-            String(this.model["maker"] ?? "maker.revision"),
-          ),
-        );
-      } catch {
-        this.notice.set({
-          kind: "error",
-          text: "無法取消修訂；In Progress 鎖定仍保留，請重試。",
-        });
-        return;
-      }
-    }
-    this.editingId.set(null);
-    this.revisionSource.set(null);
-    this.form.reset();
-    if (revisionId) await this.refresh();
-    this.view.set("dashboard");
-  }
-
-  async canDeactivate(): Promise<boolean> {
-    if (this.pendingDeactivation) return this.pendingDeactivation;
-    const attempt = this.performCanDeactivate().finally(() => {
-      if (this.pendingDeactivation === attempt) this.pendingDeactivation = null;
-    });
-    this.pendingDeactivation = attempt;
-    return attempt;
-  }
-
-  private async performCanDeactivate(): Promise<boolean> {
+  async canDeactivate(targetUrl?: string): Promise<boolean> {
     if (
       this.activeCheckerRoute &&
       !(await this.activeCheckerRoute.canDeactivate())
@@ -1994,102 +1582,7 @@ export class AppComponent implements OnInit, OnDestroy {
       return false;
     const swiftData = this.swiftDataCrud();
     if (swiftData && !(await swiftData.canDeactivate())) return false;
-    const revisionId =
-      this.view() === "maker" && this.revisionSource()
-        ? this.editingId()
-        : null;
-    if (!revisionId) return true;
-    try {
-      await firstValueFrom(
-        this.ssiMaintenanceApi.cancelRevision(
-          revisionId,
-          String(this.model["maker"] ?? "maker.revision"),
-        ),
-      );
-      this.editingId.set(null);
-      this.revisionSource.set(null);
-      return true;
-    } catch {
-      this.notice.set({
-        kind: "error",
-        text: "無法取消修訂；In Progress 鎖定仍保留，請重試。",
-      });
-      return false;
-    }
-  }
-
-  async create(): Promise<void> {
-    if (this.form.invalid) {
-      this.form.markAllAsTouched();
-      this.notice.set({ kind: "warning", text: "請修正必填欄位及 BIC 格式。" });
-      return;
-    }
-    try {
-      this.applyCounterpartyIdentityPolicy();
-      const id = this.editingId();
-      if (id)
-        await firstValueFrom(
-          this.ssiMaintenanceApi.updateDraft(id, this.model),
-        );
-      else await firstValueFrom(this.ssiMaintenanceApi.createDraft(this.model));
-      this.notice.set({
-        kind: "info",
-        text:
-          id || this.revisionSource()
-            ? "SSI 草稿已更新；請提交審批。"
-            : "SSI 草稿已建立；請提交審批。",
-      });
-      this.editingId.set(null);
-      this.revisionSource.set(null);
-      this.ownershipStatus.set("DRAFT");
-      this.indexPage.set(1);
-      await this.refresh();
-      this.view.set("dashboard");
-    } catch {
-      this.notice.set({
-        kind: "error",
-        text: "儲存失敗；請確認資料格式及 Maker 權限。",
-      });
-    }
-  }
-
-  async act(row: SsiRow, action: "submit" | "approve"): Promise<void> {
-    const actor = action === "submit" ? row.maker : "checker.demo";
-    try {
-      await firstValueFrom(this.ssiMaintenanceApi.act(row.id, action, actor));
-      await this.refresh();
-    } catch {
-      this.notice.set({ kind: "error", text: `動作 ${action} 被拒絕。` });
-    }
-  }
-
-  edit(row: SsiRow): void {
-    if (row.changeType === "SUPPRESSION") return;
-    if (!["DRAFT", "WIP"].includes(row.status)) {
-      void this.revise(row);
-      return;
-    }
-    this.editingId.set(row.id);
-    this.revisionSource.set(null);
-    this.model = this.modelForRow(row);
-    this.view.set("maker");
-    this.ensureMakerCurrencies();
-  }
-
-  isOwnershipActionPresented(
-    action: MaintenanceIndexActionId,
-    row: SsiRow,
-  ): boolean {
-    return this.ownershipActionAdapter.isPresented(action, row);
-  }
-
-  ownershipCurrentStatusLabel(row: SsiRow): string {
-    return currentStatusLabel(row.currentStatus ?? "EMPTY");
-  }
-
-  private ensureMakerCurrencies(): void {
-    if (this.currencies().length === 0 && !this.currenciesLoading())
-      void this.loadCurrencies();
+    return (await this.activeMaintenanceWipPort?.canDeactivate(targetUrl)) ?? true;
   }
 
   requestTypeLabel(row: SsiRow): "ADD" | "EDIT" | "SUPPRESSED" {
@@ -2097,75 +1590,9 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   private modelForRow(row: SsiRow): Record<string, unknown> {
-    return ssiFormModel(row, this.ownershipOf(row));
-  }
-
-  async revise(row: SsiRow): Promise<void> {
-    try {
-      const maker = "maker.revision";
-      const revision = await firstValueFrom(
-        this.ssiMaintenanceApi.reserveRevision(row.id, maker),
-      );
-      this.notice.set(null);
-      this.editingId.set(revision.id);
-      this.revisionSource.set(row);
-      this.model = { ...this.modelForRow(revision), maker };
-      this.view.set("maker");
-      this.ensureMakerCurrencies();
-      await this.refresh();
-    } catch {
-      this.notice.set({
-        kind: "error",
-        text: "無法建立修訂；此 SSI 可能正由其他使用者修改。",
-      });
-    }
-  }
-
-  requestDelete(row: SsiRow): void {
-    this.deleteTarget.set(row);
-    this.deleteReason.set("");
-  }
-  requestDraftRevoke(row: SsiRow): void {
-    if (row.status !== "DRAFT") return;
-    this.deleteTarget.set(row);
-    this.deleteReason.set("");
-  }
-  closeDeleteDialog(): void {
-    this.deleteTarget.set(null);
-    this.deleteReason.set("");
-  }
-  async confirmDelete(): Promise<void> {
-    const row = this.deleteTarget();
-    const reason = this.deleteReason().trim();
-    if (!row || reason.length < 5) return;
-    try {
-      if (row.status === "DRAFT") {
-        await firstValueFrom(
-          this.ssiMaintenanceApi.revokeDraft(row.id, row.maker, reason),
-        );
-      } else {
-        await firstValueFrom(
-          this.ssiMaintenanceApi.suppress(row.id, "maker.suppression", reason),
-        );
-      }
-      this.closeDeleteDialog();
-      this.ownershipStatus.set(row.status === "DRAFT" ? "ACTIVE" : "DRAFT");
-      this.indexPage.set(1);
-      this.notice.set({
-        kind: "info",
-        text:
-          row.status === "DRAFT"
-            ? "Draft 已撤銷；原 Active SSI 已恢復可 Revise／Suppress。"
-            : "SUPPRESSION DRAFT 已建立；原 Active SSI 在 Checker 核准前繼續有效。",
-      });
-      await this.refresh();
-    } catch {
-      await this.refresh();
-      this.notice.set({
-        kind: "error",
-        text: "Suppression 建立失敗；狀態已重新檢查，可能已有進行中的工作。",
-      });
-    }
+    const ownership = row.ownershipType ??
+      (row.route["counterpartyBic"] === "ANY" ? "OWN" : "COUNTERPARTY");
+    return ssiFormModel(row, ownership);
   }
 
   selectResolutionCounterpartyBankService(bankServiceId: string): void {
@@ -2230,31 +1657,27 @@ export class AppComponent implements OnInit, OnDestroy {
     const requestSequence = ++this.clearingOptionsRequestSequence;
     try {
       const response = await firstValueFrom(
-        this.http.post<{ items: ClearingSystemReference[] }>(
-          `${this.api}/settlements/clearing-options`,
-          {
-            consumer: this.resolutionConsumer(),
-            product: this.resolutionProduct(),
-            counterpartyBankServiceId:
-              this.resolutionCounterpartyBankServiceId(),
-            ...(this.resolutionSettlementCountry()
-              ? { settlementCountry: this.resolutionSettlementCountry() }
-              : {}),
-            ...(this.resolutionSettlementMarket()
-              ? { settlementMarket: this.resolutionSettlementMarket() }
-              : {}),
-            currency: this.resolutionCurrency(),
-            businessFunction: this.resolutionFunction(),
-            paymentLeg: this.resolutionPaymentLeg(),
-            direction: this.resolutionDirection(),
-            bookingEntity: this.resolutionBookingEntity(),
-            valueDate: this.resolutionValueDate(),
-            amount: this.resolutionAmount(),
-            messageType: this.resolutionMessageType(),
-            sourceMessageType: this.selectedPaymentMessage()?.messageType,
-            transactionReference: this.resolutionReference(),
-          },
-        ),
+        this.paymentApi.clearingOptions<{ items: ClearingSystemReference[] }>({
+          consumer: this.resolutionConsumer(),
+          product: this.resolutionProduct(),
+          counterpartyBankServiceId: this.resolutionCounterpartyBankServiceId(),
+          ...(this.resolutionSettlementCountry()
+            ? { settlementCountry: this.resolutionSettlementCountry() }
+            : {}),
+          ...(this.resolutionSettlementMarket()
+            ? { settlementMarket: this.resolutionSettlementMarket() }
+            : {}),
+          currency: this.resolutionCurrency(),
+          businessFunction: this.resolutionFunction(),
+          paymentLeg: this.resolutionPaymentLeg(),
+          direction: this.resolutionDirection(),
+          bookingEntity: this.resolutionBookingEntity(),
+          valueDate: this.resolutionValueDate(),
+          amount: this.resolutionAmount(),
+          messageType: this.resolutionMessageType(),
+          sourceMessageType: this.selectedPaymentMessage()?.messageType,
+          transactionReference: this.resolutionReference(),
+        }),
       );
       if (requestSequence !== this.clearingOptionsRequestSequence) return;
       this.eligibleClearingSystemCodes.set(
@@ -2367,10 +1790,7 @@ export class AppComponent implements OnInit, OnDestroy {
     this.resolutionLoading.set(true);
     try {
       const result: unknown = await firstValueFrom(
-        this.http.post<unknown>(
-          `${this.api}/settlements/resolve`,
-          this.resolutionRequestPayload(),
-        ),
+        this.paymentApi.resolve(this.resolutionRequestPayload()),
       );
       await this.acceptResolutionResponse(result, requestSequence);
     } catch (error: unknown) {
@@ -2399,16 +1819,13 @@ export class AppComponent implements OnInit, OnDestroy {
     this.resolutionConfirming.set(true);
     try {
       const confirmation = await firstValueFrom(
-        this.http.post<ResolutionConfirmation>(
-          `${this.api}/settlements/${attemptId}/confirm`,
-          {
-            selectedSsiId,
-            actor: "maker.demo",
-            ...(this.resolutionHasManualRouteOverride()
-              ? { overrideReason: "USER_SELECTED_ALTERNATIVE_ROUTE" }
-              : {}),
-          },
-        ),
+        this.paymentApi.confirm<ResolutionConfirmation>(attemptId, {
+          selectedSsiId,
+          actor: "maker.demo",
+          ...(this.resolutionHasManualRouteOverride()
+            ? { overrideReason: "USER_SELECTED_ALTERNATIVE_ROUTE" }
+            : {}),
+        }),
       );
       if (
         resolutionRequestSequence === this.resolutionRequestSequence &&
@@ -2547,7 +1964,7 @@ export class AppComponent implements OnInit, OnDestroy {
     try {
       this.extractionResult.set(
         await firstValueFrom(
-          this.http.post<ExtractionResponse>(`${this.api}/messages/extract`, {
+          this.finApi.extract<ExtractionResponse>({
             format: this.selectedTagScenario().format,
             content: this.pseudoContent,
           }),
@@ -2574,8 +1991,7 @@ export class AppComponent implements OnInit, OnDestroy {
     this.extractionResult.set(null);
     try {
       const result = await firstValueFrom(
-        this.http.post<GenerationResponse>(
-          `${this.api}/reference/fin-controlled-resolutions`,
+        this.finApi.controlledResolution<GenerationResponse>(
           this.controlledTagResolutionPayload(ssi),
         ),
       );
@@ -2607,9 +2023,7 @@ export class AppComponent implements OnInit, OnDestroy {
     if (descriptor.sequence) parameters.set("sequence", descriptor.sequence);
     try {
       const response = await firstValueFrom(
-        this.http.get<ControlledFixtureResponse>(
-          `${this.api}/reference/fin-controlled-fixtures?${parameters.toString()}`,
-        ),
+        this.finApi.controlledFixtures<ControlledFixtureResponse>(parameters),
       );
       if (requestSequence !== this.controlledTagCandidateRequestSequence)
         return;
@@ -2653,81 +2067,6 @@ export class AppComponent implements OnInit, OnDestroy {
     };
   }
 
-  async openBicPicker(target: BicTarget, title: string): Promise<void> {
-    this.bicPickerTarget.set(target);
-    this.bicPickerTitle.set(title);
-    const source =
-      target === "counterpartyId" &&
-      this.form.get("route.counterpartyType")?.value === "CUSTOMER"
-        ? "CUSTOMER"
-        : "BANK";
-    this.identityPickerSource.set(source);
-    if (source === "CUSTOMER") {
-      this.customerQuery.set("");
-      await this.loadCustomers(1);
-      return;
-    }
-    this.bankQuery.set("");
-    this.bankPickerError.set(null);
-    await this.loadBanks(1);
-  }
-  closeBicPicker(): void {
-    this.bicPickerTarget.set(null);
-  }
-  async searchBanks(query: string): Promise<void> {
-    this.bankQuery.set(query.trim());
-    await this.loadBanks(1);
-  }
-  async moveBankPage(delta: number): Promise<void> {
-    await this.loadBanks(this.bankPage().page + delta);
-  }
-  async moveBankToPage(page: number): Promise<void> {
-    await this.loadBanks(page);
-  }
-  async searchCustomers(query: string): Promise<void> {
-    this.customerQuery.set(query.trim());
-    await this.loadCustomers(1);
-  }
-  async moveCustomerPage(delta: number): Promise<void> {
-    await this.loadCustomers(this.customerPage().page + delta);
-  }
-  selectBank(bank: BankReference): void {
-    const target = this.bicPickerTarget();
-    if (!target) return;
-    if (target === "counterpartyId") {
-      const counterpartyId = `CP-${bank.bic}`;
-      this.form.get("counterpartyId")?.setValue(counterpartyId);
-      this.model = {
-        ...this.model,
-        counterpartyId,
-        route: {
-          ...(this.model["route"] as Record<string, string> | undefined),
-          counterpartyBic: bank.bic,
-        },
-      };
-      this.closeBicPicker();
-      return;
-    }
-    this.form.get(`route.${target}`)?.setValue(bank.bic);
-    this.closeBicPicker();
-  }
-  selectBankPickerItem(item: BankServicePickerItem): void {
-    const bank = this.bankPage().items.find(
-      (candidate) => candidate.bankServiceId === item.bankServiceId,
-    );
-    if (bank) this.selectBank(bank);
-  }
-  selectCustomer(customer: CustomerReference): void {
-    this.form.get("counterpartyId")?.setValue(customer.customerId);
-    this.closeBicPicker();
-  }
-  selectedBic(target: BicTarget): string {
-    return String(
-      this.form.get(target === "counterpartyId" ? target : `route.${target}`)
-        ?.value ?? "尚未選擇",
-    );
-  }
-
   private ensureTagSsiSelection(): void {
     const options = this.relatedTagSsis();
     if (!options.some((row) => row.id === this.tagSsiId()))
@@ -2738,11 +2077,10 @@ export class AppComponent implements OnInit, OnDestroy {
     this.currenciesLoading.set(true);
     try {
       const currencies = await firstValueFrom(
-        this.http.get<CurrencyReference[]>(`${this.api}/reference/currencies`),
+        this.referenceApi.currencies<CurrencyReference[]>(),
       );
       this.currencies.set(currencies);
       this.activeAuditCurrencyOptionsConsumer?.(currencies);
-      this.fields.set(this.buildFields(currencies));
     } catch {
       this.notice.set({
         kind: "warning",
@@ -2757,9 +2095,7 @@ export class AppComponent implements OnInit, OnDestroy {
     this.finResolutionCatalogueError.set("");
     try {
       const response = await firstValueFrom(
-        this.http.get<FinResolutionCatalogueResponse>(
-          `${this.api}/reference/fin-resolution-catalogue?standardsRelease=SR2026`,
-        ),
+        this.finApi.catalogue<FinResolutionCatalogueResponse>("SR2026"),
       );
       this.finResolutionCatalogue.set(response.items);
     } catch {
@@ -2774,46 +2110,12 @@ export class AppComponent implements OnInit, OnDestroy {
       this.finResolutionCatalogueLoading.set(false);
     }
   }
-  private async loadCountries(): Promise<void> {
-    try {
-      const response = await firstValueFrom(
-        this.http.get<{ items: CountryReference[] }>(
-          `${this.api}/reference/countries`,
-        ),
-      );
-      this.countries.set(
-        response.items.filter((item) => item.status === "ACTIVE"),
-      );
-    } catch {
-      this.notice.set({
-        kind: "warning",
-        text: "Country Standing Data 暫時不可用。",
-      });
-    }
-  }
-  private async loadBookingBranches(): Promise<void> {
-    try {
-      const response = await firstValueFrom(
-        this.http.get<{ items: BookingBranchReference[] }>(
-          `${this.api}/reference/booking-branches`,
-        ),
-      );
-      this.bookingBranches.set(
-        response.items.filter((item) => item.status === "ACTIVE"),
-      );
-    } catch {
-      this.notice.set({
-        kind: "warning",
-        text: "Booking Branch/Entity Standing Data 暫時不可用。",
-      });
-    }
-  }
   private async loadClearingSystems(): Promise<void> {
     try {
       const response = await firstValueFrom(
-        this.http.get<{ items: ClearingSystemReference[] }>(
-          `${this.api}/reference/clearing-systems`,
-        ),
+        this.referenceApi.clearingSystems<{
+          items: ClearingSystemReference[];
+        }>(),
       );
       this.clearingSystems.set(
         response.items.filter((item) => item.status === "ACTIVE"),
@@ -2840,18 +2142,14 @@ export class AppComponent implements OnInit, OnDestroy {
     this.resolutionBanksError.set("");
     try {
       const firstPage = await firstValueFrom(
-        this.http.get<BankPage>(
-          `${this.api}/reference/banks?page=1&pageSize=${this.indexPageSize}&query=`,
-        ),
+        this.referenceApi.banks<BankPage>(1, 10),
       );
       const remaining = await Promise.all(
         Array.from(
           { length: Math.max(0, firstPage.totalPages - 1) },
           (_, index) =>
             firstValueFrom(
-              this.http.get<BankPage>(
-                `${this.api}/reference/banks?page=${index + 2}&pageSize=${this.indexPageSize}&query=`,
-              ),
+              this.referenceApi.banks<BankPage>(index + 2, 10),
             ),
         ),
       );
@@ -2878,404 +2176,14 @@ export class AppComponent implements OnInit, OnDestroy {
     try {
       this.ownNostroAccounts.set(
         await firstValueFrom(
-          this.http.get<OwnNostroReference[]>(`${this.api}/nostro-accounts`),
+          this.referenceApi.ownNostroAccounts<OwnNostroReference[]>(),
         ),
       );
     } catch {
       this.ownNostroAccounts.set([]);
     }
   }
-  private async loadCounterpartyDirectory(): Promise<void> {
-    this.counterpartyDirectoryLoading.set(true);
-    try {
-      const [response, coverage] = await Promise.all([
-        firstValueFrom(
-          this.http.get<{ items: readonly CounterpartyReference[] }>(
-            `${this.api}/reference/counterparties`,
-          ),
-        ),
-        firstValueFrom(this.ssiMaintenanceApi.counterpartyCoverage()),
-      ]);
-      this.counterpartyDirectory.set(response.items);
-      this.counterpartyCoverage.set(coverage);
-    } catch {
-      this.counterpartyDirectory.set([]);
-      this.counterpartyCoverage.set([]);
-      this.notice.set({
-        kind: "warning",
-        text: "Counterparty Master 暫時不可用。",
-      });
-    } finally {
-      this.counterpartyDirectoryLoading.set(false);
-    }
-  }
-  private async loadBanks(page: number): Promise<void> {
-    this.banksLoading.set(true);
-    this.bankPickerError.set(null);
-    try {
-      const query = encodeURIComponent(this.bankQuery());
-      this.bankPage.set(
-        await firstValueFrom(
-          this.http.get<BankPage>(
-            `${this.api}/reference/banks?page=${page}&pageSize=${this.indexPageSize}&query=${query}`,
-          ),
-        ),
-      );
-    } catch {
-      this.bankPickerError.set("Bank Service lookup is unavailable.");
-      this.notice.set({ kind: "error", text: "BIC 參考服務暫時不可用。" });
-    } finally {
-      this.banksLoading.set(false);
-    }
-  }
-  private async loadCustomers(page: number): Promise<void> {
-    this.customersLoading.set(true);
-    try {
-      const query = encodeURIComponent(this.customerQuery());
-      this.customerPage.set(
-        await firstValueFrom(
-          this.http.get<CustomerPage>(
-            `${this.api}/reference/customers?page=${page}&pageSize=5&query=${query}`,
-          ),
-        ),
-      );
-    } catch {
-      this.notice.set({
-        kind: "error",
-        text: "Customer 參考服務暫時不可用。",
-      });
-      this.closeBicPicker();
-    } finally {
-      this.customersLoading.set(false);
-    }
-  }
   displayStatus(status: string): string {
     return status === "PENDING_APPROVAL" ? "SUBMITTED" : status;
-  }
-  private resetMaker(): void {
-    this.model = {
-      maker: "maker.demo",
-      scope: "STANDING",
-      ownershipType: this.ownershipTab(),
-      ownerParty: this.ownershipTab() === "OWN" ? "HK01" : "COUNTERPARTY",
-      publisherParty: this.ownershipTab() === "OWN" ? "HK01" : "COUNTERPARTY",
-      counterpartyId: "ANY",
-      route: {
-        currency: "USD",
-        counterpartyType: "ANY_BANK",
-        counterpartyBic: "ANY",
-        beneficiarySource: "SSI",
-      },
-    };
-    this.form.reset(this.model);
-  }
-
-  private applyCounterpartyIdentityPolicy(): void {
-    const route = {
-      ...(this.model["route"] as Record<string, string> | undefined),
-    };
-    const counterpartyId = scalarText(this.model["counterpartyId"]).trim();
-    route["counterpartyType"] = route["counterpartyType"] ?? "BANK";
-    if (route["counterpartyType"] === "BANK") {
-      const currentBic = scalarText(route["counterpartyBic"])
-        .trim()
-        .toUpperCase();
-      const derivedBic = counterpartyId.replace(/^CP-/i, "").toUpperCase();
-      if (new RegExp(BIC_PATTERN).test(currentBic))
-        route["counterpartyBic"] = currentBic;
-      else if (new RegExp(BIC_PATTERN).test(derivedBic))
-        route["counterpartyBic"] = derivedBic;
-      else delete route["counterpartyBic"];
-    } else if (route["counterpartyType"] === "ANY_BANK") {
-      route["counterpartyBic"] = "ANY";
-      this.model = { ...this.model, counterpartyId: "ANY", route };
-      return;
-    } else delete route["counterpartyBic"];
-    this.model = { ...this.model, counterpartyId, route };
-  }
-
-  private buildFields(
-    currencies: readonly CurrencyReference[],
-  ): FormlyFieldConfig[] {
-    const bicValidation = {
-      required: true,
-      pattern: BIC_PATTERN,
-      maxLength: 11,
-      minLength: 8,
-    };
-    return [
-      {
-        key: "maker",
-        type: "input",
-        props: {
-          label: "Maker 使用者",
-          required: true,
-          description: "建立或修改草稿的操作人；Checker 必須為不同使用者。",
-        },
-      },
-      {
-        key: "ownershipType",
-        type: "select",
-        props: {
-          label: "Ownership Type",
-          required: true,
-          options: [
-            { label: "Own SSI／本行 SSI", value: "OWN" },
-            { label: "Counterparty SSI／對手行 SSI", value: "COUNTERPARTY" },
-          ],
-        },
-      },
-      {
-        key: "ownerParty",
-        type: "input",
-        props: { label: "Owner Party", required: true },
-      },
-      {
-        key: "publisherParty",
-        type: "input",
-        props: { label: "Publisher Party", required: true },
-      },
-      {
-        key: "route.counterpartyType",
-        type: "select",
-        props: {
-          label: "Counterparty Type／交易對手類型",
-          required: true,
-          description:
-            "SSI Maintenance 僅管理銀行間 settlement SSI；一般 Bank 使用 SWIFT BIC，通用 fallback 使用 ANY。",
-          options: [
-            { label: "Bank／銀行", value: "BANK" },
-            {
-              label: "Any approved bank／任何已核准銀行",
-              value: "ANY_BANK",
-            },
-          ],
-        },
-      },
-      {
-        key: "counterpartyId",
-        type: "bic-input",
-        props: {
-          label: "Counterparty ID／交易對手識別碼",
-          required: true,
-          placeholder: "Bank: CP-CITIUS33；通用 fallback: ANY",
-          description:
-            "內部穩定識別碼；Bank Service 選擇會同步保存對應的 SWIFT BIC。",
-          pickerAction: () =>
-            void this.openBicPicker("counterpartyId", "選擇交易對手識別碼"),
-        },
-        expressions: {
-          "props.pattern": (field) =>
-            (
-              field.model as {
-                route?: { counterpartyType?: "BANK" | "CUSTOMER" };
-              }
-            )?.route?.counterpartyType === "CUSTOMER"
-              ? /^[A-Z0-9][A-Z0-9._-]{2,34}$/i
-              : (
-                    field.model as {
-                      route?: { counterpartyType?: string };
-                    }
-                  )?.route?.counterpartyType === "ANY_BANK"
-                ? /^ANY$/
-                : COUNTERPARTY_ID_PATTERN,
-          "props.minLength": (field) =>
-            (
-              field.model as {
-                route?: { counterpartyType?: "BANK" | "CUSTOMER" };
-              }
-            )?.route?.counterpartyType === "CUSTOMER"
-              ? 3
-              : (
-                    field.model as {
-                      route?: { counterpartyType?: string };
-                    }
-                  )?.route?.counterpartyType === "ANY_BANK"
-                ? 3
-                : 3,
-          "props.maxLength": (field) =>
-            (
-              field.model as {
-                route?: { counterpartyType?: "BANK" | "CUSTOMER" };
-              }
-            )?.route?.counterpartyType === "CUSTOMER"
-              ? 35
-              : (
-                    field.model as {
-                      route?: { counterpartyType?: string };
-                    }
-                  )?.route?.counterpartyType === "ANY_BANK"
-                ? 3
-                : 35,
-          "props.validationMessage": (field) =>
-            (
-              field.model as {
-                route?: { counterpartyType?: "BANK" | "CUSTOMER" };
-              }
-            )?.route?.counterpartyType === "CUSTOMER"
-              ? "請輸入 3–35 字元的 Customer ID，或從 Customer Service 選擇"
-              : (
-                    field.model as {
-                      route?: { counterpartyType?: string };
-                    }
-                  )?.route?.counterpartyType === "ANY_BANK"
-                ? "通用 fallback 固定使用 ANY；實際受款銀行由交易資料提供"
-                : "請輸入 3–35 字元的內部 Counterparty ID，或從 Bank Service 選擇",
-          "props.description": (field) =>
-            (field.model as { route?: { counterpartyType?: string } })?.route
-              ?.counterpartyType === "ANY_BANK"
-              ? "通用 fallback 適用任何已核准銀行；實際交易對手由交易資料提供。"
-              : "內部穩定識別碼；SWIFT BIC 另存於受控 route 資料。",
-          "props.showPicker": (field) =>
-            (field.model as { route?: { counterpartyType?: string } })?.route
-              ?.counterpartyType !== "ANY_BANK",
-          "props.readonly": (field) =>
-            (field.model as { route?: { counterpartyType?: string } })?.route
-              ?.counterpartyType === "ANY_BANK",
-          "props.pickerLabel": (field) =>
-            (
-              field.model as {
-                route?: { counterpartyType?: "BANK" | "CUSTOMER" };
-              }
-            )?.route?.counterpartyType === "CUSTOMER"
-              ? "從 Customer Service 選擇"
-              : "從 Bank Service 選擇",
-        },
-      },
-      {
-        key: "scope",
-        type: "select",
-        props: {
-          label: "SSI Scope",
-          required: true,
-          options: [
-            { label: "Standing（可重複使用）", value: "STANDING" },
-            {
-              label: "Transaction specific（須綁定交易）",
-              value: "TRANSACTION_SPECIFIC",
-            },
-          ],
-        },
-      },
-      {
-        key: "route.currency",
-        type: "select",
-        props: {
-          label: "Currency（ISO 4217）",
-          description: "由 Currency 微服務提供，不接受自由輸入。",
-          required: true,
-          placeholder: "請選擇幣別",
-          options: currencies.map(({ code, decimals }) => ({
-            label: `${code} · ${decimals} decimals`,
-            value: code,
-          })),
-        },
-      },
-      {
-        key: "route.beneficiarySource",
-        type: "select",
-        props: {
-          label: "Beneficiary Source",
-          required: true,
-          description:
-            "SSI 表示 Beneficiary BIC 儲存在本 SSI；Transaction 表示由交易資料提供，SSI 不得儲存或推導。",
-          options: [
-            { label: "SSI／由 SSI 提供", value: "SSI" },
-            { label: "Transaction／由交易提供", value: "TRANSACTION" },
-          ],
-        },
-      },
-      {
-        key: "route.beneficiaryBic",
-        type: "bic-input",
-        props: {
-          label: "Beneficiary BIC（ISO 9362）",
-          pickerAction: () =>
-            void this.openBicPicker("beneficiaryBic", "選擇 Beneficiary BIC"),
-          pattern: BIC_PATTERN,
-          maxLength: 11,
-          minLength: 8,
-        },
-        expressions: {
-          "props.required": (field) =>
-            (field.model as { route?: { beneficiarySource?: string } })?.route
-              ?.beneficiarySource !== "TRANSACTION",
-          "props.disabled": (field) =>
-            (field.model as { route?: { beneficiarySource?: string } })?.route
-              ?.beneficiarySource === "TRANSACTION",
-          "props.description": (field) =>
-            (field.model as { route?: { beneficiarySource?: string } })?.route
-              ?.beneficiarySource === "TRANSACTION"
-              ? "不儲存在 SSI；由交易資料提供。"
-              : "可手動輸入 BIC8/BIC11，或從 Bank Service 選擇銀行身分並回填唯讀 BIC。",
-        },
-      },
-      {
-        key: "route.accountWithBic",
-        type: "bic-input",
-        props: {
-          label: "Account With Institution（ISO 9362）",
-          description:
-            "SSI 的 Account With Institution BIC；Bank Service 只提供銀行身分與 BIC，不提供帳號。",
-          pickerAction: () =>
-            void this.openBicPicker(
-              "accountWithBic",
-              "選擇 Account With Institution",
-            ),
-          ...bicValidation,
-        },
-      },
-      {
-        key: "route.intermediaryBic",
-        type: "bic-input",
-        props: {
-          label: "Intermediary Institution（ISO 9362）",
-          description: "選填；沒有 intermediary 時保持空白。",
-          pickerAction: () =>
-            void this.openBicPicker(
-              "intermediaryBic",
-              "選擇 Intermediary Institution",
-            ),
-          pattern: BIC_PATTERN,
-          maxLength: 11,
-        },
-      },
-      {
-        key: "route.accountId",
-        type: "input",
-        expressions: {
-          "props.label": (field) => {
-            const model = field.model as {
-              ownershipType?: "OWN" | "COUNTERPARTY";
-              route?: { counterpartyType?: "BANK" | "CUSTOMER" };
-            };
-            return ssiAccountReferenceCopy(
-              model?.ownershipType,
-              model?.route?.counterpartyType,
-            ).label;
-          },
-          "props.description": (field) => {
-            const model = field.model as {
-              ownershipType?: "OWN" | "COUNTERPARTY";
-              route?: { counterpartyType?: "BANK" | "CUSTOMER" };
-            };
-            return ssiAccountReferenceCopy(
-              model?.ownershipType,
-              model?.route?.counterpartyType,
-            ).description;
-          },
-          "props.placeholder": (field) => {
-            const model = field.model as {
-              ownershipType?: "OWN" | "COUNTERPARTY";
-              route?: { counterpartyType?: "BANK" | "CUSTOMER" };
-            };
-            return ssiAccountReferenceCopy(
-              model?.ownershipType,
-              model?.route?.counterpartyType,
-            ).placeholder;
-          },
-        },
-      },
-    ];
   }
 }

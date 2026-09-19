@@ -19,8 +19,16 @@ describe("AppComponent shell integration", () => {
     expect(component()).toContain("AppShellComponent,");
   });
 
-  it("keeps feature content in the parent and overlays outside the shell", () => {
+  it("keeps shared shell content while the SSI deletion overlay belongs to Dashboard", () => {
     const html = template();
+    const dashboard = readFileSync(
+      join(
+        __dirname,
+        "ssi-maintenance-feature",
+        "dashboard-route.component.html",
+      ),
+      "utf8",
+    );
     const start = html.indexOf("<ssi-app-shell");
     const close = html.indexOf("</ssi-app-shell>");
     expect(start).toBeGreaterThanOrEqual(0);
@@ -28,7 +36,93 @@ describe("AppComponent shell integration", () => {
     expect(html.indexOf("<ssi-alert")).toBeGreaterThan(start);
     expect(html.indexOf("<ssi-alert")).toBeLessThan(close);
     expect(html.indexOf("<ssi-swift-data-crud")).toBeLessThan(close);
-    expect(html.indexOf("@if (deleteTarget(); as row)")).toBeGreaterThan(close);
+    expect(html).not.toContain("@if (deleteTarget(); as row)");
+    expect(dashboard).toContain("@if (index.deleteTarget(); as row)");
+  });
+
+  it("reads Dashboard-owned index state and local actions from its feature facade", () => {
+    const dashboard = readFileSync(
+      join(
+        __dirname,
+        "ssi-maintenance-feature",
+        "dashboard-route.component.html",
+      ),
+      "utf8",
+    );
+    const route = readFileSync(
+      join(
+        __dirname,
+        "ssi-maintenance-feature",
+        "dashboard-route.component.ts",
+      ),
+      "utf8",
+    );
+    for (const member of [
+      "rows",
+      "ssiSummary",
+      "ownershipTab",
+      "ownershipSearch",
+      "ownershipStatus",
+      "selectedCounterparty",
+      "counterpartyDirectoryLoading",
+      "filteredCounterpartyInbox",
+      "counterpartyPartyType",
+      "counterpartyInboxSearch",
+      "pagedCounterpartyInbox",
+      "counterpartyInboxPage",
+      "counterpartyInboxTotalPages",
+      "indexPage",
+      "ssiIndexLoading",
+      "ssiIndexTotalItems",
+      "ssiIndexDistinctCurrencyCount",
+      "ownershipActionColumns",
+      "ownershipOf",
+      "deleteTarget",
+      "deleteReason",
+      "canConfirmDelete",
+      "searchCounterpartyInbox",
+      "selectCounterpartyPartyType",
+      "sortCounterpartyInbox",
+      "moveCounterpartyInboxPage",
+      "requestDelete",
+      "requestDraftRevoke",
+      "closeDeleteDialog",
+      "counterpartyAriaSort",
+      "ownershipAriaSort",
+      "counterpartySortIndicator",
+      "ownershipSortIndicator",
+      "activeCount",
+      "archivedCount",
+      "indexTotalPages",
+      "pagedVisibleRows",
+      "isOwnershipActionPresented",
+      "ownershipCurrentStatusLabel",
+      "requestTypeLabel",
+    ]) {
+      expect(dashboard).not.toContain(`host.${member}`);
+      expect(dashboard).toContain(`index.${member}`);
+    }
+    expect(route).not.toContain('from "../app.component"');
+    expect(route).toContain("inject(SsiMaintenanceSession)");
+    expect(route).toContain("readonly index = this.session.index;");
+  });
+
+  it("binds the Maker route to its feature facade through a narrow action bridge", () => {
+    const maker = readFileSync(
+      join(__dirname, "ssi-maintenance-feature", "maker-route.component.html"),
+      "utf8",
+    );
+    const route = readFileSync(
+      join(__dirname, "ssi-maintenance-feature", "maker-route.component.ts"),
+      "utf8",
+    );
+    expect(route).not.toContain('from "../app.component"');
+    expect(route).toContain("inject(SSI_MAKER_ROUTE_CONTEXT)");
+    expect(route).toContain("inject(SsiMaintenanceSession)");
+    expect(maker).not.toContain("host.");
+    expect(maker).toContain("maker.form");
+    expect(maker).toContain("actions.save()");
+    expect(maker).toContain("actions.close()");
   });
 
   it("keeps the lazy feature outlet mounted while the shared SSI detail is open", () => {
@@ -37,5 +131,15 @@ describe("AppComponent shell integration", () => {
       /\n {2}}\n {2}<div\s+\[hidden\]="\s+!!detailTarget\(\) \|\|/,
     );
     expect(html).toContain("<router-outlet");
+  });
+
+  it("keeps SSI Dashboard and Maker presentation out of the eager root template", () => {
+    const html = template();
+    expect(html).not.toContain("CURRENT OPERATING RECORDS");
+    expect(html).not.toContain("MAKER WORKSPACE · PARAMETER-DRIVEN FORMLY");
+  });
+
+  it("does not retain an unreachable legacy FIN screen in the root shell", () => {
+    expect(template()).not.toContain('@if (false && (view() === "treasury"');
   });
 });

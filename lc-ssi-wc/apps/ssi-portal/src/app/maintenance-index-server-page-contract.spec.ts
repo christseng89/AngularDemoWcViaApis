@@ -14,13 +14,13 @@ describe("maintenance index server-page contract", () => {
   );
 
   it("renders SSI server page items without post-pagination lifecycle filtering", () => {
-    const source = readFileSync(join(__dirname, "app.component.ts"), "utf8");
+    const source = readFileSync(
+      join(__dirname, "ssi-maintenance-feature", "ssi-index.facade.ts"),
+      "utf8",
+    );
     const visibleRows = source.slice(
       source.indexOf("readonly visibleRows"),
-      source.indexOf(
-        "readonly counterpartyInbox",
-        source.indexOf("readonly visibleRows"),
-      ),
+      source.indexOf("readonly indexTotalPages", source.indexOf("readonly visibleRows")),
     );
     expect(visibleRows).toContain("this.rows(),");
     expect(visibleRows).not.toContain(".filter(");

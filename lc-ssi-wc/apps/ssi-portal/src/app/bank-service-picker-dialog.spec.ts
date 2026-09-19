@@ -20,8 +20,23 @@ describe("shared Bank Service picker contract", () => {
     join(process.cwd(), "apps/ssi-portal/src/app/app.component.html"),
     "utf8",
   );
-  const appSource = readFileSync(
-    join(process.cwd(), "apps/ssi-portal/src/app/app.component.ts"),
+  const makerTemplate = readFileSync(
+    join(
+      process.cwd(),
+      "apps/ssi-portal/src/app/ssi-maintenance-feature/maker-route.component.html",
+    ),
+    "utf8",
+  );
+  const sessionSource = readFileSync(
+    join(process.cwd(), "apps/ssi-portal/src/app/ssi-maintenance-feature/ssi-maintenance-session.ts"),
+    "utf8",
+  );
+  const makerSource = readFileSync(
+    join(process.cwd(), "apps/ssi-portal/src/app/ssi-maintenance-feature/ssi-maker.facade.ts"),
+    "utf8",
+  );
+  const apiSource = readFileSync(
+    join(process.cwd(), "apps/ssi-portal/src/app/ssi-maintenance-api.service.ts"),
     "utf8",
   );
   const swiftDataTemplate = readFileSync(
@@ -48,7 +63,8 @@ describe("shared Bank Service picker contract", () => {
 
   it("is reused by both SSI maintenance and parameter-driven scenarios", () => {
     expect(scenarioTemplate).toContain("<ssi-bank-service-picker-dialog");
-    expect(appTemplate).toContain("<ssi-bank-service-picker-dialog");
+    expect(makerTemplate).toContain("<ssi-bank-service-picker-dialog");
+    expect(appTemplate).not.toContain("<ssi-bank-service-picker-dialog");
     expect(appTemplate).not.toContain("bankPage().items; track bank.bic");
   });
 
@@ -103,8 +119,9 @@ describe("shared Bank Service picker contract", () => {
   });
 
   it("uses the shared index page size and keeps lookup errors in the dialog", () => {
-    expect(appSource).toContain("pageSize=${this.indexPageSize}");
-    expect(appSource).not.toMatch(/reference\/banks[^`]*pageSize=(?:5|20)/);
-    expect(appTemplate).toContain('[error]="bankPickerError()"');
+    expect(sessionSource).toContain("this.index.indexPageSize");
+    expect(makerSource).toContain("this.api.lookupBanks(page, this.bankPageSize, this.bankQuery())");
+    expect(apiSource).toContain("pageSize=${pageSize}");
+    expect(makerTemplate).toContain('[error]="maker.bankPickerError()"');
   });
 });

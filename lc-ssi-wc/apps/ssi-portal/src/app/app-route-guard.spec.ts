@@ -26,6 +26,17 @@ describe("AppRouteGuardBridge", () => {
     expect(await bridge.canActivate()).toBe(false);
   });
 
+  it("passes the destination URL to the host for pending Maker WIP decisions", async () => {
+    const bridge = new AppRouteGuardBridge(() => 3);
+    const host = {
+      canDeactivate: jest.fn(async (_targetUrl?: string) => true),
+      hasActiveMakerRevision: () => true,
+    };
+    bridge.register(host);
+    expect(await bridge.canActivate("/maker")).toBe(true);
+    expect(host.canDeactivate).toHaveBeenCalledWith("/maker");
+  });
+
   it("records only a successfully released Maker WIP for its navigation ID", async () => {
     let navigationId = 5;
     const bridge = new AppRouteGuardBridge(() => navigationId);

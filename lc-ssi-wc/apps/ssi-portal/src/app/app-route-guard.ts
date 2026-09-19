@@ -2,7 +2,7 @@ import { inject, InjectionToken } from "@angular/core";
 import { Router, type CanActivateFn } from "@angular/router";
 
 export interface AppRouteGuardHost {
-  canDeactivate(): Promise<boolean>;
+  canDeactivate(targetUrl?: string): Promise<boolean>;
   hasActiveMakerRevision(): boolean;
   onLateMakerWipRelease?(navigationId: number): void;
 }
@@ -26,7 +26,7 @@ export class AppRouteGuardBridge {
     if (this.host === host) this.host = null;
   }
 
-  async canActivate(): Promise<boolean> {
+  async canActivate(targetUrl?: string): Promise<boolean> {
     const id = this.navigationId();
     const host = this.host;
     const initialActivation = this.firstActivationAvailable;
@@ -38,7 +38,7 @@ export class AppRouteGuardBridge {
     if (id !== null) this.pendingNavigations.add(id);
     try {
       const hadMakerWip = host.hasActiveMakerRevision();
-      const allowed = await host.canDeactivate();
+      const allowed = await host.canDeactivate(targetUrl);
       if (!allowed) this.recordDenial(id);
       if (allowed && hadMakerWip && !host.hasActiveMakerRevision()) {
         if (id !== null) {
@@ -98,5 +98,5 @@ export const APP_ROUTE_GUARD_BRIDGE = new InjectionToken<AppRouteGuardBridge>(
   },
 );
 
-export const appRouteCanActivate: CanActivateFn = () =>
-  inject(APP_ROUTE_GUARD_BRIDGE).canActivate();
+export const appRouteCanActivate: CanActivateFn = (_route, state) =>
+  inject(APP_ROUTE_GUARD_BRIDGE).canActivate(state.url);

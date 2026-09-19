@@ -3,6 +3,7 @@ import {
   Component,
   inject,
   output,
+  viewChild,
 } from "@angular/core";
 import { SettingsPageComponent } from "./settings-page.component";
 import { ThemeService } from "./theme.service";
@@ -23,4 +24,9 @@ import { ThemeService } from "./theme.service";
 export class SettingsRouteComponent {
   readonly themeService = inject(ThemeService);
   readonly dataReloaded = output<void>();
+  private readonly page = viewChild(SettingsPageComponent);
+
+  async refresh(): Promise<void> {
+    await this.page()?.loadRuntime();
+  }
 }

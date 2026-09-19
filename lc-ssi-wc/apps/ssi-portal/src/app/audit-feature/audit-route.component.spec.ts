@@ -21,4 +21,14 @@ describe("Audit lazy route view", () => {
     expect(html).not.toContain("@if (auditDetail(); as detail)");
     expect(html).toContain("<router-outlet");
   });
+
+  it("exposes Audit-owned refresh without calling SSI Maintenance", () => {
+    const route = readFileSync(
+      join(__dirname, "audit-route.component.ts"),
+      "utf8",
+    );
+    expect(route).toMatch(
+      /refresh\(\): Promise<void>\s*\{\s*return this\.audit\.load\(\);/,
+    );
+  });
 });
