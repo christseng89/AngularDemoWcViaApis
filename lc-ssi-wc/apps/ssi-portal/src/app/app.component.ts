@@ -531,6 +531,9 @@ export class AppComponent implements OnInit, OnDestroy {
   private readonly routeGuardBridge = inject(APP_ROUTE_GUARD_BRIDGE);
   readonly routedAuditDetailOpen = signal(false);
   private auditRouteSubscriptions: Array<{ unsubscribe(): void }> = [];
+  private activeAuditCurrencyOptionsConsumer:
+    ((options: readonly { code: string; decimals: number }[]) => void) | null =
+    null;
   private readonly swiftDataCrud = viewChild(SwiftDataCrudComponent);
   private readonly api = "http://localhost:3100/api";
   readonly finResolutionCatalogue = signal<
@@ -1521,7 +1524,9 @@ export class AppComponent implements OnInit, OnDestroy {
         subscribe(callback: () => void): { unsubscribe(): void };
       };
     };
-    route.setCurrencyOptions?.(this.currencies());
+    this.activeAuditCurrencyOptionsConsumer =
+      route.setCurrencyOptions?.bind(route) ?? null;
+    this.activeAuditCurrencyOptionsConsumer?.(this.currencies());
     if (route.detailOpenChange)
       this.auditRouteSubscriptions.push(
         route.detailOpenChange.subscribe((open) =>
@@ -1545,6 +1550,7 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   onSettingsDeactivated(): void {
+    this.activeAuditCurrencyOptionsConsumer = null;
     this.settingsReloadSubscription?.unsubscribe();
     this.settingsReloadSubscription = null;
     for (const subscription of this.auditRouteSubscriptions)
@@ -2896,6 +2902,7 @@ export class AppComponent implements OnInit, OnDestroy {
         this.http.get<CurrencyReference[]>(`${this.api}/reference/currencies`),
       );
       this.currencies.set(currencies);
+      this.activeAuditCurrencyOptionsConsumer?.(currencies);
       this.fields.set(this.buildFields(currencies));
     } catch {
       this.notice.set({

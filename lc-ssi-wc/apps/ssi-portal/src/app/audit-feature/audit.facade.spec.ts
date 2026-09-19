@@ -34,11 +34,18 @@ const api = {
     of({ "x-ui-resources": [{ id: "rma", fields: [] }] }),
   ),
 };
+const session = {
+  tab: testSignal<"rma" | "entity" | "nostro" | "ssi">("rma"),
+  sortKey: testSignal<"title" | "actor" | "occurredAt">("title"),
+  sortDirection: testSignal<"asc" | "desc">("asc"),
+  indexSortPath: testSignal<string | null>(null),
+};
 
 jest.mock("@angular/core", () => ({
   Injectable: () => (target: unknown) => target,
   computed: <T>(calculation: () => T) => calculation,
-  inject: () => api,
+  inject: (token: { name: string }) =>
+    token.name === "AuditSessionState" ? session : api,
   signal: testSignal,
 }));
 jest.mock("./audit-api.service", () => ({ AuditApiService: class {} }));
@@ -49,6 +56,10 @@ describe("AuditFacade", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     api.events.mockImplementation(() => of(rows));
+    session.tab.set("rma");
+    session.sortKey.set("title");
+    session.sortDirection.set("asc");
+    session.indexSortPath.set(null);
   });
 
   it("loads the three existing sources only after feature entry", async () => {
@@ -72,6 +83,20 @@ describe("AuditFacade", () => {
     expect(audit.tab()).toBe("entity");
     expect(audit.currentPage()).toBe(1);
     expect(audit.detail()).toBeNull();
+  });
+
+  it("retains the chosen tab and sort across lazy-route re-entry without retaining rows", async () => {
+    const first = new AuditFacade();
+    await first.selectTab("entity");
+    first.sortBy("actor");
+    first.sortIndex("status");
+    const second = new AuditFacade();
+    expect(second.tab()).toBe("entity");
+    expect(second.sortKey()).toBe("actor");
+    expect(second.indexSortPath()).toBe("status");
+    expect(second.rows()).toEqual([]);
+    await second.load();
+    expect(api.events).toHaveBeenLastCalledWith("entity");
   });
 
   it("presents the existing unavailable state on read failure", async () => {

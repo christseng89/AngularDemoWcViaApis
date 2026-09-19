@@ -875,6 +875,23 @@ describe("portal component behavior", () => {
     component.ngOnDestroy();
   });
 
+  it("keeps an active Audit route's Currency options in sync with parent refresh", async () => {
+    const { AppComponent } = await import("./app.component");
+    const component = new AppComponent();
+    const setCurrencyOptions = jest.fn();
+    component.onSettingsActivated({ setCurrencyOptions });
+    expect(setCurrencyOptions).toHaveBeenCalledWith([]);
+    await component["loadCurrencies"]();
+    expect(setCurrencyOptions).toHaveBeenLastCalledWith([
+      { code: "USD", decimals: 2, standard: "ISO 4217" },
+    ]);
+    component.onSettingsDeactivated();
+    setCurrencyOptions.mockClear();
+    await component["loadCurrencies"]();
+    expect(setCurrencyOptions).not.toHaveBeenCalled();
+    component.ngOnDestroy();
+  });
+
   it("does not eagerly request parent workspace data or submit settlement POSTs during application startup", async () => {
     fakeHttp.get.mockClear();
     fakeHttp.post.mockClear();

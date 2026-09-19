@@ -11,7 +11,6 @@ import {
   sortAuditRows,
   type AuditPresentation,
   type AuditRow,
-  type AuditSortDirection,
   type AuditSortKey,
   type AuditSsiSnapshot,
 } from "../audit-presentation";
@@ -19,6 +18,7 @@ import { presentOperationalIssue } from "../operational-issue";
 import { governanceRecordValue } from "../governance-record-value";
 import { scalarText } from "../scalar-text";
 import { AuditApiService, type AuditParameterField } from "./audit-api.service";
+import { AuditSessionState } from "./audit-session-state";
 
 export interface AuditMessageTypeChanges {
   readonly unchanged: readonly string[];
@@ -29,7 +29,8 @@ export interface AuditMessageTypeChanges {
 @Injectable()
 export class AuditFacade {
   private readonly api = inject(AuditApiService);
-  readonly tab = signal<GovernanceTab>("rma");
+  private readonly session = inject(AuditSessionState);
+  readonly tab = this.session.tab;
   readonly rows = signal<readonly AuditRow[]>([]);
   readonly detail = signal<AuditPresentation | null>(null);
   readonly parameterFields = signal<readonly AuditParameterField[]>([]);
@@ -54,9 +55,9 @@ export class AuditFacade {
   readonly issue = computed(() =>
     this.error() ? presentOperationalIssue(this.error()) : null,
   );
-  readonly sortKey = signal<AuditSortKey>("title");
-  readonly sortDirection = signal<AuditSortDirection>("asc");
-  readonly indexSortPath = signal<string | null>(null);
+  readonly sortKey = this.session.sortKey;
+  readonly sortDirection = this.session.sortDirection;
+  readonly indexSortPath = this.session.indexSortPath;
   readonly currentPage = signal(1);
   readonly pageSize = 10;
   readonly detailRecord = computed<Readonly<Record<string, unknown>>>(() => {
