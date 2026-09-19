@@ -60,7 +60,10 @@ export class SsiMaintenanceSession {
       return;
     }
     if (view === "dashboard") {
-      await Promise.all([this.refreshIndex(), this.loadCounterpartyDirectory()]);
+      await Promise.all([
+        this.refreshIndex(),
+        this.loadCounterpartyDirectory(),
+      ]);
       return;
     }
     await Promise.all([
@@ -75,9 +78,12 @@ export class SsiMaintenanceSession {
   async refreshIndex(): Promise<void> {
     const result = await this.index.refresh();
     if (result === "applied") {
-      this.readStore?.publishSettlementSsis(projectSettlementSsis(this.index.rows()));
-      this.shell?.acceptPendingApprovalCount(this.index.ssiSummary().pendingApproval);
-      this.shell?.onIndexRefreshed();
+      this.readStore?.publishSettlementSsis(
+        projectSettlementSsis(this.index.rows()),
+      );
+      this.shell?.acceptPendingApprovalCount(
+        this.index.ssiSummary().pendingApproval,
+      );
     }
     if (result === "error")
       this.shell?.notify({
@@ -124,7 +130,9 @@ export class SsiMaintenanceSession {
       const response = await firstValueFrom(
         this.references.countries<{ items: ReferenceCountry[] }>(),
       );
-      const countries = response.items.filter((item) => item.status === "ACTIVE");
+      const countries = response.items.filter(
+        (item) => item.status === "ACTIVE",
+      );
       this.countries.set(countries);
     } catch {
       this.shell?.notify({
@@ -140,7 +148,9 @@ export class SsiMaintenanceSession {
       const response = await firstValueFrom(
         this.references.bookingBranches<{ items: ReferenceBookingBranch[] }>(),
       );
-      const branches = response.items.filter((item) => item.status === "ACTIVE");
+      const branches = response.items.filter(
+        (item) => item.status === "ACTIVE",
+      );
       this.bookingBranches.set(branches);
     } catch {
       this.shell?.notify({
@@ -160,7 +170,9 @@ export class SsiMaintenanceSession {
   }
 
   checkerCount(): number {
-    return this.shell?.checkerCount() ?? this.index.ssiSummary().pendingApproval;
+    return (
+      this.shell?.checkerCount() ?? this.index.ssiSummary().pendingApproval
+    );
   }
 
   async closeMaker(): Promise<void> {
@@ -287,7 +299,9 @@ export class SsiMaintenanceSession {
     try {
       await this.index.revokeOrSuppress(row, reason);
       this.index.closeDeleteDialog();
-      this.index.ownershipStatus.set(row.status === "DRAFT" ? "ACTIVE" : "DRAFT");
+      this.index.ownershipStatus.set(
+        row.status === "DRAFT" ? "ACTIVE" : "DRAFT",
+      );
       this.index.indexPage.set(1);
       this.notify({
         kind: "info",
@@ -320,12 +334,16 @@ export class SsiMaintenanceSession {
     void this.refreshIndex();
   }
 
-  sortOwnershipIndex(sort: Parameters<SsiIndexFacade["sortOwnershipIndex"]>[0]): void {
+  sortOwnershipIndex(
+    sort: Parameters<SsiIndexFacade["sortOwnershipIndex"]>[0],
+  ): void {
     this.index.sortOwnershipIndex(sort);
     void this.refreshIndex();
   }
 
-  selectOwnershipStatus(status: "ACTIVE" | "DRAFT" | "SUPPRESSED" | "ALL"): void {
+  selectOwnershipStatus(
+    status: "ACTIVE" | "DRAFT" | "SUPPRESSED" | "ALL",
+  ): void {
     this.index.selectOwnershipStatus(status);
     void this.refreshIndex();
   }
@@ -385,7 +403,10 @@ export class SsiMaintenanceSession {
       void this.loadCurrencies();
   }
 
-  private notify(notice: { kind: "info" | "warning" | "error"; text: string }): void {
+  private notify(notice: {
+    kind: "info" | "warning" | "error";
+    text: string;
+  }): void {
     this.shell?.notify(notice);
     if (!this.shell && notice.kind === "error")
       this.raiseNotice({ kind: "error", text: notice.text });
@@ -413,7 +434,9 @@ export class SsiMaintenanceSession {
     return attempt;
   }
 
-  private async releaseWipForNavigation(preserveWip: boolean): Promise<boolean> {
+  private async releaseWipForNavigation(
+    preserveWip: boolean,
+  ): Promise<boolean> {
     if (preserveWip) return true;
     const revisionId = this.maker.revisionSource()
       ? this.maker.editingId()

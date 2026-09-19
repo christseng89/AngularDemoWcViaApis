@@ -48,7 +48,6 @@ describe("SSI Maintenance feature session", () => {
       acceptCurrencies: jest.fn(),
       acceptCountries: jest.fn(),
       acceptBookingBranches: jest.fn(),
-      onIndexRefreshed: jest.fn(),
       restoreDashboardAfterReleasedWip: jest.fn(),
     }) satisfies SsiMaintenanceShellPort;
 
@@ -63,7 +62,9 @@ describe("SSI Maintenance feature session", () => {
 
   it("loads Dashboard through the existing Index facade without duplicating API orchestration", async () => {
     const session = new SsiMaintenanceSession({} as SsiMaintenanceApiService);
-    const refresh = jest.spyOn(session.index, "refresh").mockResolvedValue("applied");
+    const refresh = jest
+      .spyOn(session.index, "refresh")
+      .mockResolvedValue("applied");
     const directory = jest
       .spyOn(session.index, "loadCounterpartyDirectory")
       .mockResolvedValue("applied");
@@ -73,7 +74,9 @@ describe("SSI Maintenance feature session", () => {
   });
 
   it("starts a new Maker draft in the shared session without an eager API request", async () => {
-    const api = { createDraft: jest.fn() } as unknown as SsiMaintenanceApiService;
+    const api = {
+      createDraft: jest.fn(),
+    } as unknown as SsiMaintenanceApiService;
     const host = shell();
     const session = new SsiMaintenanceSession(api, undefined, host);
     await session.startNew();
@@ -102,9 +105,15 @@ describe("SSI Maintenance feature session", () => {
 
   it("preserves the same WIP across Dashboard to Maker and releases it on exit", async () => {
     const cancelRevision = jest.fn(() => of({}));
-    const session = new SsiMaintenanceSession({ cancelRevision } as unknown as SsiMaintenanceApiService);
+    const session = new SsiMaintenanceSession({
+      cancelRevision,
+    } as unknown as SsiMaintenanceApiService);
     session.activate("dashboard");
-    session.maker.beginRevision(active, { ...active, id: "SSI-WIP", status: "WIP" }, { maker: "maker.revision" });
+    session.maker.beginRevision(
+      active,
+      { ...active, id: "SSI-WIP", status: "WIP" },
+      { maker: "maker.revision" },
+    );
     expect(session.hasActiveMakerRevision()).toBe(true);
     expect(await session.canDeactivate("/maker")).toBe(true);
     expect(cancelRevision).not.toHaveBeenCalled();
@@ -123,7 +132,11 @@ describe("SSI Maintenance feature session", () => {
       (notice) => notices.push(notice),
     );
     session.activate("maker");
-    session.maker.beginRevision(active, { ...active, id: "SSI-WIP", status: "WIP" }, { maker: "maker.revision" });
+    session.maker.beginRevision(
+      active,
+      { ...active, id: "SSI-WIP", status: "WIP" },
+      { maker: "maker.revision" },
+    );
     const first = session.canDeactivate("/settings");
     const second = session.canDeactivate("/settings");
     expect(cancelRevision).toHaveBeenCalledTimes(1);

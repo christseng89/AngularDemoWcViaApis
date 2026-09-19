@@ -396,74 +396,6 @@ const fakeHttp = {
   ),
 };
 
-function legacyResolutionResponse(
-  currency: string,
-  hasRecommendedRoute = true,
-) {
-  return {
-    useCase: "PAYMENT_SSI",
-    usage: "EXECUTABLE_SETTLEMENT",
-    paymentExecutable: false,
-    preSettlement: true,
-    attemptId: `ATTEMPT-${currency}`,
-    requestHash: `hash-${currency}`,
-    decision: hasRecommendedRoute ? "RESOLVED" : "NO_SSI_FOUND",
-    recommendedRoute: hasRecommendedRoute
-      ? {
-          ssiId: `SSI-${currency}`,
-          ssiVersion: 1,
-          counterpartyId: "BANK-1",
-          route: { currency },
-          applicability: {
-            id: "APP-1",
-            ssiId: `SSI-${currency}`,
-            consumer: "ANY",
-            product: "ANY",
-            businessFunction: "ANY",
-            paymentLeg: "ANY",
-            direction: "ANY",
-            status: "ACTIVE",
-            validFrom: "2026-01-01",
-            validTo: "9999-12-31",
-            version: 1,
-          },
-          fallbackTier: 0,
-          rank: [1],
-          evidence: [],
-        }
-      : null,
-    alternatives: [],
-    excludedRoutes: [],
-    explanation: hasRecommendedRoute ? "Exact match" : "No SSI found",
-  };
-}
-
-function governedResolutionResponse(currency: string) {
-  return {
-    resolutionDecision: "RESOLVED",
-    chosenRoute: {
-      ssiId: `SSI-${currency}`,
-      ssiCode: `SSI-DEMO-${currency}`,
-      ssiVersion: 4,
-      currency,
-      accountId: `NOSTRO-${currency}`,
-    },
-    alternatives: [
-      {
-        ssiId: `SSI-${currency}-ALT`,
-        ssiCode: `SSI-DEMO-${currency}-ALT`,
-        ssiVersion: 2,
-        currency,
-        accountId: `NOSTRO-${currency}-ALT`,
-      },
-    ],
-    resolutionToken: `ATTEMPT-${currency}`,
-    snapshotHash: `HASH-${currency}`,
-    mx: { httpStatus: 200, decision: "RESOLVED" },
-    mt: { tags: { "58A": "BARCGB22" } },
-  };
-}
-
 jest.doMock("@angular/core", () => ({
   ChangeDetectionStrategy: { OnPush: "OnPush" },
   ChangeDetectorRef: ChangeDetectorRefToken,
@@ -477,7 +409,10 @@ jest.doMock("@angular/core", () => ({
     <T>(target: T): T =>
       target,
   InjectionToken: class {
-    constructor(public description: string, _options?: unknown) {}
+    constructor(
+      public description: string,
+      _options?: unknown,
+    ) {}
   },
   computed: <T>(compute: () => T): (() => T) => compute,
   inject: (token: unknown) => {
@@ -495,7 +430,10 @@ jest.doMock("@angular/core", () => ({
       return new (token as new () => unknown)();
     if ((token as { name?: string }).name === "ReferenceLookupApiService")
       return new (token as new () => unknown)();
-    if ((token as { description?: string }).description === "SSI_RESOLUTION_READ_PORT")
+    if (
+      (token as { description?: string }).description ===
+      "SSI_RESOLUTION_READ_PORT"
+    )
       return testSsiReadStore;
     if ((token as { name?: string }).name === "SsiMaintenanceShellBridge")
       return fakeSsiShellBridge;
@@ -563,7 +501,9 @@ jest.doMock("./app.component", () => {
     "./reference-lookup-api.service",
   );
   const { projectSettlementSsis, projectResolutionCounterparties } =
-    jest.requireActual("./ssi-maintenance-feature/ssi-resolution-read-projection");
+    jest.requireActual(
+      "./ssi-maintenance-feature/ssi-resolution-read-projection",
+    );
   return {
     ...actual,
     AppComponent: class AppComponent extends actual.AppComponent {
@@ -587,9 +527,10 @@ jest.doMock("./app.component", () => {
           originalRowsSet(rows);
           testSsiReadStore.publishSettlementSsis(projectSettlementSsis(rows));
         };
-        const originalDirectorySet = session.index.counterpartyDirectory.set.bind(
-          session.index.counterpartyDirectory,
-        );
+        const originalDirectorySet =
+          session.index.counterpartyDirectory.set.bind(
+            session.index.counterpartyDirectory,
+          );
         session.index.counterpartyDirectory.set = (parties: unknown) => {
           originalDirectorySet(parties);
           testSsiReadStore.publishCounterparties(
@@ -610,7 +551,8 @@ jest.doMock("./app.component", () => {
           maintenanceIndex: session.index,
           makerState: session.maker,
           model: undefined,
-          loadMaintenanceRoute: (view: "dashboard" | "maker") => session.load(view),
+          loadMaintenanceRoute: (view: "dashboard" | "maker") =>
+            session.load(view),
           create: () => session.save(),
           refreshMaintenanceIndex: () => session.refreshIndex(),
           onLateMakerWipRelease: (id: number) => {
@@ -621,11 +563,14 @@ jest.doMock("./app.component", () => {
         const proxy = new Proxy(this, {
           get(target, key, receiver) {
             if (key === "model") return session.maker.model;
-            if (typeof key === "string" && key in aliases)
-              return aliases[key];
+            if (typeof key === "string" && key in aliases) return aliases[key];
             if (typeof key === "string" && !(key in target)) {
-              const owner = key in session ? session :
-                key in session.index ? session.index : session.maker;
+              const owner =
+                key in session
+                  ? session
+                  : key in session.index
+                    ? session.index
+                    : session.maker;
               const value = owner[key];
               return typeof value === "function" && !value.set
                 ? value.bind(owner)
@@ -1606,677 +1551,13 @@ describe("portal component behavior", () => {
     component.ngOnDestroy();
   });
 
-  it("uses Escape as the common cancel action for SSI overlays", async () => {
+  it("uses Escape as the common cancel action for the SSI picker", async () => {
     const { AppComponent } = await import("./app.component");
     const component = new AppComponent();
 
     component.bicPickerTarget.set("accountWithBic");
     await component.closeOverlayOnEscape();
     expect(component.bicPickerTarget()).toBeNull();
-
-    component.tagTransactionOpen.set(true);
-    await component.closeOverlayOnEscape();
-    expect(component.tagTransactionOpen()).toBe(false);
-
-    component.paymentTransactionOpen.set(true);
-    await component.closeOverlayOnEscape();
-    expect(component.paymentTransactionOpen()).toBe(false);
-  });
-
-  it("keeps a Bank Service outage in feature state without adding a duplicate global banner", async () => {
-    rejectHttp = true;
-    try {
-      const { AppComponent } = await import("./app.component");
-      const component = new AppComponent();
-
-      await component.loadResolutionBanks();
-
-      expect(component.resolutionBanksError()).toBe("BANK_SERVICE_UNAVAILABLE");
-      expect(component.notice()).toBeNull();
-    } finally {
-      rejectHttp = false;
-    }
-  });
-
-  it("does not let background MT347 candidates overwrite the MT2 bank identity", async () => {
-    const { AppComponent } = await import("./app.component");
-    const component = new AppComponent();
-    component.resolutionCounterpartyBic.set("BARCGB22");
-    const scenario = component.tagScenarios.find(
-      (item) => item.descriptor.messageType === "MT300",
-    )!;
-
-    component.chooseTagScenario(scenario.id);
-    await Promise.resolve();
-    await Promise.resolve();
-
-    expect(component.resolutionCounterpartyBic()).toBe("BARCGB22");
-  });
-
-  it("submits only business context to the controlled MT347 resolver", async () => {
-    const { AppComponent } = await import("./app.component");
-    const component = new AppComponent();
-    await Promise.resolve();
-    await Promise.resolve();
-    const scenario = component.tagScenarios.find(
-      (item) => item.descriptor.messageType === "MT300",
-    )!;
-    component.chooseTagScenario(scenario.id);
-    await Promise.resolve();
-    await Promise.resolve();
-    component.chooseTagSsi("SSI-MT347-CONTROLLED-001");
-
-    await component.generateTags();
-
-    const call = [...fakeHttp.post.mock.calls]
-      .reverse()
-      .find(([url]) => url.endsWith("/reference/fin-controlled-resolutions"));
-    expect(call?.[1]).toMatchObject({
-      messageType: "MT300",
-      sequence: "B1",
-      currency: "USD",
-      bookingEntity: "HK01",
-      bindingId: "FIX-MT300-001@v1",
-    });
-    expect(call?.[1]).not.toHaveProperty("roles");
-    expect(call?.[1]).not.toHaveProperty("roleSources");
-    expect(call?.[1]).not.toHaveProperty("roleEvidence");
-  });
-
-  it("shows and opens only executable Counterparty SSI profiles", async () => {
-    const { AppComponent } = await import("./app.component");
-    const component = new AppComponent();
-    await Promise.resolve();
-    const item = (messageType: string, selectable: boolean) => ({
-      order: 1,
-      messageType,
-      description: `${messageType} profile`,
-      processingMode: "SINGLE" as const,
-      profileStatus: selectable ? "PROFILE_VERIFIED" : "OUT_OF_SCOPE",
-      targetMessage: "pacs.009.001.08",
-      businessService: "swift.cbprplus.04",
-      selectable,
-    });
-    component.paymentMessageIndex.set([
-      item("MT200", false),
-      item("MT201", false),
-      item("MT202", true),
-      item("MT202COV", true),
-      item("MT203", false),
-      item("MT204", false),
-      item("MT205", true),
-      item("MT205COV", true),
-      item("MT210", false),
-    ]);
-
-    expect(
-      component.filteredPaymentMessageIndex().map((row) => row.messageType),
-    ).toEqual(["MT202", "MT202COV", "MT205", "MT205COV"]);
-
-    for (const profile of component
-      .filteredPaymentMessageIndex()
-      .filter((row) => row.selectable)) {
-      component.openPaymentMessage(profile);
-      expect(component.paymentTransactionOpen()).toBe(true);
-      expect(component.selectedPaymentMessage()?.messageType).toBe(
-        profile.messageType,
-      );
-      expect(component.resolutionMessageType()).toBe(profile.targetMessage);
-      component.closePaymentTransaction();
-    }
-  });
-
-  it("presents governed MT2 dual-format contracts returned by resolution endpoints", async () => {
-    const { AppComponent } = await import("./app.component");
-    const component = new AppComponent();
-    await Promise.resolve();
-    await Promise.resolve();
-    component.resolutionBanksError.set("");
-    component.resolutionCounterpartyBankServiceId.set("BANK-SVC-BARC");
-    nextResolutionResponse = {
-      mx: { httpStatus: 200, decision: "RESOLVED" },
-      mt: { tags: { "58A": "BARCGB22" } },
-    };
-
-    try {
-      await component.resolve();
-      const resolveCall = fakeHttp.post.mock.calls.find(([url]) =>
-        url.endsWith("/settlements/resolve"),
-      );
-      expect(resolveCall?.[1]).toMatchObject({
-        counterpartyBankServiceId: "BANK-SVC-BARC",
-        messagingService: "FINPLUS",
-        paymentBeneficiaryInstitutionInput: "BARCGB22",
-      });
-      expect(resolveCall?.[1]).not.toHaveProperty("counterpartyBic");
-      expect(resolveCall?.[1]).not.toHaveProperty("counterpartyId");
-      expect(component.resolutionContractDecision()).toBe("RESOLVED");
-      component.resolutionOutputFormat.set("MT");
-      expect(component.renderedSettlementOutput()).toEqual({
-        tags: { "58A": "BARCGB22" },
-      });
-      component.resolutionOutputFormat.set("MX");
-      expect(component.renderedSettlementOutput()).toEqual({
-        httpStatus: 200,
-        decision: "RESOLVED",
-      });
-      expect(component.resolutionResult()).toBeNull();
-      component.clearResolution();
-      expect(component.resolutionContractResult()).toBeNull();
-    } finally {
-      nextResolutionResponse = undefined;
-    }
-  });
-
-  it("binds scenario and pinned own-account identities into the resolution request", async () => {
-    const { AppComponent } = await import("./app.component");
-    const component = new AppComponent();
-    await Promise.resolve();
-    await Promise.resolve();
-    component.resolutionBanksError.set("");
-    component.resolutionBanks.set([
-      {
-        bankServiceId: "BANK-SVC-BARC",
-        bic: "BARCGB22",
-        name: "Barclays",
-        country: "GB",
-        addressRef: "ADDR-BARC",
-        standard: "BIC",
-      },
-    ]);
-    component.ownNostroAccounts.set(
-      (await new Promise((resolve) => {
-        fakeHttp.get("/nostro-accounts").subscribe(resolve);
-      })) as never,
-    );
-    component.paymentMessageIndex.set([
-      {
-        order: 1,
-        messageType: "MT202",
-        description: "MT202",
-        processingMode: "SINGLE",
-        profileStatus: "PROFILE_VERIFIED",
-        targetMessage: "pacs.009.001.08",
-        businessService: "swift.cbprplus.04",
-        selectable: true,
-      },
-    ]);
-    const scenario = component
-      .paymentMessageScenarios()
-      .find((item) => item.code === "BOOK_TRANSFER_SAME_RECEIVER")!;
-    component.openPaymentScenario(scenario);
-    expect(component.paymentResolutionDomain()).toBe("OWN_SSI_NOSTRO");
-    component.selectPaymentScenarioControl("ownDebitAccountId", "NOSTRO-DEBIT");
-    component.selectPaymentScenarioControl(
-      "ownCreditAccountId",
-      "NOSTRO-CREDIT",
-    );
-    component.selectPaymentScenarioControl(
-      "receiverBankServiceId",
-      "BANK-SVC-BARC",
-    );
-    nextResolutionResponse = { mx: { httpStatus: 200 }, mt: {} };
-    await component.resolve();
-    const call = [...fakeHttp.post.mock.calls]
-      .reverse()
-      .find(([url]) => url.endsWith("/settlements/resolve"));
-    expect(call?.[1]).toMatchObject({
-      scenarioCode: "BOOK_TRANSFER_SAME_RECEIVER",
-      ownDebitAccountId: "NOSTRO-DEBIT",
-      ownDebitAccountVersion: 4,
-      ownCreditAccountId: "NOSTRO-CREDIT",
-      ownCreditAccountVersion: 7,
-      receiverBankServiceId: "BANK-SVC-BARC",
-      bookingEntity: "HK01",
-    });
-    nextResolutionResponse = undefined;
-  });
-
-  it("defaults the 57A scenario to distinct Receiver-debit and 57A-credit accounts", async () => {
-    const { AppComponent } = await import("./app.component");
-    const component = new AppComponent();
-    await Promise.resolve();
-    await Promise.resolve();
-    component.resolutionBanksError.set("");
-    component.resolutionBanks.set([
-      {
-        bankServiceId: "BANK-SVC-BARC",
-        bic: "BARCGB22",
-        name: "Barclays",
-        country: "GB",
-        addressRef: "ADDR-BARC",
-        standard: "BIC",
-      },
-    ]);
-    component.ownNostroAccounts.set(
-      (await new Promise((resolve) => {
-        fakeHttp.get("/nostro-accounts").subscribe(resolve);
-      })) as never,
-    );
-    component.paymentMessageIndex.set([
-      {
-        order: 1,
-        messageType: "MT202",
-        description: "MT202",
-        processingMode: "SINGLE",
-        profileStatus: "PROFILE_VERIFIED",
-        targetMessage: "pacs.009.001.08",
-        businessService: "swift.cbprplus.04",
-        selectable: true,
-      },
-    ]);
-    const scenario = component
-      .paymentMessageScenarios()
-      .find((item) => item.code === "CREDIT_ONE_OF_SEVERAL_AT_57A")!;
-    component.openPaymentScenario(scenario);
-    expect(component.paymentScenarioValues()).toMatchObject({
-      ownDebitAccountId: "NOSTRO-DEBIT",
-      ownCreditAccountId: "NOSTRO-57A-CREDIT",
-      receiverBankServiceId: "BANK-SVC-BARC",
-    });
-  });
-
-  it("clears a resolved USD route immediately when SGD is selected", async () => {
-    const { AppComponent } = await import("./app.component");
-    const component = new AppComponent();
-    await Promise.resolve();
-    await Promise.resolve();
-    component.resolutionBanksError.set("");
-    component.resolutionCounterpartyBankServiceId.set("BANK-SVC-BARC");
-    nextResolutionResponse = legacyResolutionResponse("USD");
-
-    try {
-      await component.resolve();
-      expect(component.resolutionResult()?.recommendedRoute?.route).toEqual({
-        currency: "USD",
-      });
-
-      component.selectResolutionCurrency("SGD");
-
-      expect(component.resolutionCurrency()).toBe("SGD");
-      expect(component.resolutionResult()).toBeNull();
-      expect(component.resolutionContractResult()).toBeNull();
-      expect(component.resolutionConfirmation()).toBeNull();
-      expect(component.resolutionRequestError()).toBe("");
-      expect(component.resolutionLoading()).toBe(false);
-    } finally {
-      nextResolutionResponse = undefined;
-    }
-  });
-
-  it("ignores a delayed USD response after the currency changes to SGD", async () => {
-    const { AppComponent } = await import("./app.component");
-    const component = new AppComponent();
-    await Promise.resolve();
-    component.resolutionBanksError.set("");
-    component.resolutionCounterpartyBankServiceId.set("BANK-SVC-BARC");
-    pendingResolutionResponse = new Subject<unknown>();
-
-    try {
-      const pendingResolve = component.resolve();
-      expect(component.resolutionLoading()).toBe(true);
-
-      component.selectResolutionCurrency("SGD");
-      expect(component.resolutionResult()).toBeNull();
-      expect(component.resolutionLoading()).toBe(false);
-
-      pendingResolutionResponse.next(legacyResolutionResponse("USD"));
-      pendingResolutionResponse.complete();
-      await pendingResolve;
-
-      expect(component.resolutionCurrency()).toBe("SGD");
-      expect(component.resolutionResult()).toBeNull();
-      expect(component.resolutionContractResult()).toBeNull();
-      expect(component.resolutionConfirmation()).toBeNull();
-    } finally {
-      pendingResolutionResponse = undefined;
-    }
-  });
-
-  it("ignores a delayed governed contract after the routing inputs change", async () => {
-    const { AppComponent } = await import("./app.component");
-    const component = new AppComponent();
-    await Promise.resolve();
-    component.resolutionBanksError.set("");
-    component.resolutionCounterpartyBankServiceId.set("BANK-SVC-BARC");
-    pendingResolutionResponse = new Subject<unknown>();
-
-    try {
-      const pendingResolve = component.resolve();
-      component.selectResolutionCurrency("SGD");
-
-      pendingResolutionResponse.next(governedResolutionResponse("USD"));
-      pendingResolutionResponse.complete();
-      await pendingResolve;
-
-      expect(component.resolutionCurrency()).toBe("SGD");
-      expect(component.resolutionContractResult()).toBeNull();
-      expect(component.resolutionContractEvidence()).toBeNull();
-      expect(component.resolutionContractAlternatives()).toEqual([]);
-      expect(component.resolutionConfirmation()).toBeNull();
-    } finally {
-      pendingResolutionResponse = undefined;
-    }
-  });
-
-  it("confirms a governed preview using its preserved resolution token", async () => {
-    const { AppComponent } = await import("./app.component");
-    const component = new AppComponent();
-    await Promise.resolve();
-    component.resolutionBanksError.set("");
-    component.resolutionCounterpartyBankServiceId.set("BANK-SVC-BARC");
-    nextResolutionResponse = governedResolutionResponse("USD");
-    nextConfirmationResponse = {
-      decision: "CONFIRMED",
-      resolutionToken: "CONFIRMED-TOKEN",
-      snapshotHash: "CONFIRMED-HASH",
-    };
-
-    try {
-      await component.resolve();
-
-      expect(component.resolutionContractEvidence()).toEqual({
-        resolutionToken: "ATTEMPT-USD",
-        snapshotHash: "HASH-USD",
-      });
-      expect(component.resolutionContractAlternatives()).toHaveLength(1);
-      expect(component.resolutionSelectedSsiId()).toBe("SSI-USD");
-
-      await component.confirmResolution();
-
-      expect(fakeHttp.post).toHaveBeenCalledWith(
-        expect.stringContaining("/settlements/ATTEMPT-USD/confirm"),
-        { selectedSsiId: "SSI-USD", actor: "maker.demo" },
-      );
-      expect(component.resolutionConfirmation()).toMatchObject({
-        decision: "CONFIRMED",
-        resolutionToken: "CONFIRMED-TOKEN",
-        snapshotHash: "CONFIRMED-HASH",
-      });
-      expect(component.resolutionContractEvidence()).toEqual({
-        resolutionToken: "ATTEMPT-USD",
-        snapshotHash: "HASH-USD",
-      });
-    } finally {
-      nextResolutionResponse = undefined;
-      nextConfirmationResponse = undefined;
-    }
-  });
-
-  it("retains unordered ambiguous candidates and never offers a route to confirm", async () => {
-    const { AppComponent } = await import("./app.component");
-    const component = new AppComponent();
-    await Promise.resolve();
-    component.resolutionBanksError.set("");
-    component.resolutionCounterpartyBankServiceId.set("BANK-SVC-BARC");
-    nextResolutionError = {
-      status: 422,
-      error: {
-        resolutionDecision: "SSI_AMBIGUOUS",
-        chosenRoute: null,
-        candidates: [
-          { ssiId: "SSI-003", ssiCode: "SSI-DEMO-003" },
-          { ssiId: "SSI-022", ssiCode: "SSI-DEMO-022" },
-        ],
-        resolutionToken: "ATTEMPT-GBP",
-        snapshotHash: "HASH-GBP",
-        mx: {
-          httpStatus: 422,
-          code: "SSI_AMBIGUOUS",
-          payloadGenerated: false,
-        },
-        mt: {
-          validation: "FAIL",
-          code: "SSI_AMBIGUOUS",
-          payloadGenerated: false,
-        },
-      },
-    };
-
-    try {
-      await component.resolve();
-      const confirmCallsBefore = fakeHttp.post.mock.calls.filter(([url]) =>
-        url.endsWith("/confirm"),
-      ).length;
-
-      expect(component.resolutionContractDecision()).toBe("SSI_AMBIGUOUS");
-      expect(component.resolutionContractChosenRoute()).toBeNull();
-      expect(component.resolutionContractCandidates()).toEqual([
-        expect.objectContaining({ ssiCode: "SSI-DEMO-003" }),
-        expect.objectContaining({ ssiCode: "SSI-DEMO-022" }),
-      ]);
-      expect(component.resolutionRequestError()).toContain("SSI_AMBIGUOUS");
-
-      await component.confirmResolution();
-      expect(
-        fakeHttp.post.mock.calls.filter(([url]) => url.endsWith("/confirm")),
-      ).toHaveLength(confirmCallsBefore);
-      expect(component.resolutionConfirmation()).toBeNull();
-    } finally {
-      nextResolutionError = undefined;
-    }
-  });
-
-  it("previews SGD with the current parameters and never displays the USD route", async () => {
-    const { AppComponent } = await import("./app.component");
-    const component = new AppComponent();
-    await Promise.resolve();
-    component.resolutionBanksError.set("");
-    component.resolutionCounterpartyBankServiceId.set("BANK-SVC-BARC");
-    nextResolutionResponse = legacyResolutionResponse("USD");
-
-    try {
-      await component.resolve();
-      component.selectResolutionCurrency("SGD");
-      nextResolutionResponse = undefined;
-      nextResolutionError = {
-        status: 422,
-        error: {
-          mx: {
-            httpStatus: 422,
-            code: "SSI_NOT_FOUND",
-            payloadGenerated: false,
-            detail: "No active SGD SSI route",
-          },
-          mt: { routeEligibilityCreated: false },
-        },
-      };
-      await component.resolve();
-
-      const resolveCalls = fakeHttp.post.mock.calls.filter(([url]) =>
-        url.endsWith("/settlements/resolve"),
-      );
-      expect(resolveCalls.at(-1)?.[1]).toMatchObject({ currency: "SGD" });
-      expect(component.resolutionResult()).toBeNull();
-      expect(component.resolutionContractResult()).toBeNull();
-      expect(component.resolutionRequestError()).toContain("SSI_NOT_FOUND");
-      expect(component.resolutionRequestError()).toContain("HTTP 422");
-    } finally {
-      nextResolutionResponse = undefined;
-      nextResolutionError = undefined;
-    }
-  });
-
-  it("removes an authoritative GBP result immediately on USD selection and previews only USD", async () => {
-    const { AppComponent } = await import("./app.component");
-    const component = new AppComponent();
-    await Promise.resolve();
-    await Promise.resolve();
-    component.resolutionBanksError.set("");
-    component.resolutionCounterpartyBankServiceId.set("BANK-SVC-BARCGB22");
-    component.selectResolutionCurrency("GBP");
-    component.resolutionContractResult.set({
-      resolutionDecision: "RESOLVED",
-      mx: {
-        httpStatus: 200,
-        decision: "RESOLVED",
-        chosenRoute: {
-          ssiCode: "SSI-DEMO-003",
-          ssiVersion: 39,
-          currency: "GBP",
-        },
-        canonicalRoles: {
-          instructedAgent: "BARCGB22",
-          creditorAgent: "BARCGB22",
-        },
-      },
-      mt: { tags: { "58A": "BARCGB22" }, omitted: ["57a"] },
-    });
-
-    try {
-      expect(JSON.stringify(component.renderedSettlementOutput())).toContain(
-        "BARCGB22",
-      );
-
-      component.selectResolutionCurrency("USD");
-
-      expect(component.resolutionContractResult()).toBeNull();
-      expect(component.resolutionResult()).toBeNull();
-      expect(component.resolutionConfirmation()).toBeNull();
-      expect(component.resolutionContractDecision()).toBe("");
-      expect(component.renderedSettlementOutput()).toBeNull();
-      await component.loadResolutionBanks();
-      await component.refreshResolutionClearingOptions();
-      nextResolutionResponse = {
-        resolutionDecision: "RESOLVED",
-        mx: {
-          httpStatus: 200,
-          decision: "RESOLVED",
-          chosenRoute: {
-            ssiCode: "SSI-DEMO-024",
-            ssiVersion: 14,
-            currency: "USD",
-          },
-          canonicalRoles: {
-            instructedAgent: "CITIUS33",
-            creditorAgent: "CITIUS33",
-            creditor: "BARCGB22",
-          },
-        },
-        mt: { tags: { "58A": "BARCGB22" }, omitted: ["57a"] },
-      };
-      component.resolutionBanksError.set("");
-      component.resolutionCounterpartyBankServiceId.set("BANK-SVC-BARCGB22");
-
-      await component.resolve();
-
-      const resolveCalls = fakeHttp.post.mock.calls.filter(([url]) =>
-        url.endsWith("/settlements/resolve"),
-      );
-      expect(resolveCalls.at(-1)?.[1]).toMatchObject({ currency: "USD" });
-      expect(component.resolutionContractResult()).toMatchObject({
-        mx: {
-          chosenRoute: { ssiCode: "SSI-DEMO-024", currency: "USD" },
-          canonicalRoles: {
-            instructedAgent: "CITIUS33",
-            creditorAgent: "CITIUS33",
-          },
-        },
-      });
-      expect(component.resolutionContractDecision()).toBe("RESOLVED");
-      expect(
-        JSON.stringify(component.resolutionContractResult()),
-      ).not.toContain("SSI-DEMO-003");
-    } finally {
-      nextResolutionResponse = undefined;
-    }
-  });
-
-  it("invalidates every resolution-derived panel when a routing input changes", async () => {
-    const { AppComponent } = await import("./app.component");
-    const component = new AppComponent();
-    await Promise.resolve();
-    component.resolutionBanks.set([
-      {
-        bankServiceId: "BANK-SVC-NEW",
-        bic: "DEUTDEFF",
-        name: "Deutsche Bank",
-        country: "DE",
-        addressRef: "ADDR-DEUT",
-        standard: "BIC",
-      },
-    ]);
-    component.resolutionBanksError.set("");
-
-    const seedAuthoritativeResult = () => {
-      component.resolutionContractResult.set({
-        mx: { httpStatus: 200, decision: "RESOLVED" },
-        mt: { tags: { "58A": "BARCGB22" } },
-      });
-      component.resolutionConfirmation.set({} as never);
-      component.resolutionRequestError.set("stale error");
-    };
-    const expectInvalidated = () => {
-      expect(component.resolutionContractResult()).toBeNull();
-      expect(component.resolutionResult()).toBeNull();
-      expect(component.resolutionConfirmation()).toBeNull();
-      expect(component.resolutionRequestError()).toBe("");
-      expect(component.renderedSettlementOutput()).toBeNull();
-    };
-    const routingChanges: readonly (() => void)[] = [
-      () => component.selectResolutionCounterpartyBankService("BANK-SVC-NEW"),
-      () => component.selectResolutionCurrency("EUR"),
-      () => component.selectResolutionSettlementCountry("DE"),
-      () => component.selectResolutionBookingEntity("DE01"),
-      () => component.selectResolutionValueDate("2026-09-12"),
-      () => component.selectResolutionSettlementMarket("T2"),
-      () => component.selectResolutionClearingSystem("TGT"),
-      () => component.selectResolutionAmount("2000000"),
-      () => component.selectResolutionReference("MT2XX-CHANGED"),
-    ];
-
-    for (const change of routingChanges) {
-      seedAuthoritativeResult();
-      change();
-      expectInvalidated();
-    }
-
-    seedAuthoritativeResult();
-    component.openPaymentMessage({
-      order: 1,
-      messageType: "MT202",
-      description: "General Financial Institution Transfer",
-      processingMode: "SINGLE",
-      profileStatus: "PROFILE_VERIFIED",
-      targetMessage: "pacs.009.001.08",
-      businessService: "swift.cbprplus.04",
-      selectable: true,
-    });
-    expectInvalidated();
-  });
-
-  it("switches response format without rerunning resolution", async () => {
-    const { AppComponent } = await import("./app.component");
-    const component = new AppComponent();
-    await Promise.resolve();
-    component.resolutionBanksError.set("");
-    component.resolutionCounterpartyBankServiceId.set("BANK-SVC-BARC");
-    nextResolutionResponse = {
-      mx: { httpStatus: 200, decision: "RESOLVED" },
-      mt: { tags: { "58A": "BARCGB22" } },
-    };
-
-    try {
-      await component.resolve();
-      const resolveCount = fakeHttp.post.mock.calls.filter(([url]) =>
-        url.endsWith("/settlements/resolve"),
-      ).length;
-
-      component.resolutionOutputFormat.set("MT");
-      expect(component.renderedSettlementOutput()).toEqual({
-        tags: { "58A": "BARCGB22" },
-      });
-      component.resolutionOutputFormat.set("MX");
-
-      expect(
-        fakeHttp.post.mock.calls.filter(([url]) =>
-          url.endsWith("/settlements/resolve"),
-        ),
-      ).toHaveLength(resolveCount);
-      expect(component.resolutionContractDecision()).toBe("RESOLVED");
-    } finally {
-      nextResolutionResponse = undefined;
-    }
   });
 
   it("initialises the main workbench and handles local index interactions", async () => {
@@ -2285,12 +1566,6 @@ describe("portal component behavior", () => {
     await Promise.resolve();
 
     expect(component.view()).toBe("swiftdata");
-    component.searchPaymentMessageIndex("MT202");
-    expect(component.paymentMessageIndexSearch()).toBe("MT202");
-    component.sortPaymentMessageIndexBy("description");
-    expect(component.paymentMessageIndexSortKey()).toBe("description");
-    component.sortPaymentMessageIndexBy("description");
-    expect(component.paymentMessageIndexSortDirection()).toBe("desc");
     fakeHttp.get.mockClear();
     component.selectOwnershipTab("COUNTERPARTY");
     await Promise.resolve();
@@ -2429,7 +1704,7 @@ describe("portal component behavior", () => {
     ).toEqual(["CUST-1"]);
   });
 
-  it("drives payment, SSI maintenance, resolution, and tag-selection state", async () => {
+  it("drives SSI maintenance state", async () => {
     const { AppComponent } = await import("./app.component");
     const component = new AppComponent();
     const row = {
@@ -2454,115 +1729,14 @@ describe("portal component behavior", () => {
     await component.act(row, "approve");
     component.startNew();
     await component.create();
-
-    component.paymentMessageIndex.set([
-      {
-        order: 1,
-        messageType: "MT202",
-        description: "General Financial Institution Transfer",
-        processingMode: "SINGLE",
-        profileStatus: "PROFILE_VERIFIED",
-        targetMessage: "pacs.009.001.08",
-        businessService: "swift.cbprplus.04",
-        selectable: true,
-      },
-    ]);
-    const scenario = component.paymentMessageScenarios()[0]!;
-    component.openPaymentScenario(scenario);
-    expect(component.paymentTransactionOpen()).toBe(true);
-    component.togglePaymentScenarioSort();
-    component.closePaymentTransaction();
-    expect(component.paymentTransactionOpen()).toBe(false);
-
-    component.navigate("resolver");
-    component.navigate("treasury");
-    component.navigate("tradefinance");
-    component.navigate("audit");
-    component.resolutionBanks.set([
-      {
-        bankServiceId: "BANK-SVC-1",
-        bic: "CHASUS33",
-        name: "Bank",
-        country: "US",
-        addressRef: "ADDR-1",
-        standard: "BIC",
-      },
-    ]);
-    component.selectResolutionCounterpartyBankService("BANK-SVC-1");
-    component.selectResolutionCustomerId("CUSTOMER-1");
-    component.selectResolutionCurrency("EUR");
-    component.selectResolutionSettlementCountry("DE");
-    component.selectResolutionBookingEntity("DE01");
-    component.selectResolutionValueDate("2026-09-10");
-    component.selectResolutionSettlementMarket("T2");
-    await component.refreshResolutionClearingOptions();
-    await component.resolve();
-    component.selectResolutionRoute("SSI-1");
-    component.clearResolution();
-    component.resolutionResult.set({
-      useCase: "PAYMENT_SSI",
-      usage: "EXECUTABLE_SETTLEMENT",
-      paymentExecutable: false,
-      preSettlement: true,
-      attemptId: "ATTEMPT-1",
-      requestHash: "hash",
-      decision: "RESOLVED",
-      recommendedRoute: {
-        ssiId: "SSI-1",
-        ssiVersion: 1,
-        counterpartyId: "BANK-1",
-        route: { currency: "USD" },
-        applicability: {
-          id: "APP-1",
-          ssiId: "SSI-1",
-          consumer: "ANY",
-          product: "ANY",
-          businessFunction: "ANY",
-          paymentLeg: "ANY",
-          direction: "ANY",
-          status: "ACTIVE",
-          validFrom: "2026-01-01",
-          validTo: "9999-12-31",
-          version: 1,
-        },
-        fallbackTier: 0,
-        rank: [1],
-        evidence: [],
-      },
-      alternatives: [],
-      excludedRoutes: [],
-      explanation: "Exact match",
-    });
-    component.resolutionSelectedSsiId.set("SSI-1");
-    await component.confirmResolution();
-
-    const tagScenario = component.tagScenarios[0]!;
-    component.chooseTagScenario(tagScenario.id);
-    component.chooseTagSsi("SSI-1");
-    component.selectTagCurrency("USD");
-    component.selectTagCounterparty("CHASUS33");
-    component.updateTagTransactionContext();
-    component.searchTagCatalog("MT7");
-    component.sortTagCatalog("description");
-    component.sortTagCatalog("description");
-    component.openTagTransaction(tagScenario.id);
-    component.openTagMessage(tagScenario.descriptor.messageType);
-    await component.extract();
-    await component.generateTags();
-    component.moveTagCatalogPage(1);
-    component.cancelTagTransaction();
-    expect(component.tagTransactionOpen()).toBe(false);
   });
 
-  it("derives governed dashboard, payment, resolution, and tag state", async () => {
+  it("derives governed SSI dashboard state", async () => {
     const { AppComponent } = await import("./app.component");
     const component = new AppComponent();
     await Promise.resolve();
     component.rows.set([]);
     component.counterpartyDirectory.set([]);
-    component.paymentMessageIndex.set([]);
-    component.finResolutionCatalogue.set([]);
-    component.controlledTagCandidates.set([]);
 
     expect(component.visibleRows()).toEqual([]);
     expect(component.counterpartyInbox()).toEqual([]);
@@ -2579,33 +1753,6 @@ describe("portal component behavior", () => {
     expect(component.hasNextBankPage()).toBe(false);
     expect(component.hasPreviousCustomerPage()).toBe(false);
     expect(component.hasNextCustomerPage()).toBe(false);
-    expect(component.resolutionCustomers()).toEqual([]);
-    expect(component.resolutionSourceLabel()).toBe("Trade Finance");
-    expect(component.resolutionCounterpartyId()).toBe("BARCGB22");
-    expect(component.resolutionCounterpartyCountry()).toBe("GB");
-    expect(component.resolutionCoveredCurrencies()).toEqual(new Set());
-    expect(component.resolutionSelectedCurrencyCovered()).toBe(false);
-    expect(component.resolutionClearingSystems()).toEqual([]);
-    expect(component.resolutionBusinessService()).toBe("");
-    expect(component.resolutionPaymentProfile().counterpartyType).toBe("BANK");
-    expect(component.resolutionMtMessageType()).toBe("MT202");
-    expect(component.resolutionBeneficiaryCustomer()).toBeUndefined();
-    expect(component.resolvedCanonicalSettlement()).toBeNull();
-    expect(component.renderedSettlementOutput()).toBeNull();
-    expect(component.resolutionSelectableRoutes()).toEqual([]);
-    expect(component.selectedResolutionRoute()).toBeNull();
-    expect(component.resolutionHasManualRouteOverride()).toBe(false);
-    expect(component.availableTagMessages()).toEqual([]);
-    expect(component.tagCatalogTotalPages()).toBe(1);
-    expect(component.pagedTagScenarios()).toEqual([]);
-    expect(component.tagSelectedCurrencyCovered()).toBe(false);
-    expect(component.eligibleSuggestionBanks()).toEqual([]);
-    expect(component.mt760ValidationIssue()).toBe("");
-    expect(component.mt400ValidationIssue()).toBe("");
-    expect(component.tagSuggestionValidationIssue()).toBe("");
-    expect(component.tagSsiDerivationReason()).toBe("NO_SSI_FOUND");
-    expect(component.tagSupportRows()).toBeDefined();
-    expect(component.visibleTagSupportRows()).toBeDefined();
   });
 
   it("validates dynamic identity form rules for banks and customers", async () => {
@@ -2695,7 +1842,7 @@ describe("portal component behavior", () => {
     ).toBeTruthy();
   });
 
-  it("derives populated ownership, customer-payment, and settlement state", async () => {
+  it("derives populated SSI ownership and Maker state", async () => {
     const { AppComponent } = await import("./app.component");
     const component = new AppComponent();
     await Promise.resolve();
@@ -2766,33 +1913,7 @@ describe("portal component behavior", () => {
     ]);
 
     expect(component.visibleRows().map((row) => row.id)).toEqual(["SSI-OWN"]);
-    component.resolutionCounterpartyBic.set("BARCGB22");
-    component.resolutionBanksError.set("");
-    expect(component.resolutionCoveredCurrencies()).toEqual(new Set(["USD"]));
-    expect(component.resolutionSelectedCurrencyCovered()).toBe(true);
-    component.resolutionBanks.set([
-      {
-        bankServiceId: "BANK-SVC-BARC",
-        bic: "BARCGB22",
-        name: "Barclays",
-        country: "GB",
-        addressRef: "ADDR-BARC",
-        standard: "BIC",
-      },
-    ]);
-    component.resolutionCounterpartyBankServiceId.set("BANK-SVC-BARC");
-    expect(component.selectedResolutionBank()?.bic).toBe("BARCGB22");
-    component.paymentMessageIndex.set([
-      {
-        messageType: "MT202",
-        targetMessage: "pacs.009.001.08",
-        description: "FI transfer",
-        direction: "OUTGOING",
-        businessService: "swift.cbprplus.03",
-        selectable: true,
-      },
-    ]);
-    expect(component.filteredPaymentMessageIndex()).toHaveLength(1);
+
     component.ownershipSearch.set("chas");
     expect(component.visibleRows()).toHaveLength(1);
     component.selectOwnershipTab("COUNTERPARTY");
@@ -2812,111 +1933,6 @@ describe("portal component behavior", () => {
     expect(component.maintenanceIndex.archivedCount()).toBe(1);
     component.deleteReason.set("valid reason");
     expect(component.canConfirmDelete()).toBe(true);
-
-    component.resolutionConsumer.set("TREASURY");
-    expect(component.resolutionSourceLabel()).toBe("Treasury");
-    component.resolutionCounterpartyType.set("CUSTOMER");
-    component.resolutionCustomerId.set("CUST-1");
-    expect(component.resolutionCounterpartyId()).toBe("CUST-1");
-    expect(component.resolutionCounterpartyCountry()).toBe("US");
-    expect(component.resolutionBeneficiaryCustomer()).toMatchObject({
-      customerId: "CUST-1",
-      accountReference: "ACCT-1",
-    });
-    component.clearingSystems.set([
-      {
-        code: "T2",
-        name: "T2",
-        supportedCurrency: "EUR",
-        settlementCountry: "DE",
-        marketScope: "PAN_REGIONAL",
-        eligibleCountries: ["DE"],
-        settlementMarket: "T2",
-        paymentServiceLevel: "HIGH_VALUE",
-        schemeType: "RTGS",
-        status: "ACTIVE",
-        validFrom: "2026-01-01",
-        validTo: "9999-12-31",
-      },
-    ]);
-    component.eligibleClearingSystemCodes.set(["T2"]);
-    expect(component.resolutionClearingSystems()).toHaveLength(1);
-
-    const settlement = {
-      finMessageType: "MT202" as const,
-      instructingAgentBic: "AAAAGB2L",
-      instructedAgentBic: "BBBBUS33",
-      deliveryAgentBic: "AAAAGB2L",
-      intermediaryAgentBics: ["CCCCDEFF"],
-      creditorAgentBic: "DDDDUS44",
-      beneficiaryInstitutionBic: "EEEEJPJT",
-      reimbursementAgentBics: [],
-      settlementAccountReference: "ACCT-1",
-      settlementCountry: "US",
-      settlementMarket: "FEDWIRE",
-      clearingSystem: "FEDWIRE",
-      schemeType: "RTGS",
-      fieldProvenance: {},
-    };
-    component.resolutionResult.set({
-      useCase: "PAYMENT_SSI",
-      usage: "EXECUTABLE_SETTLEMENT",
-      paymentExecutable: false,
-      preSettlement: true,
-      attemptId: "ATTEMPT-2",
-      requestHash: "hash",
-      decision: "NO_SSI_FOUND",
-      alternatives: [],
-      excludedRoutes: [],
-      explanation: "Preview only",
-      canonicalSettlementPreview: settlement,
-    });
-    expect(component.resolvedCanonicalSettlement()).toEqual(settlement);
-    component.resolutionOutputFormat.set("MT");
-    expect(component.renderedSettlementOutput()).toHaveProperty("58A");
-
-    component.finResolutionCatalogue.set([
-      {
-        messageType: "MT300",
-        resolutionMode: "TREASURY",
-        profileSlots: ["B1/57A"],
-        ssiResolvableTags: ["57A"],
-      },
-      {
-        messageType: "MT999",
-        resolutionMode: "TREASURY",
-        profileSlots: [],
-        ssiResolvableTags: [],
-      },
-    ]);
-    component.view.set("treasury");
-    expect(component.availableTagMessages()).toHaveLength(2);
-    component.tagCatalogSearch.set("foreign");
-    expect(component.availableTagMessages()[0]?.messageType).toBe("MT300");
-    component.navigate("treasury");
-    expect(component.selectedTagScenario().descriptor.messageType).toBe(
-      "MT300",
-    );
-    expect(component.tagScenarioUsesSettlementSsi()).toBe(true);
-    expect(component.tagUpstreamContext().messageType).toBe("MT300");
-    const mt760 = component.tagScenarios.find(
-      (scenario) => scenario.descriptor.messageType === "MT760",
-    )!;
-    component.chooseTagScenario(mt760.id);
-    component.mt760ConfirmationInstructions.set("CONFIRM");
-    expect(component.mt760ValidationIssue()).toContain(
-      "UPSTREAM_TRANSACTION_CONTEXT",
-    );
-    await component.generateTags();
-    component.mt760ConfirmationInstructions.set("WITHOUT");
-    expect(component.mt760ValidationIssue()).toBe("");
-
-    const mt400 = component.tagScenarios.find(
-      (scenario) => scenario.descriptor.messageType === "MT400",
-    )!;
-    component.chooseTagScenario(mt400.id);
-    expect(component.mt400SettlementMode()).not.toBe("UNVERIFIED");
-    await component.generateTags();
 
     const setValue = jest.fn();
     jest.mocked(component.form.get).mockReturnValue({
@@ -2944,9 +1960,6 @@ describe("portal component behavior", () => {
       route: { counterpartyBic: "CHASUS33" },
     });
     expect(component.selectedBic("counterpartyId")).toBe("CUSTOMER");
-    component.resolutionClearingSystem.set("UNKNOWN");
-    await component.refreshResolutionClearingOptions();
-    expect(component.resolutionClearingSystem()).toBe("");
 
     component.model = {
       maker: "maker",
@@ -2966,26 +1979,13 @@ describe("portal component behavior", () => {
     expect(component.notice()?.kind).toBe("warning");
   });
 
-  it("fails closed when reference, resolution, and maintenance services are offline", async () => {
+  it("fails closed when maintenance and reference services are offline", async () => {
     rejectHttp = true;
     try {
       const { AppComponent } = await import("./app.component");
       const component = new AppComponent();
       component.ngOnInit();
-      component.navigate("resolver");
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
-      expect(component.resolutionBanksError()).toBe("");
-      expect(component.paymentMessageIndexError()).toBe("");
-      expect(component.notice()).toBeNull();
 
-      await component.refresh();
-      await component.loadPaymentMessageIndex();
-      expect(component.paymentMessageIndexError()).toBe(
-        "PAYMENT_MESSAGE_INDEX_UNAVAILABLE",
-      );
-      await component.loadFinResolutionCatalogue();
       component.model = {
         maker: "maker",
         counterpartyId: "BANK-1",
@@ -3007,56 +2007,12 @@ describe("portal component behavior", () => {
       component.deleteReason.set("duplicate record");
       await component.confirmDelete();
 
-      component.resolutionBanksError.set("");
-      component.resolutionCounterpartyBankServiceId.set("BANK-SVC-1");
-      await component.refreshResolutionClearingOptions();
-      await component.resolve();
-      component.resolutionResult.set({
-        useCase: "PAYMENT_SSI",
-        usage: "EXECUTABLE_SETTLEMENT",
-        paymentExecutable: false,
-        preSettlement: true,
-        attemptId: "ATTEMPT-1",
-        requestHash: "hash",
-        decision: "RESOLVED",
-        recommendedRoute: {
-          ssiId: "SSI-1",
-          ssiVersion: 1,
-          counterpartyId: "BANK-1",
-          route: { currency: "USD" },
-          applicability: {
-            id: "APP-1",
-            ssiId: "SSI-1",
-            consumer: "ANY",
-            product: "ANY",
-            businessFunction: "ANY",
-            paymentLeg: "ANY",
-            direction: "ANY",
-            status: "ACTIVE",
-            validFrom: "2026-01-01",
-            validTo: "9999-12-31",
-            version: 1,
-          },
-          fallbackTier: 0,
-          rank: [1],
-          evidence: [],
-        },
-        alternatives: [],
-        excludedRoutes: [],
-        explanation: "Exact match",
-      });
-      component.resolutionSelectedSsiId.set("SSI-1");
-      await component.confirmResolution();
-      await component.extract();
-      await component.generateTags();
       await component.openBicPicker("beneficiaryBic", "Beneficiary bank");
       await component.searchBanks("bank");
       await component.moveBankPage(1);
       await component.searchCustomers("customer");
       await component.moveCustomerPage(1);
-      expect(component.resolutionLoading()).toBe(false);
-      expect(component.resolutionConfirming()).toBe(false);
-      expect(component.tagLoading()).toBe(false);
+      expect(fakeHttp.post).toHaveBeenCalled();
     } finally {
       rejectHttp = false;
     }

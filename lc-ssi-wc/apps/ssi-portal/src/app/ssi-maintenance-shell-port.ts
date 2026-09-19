@@ -29,11 +29,12 @@ export interface ReferenceBookingBranch {
 export interface SsiMaintenanceShellPort {
   checkerCount(): number;
   navigate(view: "dashboard" | "maker"): Promise<boolean>;
-  notify(notice: { kind: "info" | "warning" | "error"; text: string } | null): void;
+  notify(
+    notice: { kind: "info" | "warning" | "error"; text: string } | null,
+  ): void;
   openDetail(row: SsiRow): Promise<void>;
   closeDetail(): void;
   acceptCurrencies(items: readonly ReferenceCurrency[]): void;
-  onIndexRefreshed(): void;
   acceptPendingApprovalCount(count: number): void;
   restoreDashboardAfterReleasedWip(notice: {
     kind: "error";
@@ -56,25 +57,33 @@ export class SsiMaintenanceShellBridge implements SsiMaintenanceShellPort {
     if (this.delegate === port) this.delegate = null;
   }
 
-  checkerCount(): number { return this.delegate?.checkerCount() ?? 0; }
+  checkerCount(): number {
+    return this.delegate?.checkerCount() ?? 0;
+  }
   navigate(view: "dashboard" | "maker"): Promise<boolean> {
     return this.delegate?.navigate(view) ?? Promise.resolve(false);
   }
-  notify(notice: { kind: "info" | "warning" | "error"; text: string } | null): void {
+  notify(
+    notice: { kind: "info" | "warning" | "error"; text: string } | null,
+  ): void {
     this.delegate?.notify(notice);
   }
   openDetail(row: SsiRow): Promise<void> {
     return this.delegate?.openDetail(row) ?? Promise.resolve();
   }
-  closeDetail(): void { this.delegate?.closeDetail(); }
+  closeDetail(): void {
+    this.delegate?.closeDetail();
+  }
   acceptCurrencies(items: readonly ReferenceCurrency[]): void {
     this.delegate?.acceptCurrencies(items);
   }
-  onIndexRefreshed(): void { this.delegate?.onIndexRefreshed(); }
   acceptPendingApprovalCount(count: number): void {
     this.pendingApprovalCountState.set(count);
   }
-  restoreDashboardAfterReleasedWip(notice: { kind: "error"; text: string }): void {
+  restoreDashboardAfterReleasedWip(notice: {
+    kind: "error";
+    text: string;
+  }): void {
     this.delegate?.restoreDashboardAfterReleasedWip(notice);
   }
 }
