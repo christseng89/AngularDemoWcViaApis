@@ -22,6 +22,14 @@ export const APP_ROUTES: Routes = [
       ),
   },
   {
+    path: "swiftdata",
+    canActivate: [appRouteCanActivate],
+    loadComponent: () =>
+      import("./swift-data-crud.component").then(
+        (module) => module.SwiftDataCrudComponent,
+      ),
+  },
+  {
     path: "checker",
     canActivate: [appRouteCanActivate],
     loadComponent: () =>

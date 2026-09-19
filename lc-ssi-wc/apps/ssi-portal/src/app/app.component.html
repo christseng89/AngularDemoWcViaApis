@@ -105,18 +105,12 @@
     @if (routeLoading()) {
       <ssi-loading-state label="Loading workspace…" />
     }
-    @if (view() === "swiftdata") {
-      <ssi-swift-data-crud
-        [initialResourceId]="governedReviewResourceId()"
-        [initialRecordId]="governedReviewRecordId()"
-        [checkerMode]="governedReviewRecordId() !== null"
-      />
-    }
   }
   <div
     [hidden]="
       !!detail.target() ||
       (view() !== 'settings' &&
+        view() !== 'swiftdata' &&
         view() !== 'dashboard' &&
         view() !== 'maker' &&
         view() !== 'resolver' &&

@@ -9,146 +9,46 @@ import {
   type SimpleChanges,
   signal,
 } from "@angular/core";
-import { HttpClient } from "@angular/common/http";
 import { scalarText } from "./scalar-text";
-import { DOCUMENT, JsonPipe } from "@angular/common";
-import {
-  AbstractControl,
-  FormGroup,
-  ReactiveFormsModule,
-} from "@angular/forms";
+import { JsonPipe } from "@angular/common";
+import { FormGroup, ReactiveFormsModule } from "@angular/forms";
 import { FormlyForm, type FormlyFieldConfig } from "@ngx-formly/core";
 import { firstValueFrom } from "rxjs";
 import { AlertComponent } from "./alert.component";
 import { GovernedRecordViewComponent } from "./governed-record-view.component";
 import {
   BankServicePickerDialogComponent,
-  type BankServicePickerItem,
 } from "./bank-service-picker-dialog.component";
 import {
   createMaintenanceIndexActionAdapter,
   type MaintenanceIndexActionId,
   type MaintenanceIndexTab,
 } from "./maintenance-index-action-policy";
-import { assertMaintenanceServerPage } from "./maintenance-index-server-page";
 import {
   currentStatusLabel,
   type CurrentStatus,
 } from "./current-status-contract";
+import type {
+  CurrencyReference,
+  MessageTypeChanges,
+  OpenApiUiContract,
+  RmaMessageTypePolicy,
+  Row,
+  StatusFilter,
+  UiColumn,
+  UiResource,
+} from "./swift-data-feature/swift-data.models";
+import { SwiftDataApiService } from "./swift-data-feature/swift-data-api.service";
+import { SwiftDataBankPicker } from "./swift-data-feature/swift-data-bank-picker";
+import { SwiftDataRmaSelection } from "./swift-data-feature/swift-data-rma-selection";
+import { SwiftDataRevisionSession } from "./swift-data-feature/swift-data-revision-session";
+import { SwiftDataFieldMapper } from "./swift-data-feature/swift-data-field-mapper";
+import { SwiftDataIndexStore } from "./swift-data-feature/swift-data-index.store";
+import {
+  SwiftDataExportService,
+  type SwiftDataExportContext,
+} from "./swift-data-feature/swift-data-export.service";
 
-interface UiColumn {
-  path?: string;
-  paths?: string[];
-  separator?: string;
-  label: string;
-}
-interface UiField {
-  key: string;
-  label: string;
-  description?: string;
-  required?: boolean;
-  type: string;
-  inputType?: string;
-  pattern?: string;
-  minLength?: number;
-  maxLength?: number;
-  minimum?: number;
-  maximum?: number;
-  options?: string[];
-  optionsSource?: string;
-  referenceSource?: "reference/banks";
-  defaultValue?: unknown;
-  "x-required-when"?: { path: string; equals: unknown };
-  "x-disabled-when"?: { path: string; equals: unknown };
-}
-interface UiResource {
-  id: string;
-  label: string;
-  endpoint: string;
-  importType?: "SSI" | "RMA" | "NOSTRO";
-  description: string;
-  columns: UiColumn[];
-  exportColumns?: Array<{ path: string; label: string }>;
-  fields: UiField[];
-  "x-lifecycle": string[];
-}
-interface OpenApiUiContract {
-  info: { title: string; version: string };
-  "x-standards-baseline": Record<string, string>;
-  "x-ui-resources": UiResource[];
-}
-interface CurrencyReference {
-  code: string;
-  decimals: number;
-}
-type Row = Record<string, unknown> & {
-  id: string;
-  status: string;
-  version: number;
-  maker: string;
-};
-type StatusFilter =
-  "ACTIVE" | "DRAFT" | "PENDING_APPROVAL" | "SUPPRESSED" | "ALL";
-type ExcelWorkbook = import("exceljs").Workbook;
-type ExcelWorksheet = import("exceljs").Worksheet;
-interface ExportColumn {
-  path: string;
-  label: string;
-}
-interface PagedRows {
-  items: Row[];
-  page: number;
-  pageSize: number;
-  totalItems: number;
-  totalPages: number;
-  hasPrevious: boolean;
-  hasNext: boolean;
-}
-interface BankReference {
-  bankServiceId: string;
-  bic: string;
-  name: string;
-  country: string;
-  city?: string;
-  standard: string;
-}
-interface BankPage {
-  items: readonly BankReference[];
-  page: number;
-  pageSize: number;
-  total: number;
-  totalPages: number;
-}
-interface MessageTypeChanges {
-  readonly unchanged: readonly string[];
-  readonly added: readonly string[];
-  readonly suppressed: readonly string[];
-}
-interface RmaMessageCategory {
-  readonly categoryId: "SECURITY" | "TRADE_FINANCE" | "PAYMENT";
-  readonly displayName: string;
-  readonly displayOrder: number;
-  readonly emptyStateText: string;
-}
-interface RmaMessagePolicyItem {
-  readonly messageType: string;
-  readonly description: string;
-  readonly categoryId: RmaMessageCategory["categoryId"];
-  readonly directionApplicability: {
-    readonly inbound: { readonly applicable: boolean };
-    readonly outbound: { readonly applicable: boolean };
-  };
-}
-interface RmaMessageTypePolicy {
-  readonly supportedMessageTypes: readonly string[];
-  readonly categories: readonly RmaMessageCategory[];
-  readonly items: readonly RmaMessagePolicyItem[];
-}
-interface RmaPairState {
-  readonly ownBic: string;
-  readonly counterpartyBic: string;
-  readonly directions: Readonly<Record<"INBOUND" | "OUTBOUND", Row | null>>;
-}
 
 @Component({
   selector: "ssi-swift-data-crud",
@@ -161,6 +61,7 @@ interface RmaPairState {
     BankServicePickerDialogComponent,
     GovernedRecordViewComponent,
   ],
+  providers: [SwiftDataApiService, SwiftDataBankPicker, SwiftDataExportService, SwiftDataRmaSelection, SwiftDataRevisionSession, SwiftDataFieldMapper, SwiftDataIndexStore],
   templateUrl: "./swift-data-crud.component.html",
   styleUrl: "./swift-data-crud.component.css",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -169,9 +70,13 @@ interface RmaPairState {
   },
 })
 export class SwiftDataCrudComponent implements OnInit, OnChanges {
-  private readonly http = inject(HttpClient);
-  private readonly document = inject(DOCUMENT);
-  private readonly api = "http://localhost:3100/api";
+  private readonly api = inject(SwiftDataApiService);
+  readonly bankPicker = inject(SwiftDataBankPicker);
+  private readonly rmaSelection = inject(SwiftDataRmaSelection);
+  readonly revision = inject(SwiftDataRevisionSession);
+  private readonly exporter = inject(SwiftDataExportService);
+  private readonly fieldMapper = inject(SwiftDataFieldMapper);
+  readonly index = inject(SwiftDataIndexStore);
   readonly contract = signal<OpenApiUiContract | null>(null);
   readonly initialResourceId = input<string | null>(null);
   readonly initialRecordId = input<string | null>(null);
@@ -186,8 +91,9 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
     () =>
       this.resources().find((item) => item.id === this.resourceId()) ?? null,
   );
-  readonly rows = signal<readonly Row[]>([]);
-  readonly statusFilter = signal<StatusFilter>("ACTIVE");
+  readonly rows = this.index.rows;
+  readonly filteredRows = this.index.rows;
+  readonly statusFilter = this.index.statusFilter;
   readonly actionAdapter = computed(() =>
     createMaintenanceIndexActionAdapter(this.resourceId()),
   );
@@ -198,30 +104,19 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
           this.statusFilter() as MaintenanceIndexTab,
         ),
   );
-  readonly indexSearch = signal("");
-  readonly page = signal(1);
-  readonly pageSize = 8;
-  readonly totalItems = signal(0);
-  readonly serverTotalPages = signal(1);
-  readonly filteredRows = computed(() => this.rows());
-  readonly sortPath = signal<string | null>(null);
-  readonly sortDirection = signal<"asc" | "desc">("asc");
-  readonly sortedRows = computed(() => {
-    const path = this.sortPath();
-    if (!path) return this.filteredRows();
-    const direction = this.sortDirection() === "asc" ? 1 : -1;
-    return [...this.filteredRows()].sort(
-      (left, right) =>
-        this.compare(this.sortValue(left, path), this.sortValue(right, path)) *
-        direction,
-    );
-  });
-  readonly totalPages = computed(() => this.serverTotalPages());
-  readonly pagedRows = computed(() => this.sortedRows());
+  readonly indexSearch = this.index.indexSearch;
+  readonly page = this.index.page;
+  readonly pageSize = this.index.pageSize;
+  readonly totalItems = this.index.totalItems;
+  readonly serverTotalPages = this.index.serverTotalPages;
+  readonly sortPath = this.index.sortPath;
+  readonly sortDirection = this.index.sortDirection;
+  readonly totalPages = this.index.totalPages;
+  readonly sortedRows = this.index.sortedRows;
+  readonly pagedRows = this.index.pagedRows;
   readonly form = new FormGroup({});
   readonly fields = signal<FormlyFieldConfig[]>([]);
   readonly editingId = signal<string | null>(null);
-  readonly revisionReservationId = signal<string | null>(null);
   readonly savedDraftId = signal<string | null>(null);
   readonly formVisible = signal(false);
   readonly busy = signal(false);
@@ -252,10 +147,10 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
     if (!row || !resource) return {};
     const model: Record<string, unknown> = {};
     for (const field of resource.fields) {
-      this.setPath(
+      this.fieldMapper.setPath(
         model,
         field.key,
-        this.toFormValue(this.getPath(row, field.key), field),
+        this.fieldMapper.toFormValue(this.fieldMapper.getPath(row, field.key), field),
       );
     }
     return model;
@@ -263,33 +158,11 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
   readonly revokeTarget = signal<Row | null>(null);
   readonly revokeReason = signal("");
   readonly checkerRejectReason = signal("");
-  readonly bankPickerTarget = signal<string | null>(null);
-  readonly bankPickerTitle = signal("Select Bank Service");
-  readonly bankQuery = signal("");
-  readonly bankPickerLoading = signal(false);
-  readonly bankPickerError = signal<string | null>(null);
-  private readonly rmaDirectionMessageTypes = new Map<
-    string,
-    readonly string[]
-  >();
-  private pendingDeactivation: Promise<boolean> | null = null;
-  readonly bankPage = signal<BankPage>({
-    items: [],
-    page: 1,
-    pageSize: 8,
-    total: 0,
-    totalPages: 0,
-  });
-  readonly bankPickerItems = computed<readonly BankServicePickerItem[]>(() =>
-    this.bankPage().items.map((bank) => ({
-      bankServiceId: bank.bankServiceId,
-      bic: bank.bic,
-      displayValue: bank.name,
-      location: [bank.city, bank.country].filter(Boolean).join(" · "),
-      standard: bank.standard,
-    })),
-  );
   model: Record<string, unknown> = {};
+
+  constructor() {
+    this.index.sortValue = (row, path) => this.sortValue(row, path);
+  }
 
   ngOnInit(): void {
     void this.initialise();
@@ -312,21 +185,9 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
     try {
       if (this.checkerMode()) this.statusFilter.set("PENDING_APPROVAL");
       const [contract, currencies, messageTypePolicy] = await Promise.all([
-        firstValueFrom(
-          this.http.get<OpenApiUiContract>(
-            "/openapi/swift-data-service.v1.json",
-          ),
-        ),
-        firstValueFrom(
-          this.http.get<CurrencyReference[]>(
-            `${this.api}/reference/currencies`,
-          ),
-        ),
-        firstValueFrom(
-          this.http.get<RmaMessageTypePolicy>(
-            `${this.api}/rma-authorisations/message-type-policy`,
-          ),
-        ),
+        firstValueFrom(this.api.contract()),
+        firstValueFrom(this.api.currencies()),
+        firstValueFrom(this.api.messageTypePolicy()),
       ]);
       this.contract.set(contract);
       const requestedResourceId = this.initialResourceId();
@@ -362,28 +223,17 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
     this.editingId.set(null);
     this.importResult.set(null);
     this.detailTarget.set(null);
-    this.sortPath.set(null);
-    this.sortDirection.set("asc");
-    this.statusFilter.set(this.checkerMode() ? "PENDING_APPROVAL" : "ACTIVE");
-    this.indexSearch.set("");
-    this.page.set(1);
+    this.index.reset(this.checkerMode());
     const [currencies, messageTypePolicy] = await Promise.all([
-      firstValueFrom(
-        this.http.get<CurrencyReference[]>(`${this.api}/reference/currencies`),
-      ),
-      firstValueFrom(
-        this.http.get<RmaMessageTypePolicy>(
-          `${this.api}/rma-authorisations/message-type-policy`,
-        ),
-      ),
+      firstValueFrom(this.api.currencies()),
+      firstValueFrom(this.api.messageTypePolicy()),
     ]);
     this.configureFields(currencies, messageTypePolicy);
     await this.refresh();
   }
 
   searchIndex(value: string): void {
-    this.indexSearch.set(value);
-    this.page.set(1);
+    this.index.search(value);
     void this.refresh();
   }
 
@@ -392,36 +242,7 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
     if (!resource) return;
     this.busy.set(true);
     try {
-      const query = new URLSearchParams({
-        page: String(this.page()),
-        pageSize: String(this.pageSize),
-      });
-      if (this.statusFilter() !== "ALL")
-        query.set("status", this.statusFilter());
-      const search = this.indexSearch().trim();
-      if (search) query.set("search", search);
-      const response = await firstValueFrom(
-        this.http.get<PagedRows | Row[]>(
-          `${this.api}/${resource.endpoint}?${query.toString()}`,
-        ),
-      );
-      const result: PagedRows = Array.isArray(response)
-        ? {
-            items: response,
-            page: 1,
-            pageSize: response.length || this.pageSize,
-            totalItems: response.length,
-            totalPages: 1,
-            hasPrevious: false,
-            hasNext: false,
-          }
-        : response;
-      assertMaintenanceServerPage(result.items, this.statusFilter());
-      this.rows.set(result.items);
-      this.cacheRmaDirectionMessageTypes(result.items);
-      this.totalItems.set(result.totalItems);
-      this.serverTotalPages.set(result.totalPages);
-      this.page.set(result.page);
+      await this.index.refresh(resource, this.resourceId());
     } catch {
       this.notice.set({
         kind: "error",
@@ -438,123 +259,40 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
     this.model = {};
     for (const field of resource.fields)
       if (field.defaultValue !== undefined)
-        this.setPath(this.model, field.key, field.defaultValue);
+        this.fieldMapper.setPath(this.model, field.key, field.defaultValue);
     this.editingId.set(null);
     this.form.reset(this.model);
     this.formVisible.set(true);
   }
-  cancelWork(): void {
-    if (this.bankPickerTarget()) {
-      this.closeBankPicker();
+  async cancelWork(): Promise<void> {
+    if (this.bankPicker.target()) {
+      this.bankPicker.close();
       return;
     }
-    const reservationId = this.revisionReservationId();
-    this.revisionReservationId.set(null);
+    const reservationId = this.revision.reservationId();
+    if (reservationId && !(await this.canDeactivate())) return;
     this.formVisible.set(false);
     this.detailTarget.set(null);
     this.revokeTarget.set(null);
     this.revokeReason.set("");
     this.editingId.set(null);
-    if (reservationId) void this.releaseRevisionReservation(reservationId);
-  }
-
-  async openBankPicker(field: UiField): Promise<void> {
-    this.bankPickerTarget.set(field.key);
-    this.bankPickerTitle.set(`Select ${field.label}`);
-    this.bankQuery.set("");
-    this.bankPickerError.set(null);
-    await this.loadBankPage(1);
-  }
-
-  closeBankPicker(): void {
-    this.bankPickerTarget.set(null);
-  }
-
-  async searchBanks(query: string): Promise<void> {
-    this.bankQuery.set(query.trim());
-    await this.loadBankPage(1);
-  }
-
-  async moveBankToPage(page: number): Promise<void> {
-    await this.loadBankPage(page);
-  }
-
-  selectBank(item: BankServicePickerItem): void {
-    const target = this.bankPickerTarget();
-    if (!target) return;
-    this.form.get(target)?.setValue(item.bic);
-    this.closeBankPicker();
-  }
-
-  private async loadBankPage(page: number): Promise<void> {
-    this.bankPickerLoading.set(true);
-    this.bankPickerError.set(null);
-    try {
-      const query = encodeURIComponent(this.bankQuery());
-      this.bankPage.set(
-        await firstValueFrom(
-          this.http.get<BankPage>(
-            `${this.api}/reference/banks?page=${page}&pageSize=8&query=${query}`,
-          ),
-        ),
-      );
-    } catch {
-      this.bankPickerError.set("Bank Service lookup is unavailable.");
-    } finally {
-      this.bankPickerLoading.set(false);
-    }
   }
 
   async canDeactivate(): Promise<boolean> {
-    if (this.pendingDeactivation) return this.pendingDeactivation;
-    const attempt = this.performCanDeactivate().finally(() => {
-      if (this.pendingDeactivation === attempt) this.pendingDeactivation = null;
-    });
-    this.pendingDeactivation = attempt;
-    return attempt;
-  }
-
-  private async performCanDeactivate(): Promise<boolean> {
-    const reservationId = this.revisionReservationId();
-    if (!reservationId) return true;
-    const released = await this.releaseRevisionReservation(reservationId);
-    if (released) {
-      this.revisionReservationId.set(null);
+    const hadReservation = Boolean(this.revision.reservationId());
+    const released = await this.revision.canDeactivate(
+      this.resource()?.endpoint ?? null,
+      () => this.refresh(),
+      (notice) => this.notice.set(notice),
+    );
+    if (released && hadReservation) {
       this.formVisible.set(false);
       this.editingId.set(null);
     }
     return released;
   }
-
-  private async releaseRevisionReservation(id: string): Promise<boolean> {
-    const resource = this.resource();
-    if (!resource) return false;
-    try {
-      await firstValueFrom(
-        this.http.delete(`${this.api}/${resource.endpoint}/${id}`, {
-          body: {
-            actor: "maker.revision",
-            reason: "Revision cancelled before Save Draft",
-          },
-        }),
-      );
-      this.notice.set({
-        kind: "info",
-        text: "Revise 已取消；ACTIVE 紀錄已解除修訂註記。",
-      });
-      await this.refresh();
-      return true;
-    } catch {
-      this.notice.set({
-        kind: "error",
-        text: "取消 Revise 失敗；資料狀態已改變，請重新整理。",
-      });
-      await this.refresh();
-      return false;
-    }
-  }
   async view(row: Row): Promise<void> {
-    await this.hydrateRmaDirectionMessageTypes(row);
+    await this.hydrateRmaSelection(row);
     this.checkerRejectReason.set("");
     this.detailTarget.set(row);
     this.formVisible.set(false);
@@ -578,13 +316,13 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
     }
     const resource = this.resource();
     if (!resource) return;
-    await this.hydrateRmaDirectionMessageTypes(row);
+    await this.hydrateRmaSelection(row);
     this.model = {};
     for (const field of resource.fields)
-      this.setPath(
+      this.fieldMapper.setPath(
         this.model,
         field.key,
-        this.toFormValue(this.getPath(row, field.key), field),
+        this.fieldMapper.toFormValue(this.fieldMapper.getPath(row, field.key), field),
       );
     this.editingId.set(row.id);
     this.form.reset(this.model);
@@ -602,17 +340,12 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
     }
     const resource = this.resource();
     if (!resource) return;
-    const payload = this.toApiPayload(resource);
+    const payload = this.fieldMapper.toApiPayload(resource, this.model);
     this.busy.set(true);
     try {
       const id = this.editingId();
-      const resourceUrl = id
-        ? `${this.api}/${resource.endpoint}/${id}`
-        : `${this.api}/${resource.endpoint}`;
       const saved = await firstValueFrom(
-        this.http.request<Row>(id ? "PUT" : "POST", resourceUrl, {
-          body: payload,
-        }),
+        this.api.save(resource.endpoint, id, payload),
       );
       this.editingId.set(saved.id);
       this.notice.set({
@@ -620,7 +353,7 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
         text: `${resource.label} DRAFT 已${id ? "更新" : "建立"}；仍須 Maker submit 與獨立 Checker approve。`,
       });
       this.savedDraftId.set(saved.id);
-      this.revisionReservationId.set(null);
+      this.revision.reservationId.set(null);
       this.editingId.set(null);
       this.formVisible.set(false);
       this.statusFilter.set("DRAFT");
@@ -650,9 +383,7 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
     const actor = action === "submit" ? row.maker : "checker.demo";
     try {
       await firstValueFrom(
-        this.http.post(`${this.api}/${resource.endpoint}/${row.id}/${action}`, {
-          actor,
-        }),
+        this.api.act(resource.endpoint, row.id, action, actor),
       );
       this.notice.set({
         kind: "info",
@@ -689,12 +420,9 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
     if (!resource) return;
     try {
       const revision = await firstValueFrom(
-        this.http.post<Row>(
-          `${this.api}/${resource.endpoint}/${row.id}/revise`,
-          { maker: "maker.revision" },
-        ),
+        this.api.revise(resource.endpoint, row.id, "maker.revision"),
       );
-      this.revisionReservationId.set(revision.id);
+      this.revision.reservationId.set(revision.id);
       await this.refresh();
       await this.edit(revision);
     } catch {
@@ -719,19 +447,14 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
     try {
       if (row.status === "DRAFT") {
         await firstValueFrom(
-          this.http.delete(`${this.api}/${resource.endpoint}/${row.id}`, {
-            body: { actor: row.maker, reason },
+          this.api.delete(resource.endpoint, row.id, {
+            actor: row.maker,
+            reason,
           }),
         );
       } else {
         await firstValueFrom(
-          this.http.post(
-            `${this.api}/${resource.endpoint}/${row.id}/suppress`,
-            {
-              maker: "maker.suppression",
-              reason,
-            },
-          ),
+          this.api.suppress(resource.endpoint, row.id, "maker.suppression", reason),
         );
       }
       this.revokeTarget.set(null);
@@ -761,13 +484,13 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
       if (!Array.isArray(records)) throw new Error("records array required");
       this.importResult.set(
         await firstValueFrom(
-          this.http.post(`${this.api}/swift-data/imports`, {
-            dataType: resource.importType,
-            fileName: file.name,
+          this.api.import(
+            resource.importType,
+            file.name,
             dryRun,
-            idempotencyKey: `portal-${resource.id}-${file.name}-${file.lastModified}-${dryRun}`,
+            `portal-${resource.id}-${file.name}-${file.lastModified}-${dryRun}`,
             records,
-          }),
+          ),
         ),
       );
       if (!dryRun) await this.refresh();
@@ -792,23 +515,7 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
     if (!resource || this.exportBusy()) return;
     this.exportBusy.set(true);
     try {
-      const excelJsModule =
-        (await import("exceljs")) as typeof import("exceljs") & {
-          default?: typeof import("exceljs");
-        };
-      const ExcelJS = excelJsModule.default ?? excelJsModule;
-      const workbook = new ExcelJS.Workbook();
-      workbook.creator = "Baseline SSI Prototype";
-      workbook.created = new Date();
-      const rows = this.sortedRows();
-      this.addDataSheet(workbook, resource, rows);
-      if (resource.id === "ssi") this.addApplicabilitySheet(workbook, rows);
-      this.addMetadataSheet(workbook, resource, rows.length);
-      const buffer = await workbook.xlsx.writeBuffer();
-      const blob = new Blob([new Uint8Array(buffer)], {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      });
-      this.download(blob, this.exportFileName(resource.id, "xlsx"));
+      await this.exporter.excel(this.exportContext(resource));
       this.notice.set({
         kind: "info",
         text: `已匯出 ${this.sortedRows().length} 筆 ${resource.label} 至 Excel。`,
@@ -824,160 +531,15 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
     }
   }
 
-  private exportColumns(resource: UiResource): readonly ExportColumn[] {
-    return (
-      resource.exportColumns ??
-      resource.columns.flatMap((column) =>
-        column.path
-          ? [{ path: column.path, label: column.label }]
-          : (column.paths ?? []).map((path) => ({ path, label: path })),
-      )
-    );
-  }
-
-  private styleHeader(sheet: ExcelWorksheet): void {
-    sheet.getRow(1).eachCell((cell) => {
-      cell.font = { name: "Arial", bold: true, color: { argb: "FFFFFFFF" } };
-      cell.fill = {
-        type: "pattern",
-        pattern: "solid",
-        fgColor: { argb: "FF17363D" },
-      };
-      cell.alignment = { vertical: "middle" };
-    });
-    sheet.getRow(1).height = 24;
-  }
-
-  private addDataSheet(
-    workbook: ExcelWorkbook,
-    resource: UiResource,
-    rows: readonly Row[],
-  ): void {
-    const sheet = workbook.addWorksheet(resource.label.slice(0, 31), {
-      views: [{ state: "frozen", ySplit: 1 }],
-    });
-    const columns = this.exportColumns(resource);
-    sheet.columns = columns.map((column, index) => ({
-      header: column.label,
-      key: `column${index}`,
-      width: Math.max(14, Math.min(42, column.label.length + 8)),
-    }));
-    for (const row of rows)
-      sheet.addRow(
-        Object.fromEntries(
-          columns.map((column, index) => [
-            `column${index}`,
-            this.value(row, column.path),
-          ]),
-        ),
-      );
-    sheet.autoFilter = {
-      from: { row: 1, column: 1 },
-      to: { row: Math.max(1, sheet.rowCount), column: columns.length },
+  private exportContext(resource: UiResource): SwiftDataExportContext {
+    return {
+      resource,
+      rows: this.sortedRows(),
+      statusFilter: this.statusFilter(),
+      sortPath: this.sortPath(),
+      sortDirection: this.sortDirection(),
+      value: (row, path) => this.value(row, path),
     };
-    this.styleHeader(sheet);
-    sheet.eachRow((row, rowNumber) => {
-      if (rowNumber <= 1) return;
-      row.font = { name: "Arial", size: 10 };
-      if (rowNumber % 2 === 0)
-        row.eachCell((cell) => {
-          cell.fill = {
-            type: "pattern",
-            pattern: "solid",
-            fgColor: { argb: "FFF1F5F2" },
-          };
-        });
-    });
-    for (let index = 1; index <= columns.length; index += 1) {
-      const column = sheet.getColumn(index);
-      let width = 14;
-      column.eachCell({ includeEmpty: true }, (cell) => {
-        width = Math.max(
-          width,
-          Math.min(42, scalarText(cell.value).length + 2),
-        );
-      });
-      column.width = width;
-    }
-  }
-
-  private addApplicabilitySheet(
-    workbook: ExcelWorkbook,
-    rows: readonly Row[],
-  ): void {
-    const sheet = workbook.addWorksheet("SSI Applicability", {
-      views: [{ state: "frozen", ySplit: 1 }],
-    });
-    const headers = [
-      "SSI ID",
-      "Consumer",
-      "Product",
-      "Business Function",
-      "Payment Leg",
-      "Direction",
-      "Status",
-      "Effective From",
-      "Effective To",
-      "Version",
-    ];
-    sheet.columns = headers.map((header, index) => ({
-      header,
-      key: `column${index}`,
-      width: Math.max(14, header.length + 8),
-    }));
-    for (const row of rows) {
-      const links = Array.isArray(row["applicability"])
-        ? (row["applicability"] as Record<string, unknown>[])
-        : [];
-      for (const link of links)
-        sheet.addRow({
-          column0: this.value(row, "route.ssiCode"),
-          column1: link["consumer"],
-          column2: link["product"],
-          column3: link["businessFunction"],
-          column4: link["paymentLeg"],
-          column5: link["direction"],
-          column6: link["status"],
-          column7: link["validFrom"],
-          column8: link["validTo"],
-          column9: link["version"],
-        });
-    }
-    sheet.autoFilter = {
-      from: { row: 1, column: 1 },
-      to: { row: Math.max(1, sheet.rowCount), column: headers.length },
-    };
-    this.styleHeader(sheet);
-  }
-
-  private addMetadataSheet(
-    workbook: ExcelWorkbook,
-    resource: UiResource,
-    rowCount: number,
-  ): void {
-    const sheet = workbook.addWorksheet("Export Metadata");
-    sheet.addRows([
-      ["Field", "Value"],
-      ["Resource", resource.label],
-      ["Status filter", this.statusFilter()],
-      [
-        "Sort",
-        this.sortPath()
-          ? `${this.sortPath()} ${this.sortDirection()}`
-          : "API order",
-      ],
-      ["Exported records", rowCount],
-      ["Generated at", new Date().toISOString()],
-      [
-        "Source",
-        "Local synthetic prototype data; never use as payment instructions.",
-      ],
-    ]);
-    sheet.getColumn(1).width = 24;
-    sheet.getColumn(2).width = 72;
-    sheet.eachRow((row, index) => {
-      row.font = { name: "Arial", bold: index === 1 };
-    });
   }
 
   exportJson(): void {
@@ -985,31 +547,7 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
     if (!resource || this.exportBusy()) return;
     this.exportBusy.set(true);
     try {
-      const generatedAt = new Date().toISOString();
-      const payload = {
-        metadata: {
-          schemaVersion: "1.0",
-          resourceId: resource.id,
-          resourceLabel: resource.label,
-          endpoint: resource.endpoint,
-          statusFilter: this.statusFilter(),
-          sort: this.sortPath()
-            ? { path: this.sortPath(), direction: this.sortDirection() }
-            : null,
-          exportedRecords: this.sortedRows().length,
-          generatedAt,
-          encoding: "UTF-8",
-          source: "Local synthetic prototype data",
-          disclaimer:
-            "Synthetic prototype data only; never use as payment instructions.",
-        },
-        records: this.sortedRows(),
-      };
-      const bytes = new TextEncoder().encode(JSON.stringify(payload, null, 2));
-      this.download(
-        new Blob([bytes], { type: "application/json;charset=utf-8" }),
-        this.exportFileName(resource.id, "json"),
-      );
+      this.exporter.json(this.exportContext(resource));
       this.notice.set({
         kind: "info",
         text: `已匯出 ${this.sortedRows().length} 筆 ${resource.label} 至 UTF-8 JSON。`,
@@ -1026,7 +564,7 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
   }
 
   value(row: Row, path: string): string {
-    const value = this.getPath(row, path);
+    const value = this.fieldMapper.getPath(row, path);
     if (path === "status" && value === "PENDING_APPROVAL") return "SUBMITTED";
     if (path === "status" && value === "WIP") return "IN PROGRESS";
     if (path === "scope") {
@@ -1124,7 +662,7 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
       return this.canSuppress(row) ? "Suppress" : "";
     if (path === "__revokeDraftAction")
       return this.canRevokeDraft(row) ? "Revoke Draft" : "";
-    return this.getPath(row, path);
+    return this.fieldMapper.getPath(row, path);
   }
   setStatusFilter(filter: StatusFilter): void {
     if (
@@ -1149,10 +687,7 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
     this.busy.set(true);
     try {
       await firstValueFrom(
-        this.http.post(`${this.api}/${resource.endpoint}/${row.id}/reject`, {
-          actor: "checker.demo",
-          reason,
-        }),
+        this.api.reject(resource.endpoint, row.id, "checker.demo", reason),
       );
       this.notice.set({
         kind: "info",
@@ -1171,24 +706,14 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
     }
   }
   movePage(delta: number): void {
-    this.page.set(
-      Math.min(this.totalPages(), Math.max(1, this.page() + delta)),
-    );
+    this.index.movePage(delta);
     void this.refresh();
   }
   toggleSort(path: string): void {
-    if (this.sortPath() === path)
-      this.sortDirection.update((direction) =>
-        direction === "asc" ? "desc" : "asc",
-      );
-    else {
-      this.sortPath.set(path);
-      this.sortDirection.set("asc");
-    }
+    this.index.toggleSort(path);
   }
   sortIndicator(path: string): string {
-    if (this.sortPath() !== path) return "";
-    return this.sortDirection() === "asc" ? "▲" : "▼";
+    return this.index.sortIndicator(path);
   }
   private configureFields(
     currencies: readonly CurrencyReference[],
@@ -1197,285 +722,26 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
     const resource = this.resource();
     if (!resource) return;
     this.fields.set(
-      resource.fields.map((field) =>
-        this.formlyField(field, currencies, messageTypePolicy),
-      ),
+      this.fieldMapper.fields(resource, currencies, messageTypePolicy, {
+        editingId: () => this.editingId(),
+        selectMessageTypes: (model, direction) =>
+          this.rmaSelection.forDirection(model, direction),
+        openBankPicker: (field) => void this.bankPicker.open(field),
+      }),
     );
   }
 
-  private formlyField(
-    field: UiField,
-    currencies: readonly CurrencyReference[],
-    messageTypePolicy: RmaMessageTypePolicy,
-  ): FormlyFieldConfig {
-    const config: FormlyFieldConfig = {
-      key: field.key,
-      type: field.type,
-      props: this.fieldProps(field, currencies, messageTypePolicy),
-    };
-    if (field.defaultValue !== undefined)
-      config.defaultValue = field.defaultValue;
-    if (field.type === "multicheckbox")
-      config.validators = {
-        messageTypes: { expression: this.validMessageTypes },
-      };
-    const requiredWhen = field["x-required-when"];
-    const disabledWhen = field["x-disabled-when"];
-    if (requiredWhen || disabledWhen)
-      config.expressions = {
-        ...(requiredWhen
-          ? {
-              "props.required": (formlyField: FormlyFieldConfig) =>
-                this.getPath(
-                  (formlyField.model as Record<string, unknown>) ?? {},
-                  requiredWhen.path,
-                ) === requiredWhen.equals,
-            }
-          : {}),
-        ...(disabledWhen
-          ? {
-              "props.disabled": (formlyField: FormlyFieldConfig) =>
-                this.getPath(
-                  (formlyField.model as Record<string, unknown>) ?? {},
-                  disabledWhen.path,
-                ) === disabledWhen.equals,
-            }
-          : {}),
-      };
-    return config;
-  }
-
-  private fieldProps(
-    field: UiField,
-    currencies: readonly CurrencyReference[],
-    messageTypePolicy: RmaMessageTypePolicy,
-  ): NonNullable<FormlyFieldConfig["props"]> {
-    const props: NonNullable<FormlyFieldConfig["props"]> = {
-      label: field.label,
-      required: Boolean(field.required),
-      options:
-        field.optionsSource === "reference/currencies"
-          ? currencies.map(({ code, decimals }) => ({
-              label: `${code} · ${decimals} decimals`,
-              value: code,
-            }))
-          : field.optionsSource === "rma-authorisations/message-types"
-            ? messageTypePolicy.supportedMessageTypes.map((value) => ({
-                label: value,
-                value,
-              }))
-            : (field.options ?? []).map((value) => ({ label: value, value })),
-    };
-    const optionalProps: Array<
-      [keyof NonNullable<FormlyFieldConfig["props"]>, unknown]
-    > = [
-      ["type", field.inputType],
-      ["pattern", field.pattern],
-      ["minLength", field.minLength],
-      ["maxLength", field.maxLength],
-      ["min", field.minimum],
-      ["max", field.maximum],
-      ["description", field.description],
-    ];
-    for (const [key, value] of optionalProps)
-      if (value !== undefined) props[key] = value as never;
-    if (field.type === "multicheckbox") {
-      props.description =
-        "從受控清單選擇；Popup 以相同參數並排顯示 INBOUND／OUTBOUND。";
-      props["messageTypeCategories"] = messageTypePolicy.categories;
-      props["messageTypeItems"] = messageTypePolicy.items;
-      props["messageTypeOperation"] = () => (this.editingId() ? "EDIT" : "ADD");
-      props["messageTypeSelectionForDirection"] = (
-        model: Record<string, unknown>,
-        direction: "INBOUND" | "OUTBOUND",
-      ) => this.rmaMessageTypesForDirection(model, direction);
-    }
-    if (field.referenceSource === "reference/banks") {
-      props.readonly = true;
-      props.showPicker = true;
-      props.pickerLabel = "Bank Service";
-      props.pickerAction = () => void this.openBankPicker(field);
-      props.description =
-        field.description ?? "由 Bank Service 選擇並回填受控 SWIFT BIC。";
-    }
-    return props;
-  }
-
-  private readonly validMessageTypes = (control: AbstractControl): boolean =>
-    scalarText(control.value)
-      .split(",")
-      .map((value) => value.trim())
-      .filter(Boolean)
-      .every((value) =>
-        /^(MT\d{3}(?:COV)?|pacs\.[A-Za-z0-9.]+|\*)$/.test(value),
-      );
-
-  private rmaMessageTypesForDirection(
-    model: Record<string, unknown>,
-    direction: "INBOUND" | "OUTBOUND",
-  ): readonly string[] {
-    if (model["direction"] === direction)
-      return this.messageTypesFrom(model["messageTypes"]);
-    return (
-      this.rmaDirectionMessageTypes.get(
-        this.rmaDirectionKey(model, direction),
-      ) ?? []
-    );
-  }
-
-  private cacheRmaDirectionMessageTypes(rows: readonly Row[]): void {
-    if (this.resourceId() !== "rma") return;
-    const candidates = new Map<string, Row[]>();
-    for (const row of rows) {
-      const direction = row["direction"];
-      if (direction !== "INBOUND" && direction !== "OUTBOUND") continue;
-      const key = this.rmaDirectionKey(row, direction);
-      const group = candidates.get(key) ?? [];
-      group.push(row);
-      candidates.set(key, group);
-    }
-    for (const [key, group] of candidates)
-      this.rmaDirectionMessageTypes.set(
-        key,
-        this.messageTypesFrom(this.preferredRmaRow(group)["messageTypes"]),
-      );
-  }
-
-  private async hydrateRmaDirectionMessageTypes(row: Row): Promise<void> {
-    if (this.resourceId() !== "rma") return;
-    this.cacheRmaDirectionMessageTypes([row]);
-    const counterpartyBic = scalarText(row["counterpartyBic"]).trim();
-    if (!counterpartyBic) return;
-    try {
-      const ownBic = scalarText(row["ownBic"]).trim().toLocaleUpperCase();
-      const query = new URLSearchParams({ ownBic, counterpartyBic });
-      const pairState = await firstValueFrom(
-        this.http.get<RmaPairState>(
-          `${this.api}/rma-authorisations/pair-state?${query.toString()}`,
-        ),
-      );
-      this.cacheRmaDirectionMessageTypes(
-        Object.values(pairState.directions).filter(
-          (candidate): candidate is Row => candidate !== null,
-        ),
-      );
-    } catch {
+  private async hydrateRmaSelection(row: Row): Promise<void> {
+    if (!(await this.rmaSelection.hydrate(row, this.resourceId()))) {
       this.notice.set({
         kind: "warning",
         text: "另一方向的 RMA Message Types 暫時無法載入；目前方向仍可查看。",
       });
     }
   }
-
-  private preferredRmaRow(rows: readonly Row[]): Row {
-    const statusPriority: Record<string, number> = {
-      WIP: 4,
-      DRAFT: 3,
-      PENDING_APPROVAL: 2,
-      ACTIVE: 1,
-    };
-    return [...rows].sort(
-      (left, right) =>
-        (statusPriority[right.status] ?? 0) -
-          (statusPriority[left.status] ?? 0) || right.version - left.version,
-    )[0]!;
-  }
-
-  private rmaDirectionKey(
-    model: Record<string, unknown>,
-    direction: "INBOUND" | "OUTBOUND",
-  ): string {
-    return [
-      scalarText(model["ownBic"]).trim().toLocaleUpperCase(),
-      scalarText(model["counterpartyBic"]).trim().toLocaleUpperCase(),
-      direction,
-    ].join("|");
-  }
-
-  private messageTypesFrom(value: unknown): readonly string[] {
-    const values = Array.isArray(value) ? value : scalarText(value).split(",");
-    return values.map((item) => scalarText(item).trim()).filter(Boolean);
-  }
-  private toFormValue(value: unknown, field: UiField): unknown {
-    return field.type === "multicheckbox" && Array.isArray(value)
-      ? value.join(", ")
-      : value;
-  }
-  private toApiPayload(resource: UiResource): Record<string, unknown> {
-    const payload: Record<string, unknown> = {};
-    for (const field of resource.fields) {
-      const raw = this.getPath(this.model, field.key);
-      const value = this.apiFieldValue(raw, field);
-      this.setPath(payload, field.key, value);
-    }
-    return payload;
-  }
-  private apiFieldValue(raw: unknown, field: UiField): unknown {
-    if (field.type === "multicheckbox") {
-      return scalarText(raw)
-        .split(",")
-        .map((item) => item.trim())
-        .filter(Boolean);
-    }
-    if (field.inputType === "number") return Number(raw);
-    return raw;
-  }
-  private getPath(source: Record<string, unknown>, path: string): unknown {
-    return path
-      .split(".")
-      .reduce<unknown>(
-        (value, key) =>
-          value && typeof value === "object"
-            ? (value as Record<string, unknown>)[key]
-            : undefined,
-        source,
-      );
-  }
-  private compare(left: unknown, right: unknown): number {
-    if (typeof left === "number" && typeof right === "number")
-      return left - right;
-    return scalarText(left).localeCompare(scalarText(right), undefined, {
-      numeric: true,
-      sensitivity: "base",
-    });
-  }
-  private exportFileName(
-    resourceId: string,
-    extension: "xlsx" | "json",
-  ): string {
-    return `${resourceId}-${this.statusFilter().toLowerCase()}-${new Date().toISOString().slice(0, 10)}.${extension}`;
-  }
-  private download(blob: Blob, fileName: string): void {
-    const view = this.document.defaultView;
-    if (!view) throw new Error("瀏覽器下載服務不可用");
-    const url = view.URL.createObjectURL(blob);
-    const link = this.document.createElement("a");
-    link.href = url;
-    link.download = fileName;
-    link.hidden = true;
-    this.document.body.appendChild(link);
-    link.click();
-    link.remove();
-    view.setTimeout(() => view.URL.revokeObjectURL(url), 1000);
-  }
   private exportFailureReason(error: unknown): string {
     if (error instanceof Error && error.message.trim())
       return error.message.trim();
     return "瀏覽器無法建立下載檔案";
-  }
-  private setPath(
-    target: Record<string, unknown>,
-    path: string,
-    value: unknown,
-  ): void {
-    const keys = path.split(".");
-    let cursor = target;
-    for (const key of keys.slice(0, -1)) {
-      const child = cursor[key];
-      if (!child || typeof child !== "object" || Array.isArray(child))
-        cursor[key] = {};
-      cursor = cursor[key] as Record<string, unknown>;
-    }
-    cursor[keys.at(-1)!] = value;
   }
 }

@@ -119,4 +119,15 @@ describe("portal routes", () => {
     expect(route?.component).toBeUndefined();
     expect(route?.canActivate).toHaveLength(1);
   });
+
+  it("guards and lazy-loads SWIFT Data without eagerly importing it from Root", () => {
+    const route = APP_ROUTES.find((item) => item.path === "swiftdata");
+    expect(route?.loadComponent).toEqual(expect.any(Function));
+    expect(route?.component).toBeUndefined();
+    expect(route?.canActivate).toHaveLength(1);
+    const root = readFileSync(join(__dirname, "app.component.ts"), "utf8");
+    const template = readFileSync(join(__dirname, "app.component.html"), "utf8");
+    expect(root).not.toContain('from "./swift-data-crud.component"');
+    expect(template).not.toContain("<ssi-swift-data-crud");
+  });
 });

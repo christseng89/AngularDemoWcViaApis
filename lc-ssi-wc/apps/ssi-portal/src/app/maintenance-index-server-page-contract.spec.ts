@@ -28,12 +28,13 @@ describe("maintenance index server-page contract", () => {
 
   it("renders shared maintenance server page items without post-pagination filtering", () => {
     const source = readFileSync(
-      join(__dirname, "swift-data-crud.component.ts"),
+      join(__dirname, "swift-data-feature", "swift-data-index.store.ts"),
       "utf8",
     );
-    expect(source).toContain(
-      "readonly filteredRows = computed(() => this.rows());",
-    );
+    const sorting = source.slice(source.indexOf("readonly sortedRows"), source.indexOf("readonly pagedRows"));
+    expect(sorting).toContain("if (!path) return this.rows();");
+    expect(sorting).not.toContain(".filter(");
+    expect(source).toContain("assertMaintenanceServerPage(result.items, this.statusFilter());");
   });
 
   it("fails closed when a server page leaks a forbidden lifecycle status", () => {

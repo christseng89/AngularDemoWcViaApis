@@ -23,20 +23,20 @@
     </div>
   </section>
 }
-@if (bankPickerTarget()) {
+@if (bankPicker.target()) {
   <ssi-bank-service-picker-dialog
-    [title]="bankPickerTitle()"
-    [items]="bankPickerItems()"
-    [loading]="bankPickerLoading()"
-    [error]="bankPickerError()"
-    [query]="bankQuery()"
-    [page]="bankPage().page"
-    [total]="bankPage().total"
-    [totalPages]="bankPage().totalPages"
-    (searchRequested)="searchBanks($event)"
-    (pageRequested)="moveBankToPage($event)"
-    (selected)="selectBank($event)"
-    (cancelled)="closeBankPicker()"
+    [title]="bankPicker.title()"
+    [items]="bankPicker.items()"
+    [loading]="bankPicker.loading()"
+    [error]="bankPicker.error()"
+    [query]="bankPicker.query()"
+    [page]="bankPicker.page().page"
+    [total]="bankPicker.page().total"
+    [totalPages]="bankPicker.page().totalPages"
+    (searchRequested)="bankPicker.search($event)"
+    (pageRequested)="bankPicker.moveToPage($event)"
+    (selected)="bankPicker.select($event, form)"
+    (cancelled)="bankPicker.close()"
   />
 }
 @if (noticeAlert(); as message) {

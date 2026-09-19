@@ -6,7 +6,6 @@ import {
   type OnInit,
   type OnDestroy,
   signal,
-  viewChild,
 } from "@angular/core";
 import { DOCUMENT } from "@angular/common";
 import { ReactiveFormsModule } from "@angular/forms";
@@ -21,7 +20,6 @@ import {
   Router,
   RouterOutlet,
 } from "@angular/router";
-import { SwiftDataCrudComponent } from "./swift-data-crud.component";
 import type { SsiRow } from "./ssi-maintenance.types";
 import { SsiSharedDetailPresenter } from "./ssi-shared-detail.presenter";
 import {
@@ -35,20 +33,12 @@ import type { AppView as View, ThemeMode } from "./app-view.models";
 import { ThemeService } from "./theme.service";
 import { AppShellComponent } from "./app-shell.component";
 
-type RoutedView =
-  | "settings"
-  | "resolver"
-  | "treasury"
-  | "tradefinance"
-  | "audit"
-  | "checker"
-  | "dashboard"
-  | "maker";
-type LegacyView = Exclude<View, RoutedView>;
 type WorkbenchView = "swiftdata" | "dashboard" | "maker";
 
 const routePathForView = (view: View): string | null => {
   switch (view) {
+    case "swiftdata":
+      return "/swiftdata";
     case "dashboard":
       return "/dashboard";
     case "maker":
@@ -70,8 +60,6 @@ const routePathForView = (view: View): string | null => {
   }
 };
 
-const isLegacyView = (view: View): view is LegacyView =>
-  routePathForView(view) === null;
 const isWorkbenchView = (view: View): view is WorkbenchView =>
   view === "swiftdata" || view === "dashboard" || view === "maker";
 
@@ -80,6 +68,7 @@ const routeViewFromUrl = (url: string): View | null => {
   return (
     (
       [
+        "swiftdata",
         "settings",
         "resolver",
         "treasury",
@@ -99,7 +88,6 @@ const routeViewFromUrl = (url: string): View | null => {
   imports: [
     ReactiveFormsModule,
     FormlyForm,
-    SwiftDataCrudComponent,
     RouterOutlet,
     AlertComponent,
     LoadingStateComponent,
@@ -123,9 +111,7 @@ export class AppComponent implements OnInit, OnDestroy {
   private readonly routeGuardBridge = inject(APP_ROUTE_GUARD_BRIDGE);
   readonly routedAuditDetailOpen = signal(false);
   private auditRouteSubscriptions: Array<{ unsubscribe(): void }> = [];
-  private readonly swiftDataCrud = viewChild(SwiftDataCrudComponent);
   private activeCheckerRoute: {
-    canDeactivate(): Promise<boolean>;
     refresh(): Promise<void>;
     decide(
       row: SsiRow,
@@ -133,6 +119,7 @@ export class AppComponent implements OnInit, OnDestroy {
       reason: string,
     ): Promise<boolean>;
   } | null = null;
+  private activeRoutedCanDeactivate: (() => Promise<boolean>) | null = null;
   private activeRoutedRefresh: (() => Promise<void>) | null = null;
   private activeMaintenanceWipPort: {
     canDeactivate(targetUrl?: string): Promise<boolean>;
@@ -195,9 +182,6 @@ export class AppComponent implements OnInit, OnDestroy {
     () =>
       this.routedCheckerCount() ?? this.ssiShellBridge.pendingApprovalCount(),
   );
-  // Swift Data host selectors remain unchanged until the Phase 10 owner moves them.
-  readonly governedReviewResourceId = signal<string | null>(null);
-  readonly governedReviewRecordId = signal<string | null>(null);
   private readonly routeGuardHost = {
     canDeactivate: (targetUrl?: string) => this.canDeactivate(targetUrl),
     hasActiveMakerRevision: () =>
@@ -227,11 +211,7 @@ export class AppComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     // Canonicalize a persisted Maintenance view; routed features own loading.
     const savedRoute = routePathForView(this.view());
-    if (
-      (this.view() === "dashboard" || this.view() === "maker") &&
-      this.document.defaultView?.location?.pathname === "/" &&
-      savedRoute
-    ) {
+    if (this.document.defaultView?.location?.pathname === "/" && savedRoute) {
       this.pendingRouteTarget = this.view();
       void this.router.navigateByUrl(savedRoute).catch(() => undefined);
       return;
@@ -266,23 +246,9 @@ export class AppComponent implements OnInit, OnDestroy {
   navigate(view: View): Promise<boolean> {
     if (this.pendingRouteTarget !== null) return Promise.resolve(false);
     const targetPath = routePathForView(view);
-    if (targetPath || routePathForView(this.view())) {
-      if (view === this.view()) {
-        return Promise.resolve(true);
-      }
-      this.pendingRouteTarget = view;
-      return this.router.navigateByUrl(targetPath ?? "/").catch(() => false);
-    }
-    if (!isLegacyView(view)) return Promise.resolve(false);
-    this.notice.set(null);
-    this.view.set(view);
-    this.document.defaultView?.localStorage.setItem("ssi-active-view", view);
-    this.lastWorkbenchView = view;
-    this.document.defaultView?.localStorage.setItem(
-      "ssi-last-workbench-view",
-      view,
-    );
-    return Promise.resolve(true);
+    if (view === this.view()) return Promise.resolve(true);
+    this.pendingRouteTarget = view;
+    return this.router.navigateByUrl(targetPath ?? "/").catch(() => false);
   }
 
   private savedView(): View {
@@ -367,13 +333,13 @@ export class AppComponent implements OnInit, OnDestroy {
       };
     };
     this.activeCheckerRoute =
-      route.canDeactivate && route.refresh && route.decide
+      route.refresh && route.decide
         ? {
-            canDeactivate: route.canDeactivate.bind(route),
             refresh: route.refresh.bind(route),
             decide: route.decide.bind(route),
           }
         : null;
+    this.activeRoutedCanDeactivate = route.canDeactivate?.bind(route) ?? null;
     this.activeRoutedRefresh = route.refresh?.bind(route) ?? null;
     this.activeMaintenanceWipPort = route.maintenanceWipPort ?? null;
     if (route.reviewRequested)
@@ -420,6 +386,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
   onSettingsDeactivated(): void {
     this.activeCheckerRoute = null;
+    this.activeRoutedCanDeactivate = null;
     this.activeRoutedRefresh = null;
     this.activeMaintenanceWipPort = null;
     this.detail.setCurrencyConsumer(null);
@@ -457,9 +424,7 @@ export class AppComponent implements OnInit, OnDestroy {
         ? routed
         : released
           ? "dashboard"
-          : this.pendingRouteTarget && isLegacyView(this.pendingRouteTarget)
-            ? this.pendingRouteTarget
-            : this.lastWorkbenchView;
+          : this.lastWorkbenchView;
       const previousView = this.view();
       if (routed && isWorkbenchView(previousView) && !released) {
         this.lastWorkbenchView = previousView;
@@ -471,10 +436,7 @@ export class AppComponent implements OnInit, OnDestroy {
       this.pendingRouteTarget = null;
       this.commitRouteView(target);
       this.routeLoading.set(false);
-      if (
-        event.urlAfterRedirects === "/" &&
-        (target === "dashboard" || target === "maker")
-      ) {
+      if (event.urlAfterRedirects === "/" && isWorkbenchView(target)) {
         // Legacy history entries have no routed Maintenance UI after the
         // extraction. Replace that entry with the equivalent lazy route.
         this.pendingRouteTarget = target;
@@ -548,13 +510,8 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   async canDeactivate(targetUrl?: string): Promise<boolean> {
-    if (
-      this.activeCheckerRoute &&
-      !(await this.activeCheckerRoute.canDeactivate())
-    )
+    if (this.activeRoutedCanDeactivate && !(await this.activeRoutedCanDeactivate()))
       return false;
-    const swiftData = this.swiftDataCrud();
-    if (swiftData && !(await swiftData.canDeactivate())) return false;
     return (
       (await this.activeMaintenanceWipPort?.canDeactivate(targetUrl)) ?? true
     );

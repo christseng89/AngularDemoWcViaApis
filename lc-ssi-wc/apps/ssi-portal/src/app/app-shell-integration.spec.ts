@@ -35,7 +35,9 @@ describe("AppComponent shell integration", () => {
     expect(close).toBeGreaterThan(start);
     expect(html.indexOf("<ssi-alert")).toBeGreaterThan(start);
     expect(html.indexOf("<ssi-alert")).toBeLessThan(close);
-    expect(html.indexOf("<ssi-swift-data-crud")).toBeLessThan(close);
+    expect(html).not.toContain("<ssi-swift-data-crud");
+    expect(html.indexOf("<router-outlet")).toBeGreaterThan(start);
+    expect(html.indexOf("<router-outlet")).toBeLessThan(close);
     expect(html).not.toContain("@if (deleteTarget(); as row)");
     expect(dashboard).toContain("@if (index.deleteTarget(); as row)");
   });

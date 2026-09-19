@@ -432,6 +432,20 @@ jest.doMock("@angular/core", () => ({
       return new (token as new () => unknown)();
     if ((token as { name?: string }).name === "ReferenceLookupApiService")
       return new (token as new () => unknown)();
+    if ((token as { name?: string }).name === "SwiftDataApiService")
+      return new (token as new () => unknown)();
+    if ((token as { name?: string }).name === "SwiftDataBankPicker")
+      return new (token as new () => unknown)();
+    if ((token as { name?: string }).name === "SwiftDataRmaSelection")
+      return new (token as new () => unknown)();
+    if ((token as { name?: string }).name === "SwiftDataRevisionSession")
+      return new (token as new () => unknown)();
+    if ((token as { name?: string }).name === "SwiftDataExportService")
+      return new (token as new () => unknown)();
+    if ((token as { name?: string }).name === "SwiftDataFieldMapper")
+      return new (token as new () => unknown)();
+    if ((token as { name?: string }).name === "SwiftDataIndexStore")
+      return new (token as new () => unknown)();
     if (
       (token as { description?: string }).description ===
       "SSI_RESOLUTION_READ_PORT"
@@ -1297,6 +1311,21 @@ describe("portal component behavior", () => {
     component.ngOnDestroy();
   });
 
+  it("asks the lazy SWIFT Data route to release WIP and denies navigation when it fails", async () => {
+    const { AppComponent } = await import("./app.component");
+    const component = new AppComponent();
+    const canDeactivate = jest.fn().mockResolvedValue(false);
+    component.onSettingsActivated({
+      canDeactivate,
+      refresh: jest.fn().mockResolvedValue(undefined),
+    });
+
+    expect(await component.canDeactivate("/settings")).toBe(false);
+    expect(canDeactivate).toHaveBeenCalledTimes(1);
+    component.onSettingsDeactivated();
+    component.ngOnDestroy();
+  });
+
   it("releases SSI WIP before route navigation and fails closed on release error", async () => {
     const { AppComponent } = await import("./app.component");
     const revision = {
@@ -1361,7 +1390,7 @@ describe("portal component behavior", () => {
         },
       ],
     } as never);
-    component.revisionReservationId.set("RMA-WIP-1");
+    component.revision.reservationId.set("RMA-WIP-1");
     const deletes = fakeHttp.delete.mock.calls.length;
     const [first, second] = await Promise.all([
       component.canDeactivate(),
@@ -1369,6 +1398,31 @@ describe("portal component behavior", () => {
     ]);
     expect([first, second]).toEqual([true, true]);
     expect(fakeHttp.delete.mock.calls.length - deletes).toBe(1);
+  });
+
+  it("keeps the SWIFT Data editor and reservation open when close cannot release WIP", async () => {
+    const { SwiftDataCrudComponent } =
+      await import("./swift-data-crud.component");
+    const component = new SwiftDataCrudComponent();
+    component.contract.set({
+      info: { title: "test", version: "1" },
+      "x-standards-baseline": {},
+      "x-ui-resources": [{
+        id: "rma", label: "RMA", endpoint: "rma-authorisations",
+        description: "RMA", columns: [], fields: [], "x-lifecycle": [],
+      }],
+    } as never);
+    component.revision.reservationId.set("RMA-WIP-1");
+    component.formVisible.set(true);
+    rejectHttp = true;
+    try {
+      await component.cancelWork();
+      expect(component.formVisible()).toBe(true);
+      expect(component.revision.reservationId()).toBe("RMA-WIP-1");
+      expect(component.notice()?.kind).toBe("error");
+    } finally {
+      rejectHttp = false;
+    }
   });
 
   it("clears a stale global notice when navigation provides its own page-level status", async () => {
