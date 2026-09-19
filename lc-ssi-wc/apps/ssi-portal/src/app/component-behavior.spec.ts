@@ -472,6 +472,8 @@ jest.doMock("@angular/core", () => ({
     if (token === routeGuardBridgeToken) return fakeRouteGuardBridge;
     if ((token as { name?: string }).name === "ThemeService")
       return fakeThemeService;
+    if ((token as { name?: string }).name === "SsiMaintenanceApiService")
+      return new (token as new () => unknown)();
     return fakeHttp;
   },
   signal: testSignal,
@@ -1950,6 +1952,31 @@ describe("portal component behavior", () => {
     component.setTheme("dark");
     expect(fakeThemeService.setTheme).toHaveBeenCalledWith("dark");
     expect(component.theme()).toBe("dark");
+  });
+
+  it("routes SSI Maintenance list and WIP transport through the HTTP-only service", async () => {
+    const { SsiMaintenanceApiService } =
+      await import("./ssi-maintenance-api.service");
+    const list = jest.spyOn(SsiMaintenanceApiService.prototype, "list");
+    const cancelRevision = jest.spyOn(
+      SsiMaintenanceApiService.prototype,
+      "cancelRevision",
+    );
+    try {
+      const { AppComponent } = await import("./app.component");
+      const component = new AppComponent();
+      await component.refresh();
+      expect(list).toHaveBeenCalledTimes(1);
+      component.view.set("maker");
+      component.editingId.set("SSI-REV-1");
+      component.revisionSource.set({ id: "SSI-1" } as never);
+      await component.canDeactivate();
+      expect(cancelRevision).toHaveBeenCalledWith("SSI-REV-1", "maker.demo");
+      component.ngOnDestroy();
+    } finally {
+      list.mockRestore();
+      cancelRevision.mockRestore();
+    }
   });
 
   it("splits bank SSI coverage into two tabs without opening an empty SSI detail", async () => {

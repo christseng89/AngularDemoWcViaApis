@@ -38,6 +38,7 @@ import type {
   SsiPage,
   SsiRow,
 } from "./ssi-maintenance.types";
+import { SsiMaintenanceApiService } from "./ssi-maintenance-api.service";
 import { presentOfficialFieldName } from "./official-field-name";
 import { hasManualRouteOverride } from "./resolution-route-selection";
 import {
@@ -452,6 +453,7 @@ interface ControlledFixtureResponse {
 export class AppComponent implements OnInit, OnDestroy {
   readonly presentOfficialFieldName = presentOfficialFieldName;
   private readonly http = inject(HttpClient);
+  private readonly ssiMaintenanceApi = inject(SsiMaintenanceApiService);
   private readonly document = inject(DOCUMENT);
   private readonly changeDetector = inject(ChangeDetectorRef);
   private readonly themeService = inject(ThemeService);
@@ -1269,14 +1271,8 @@ export class AppComponent implements OnInit, OnDestroy {
       if (this.selectedCounterpartyId())
         query.set("counterpartyId", this.selectedCounterpartyId());
       const [response, summary] = await Promise.all([
-        firstValueFrom(
-          this.http.get<SsiPage | SsiRow[]>(
-            `${this.api}/ssis?${query.toString()}`,
-          ),
-        ),
-        firstValueFrom(
-          this.http.get<SsiIndexSummary>(`${this.api}/ssis/summary`),
-        ),
+        firstValueFrom(this.ssiMaintenanceApi.list(query)),
+        firstValueFrom(this.ssiMaintenanceApi.summary()),
       ]);
       const page: SsiPage = Array.isArray(response)
         ? {
@@ -1961,9 +1957,10 @@ export class AppComponent implements OnInit, OnDestroy {
     if (revisionId) {
       try {
         await firstValueFrom(
-          this.http.post(`${this.api}/ssis/${revisionId}/cancel-revision`, {
-            actor: String(this.model["maker"] ?? "maker.revision"),
-          }),
+          this.ssiMaintenanceApi.cancelRevision(
+            revisionId,
+            String(this.model["maker"] ?? "maker.revision"),
+          ),
         );
       } catch {
         this.notice.set({
@@ -2004,9 +2001,10 @@ export class AppComponent implements OnInit, OnDestroy {
     if (!revisionId) return true;
     try {
       await firstValueFrom(
-        this.http.post(`${this.api}/ssis/${revisionId}/cancel-revision`, {
-          actor: String(this.model["maker"] ?? "maker.revision"),
-        }),
+        this.ssiMaintenanceApi.cancelRevision(
+          revisionId,
+          String(this.model["maker"] ?? "maker.revision"),
+        ),
       );
       this.editingId.set(null);
       this.revisionSource.set(null);
@@ -2031,9 +2029,9 @@ export class AppComponent implements OnInit, OnDestroy {
       const id = this.editingId();
       if (id)
         await firstValueFrom(
-          this.http.put(`${this.api}/ssis/${id}`, this.model),
+          this.ssiMaintenanceApi.updateDraft(id, this.model),
         );
-      else await firstValueFrom(this.http.post(`${this.api}/ssis`, this.model));
+      else await firstValueFrom(this.ssiMaintenanceApi.createDraft(this.model));
       this.notice.set({
         kind: "info",
         text:
@@ -2058,9 +2056,7 @@ export class AppComponent implements OnInit, OnDestroy {
   async act(row: SsiRow, action: "submit" | "approve"): Promise<void> {
     const actor = action === "submit" ? row.maker : "checker.demo";
     try {
-      await firstValueFrom(
-        this.http.post(`${this.api}/ssis/${row.id}/${action}`, { actor }),
-      );
+      await firstValueFrom(this.ssiMaintenanceApi.act(row.id, action, actor));
       await this.refresh();
     } catch {
       this.notice.set({ kind: "error", text: `動作 ${action} 被拒絕。` });
@@ -2108,7 +2104,7 @@ export class AppComponent implements OnInit, OnDestroy {
     try {
       const maker = "maker.revision";
       const revision = await firstValueFrom(
-        this.http.post<SsiRow>(`${this.api}/ssis/${row.id}/revise`, { maker }),
+        this.ssiMaintenanceApi.reserveRevision(row.id, maker),
       );
       this.notice.set(null);
       this.editingId.set(revision.id);
@@ -2145,16 +2141,11 @@ export class AppComponent implements OnInit, OnDestroy {
     try {
       if (row.status === "DRAFT") {
         await firstValueFrom(
-          this.http.delete(`${this.api}/ssis/${row.id}`, {
-            body: { actor: row.maker, reason },
-          }),
+          this.ssiMaintenanceApi.revokeDraft(row.id, row.maker, reason),
         );
       } else {
         await firstValueFrom(
-          this.http.post(`${this.api}/ssis/${row.id}/suppress`, {
-            maker: "maker.suppression",
-            reason,
-          }),
+          this.ssiMaintenanceApi.suppress(row.id, "maker.suppression", reason),
         );
       }
       this.closeDeleteDialog();
@@ -2903,11 +2894,7 @@ export class AppComponent implements OnInit, OnDestroy {
             `${this.api}/reference/counterparties`,
           ),
         ),
-        firstValueFrom(
-          this.http.get<readonly CounterpartySsiSummarySource[]>(
-            `${this.api}/ssis/counterparty-coverage?status=ACTIVE`,
-          ),
-        ),
+        firstValueFrom(this.ssiMaintenanceApi.counterpartyCoverage()),
       ]);
       this.counterpartyDirectory.set(response.items);
       this.counterpartyCoverage.set(coverage);
