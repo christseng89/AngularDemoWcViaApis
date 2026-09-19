@@ -585,6 +585,7 @@ describe("portal component behavior", () => {
     routerEvents.next(new NavigationErrorEvent(102));
     expect(component.view()).toBe("dashboard");
     expect(component.form.reset).toHaveBeenCalled();
+    expect(component.notice()?.text).toContain("WIP 已釋放");
     component.ngOnDestroy();
   });
 
@@ -630,6 +631,7 @@ describe("portal component behavior", () => {
     component.onLateMakerWipRelease(104);
     expect(component.view()).toBe("dashboard");
     expect(component.form.reset).toHaveBeenCalled();
+    expect(component.notice()?.text).toContain("WIP 隨後釋放");
     component.ngOnDestroy();
   });
 
@@ -675,6 +677,7 @@ describe("portal component behavior", () => {
       cleanup.complete();
       expect(await activation).toBe(true);
       expect(component.view()).toBe("dashboard");
+      expect(component.notice()?.text).toContain("WIP 隨後釋放");
       expect(bridge.consumeReleasedMakerWip(205)).toBe(false);
     } finally {
       // Consume an unused one-shot HTTP override on the RED baseline so it
