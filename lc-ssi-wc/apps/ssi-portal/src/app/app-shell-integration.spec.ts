@@ -130,7 +130,7 @@ describe("AppComponent shell integration", () => {
   it("keeps the lazy feature outlet mounted while the shared SSI detail is open", () => {
     const html = template();
     expect(html).toMatch(
-      /\n {2}}\n {2}<div\s+\[hidden\]="\s+!!detail\.target\(\) \|\|/,
+      /\r?\n {2}}\r?\n {2}<div\s+\[hidden\]="\s+!!detail\.target\(\) \|\|/,
     );
     expect(html).toContain("<router-outlet");
   });
