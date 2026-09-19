@@ -446,6 +446,8 @@ jest.doMock("@angular/core", () => ({
       return new (token as new () => unknown)();
     if ((token as { name?: string }).name === "SwiftDataIndexStore")
       return new (token as new () => unknown)();
+    if ((token as { name?: string }).name === "SwiftDataEditorSession")
+      return new (token as new () => unknown)();
     if (
       (token as { description?: string }).description ===
       "SSI_RESOLUTION_READ_PORT"
@@ -1423,6 +1425,38 @@ describe("portal component behavior", () => {
     } finally {
       rejectHttp = false;
     }
+  });
+
+  it("releases the original SWIFT Data WIP before switching resource tabs and stays put on failure", async () => {
+    const { SwiftDataCrudComponent } =
+      await import("./swift-data-crud.component");
+    const component = new SwiftDataCrudComponent();
+    component.contract.set({
+      info: { title: "test", version: "1" },
+      "x-standards-baseline": {},
+      "x-ui-resources": [
+        { id: "rma", label: "RMA", endpoint: "rma-authorisations", description: "RMA", columns: [], fields: [], "x-lifecycle": [] },
+        { id: "entity", label: "Entity", endpoint: "entities", description: "Entity", columns: [], fields: [], "x-lifecycle": [] },
+      ],
+    } as never);
+    component.revision.reservationId.set("RMA-WIP-1");
+    component.formVisible.set(true);
+    const deletes = fakeHttp.delete.mock.calls.length;
+    rejectHttp = true;
+    try {
+      await component.chooseResource("entity");
+      expect(component.resourceId()).toBe("rma");
+      expect(component.formVisible()).toBe(true);
+      expect(component.revision.reservationId()).toBe("RMA-WIP-1");
+      expect(fakeHttp.delete.mock.calls.length - deletes).toBe(1);
+      expect(fakeHttp.delete.mock.calls[deletes][0]).toContain("/rma-authorisations/RMA-WIP-1");
+    } finally {
+      rejectHttp = false;
+    }
+    await component.chooseResource("entity");
+    expect(component.resourceId()).toBe("entity");
+    expect(component.revision.reservationId()).toBeNull();
+    expect(fakeHttp.delete.mock.calls[deletes + 1][0]).toContain("/rma-authorisations/RMA-WIP-1");
   });
 
   it("clears a stale global notice when navigation provides its own page-level status", async () => {

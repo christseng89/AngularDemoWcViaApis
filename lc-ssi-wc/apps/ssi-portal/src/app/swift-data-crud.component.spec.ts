@@ -80,4 +80,16 @@ describe("SWIFT Data canonical SSI entrypoint", () => {
     expect(component).not.toMatch(/\bconst query = new URLSearchParams/);
     expect(component).toContain("inject(SwiftDataIndexStore)");
   });
+
+  it("keeps editor lifecycle operations in a feature-scoped editor owner", () => {
+    const component = readFileSync(
+      join(__dirname, "swift-data-crud.component.ts"),
+      "utf8",
+    );
+    expect(component).toContain("inject(SwiftDataEditorSession)");
+    expect(component).not.toContain("this.api.save(");
+    expect(component).not.toContain("this.api.revise(");
+    expect(component).not.toContain("this.api.suppress(");
+    expect(component).not.toContain("this.api.import(");
+  });
 });

@@ -11,7 +11,7 @@ import {
 } from "@angular/core";
 import { scalarText } from "./scalar-text";
 import { JsonPipe } from "@angular/common";
-import { FormGroup, ReactiveFormsModule } from "@angular/forms";
+import { ReactiveFormsModule } from "@angular/forms";
 import { FormlyForm, type FormlyFieldConfig } from "@ngx-formly/core";
 import { firstValueFrom } from "rxjs";
 import { AlertComponent } from "./alert.component";
@@ -44,6 +44,7 @@ import { SwiftDataRmaSelection } from "./swift-data-feature/swift-data-rma-selec
 import { SwiftDataRevisionSession } from "./swift-data-feature/swift-data-revision-session";
 import { SwiftDataFieldMapper } from "./swift-data-feature/swift-data-field-mapper";
 import { SwiftDataIndexStore } from "./swift-data-feature/swift-data-index.store";
+import { SwiftDataEditorSession, type SwiftDataEditorPorts } from "./swift-data-feature/swift-data-editor.session";
 import {
   SwiftDataExportService,
   type SwiftDataExportContext,
@@ -61,7 +62,7 @@ import {
     BankServicePickerDialogComponent,
     GovernedRecordViewComponent,
   ],
-  providers: [SwiftDataApiService, SwiftDataBankPicker, SwiftDataExportService, SwiftDataRmaSelection, SwiftDataRevisionSession, SwiftDataFieldMapper, SwiftDataIndexStore],
+  providers: [SwiftDataApiService, SwiftDataBankPicker, SwiftDataExportService, SwiftDataRmaSelection, SwiftDataRevisionSession, SwiftDataFieldMapper, SwiftDataIndexStore, SwiftDataEditorSession],
   templateUrl: "./swift-data-crud.component.html",
   styleUrl: "./swift-data-crud.component.css",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -77,6 +78,7 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
   private readonly exporter = inject(SwiftDataExportService);
   private readonly fieldMapper = inject(SwiftDataFieldMapper);
   readonly index = inject(SwiftDataIndexStore);
+  readonly editor = inject(SwiftDataEditorSession);
   readonly contract = signal<OpenApiUiContract | null>(null);
   readonly initialResourceId = input<string | null>(null);
   readonly initialRecordId = input<string | null>(null);
@@ -114,11 +116,11 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
   readonly totalPages = this.index.totalPages;
   readonly sortedRows = this.index.sortedRows;
   readonly pagedRows = this.index.pagedRows;
-  readonly form = new FormGroup({});
+  readonly form = this.editor.form;
   readonly fields = signal<FormlyFieldConfig[]>([]);
-  readonly editingId = signal<string | null>(null);
-  readonly savedDraftId = signal<string | null>(null);
-  readonly formVisible = signal(false);
+  readonly editingId = this.editor.editingId;
+  readonly savedDraftId = this.editor.savedDraftId;
+  readonly formVisible = this.editor.formVisible;
   readonly busy = signal(false);
   readonly exportBusy = signal(false);
   readonly notice = signal<{
@@ -139,7 +141,7 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
       message: notice.text,
     } as const;
   });
-  readonly importResult = signal<unknown>(null);
+  readonly importResult = this.editor.importResult;
   readonly detailTarget = signal<Row | null>(null);
   readonly detailModel = computed<Record<string, unknown>>(() => {
     const row = this.detailTarget();
@@ -155,13 +157,25 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
     }
     return model;
   });
-  readonly revokeTarget = signal<Row | null>(null);
-  readonly revokeReason = signal("");
-  readonly checkerRejectReason = signal("");
-  model: Record<string, unknown> = {};
+  readonly revokeTarget = this.editor.revokeTarget;
+  readonly revokeReason = this.editor.revokeReason;
+  readonly checkerRejectReason = this.editor.checkerRejectReason;
+  get model(): Record<string, unknown> { return this.editor.model; }
+  set model(value: Record<string, unknown>) { this.editor.model = value; }
 
   constructor() {
     this.index.sortValue = (row, path) => this.sortValue(row, path);
+    this.editor.connect(this.index, this.revision);
+  }
+
+  private editorPorts(): SwiftDataEditorPorts {
+    return {
+      busy: this.busy,
+      notify: (notice) => this.notice.set(notice),
+      refresh: () => this.refresh(),
+      hydrateRmaSelection: (row) => this.hydrateRmaSelection(row),
+      cancelWork: () => this.cancelWork(),
+    };
   }
 
   ngOnInit(): void {
@@ -218,6 +232,7 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
   }
 
   async chooseResource(id: string): Promise<void> {
+    if (this.revision.reservationId() && !(await this.canDeactivate())) return;
     this.resourceId.set(id);
     this.formVisible.set(false);
     this.editingId.set(null);
@@ -256,13 +271,7 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
   startCreate(): void {
     const resource = this.resource();
     if (!resource) return;
-    this.model = {};
-    for (const field of resource.fields)
-      if (field.defaultValue !== undefined)
-        this.fieldMapper.setPath(this.model, field.key, field.defaultValue);
-    this.editingId.set(null);
-    this.form.reset(this.model);
-    this.formVisible.set(true);
+    this.editor.startCreate(resource);
   }
   async cancelWork(): Promise<void> {
     if (this.bankPicker.target()) {
@@ -316,92 +325,19 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
     }
     const resource = this.resource();
     if (!resource) return;
-    await this.hydrateRmaSelection(row);
-    this.model = {};
-    for (const field of resource.fields)
-      this.fieldMapper.setPath(
-        this.model,
-        field.key,
-        this.fieldMapper.toFormValue(this.fieldMapper.getPath(row, field.key), field),
-      );
-    this.editingId.set(row.id);
-    this.form.reset(this.model);
-    this.formVisible.set(true);
+    await this.editor.edit(row, resource, this.editorPorts());
   }
 
   async save(): Promise<void> {
-    if (this.form.invalid) {
-      this.form.markAllAsTouched();
-      this.notice.set({
-        kind: "warning",
-        text: "請修正 OAS／SWIFT 標準驗證錯誤。",
-      });
-      return;
-    }
     const resource = this.resource();
     if (!resource) return;
-    const payload = this.fieldMapper.toApiPayload(resource, this.model);
-    this.busy.set(true);
-    try {
-      const id = this.editingId();
-      const saved = await firstValueFrom(
-        this.api.save(resource.endpoint, id, payload),
-      );
-      this.editingId.set(saved.id);
-      this.notice.set({
-        kind: "info",
-        text: `${resource.label} DRAFT 已${id ? "更新" : "建立"}；仍須 Maker submit 與獨立 Checker approve。`,
-      });
-      this.savedDraftId.set(saved.id);
-      this.revision.reservationId.set(null);
-      this.editingId.set(null);
-      this.formVisible.set(false);
-      this.statusFilter.set("DRAFT");
-      this.indexSearch.set("");
-      this.page.set(1);
-      await this.refresh();
-    } catch (error) {
-      const response =
-        error !== null && typeof error === "object"
-          ? (error as { error?: { message?: unknown } })
-          : null;
-      const conflict = response?.error?.message === "RMA_INDEX_ALREADY_EXISTS";
-      this.notice.set({
-        kind: "error",
-        text: conflict
-          ? "此 BIC 已有 ACTIVE 或進行中的 RMA；請從原 index 使用 EDIT 或 SUPPRESSED。"
-          : "儲存被拒絕；請檢查 SWIFT 格式、有效期與 Maker 權限。",
-      });
-    } finally {
-      this.busy.set(false);
-    }
+    await this.editor.save(resource, this.editorPorts());
   }
 
   async act(row: Row, action: "submit" | "approve"): Promise<void> {
     const resource = this.resource();
     if (!resource) return;
-    const actor = action === "submit" ? row.maker : "checker.demo";
-    try {
-      await firstValueFrom(
-        this.api.act(resource.endpoint, row.id, action, actor),
-      );
-      this.notice.set({
-        kind: "info",
-        text:
-          action === "submit"
-            ? `${resource.label} 已提交審批。`
-            : action === "approve"
-              ? `${resource.label} 已由獨立 Checker 核准並啟用。`
-              : `${resource.label} 已啟用。`,
-      });
-      await this.refresh();
-      if (action === "approve") this.cancelWork();
-    } catch {
-      this.notice.set({
-        kind: "error",
-        text: `${action} 被生命週期／四眼控制拒絕。`,
-      });
-    }
+    await this.editor.act(resource, row, action, this.editorPorts());
   }
 
   canAct(row: Row, action: "submit" | "approve"): boolean {
@@ -418,96 +354,25 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
   async revise(row: Row): Promise<void> {
     const resource = this.resource();
     if (!resource) return;
-    try {
-      const revision = await firstValueFrom(
-        this.api.revise(resource.endpoint, row.id, "maker.revision"),
-      );
-      this.revision.reservationId.set(revision.id);
-      await this.refresh();
-      await this.edit(revision);
-    } catch {
-      this.notice.set({ kind: "error", text: "此紀錄無法建立修訂版本。" });
-    }
+    await this.editor.revise(resource, row, this.editorPorts());
   }
 
   requestSuppress(row: Row): void {
-    this.revokeTarget.set(row);
-    this.revokeReason.set("");
+    this.editor.requestSuppress(row);
   }
   requestDraftRevoke(row: Row): void {
-    if (row.status !== "DRAFT") return;
-    this.revokeTarget.set(row);
-    this.revokeReason.set("");
+    this.editor.requestDraftRevoke(row);
   }
   async confirmSuppression(): Promise<void> {
-    const resource = this.resource(),
-      row = this.revokeTarget(),
-      reason = this.revokeReason().trim();
-    if (!resource || !row || reason.length < 5) return;
-    try {
-      if (row.status === "DRAFT") {
-        await firstValueFrom(
-          this.api.delete(resource.endpoint, row.id, {
-            actor: row.maker,
-            reason,
-          }),
-        );
-      } else {
-        await firstValueFrom(
-          this.api.suppress(resource.endpoint, row.id, "maker.suppression", reason),
-        );
-      }
-      this.revokeTarget.set(null);
-      this.revokeReason.set("");
-      this.statusFilter.set(row.status === "DRAFT" ? "ACTIVE" : "DRAFT");
-      this.page.set(1);
-      await this.refresh();
-    } catch {
-      await this.refresh();
-      this.notice.set({
-        kind: "error",
-        text: "Suppression 建立失敗；狀態已重新檢查，可能已有進行中的工作。",
-      });
-    }
+    const resource = this.resource();
+    if (!resource) return;
+    await this.editor.confirmSuppression(resource, this.editorPorts());
   }
 
   async upload(event: Event, dryRun: boolean): Promise<void> {
-    const resource = this.resource(),
-      input = event.target as HTMLInputElement,
-      file = input.files?.[0];
-    if (!resource?.importType || !file) return;
-    try {
-      const parsed = JSON.parse(await file.text()) as unknown;
-      const records = Array.isArray(parsed)
-        ? parsed
-        : (parsed as { records?: unknown[] }).records;
-      if (!Array.isArray(records)) throw new Error("records array required");
-      this.importResult.set(
-        await firstValueFrom(
-          this.api.import(
-            resource.importType,
-            file.name,
-            dryRun,
-            `portal-${resource.id}-${file.name}-${file.lastModified}-${dryRun}`,
-            records,
-          ),
-        ),
-      );
-      if (!dryRun) await this.refresh();
-      this.notice.set({
-        kind: "info",
-        text: dryRun
-          ? "檔案已完成 dry-run 驗證；未寫入資料。"
-          : "檔案已導入為 DRAFT；不會自動啟用。",
-      });
-    } catch {
-      this.notice.set({
-        kind: "error",
-        text: "匯入失敗：必須是 OAS 定義的 JSON records，且通過逐列驗證。",
-      });
-    } finally {
-      input.value = "";
-    }
+    const resource = this.resource();
+    if (!resource) return;
+    await this.editor.upload(resource, event, dryRun, this.editorPorts());
   }
 
   async exportExcel(): Promise<void> {
@@ -682,28 +547,8 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
 
   async rejectFromChecker(row: Row): Promise<void> {
     const resource = this.resource();
-    const reason = this.checkerRejectReason().trim();
-    if (!resource || !this.checkerMode() || reason.length < 5) return;
-    this.busy.set(true);
-    try {
-      await firstValueFrom(
-        this.api.reject(resource.endpoint, row.id, "checker.demo", reason),
-      );
-      this.notice.set({
-        kind: "info",
-        text: `${resource.label} 已由 Checker Reject；原因已寫入稽核紀錄。`,
-      });
-      this.checkerRejectReason.set("");
-      this.cancelWork();
-      await this.refresh();
-    } catch {
-      this.notice.set({
-        kind: "error",
-        text: "Reject 被生命週期／四眼控制拒絕。",
-      });
-    } finally {
-      this.busy.set(false);
-    }
+    if (!resource) return;
+    await this.editor.rejectFromChecker(resource, row, this.checkerMode(), this.editorPorts());
   }
   movePage(delta: number): void {
     this.index.movePage(delta);
