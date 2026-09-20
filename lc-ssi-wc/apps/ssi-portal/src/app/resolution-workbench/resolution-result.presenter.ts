@@ -1,6 +1,7 @@
 import type {
   ResolutionPageExecutionOutcome,
   ResolutionPageFieldResult,
+  ResolutionPageGeneratedOutput,
 } from "@ssi/contracts";
 
 export interface ResolutionResultRow {
@@ -56,8 +57,22 @@ const provenanceSummary = (
     .filter((value): value is string => Boolean(value))
     .join(" · ");
 
+const resolvedSourceLabel = (source: string): string =>
+  source === "OWN_NOSTRO" || source === "OWN_SSI_NOSTRO"
+    ? "RESOLVED_FROM_OWN_SSI"
+    : `RESOLVED_FROM_${source}`;
+
+const resultResolutionDomain = (
+  outputs: readonly ResolutionPageGeneratedOutput[],
+): string => {
+  const domain = outputs.find((output) => output.format === "ISO_20022")
+    ?.document["resolutionDomain"];
+  return typeof domain === "string" ? domain.trim() : "";
+};
+
 export const resolutionResultRows = (
   fields: readonly ResolutionPageFieldResult[],
+  outputs: readonly ResolutionPageGeneratedOutput[] = [],
 ): readonly ResolutionResultRow[] =>
   fields.map((field) => ({
     key: `${field.fieldId}:${field.sequenceId}:${field.swiftTag}:${field.swiftOption}`,
@@ -80,7 +95,13 @@ export const resolutionResultRows = (
     status: field.resolutionStatus,
     statusLabel: statusLabel(field.resolutionStatus),
     reasonCode: field.reasonCode ?? "",
-    statusDetail: field.reasonCode || field.provenance.source || "",
+    statusDetail:
+      field.reasonCode ||
+      (field.resolutionStatus === "RESOLVED"
+        ? [field.provenance.source, resultResolutionDomain(outputs)]
+            .filter((source): source is string => Boolean(source))
+            .map(resolvedSourceLabel)[0] ?? ""
+        : field.provenance.source ?? ""),
     provenance: provenanceSummary(field.provenance),
   }));
 

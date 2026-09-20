@@ -1,4 +1,4 @@
-import type { ResolutionPageFieldResult } from "@ssi/contracts";
+import type { ResolutionPageFieldResult, ResolutionPageGeneratedOutput } from "@ssi/contracts";
 import {
   emptyResolutionMessage,
   resolutionResultRows,
@@ -88,7 +88,7 @@ describe("resolution result presenter", () => {
       { ...resolved, provenance: { source: "OWN_NOSTRO", sourceRecordId: "NOSTRO-001" } },
     ]);
 
-    expect(row?.statusDetail).toBe("OWN_NOSTRO");
+    expect(row?.statusDetail).toBe("RESOLVED_FROM_OWN_SSI");
   });
 
   it("prefers an explicit reason code over the provenance source", () => {
@@ -97,6 +97,36 @@ describe("resolution result presenter", () => {
     ]);
 
     expect(row?.statusDetail).toBe("RESOLVED_FROM_OWN_SSI");
+  });
+
+  it("shows the governed own-SSI resolution domain for Payment book transfers", () => {
+    const output: ResolutionPageGeneratedOutput = {
+      outputId: "iso-20022",
+      format: "ISO_20022",
+      label: "pacs.009",
+      messageIdentity: "pacs.009.001.08",
+      mediaType: "application/json",
+      document: { resolutionDomain: "OWN_SSI_NOSTRO" },
+    };
+    const [row] = resolutionResultRows([{ ...resolved, provenance: {} }], [output]);
+
+    expect(row?.statusDetail).toBe("RESOLVED_FROM_OWN_SSI");
+  });
+
+  it("keeps the field reason authoritative when a result domain is also present", () => {
+    const output: ResolutionPageGeneratedOutput = {
+      outputId: "iso-20022",
+      format: "ISO_20022",
+      label: "pacs.009",
+      messageIdentity: "pacs.009.001.08",
+      mediaType: "application/json",
+      document: { resolutionDomain: "OWN_SSI_NOSTRO" },
+    };
+    const [row] = resolutionResultRows([
+      { ...resolved, reasonCode: "RESOLVED_FROM_COUNTERPARTY_SSI" },
+    ], [output]);
+
+    expect(row?.statusDetail).toBe("RESOLVED_FROM_COUNTERPARTY_SSI");
   });
 
   it("omits the repeated Tag + option prefix from the displayed role description", () => {

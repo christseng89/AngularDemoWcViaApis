@@ -19,7 +19,9 @@ import {
 })
 export class ResolutionResultTableComponent {
   readonly result = input.required<ResolutionPageExecutionResult>();
-  readonly rows = computed(() => resolutionResultRows(this.result().fields));
+  readonly rows = computed(() =>
+    resolutionResultRows(this.result().fields, this.result().outputs),
+  );
   readonly emptyMessage = computed(() =>
     emptyResolutionMessage(this.result().outcome),
   );
