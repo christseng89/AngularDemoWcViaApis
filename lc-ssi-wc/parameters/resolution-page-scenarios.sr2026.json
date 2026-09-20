@@ -28395,7 +28395,7 @@
     {
       "scenarioId": "MT400-002",
       "messageType": "MT400",
-      "businessScenario": "MESSAGE - Message / optional route unavailable",
+      "businessScenario": "optional route unavailable",
       "sequence": "MESSAGE",
       "settlementLeg": "Message",
       "polarity": "POSITIVE",
@@ -28479,7 +28479,7 @@
     {
       "scenarioId": "MT400-003",
       "messageType": "MT400",
-      "businessScenario": "MESSAGE - Message / invalid option",
+      "businessScenario": "invalid option",
       "sequence": "MESSAGE",
       "settlementLeg": "Message",
       "polarity": "NEGATIVE",
@@ -28568,7 +28568,7 @@
     {
       "scenarioId": "MT400-004",
       "messageType": "MT400",
-      "businessScenario": "MESSAGE - Message / option B provenance boundary",
+      "businessScenario": "option B provenance boundary",
       "sequence": "MESSAGE",
       "settlementLeg": "Message",
       "polarity": "NEGATIVE",
@@ -28769,7 +28769,7 @@
     {
       "scenarioId": "MT730-002",
       "messageType": "MT730",
-      "businessScenario": "MESSAGE - Message / optional route unavailable",
+      "businessScenario": "optional route unavailable",
       "sequence": "MESSAGE",
       "settlementLeg": "Message",
       "polarity": "POSITIVE",
@@ -28853,7 +28853,7 @@
     {
       "scenarioId": "MT730-003",
       "messageType": "MT730",
-      "businessScenario": "MESSAGE - Message / invalid option",
+      "businessScenario": "invalid option",
       "sequence": "MESSAGE",
       "settlementLeg": "Message",
       "polarity": "NEGATIVE",
@@ -28942,7 +28942,7 @@
     {
       "scenarioId": "MT730-004",
       "messageType": "MT730",
-      "businessScenario": "MESSAGE - Message / option D provenance boundary",
+      "businessScenario": "option D provenance boundary",
       "sequence": "MESSAGE",
       "settlementLeg": "Message",
       "polarity": "NEGATIVE",
@@ -29143,7 +29143,7 @@
     {
       "scenarioId": "MT734-002",
       "messageType": "MT734",
-      "businessScenario": "MESSAGE - Message / optional route unavailable",
+      "businessScenario": "optional route unavailable",
       "sequence": "MESSAGE",
       "settlementLeg": "Message",
       "polarity": "POSITIVE",
@@ -29227,7 +29227,7 @@
     {
       "scenarioId": "MT734-003",
       "messageType": "MT734",
-      "businessScenario": "MESSAGE - Message / invalid option",
+      "businessScenario": "invalid option",
       "sequence": "MESSAGE",
       "settlementLeg": "Message",
       "polarity": "NEGATIVE",
@@ -29316,7 +29316,7 @@
     {
       "scenarioId": "MT734-004",
       "messageType": "MT734",
-      "businessScenario": "MESSAGE - Message / option B provenance boundary",
+      "businessScenario": "option B provenance boundary",
       "sequence": "MESSAGE",
       "settlementLeg": "Message",
       "polarity": "NEGATIVE",
@@ -29517,7 +29517,7 @@
     {
       "scenarioId": "MT742-002",
       "messageType": "MT742",
-      "businessScenario": "MESSAGE - Message / optional route unavailable",
+      "businessScenario": "optional route unavailable",
       "sequence": "MESSAGE",
       "settlementLeg": "Message",
       "polarity": "POSITIVE",
@@ -29601,7 +29601,7 @@
     {
       "scenarioId": "MT742-003",
       "messageType": "MT742",
-      "businessScenario": "MESSAGE - Message / invalid option",
+      "businessScenario": "invalid option",
       "sequence": "MESSAGE",
       "settlementLeg": "Message",
       "polarity": "NEGATIVE",
@@ -29690,7 +29690,7 @@
     {
       "scenarioId": "MT742-004",
       "messageType": "MT742",
-      "businessScenario": "MESSAGE - Message / option B provenance boundary",
+      "businessScenario": "option B provenance boundary",
       "sequence": "MESSAGE",
       "settlementLeg": "Message",
       "polarity": "NEGATIVE",
@@ -29891,7 +29891,7 @@
     {
       "scenarioId": "MT750-002",
       "messageType": "MT750",
-      "businessScenario": "MESSAGE - Message / optional route unavailable",
+      "businessScenario": "optional route unavailable",
       "sequence": "MESSAGE",
       "settlementLeg": "Message",
       "polarity": "POSITIVE",
@@ -29975,7 +29975,7 @@
     {
       "scenarioId": "MT750-003",
       "messageType": "MT750",
-      "businessScenario": "MESSAGE - Message / invalid option",
+      "businessScenario": "invalid option",
       "sequence": "MESSAGE",
       "settlementLeg": "Message",
       "polarity": "NEGATIVE",
@@ -30064,7 +30064,7 @@
     {
       "scenarioId": "MT750-004",
       "messageType": "MT750",
-      "businessScenario": "MESSAGE - Message / option B provenance boundary",
+      "businessScenario": "option B provenance boundary",
       "sequence": "MESSAGE",
       "settlementLeg": "Message",
       "polarity": "NEGATIVE",
@@ -30280,7 +30280,7 @@
     {
       "scenarioId": "MT752-002",
       "messageType": "MT752",
-      "businessScenario": "MESSAGE - Message / optional route unavailable",
+      "businessScenario": "optional route unavailable",
       "sequence": "MESSAGE",
       "settlementLeg": "Message",
       "polarity": "POSITIVE",
@@ -30364,7 +30364,7 @@
     {
       "scenarioId": "MT752-003",
       "messageType": "MT752",
-      "businessScenario": "MESSAGE - Message / invalid option",
+      "businessScenario": "invalid option",
       "sequence": "MESSAGE",
       "settlementLeg": "Message",
       "polarity": "NEGATIVE",
@@ -30453,7 +30453,7 @@
     {
       "scenarioId": "MT752-004",
       "messageType": "MT752",
-      "businessScenario": "MESSAGE - Message / option B provenance boundary",
+      "businessScenario": "option B provenance boundary",
       "sequence": "MESSAGE",
       "settlementLeg": "Message",
       "polarity": "NEGATIVE",
@@ -30654,7 +30654,7 @@
     {
       "scenarioId": "MT754-002",
       "messageType": "MT754",
-      "businessScenario": "MESSAGE - Message / optional route unavailable",
+      "businessScenario": "optional route unavailable",
       "sequence": "MESSAGE",
       "settlementLeg": "Message",
       "polarity": "POSITIVE",
@@ -30738,7 +30738,7 @@
     {
       "scenarioId": "MT754-003",
       "messageType": "MT754",
-      "businessScenario": "MESSAGE - Message / invalid option",
+      "businessScenario": "invalid option",
       "sequence": "MESSAGE",
       "settlementLeg": "Message",
       "polarity": "NEGATIVE",
@@ -30827,7 +30827,7 @@
     {
       "scenarioId": "MT754-004",
       "messageType": "MT754",
-      "businessScenario": "MESSAGE - Message / option B provenance boundary",
+      "businessScenario": "option B provenance boundary",
       "sequence": "MESSAGE",
       "settlementLeg": "Message",
       "polarity": "NEGATIVE",
@@ -31043,7 +31043,7 @@
     {
       "scenarioId": "MT756-002",
       "messageType": "MT756",
-      "businessScenario": "MESSAGE - Message / optional route unavailable",
+      "businessScenario": "optional route unavailable",
       "sequence": "MESSAGE",
       "settlementLeg": "Message",
       "polarity": "POSITIVE",
@@ -31127,7 +31127,7 @@
     {
       "scenarioId": "MT756-003",
       "messageType": "MT756",
-      "businessScenario": "MESSAGE - Message / invalid option",
+      "businessScenario": "invalid option",
       "sequence": "MESSAGE",
       "settlementLeg": "Message",
       "polarity": "NEGATIVE",
@@ -31216,7 +31216,7 @@
     {
       "scenarioId": "MT756-004",
       "messageType": "MT756",
-      "businessScenario": "MESSAGE - Message / option B provenance boundary",
+      "businessScenario": "option B provenance boundary",
       "sequence": "MESSAGE",
       "settlementLeg": "Message",
       "polarity": "NEGATIVE",
@@ -31417,7 +31417,7 @@
     {
       "scenarioId": "MT765-002",
       "messageType": "MT765",
-      "businessScenario": "MESSAGE - Message / intermediary route",
+      "businessScenario": "intermediary route",
       "sequence": "MESSAGE",
       "settlementLeg": "MESSAGE",
       "polarity": "POSITIVE",
@@ -31526,7 +31526,7 @@
     {
       "scenarioId": "MT765-003",
       "messageType": "MT765",
-      "businessScenario": "MESSAGE - Message / optional route unavailable",
+      "businessScenario": "optional route unavailable",
       "sequence": "MESSAGE",
       "settlementLeg": "MESSAGE",
       "polarity": "POSITIVE",
@@ -31610,7 +31610,7 @@
     {
       "scenarioId": "MT765-004",
       "messageType": "MT765",
-      "businessScenario": "MESSAGE - Message / invalid option",
+      "businessScenario": "invalid option",
       "sequence": "MESSAGE",
       "settlementLeg": "MESSAGE",
       "polarity": "NEGATIVE",
@@ -31699,7 +31699,7 @@
     {
       "scenarioId": "MT765-005",
       "messageType": "MT765",
-      "businessScenario": "MESSAGE - Message / option B provenance boundary",
+      "businessScenario": "option B provenance boundary",
       "sequence": "MESSAGE",
       "settlementLeg": "MESSAGE",
       "polarity": "NEGATIVE",
@@ -31900,7 +31900,7 @@
     {
       "scenarioId": "MT768-002",
       "messageType": "MT768",
-      "businessScenario": "MESSAGE - Message / optional route unavailable",
+      "businessScenario": "optional route unavailable",
       "sequence": "MESSAGE",
       "settlementLeg": "Message",
       "polarity": "POSITIVE",
@@ -31984,7 +31984,7 @@
     {
       "scenarioId": "MT768-003",
       "messageType": "MT768",
-      "businessScenario": "MESSAGE - Message / invalid option",
+      "businessScenario": "invalid option",
       "sequence": "MESSAGE",
       "settlementLeg": "Message",
       "polarity": "NEGATIVE",
@@ -32073,7 +32073,7 @@
     {
       "scenarioId": "MT768-004",
       "messageType": "MT768",
-      "businessScenario": "MESSAGE - Message / option B provenance boundary",
+      "businessScenario": "option B provenance boundary",
       "sequence": "MESSAGE",
       "settlementLeg": "Message",
       "polarity": "NEGATIVE",
@@ -32274,7 +32274,7 @@
     {
       "scenarioId": "MT769-002",
       "messageType": "MT769",
-      "businessScenario": "MESSAGE - Message / optional route unavailable",
+      "businessScenario": "optional route unavailable",
       "sequence": "MESSAGE",
       "settlementLeg": "Message",
       "polarity": "POSITIVE",
@@ -32358,7 +32358,7 @@
     {
       "scenarioId": "MT769-003",
       "messageType": "MT769",
-      "businessScenario": "MESSAGE - Message / invalid option",
+      "businessScenario": "invalid option",
       "sequence": "MESSAGE",
       "settlementLeg": "Message",
       "polarity": "NEGATIVE",
@@ -32447,7 +32447,7 @@
     {
       "scenarioId": "MT769-004",
       "messageType": "MT769",
-      "businessScenario": "MESSAGE - Message / option B provenance boundary",
+      "businessScenario": "option B provenance boundary",
       "sequence": "MESSAGE",
       "settlementLeg": "Message",
       "polarity": "NEGATIVE",
@@ -35808,7 +35808,7 @@
     {
       "scenarioId": "MT765-006",
       "messageType": "MT765",
-      "businessScenario": "MESSAGE - Message / clearing-member code placement fidelity",
+      "businessScenario": "clearing-member code placement fidelity",
       "sequence": "MESSAGE",
       "settlementLeg": "MESSAGE",
       "polarity": "POSITIVE",
