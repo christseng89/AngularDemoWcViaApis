@@ -172,24 +172,26 @@
                   </button>
                 </th>
               }
-              <th
-                [attr.aria-sort]="
-                  sortPath() === '__requestType'
-                    ? sortDirection() === 'asc'
-                      ? 'ascending'
-                      : 'descending'
-                    : 'none'
-                "
-              >
-                <button
-                  class="sort-header"
-                  type="button"
-                  (click)="toggleSort('__requestType')"
+              @if (showRequestTypeColumn()) {
+                <th
+                  [attr.aria-sort]="
+                    sortPath() === '__requestType'
+                      ? sortDirection() === 'asc'
+                        ? 'ascending'
+                        : 'descending'
+                      : 'none'
+                  "
                 >
-                  Request Type
-                  <span>{{ sortIndicator("__requestType") }}</span>
-                </button>
-              </th>
+                  <button
+                    class="sort-header"
+                    type="button"
+                    (click)="toggleSort('__requestType')"
+                  >
+                    Request Type
+                    <span>{{ sortIndicator("__requestType") }}</span>
+                  </button>
+                </th>
+              }
               @if (!checkerMode()) {
                 <th
                   [attr.aria-sort]="
@@ -267,11 +269,13 @@
                     }
                   </td>
                 }
-                <td class="request-type-cell">
-                  <span class="revision-state">{{
-                    requestTypeLabel(row)
-                  }}</span>
-                </td>
+                @if (showRequestTypeColumn()) {
+                  <td class="request-type-cell">
+                    <span class="revision-state">{{
+                      requestTypeLabel(row)
+                    }}</span>
+                  </td>
+                }
                 @if (!checkerMode()) {
                   <td class="revision-action-cell">
                     @if (currentStatusLabel(row)) {
@@ -331,7 +335,7 @@
                                 requestDraftRevoke(row)
                               "
                             >
-                              Revoke Draft
+                              Revoke
                             </button>
                           }
                         }
@@ -345,7 +349,8 @@
                 <td
                   [attr.colspan]="
                     current.columns.length +
-                    (checkerMode() ? 1 : 2 + actionColumns().length)
+                    (showRequestTypeColumn() ? 1 : 0) +
+                    (checkerMode() ? 0 : 1 + actionColumns().length)
                   "
                   class="empty"
                 >
@@ -546,7 +551,7 @@
             }}
           </p>
           <h2 id="suppression-dialog-title">
-            {{ row.status === "DRAFT" ? "Revoke Draft" : "Suppress" }}
+            {{ row.status === "DRAFT" ? "Revoke" : "Suppress" }}
             {{ resource()?.label }}
           </h2>
         </div>
@@ -587,7 +592,7 @@
           (click)="confirmSuppression()"
         >
           {{
-            row.status === "DRAFT" ? "Revoke Draft" : "Create Suppression Draft"
+            row.status === "DRAFT" ? "Revoke" : "Create Suppression Draft"
           }}
         </button>
       </div>

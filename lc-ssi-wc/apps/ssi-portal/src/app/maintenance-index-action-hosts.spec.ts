@@ -36,6 +36,18 @@ describe("maintenance index action host adapters", () => {
       expect(template).toContain("Current Status");
     }
   });
+  it("removes Request Type header and cells only for Draft and adjusts empty rows", () => {
+    expect(shared).toContain("@if (showRequestTypeColumn()) {");
+    expect(ssi).toContain("@if (index.showRequestTypeColumn()) {");
+    expect(shared).toContain("showRequestTypeColumn() ? 1 : 0");
+    expect(ssi).toContain("index.showRequestTypeColumn() ? 1 : 0");
+  });
+  it("uses the generic Revoke label for the existing Draft action", () => {
+    expect(shared).not.toContain("Revoke Draft");
+    expect(ssi).not.toContain("Revoke Draft");
+    expect(shared).toContain("requestDraftRevoke(row)");
+    expect(ssi).toContain("index.requestDraftRevoke(row)");
+  });
   it("derives empty-state colspan from visible action columns", () => {
     expect(shared).toContain("actionColumns().length");
     expect(ssi).toContain("index.ownershipActionColumns().length");

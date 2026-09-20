@@ -1,6 +1,7 @@
 import {
   MaintenanceIndexActionPolicy,
   createMaintenanceIndexActionAdapter,
+  showsRequestTypeColumn,
   type MaintenanceIndexTab,
 } from "./maintenance-index-action-policy";
 
@@ -119,7 +120,7 @@ describe("MaintenanceIndexActionPolicy", () => {
     expect(policy.columnsFor("DRAFT").map(({ label }) => label)).toEqual([
       "Submit",
       "Edit",
-      "Revoke Draft",
+      "Revoke",
     ]);
     expect(policy.columnsFor("SUPPRESSED")).toEqual([]);
     expect(policy.columnsFor("ALL")).toEqual([]);
@@ -133,5 +134,13 @@ describe("MaintenanceIndexActionPolicy", () => {
     expect(ssi.isVisibleSort("ACTIVE", "EDIT_REVISE")).toBe(true);
     expect(ssi.isVisibleSort("ALL", "EDIT_REVISE")).toBe(false);
     expect(ssi.isVisibleSort("ALL", "REVISION_STATUS")).toBe(true);
+  });
+
+  it("hides Request Type only in Draft indexes and resets its hidden sort", () => {
+    expect(showsRequestTypeColumn("DRAFT")).toBe(false);
+    for (const tab of ["ACTIVE", "SUPPRESSED", "ALL", "PENDING_APPROVAL"] as const)
+      expect(showsRequestTypeColumn(tab)).toBe(true);
+    expect(createMaintenanceIndexActionAdapter("nostro").isVisibleSort("DRAFT", "__requestType")).toBe(false);
+    expect(createMaintenanceIndexActionAdapter("ssi").isVisibleSort("DRAFT", "REQUEST_TYPE")).toBe(false);
   });
 });

@@ -1,4 +1,7 @@
 export type MaintenanceIndexTab = "ACTIVE" | "DRAFT" | "SUPPRESSED" | "ALL";
+export const showsRequestTypeColumn = (
+  tab: MaintenanceIndexTab | "PENDING_APPROVAL",
+): boolean => tab !== "DRAFT";
 export type MaintenanceIndexResourceId = "rma" | "entity" | "nostro" | "ssi";
 export type MaintenanceIndexActionId =
   "REVISE" | "SUPPRESS" | "SUBMIT" | "EDIT" | "REVOKE_DRAFT";
@@ -37,7 +40,7 @@ const ACTIVE_COLUMNS = [
 const DRAFT_COLUMNS = [
   { id: "SUBMIT", label: "Submit" },
   { id: "EDIT", label: "Edit" },
-  { id: "REVOKE_DRAFT", label: "Revoke Draft" },
+  { id: "REVOKE_DRAFT", label: "Revoke" },
 ] as const;
 export class MaintenanceIndexActionPolicy {
   private readonly active =
@@ -124,6 +127,11 @@ class PolicyBackedMaintenanceIndexActionAdapter implements MaintenanceIndexActio
     return this.policy.isPresented(action, row);
   }
   isVisibleSort(tab: MaintenanceIndexTab, sortPath: string | null) {
+    if (
+      !showsRequestTypeColumn(tab) &&
+      (sortPath === "__requestType" || sortPath === "REQUEST_TYPE")
+    )
+      return false;
     if (
       !sortPath ||
       !Object.values(this.bindings).some(

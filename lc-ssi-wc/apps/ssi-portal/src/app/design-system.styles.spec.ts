@@ -84,6 +84,16 @@ describe("portal visual design system", () => {
     expect(globalStyles).toContain(".transaction-table :where(th, td)");
   });
 
+  it("matches Resolution Index typography to SWIFT Data Service", () => {
+    const searchTitle = globalStyles.match(/\.definition-index-workspace:has\(> \.transaction-index\) \.index-title\s*\{([^}]*)\}/)?.[1] ?? "";
+    const header = globalStyles.match(/\.transaction-table th\s*\{([^}]*)\}/)?.[1] ?? "";
+    const sortButton = globalStyles.match(/\.transaction-table \.sort-heading\s*\{([^}]*)\}/)?.[1] ?? "";
+    expect(searchTitle).toContain("font-size: var(--font-size-body)");
+    expect(header).toContain("font-size: 0.6875rem");
+    expect(header).toContain("font-weight: 800");
+    expect(sortButton).toContain("font: inherit");
+  });
+
   it("presents read-only request type as a status badge rather than an action", () => {
     const badge = globalStyles.match(/\.request-type-badge\s*\{([^}]*)\}/)?.[1] ?? "";
     expect(badge).toContain("border-radius: 999px");

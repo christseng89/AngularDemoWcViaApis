@@ -75,7 +75,7 @@ describe("SSI Index approved visibility contract", () => {
       "Submit",
       "Edit",
       "Suppress",
-      "Revoke Draft",
+      "Revoke",
     ]) {
       expect(indexTable).toContain(heading);
     }

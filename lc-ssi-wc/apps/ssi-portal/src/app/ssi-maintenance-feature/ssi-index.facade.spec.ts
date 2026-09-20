@@ -109,6 +109,16 @@ describe("SsiIndexFacade", () => {
     expect(facade.ownershipAriaSort("CURRENCY")).toBe("none");
   });
 
+  it("drops the hidden Request Type sort when entering Draft", () => {
+    const facade = new SsiIndexFacade({} as SsiMaintenanceApiService);
+    facade.ownershipSort.set("REQUEST_TYPE");
+    facade.selectOwnershipStatus("DRAFT");
+    expect(facade.showRequestTypeColumn()).toBe(false);
+    expect(facade.ownershipSort()).toBe("BOOKING_ENTITY");
+    facade.selectOwnershipStatus("ACTIVE");
+    expect(facade.showRequestTypeColumn()).toBe(true);
+  });
+
   it("owns Suppress/Revoke dialog state and the existing minimum reason gate", () => {
     const facade = new SsiIndexFacade({} as SsiMaintenanceApiService);
     facade.requestDelete(row);

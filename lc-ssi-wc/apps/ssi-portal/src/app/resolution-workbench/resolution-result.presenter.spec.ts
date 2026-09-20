@@ -83,6 +83,22 @@ describe("resolution result presenter", () => {
     expect(row?.tagAndOption).toBe("79");
   });
 
+  it("shows Payment field provenance beneath the status when no reason code is returned", () => {
+    const [row] = resolutionResultRows([
+      { ...resolved, provenance: { source: "OWN_NOSTRO", sourceRecordId: "NOSTRO-001" } },
+    ]);
+
+    expect(row?.statusDetail).toBe("OWN_NOSTRO");
+  });
+
+  it("prefers an explicit reason code over the provenance source", () => {
+    const [row] = resolutionResultRows([
+      { ...resolved, reasonCode: "RESOLVED_FROM_OWN_SSI" },
+    ]);
+
+    expect(row?.statusDetail).toBe("RESOLVED_FROM_OWN_SSI");
+  });
+
   it("omits the repeated Tag + option prefix from the displayed role description", () => {
     const [row] = resolutionResultRows([
       {

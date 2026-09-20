@@ -506,7 +506,7 @@ td button,
   padding: clamp(var(--ui-space-4), 2vw, 1.375rem);
 }
 .definition-index-workspace:has(> .transaction-index) .index-title {
-  font-size: var(--font-size-subsection);
+  font-size: var(--font-size-body);
   font-weight: 750;
 }
 .definition-index-workspace:has(> .transaction-index) .index-search input {
@@ -1545,13 +1545,22 @@ button.icon-button[aria-label="Cancel"]:focus-visible {
   font-weight: 800;
   letter-spacing: 0.015em;
 }
-.transaction-table th,
 .scenario-table th,
 .resolution-result-table th {
   color: var(--ui-text-muted);
   font-size: 0.75rem;
   font-weight: 750;
   letter-spacing: 0.08em;
+}
+.transaction-table th {
+  color: var(--ui-text-muted);
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+.transaction-table .sort-heading {
+  font: inherit;
+  text-transform: inherit;
 }
 .scenario-audience-tabs button {
   min-height: var(--control-height);

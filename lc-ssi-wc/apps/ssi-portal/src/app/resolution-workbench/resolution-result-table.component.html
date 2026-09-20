@@ -47,8 +47,8 @@
                 <span class="result-status" [attr.data-status]="row.status">
                   {{ row.statusLabel }}
                 </span>
-                @if (row.reasonCode) {
-                  <small>{{ row.reasonCode }}</small>
+                @if (row.statusDetail) {
+                  <small>{{ row.statusDetail }}</small>
                 }
               </td>
             </tr>

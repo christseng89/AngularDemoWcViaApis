@@ -524,18 +524,20 @@
                   }}</span>
                 </button>
               </th>
-              <th [attr.aria-sort]="index.ownershipAriaSort('REQUEST_TYPE')">
-                <button
-                  class="sort-header"
-                  type="button"
-                  (click)="host.sortOwnershipIndex('REQUEST_TYPE')"
-                >
-                  Request Type
-                  <span aria-hidden="true">{{
-                    index.ownershipSortIndicator("REQUEST_TYPE")
-                  }}</span>
-                </button>
-              </th>
+              @if (index.showRequestTypeColumn()) {
+                <th [attr.aria-sort]="index.ownershipAriaSort('REQUEST_TYPE')">
+                  <button
+                    class="sort-header"
+                    type="button"
+                    (click)="host.sortOwnershipIndex('REQUEST_TYPE')"
+                  >
+                    Request Type
+                    <span aria-hidden="true">{{
+                      index.ownershipSortIndicator("REQUEST_TYPE")
+                    }}</span>
+                  </button>
+                </th>
+              }
               <th [attr.aria-sort]="index.ownershipAriaSort('REVISION_STATUS')">
                 <button
                   class="sort-header"
@@ -624,11 +626,13 @@
                   >
                 </td>
                 <td>v{{ row.version }}</td>
-                <td class="request-type-cell">
-                  <span class="revision-state">{{
-                    index.requestTypeLabel(row)
-                  }}</span>
-                </td>
+                @if (index.showRequestTypeColumn()) {
+                  <td class="request-type-cell">
+                    <span class="revision-state">{{
+                      index.requestTypeLabel(row)
+                    }}</span>
+                  </td>
+                }
                 <td class="revision-status-cell">
                   @if (index.ownershipCurrentStatusLabel(row)) {
                     <span class="revision-state">
@@ -689,7 +693,7 @@
                               index.requestDraftRevoke(row)
                             "
                           >
-                            Revoke Draft
+                            Revoke
                           </button>
                         }
                       }
@@ -700,7 +704,11 @@
             } @empty {
               <tr>
                 <td
-                  [attr.colspan]="9 + index.ownershipActionColumns().length"
+                  [attr.colspan]="
+                    8 +
+                    (index.showRequestTypeColumn() ? 1 : 0) +
+                    index.ownershipActionColumns().length
+                  "
                   class="empty"
                 >
                   尚無目前有效資料。按「＋新增 SSI」建立第一筆。
@@ -766,7 +774,7 @@
             }}
           </p>
           <h2 id="delete-title">
-            {{ row.status === "DRAFT" ? "Revoke Draft SSI" : "Suppress SSI" }}
+            {{ row.status === "DRAFT" ? "Revoke SSI" : "Suppress SSI" }}
           </h2>
         </div>
         <button
@@ -830,7 +838,7 @@
           (click)="host.confirmDelete()"
         >
           {{
-            row.status === "DRAFT" ? "Revoke Draft" : "Create Suppression Draft"
+            row.status === "DRAFT" ? "Revoke" : "Create Suppression Draft"
           }}
         </button>
       </div>

@@ -21,6 +21,7 @@ import {
 } from "./bank-service-picker-dialog.component";
 import {
   createMaintenanceIndexActionAdapter,
+  showsRequestTypeColumn,
   type MaintenanceIndexActionId,
   type MaintenanceIndexTab,
 } from "./maintenance-index-action-policy";
@@ -96,6 +97,9 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
   readonly rows = this.index.rows;
   readonly filteredRows = this.index.rows;
   readonly statusFilter = this.index.statusFilter;
+  readonly showRequestTypeColumn = computed(() =>
+    showsRequestTypeColumn(this.statusFilter()),
+  );
   readonly actionAdapter = computed(() =>
     createMaintenanceIndexActionAdapter(this.resourceId()),
   );
@@ -526,7 +530,7 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
     if (path === "__revokeAction")
       return this.canSuppress(row) ? "Suppress" : "";
     if (path === "__revokeDraftAction")
-      return this.canRevokeDraft(row) ? "Revoke Draft" : "";
+      return this.canRevokeDraft(row) ? "Revoke" : "";
     return this.fieldMapper.getPath(row, path);
   }
   setStatusFilter(filter: StatusFilter): void {

@@ -21,6 +21,7 @@ export interface ResolutionResultRow {
   readonly status: ResolutionPageFieldResult["resolutionStatus"];
   readonly statusLabel: string;
   readonly reasonCode: string;
+  readonly statusDetail: string;
   readonly provenance: string;
 }
 
@@ -79,6 +80,7 @@ export const resolutionResultRows = (
     status: field.resolutionStatus,
     statusLabel: statusLabel(field.resolutionStatus),
     reasonCode: field.reasonCode ?? "",
+    statusDetail: field.reasonCode || field.provenance.source || "",
     provenance: provenanceSummary(field.provenance),
   }));
 

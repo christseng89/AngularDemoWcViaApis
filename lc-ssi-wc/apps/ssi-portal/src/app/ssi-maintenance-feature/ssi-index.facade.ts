@@ -3,6 +3,7 @@ import { firstValueFrom } from "rxjs";
 import { assertMaintenanceServerPage } from "../maintenance-index-server-page";
 import {
   createMaintenanceIndexActionAdapter,
+  showsRequestTypeColumn,
   type MaintenanceIndexActionId,
 } from "../maintenance-index-action-policy";
 import { currentStatusLabel } from "../current-status-contract";
@@ -47,6 +48,9 @@ export class SsiIndexFacade {
   readonly ownershipSearch = signal("");
   readonly ownershipStatus = signal<"ACTIVE" | "DRAFT" | "SUPPRESSED" | "ALL">(
     "ACTIVE",
+  );
+  readonly showRequestTypeColumn = computed(() =>
+    showsRequestTypeColumn(this.ownershipStatus()),
   );
   readonly ownershipSort = signal<SsiOwnershipSort>("BOOKING_ENTITY");
   readonly ownershipSortDirection = signal<SortDirection>("ASC");
