@@ -45,9 +45,11 @@ export interface RmaAuthorisationQuery {
   service: string;
   direction: RmaDirection;
   messageType: string;
+  at?: string;
   fixtureFamily?: string;
   usageGroup?: string;
   fixtureBindingId?: string;
+  operationalOnly?: boolean;
 }
 
 export interface RmaPairState {
@@ -312,13 +314,26 @@ export class RmaRepository extends SqliteGovernedRepository<RmaRecord> {
             SELECT 1 FROM json_each(json_extract(payload,'$.fixtureBindingIds'))
             WHERE value=?
           )`;
+    const operationalClause = query.operationalOnly
+      ? ` AND json_type(payload,'$.fixtureFamily') IS NULL
+          AND (json_type(payload,'$.fixtureBindingIds') IS NULL
+               OR (json_type(payload,'$.fixtureBindingIds')='array'
+                   AND json_array_length(payload,'$.fixtureBindingIds')=0))`
+      : "";
+    const dateClause = query.at
+      ? ` AND json_extract(payload,'$.validFrom')<=?
+          AND json_extract(payload,'$.validTo')>=?`
+      : "";
     const parameters = [
       query.ownBic,
       query.counterpartyBic,
       query.service,
+      query.service,
+      query.service,
       query.direction,
       messageType,
     ];
+    if (query.at) parameters.push(query.at, query.at);
     if (query.fixtureFamily !== undefined) parameters.push(query.fixtureFamily);
     if (query.usageGroup !== undefined) parameters.push(query.usageGroup);
     if (query.fixtureBindingId !== undefined)
@@ -331,13 +346,15 @@ export class RmaRepository extends SqliteGovernedRepository<RmaRecord> {
          AND (CASE WHEN length(trim(json_extract(payload,'$.counterpartyBic')))=8
           THEN trim(json_extract(payload,'$.counterpartyBic')) || 'XXX'
           ELSE trim(json_extract(payload,'$.counterpartyBic')) END)=?
+         AND (json_extract(payload,'$.service')=?
+              OR (json_extract(payload,'$.service')='FIN / FINPLUS' AND ? IN ('FIN','FINPLUS'))
+              OR EXISTS (SELECT 1 FROM json_each(json_extract(payload,'$.services')) WHERE value=?))
          AND json_extract(payload,'$.direction')=?
          AND EXISTS (SELECT 1 FROM json_each(json_extract(payload,'$.messageTypes')) WHERE value=?)
          AND json_extract(payload,'$.status')='ACTIVE'
-         ${familyClause}${usageClause}${bindingClause}
-       ORDER BY updated_at DESC, id DESC
-       LIMIT 1`,
-      parameters: parameters.filter((_, index) => index !== 2),
+         ${dateClause}${familyClause}${usageClause}${bindingClause}${operationalClause}
+       ORDER BY updated_at DESC, id DESC`,
+      parameters,
     };
   }
 }

@@ -1,4 +1,4 @@
-import { Injectable, Optional } from "@nestjs/common";
+import { BadRequestException, Injectable, Optional } from "@nestjs/common";
 import {
   SqliteSsiRepository,
   type SsiApplicabilityRecord,
@@ -91,6 +91,17 @@ export class PaymentGovernedApplicabilityService {
     });
     const candidates = bindings.flatMap(({ ssi, applicability }) => {
       const route = ssi.route;
+      const configuredOwnBic = process.env["OWN_BIC"]?.trim().toUpperCase() ?? "";
+      const routeSenderBic = route["senderBic"]?.trim().toUpperCase() ?? "";
+      const canonicalBic = (bic: string): string =>
+        bic.length === 8 ? `${bic}XXX` : bic;
+      if (
+        configuredOwnBic &&
+        routeSenderBic &&
+        canonicalBic(configuredOwnBic) !== canonicalBic(routeSenderBic)
+      ) {
+        throw new BadRequestException("OWN_BIC_ROUTE_MISMATCH");
+      }
       const nostro = this.nostros!.resolve({
         ...(query.bookingEntity
           ? { ownLegalEntityId: query.bookingEntity }
@@ -106,7 +117,7 @@ export class PaymentGovernedApplicabilityService {
           : {}),
       }) as Record<string, unknown>;
       const rma = this.rma!.check({
-        ownBic: route["senderBic"] ?? "",
+        ownBic: configuredOwnBic || routeSenderBic,
         counterpartyBic:
           route["actualReceiverBic"] ?? route["accountWithBic"] ?? "",
         service: route["messagingService"] ?? businessService,
@@ -117,10 +128,7 @@ export class PaymentGovernedApplicabilityService {
             ? "pacs.009.001.08"
             : query.messageType,
         at: query.valueDate,
-        ...(ssi.fixtureFamily ? { fixtureFamily: ssi.fixtureFamily } : {}),
-        ...(query.fixtureBindingId
-          ? { fixtureBindingId: query.fixtureBindingId }
-          : {}),
+        operationalOnly: true,
       }) as unknown as Record<string, unknown>;
       const accountServicerBic = nostro["accountServicerBic"];
       return nostro["decision"] === "RESOLVED" &&

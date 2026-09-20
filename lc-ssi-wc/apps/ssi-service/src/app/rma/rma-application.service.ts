@@ -366,6 +366,7 @@ export class RmaApplicationService {
     fixtureFamily?: string;
     usageGroup?: string;
     fixtureBindingId?: string;
+    operationalOnly?: boolean;
   }): RmaDecision {
     const ownBic = normalizeBic(request.ownBic),
       counterpartyBic = normalizeBic(request.counterpartyBic);
@@ -376,6 +377,14 @@ export class RmaApplicationService {
     if (!validIsoDate(effectiveAt)) {
       throw new BadRequestException("INVALID_RMA_CHECK_DATE");
     }
+    if (
+      request.operationalOnly &&
+      (request.fixtureFamily !== undefined ||
+        request.fixtureBindingId !== undefined ||
+        request.usageGroup !== undefined)
+    ) {
+      throw new BadRequestException("RMA_SCOPE_CONFLICT");
+    }
     const checkedAt = new Date().toISOString(),
       decisionId = randomUUID();
     const candidates = this.repository.findAuthorised({
@@ -384,6 +393,7 @@ export class RmaApplicationService {
       service: request.service,
       direction: request.direction,
       messageType: request.messageType,
+      at: effectiveAt,
       ...(request.fixtureFamily === undefined
         ? {}
         : { fixtureFamily: request.fixtureFamily }),
@@ -393,6 +403,7 @@ export class RmaApplicationService {
       ...(request.fixtureBindingId === undefined
         ? {}
         : { fixtureBindingId: request.fixtureBindingId }),
+      ...(request.operationalOnly ? { operationalOnly: true } : {}),
     });
     const effectiveTime = Date.parse(effectiveAt);
     const effective = candidates.filter(

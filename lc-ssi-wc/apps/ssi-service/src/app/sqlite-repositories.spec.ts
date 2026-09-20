@@ -1059,6 +1059,79 @@ describe("SQLite governed repositories", () => {
     repository.onModuleDestroy();
   });
 
+  it("selects only the active operational bank relationship when QA RMA rows coexist", () => {
+    const repository = new RmaRepository();
+    const base: RmaRecord = {
+      id: "RMA-BANK-RELATIONSHIP",
+      ownBic: "DEMOHKHH",
+      counterpartyBic: "CITIUS33",
+      service: "FIN / FINPLUS",
+      direction: "OUTBOUND",
+      messageTypes: ["MT202", "pacs.009.001.08"],
+      validFrom: "2026-01-01",
+      validTo: "2027-12-31",
+      maker: "maker.test",
+      source: "SYNTHETIC_DEMO",
+      status: "ACTIVE",
+      version: 1,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    };
+    const qa: RmaRecord = {
+      ...base,
+      id: "RMA-QA-ONLY",
+      fixtureFamily: "MT2-NEGATIVE-QA",
+      fixtureBindingIds: ["FIXTURE-MT202-QA-C81"],
+      updatedAt: "2026-09-20T00:00:00.000Z",
+    };
+    repository.save(base, "CREATED", "maker.test", "RMA");
+    repository.save(qa, "CREATED", "maker.test", "RMA");
+
+    expect(repository.findAuthorised({
+      ownBic: "DEMOHKHHXXX",
+      counterpartyBic: "CITIUS33XXX",
+      service: "FINPLUS",
+      direction: "OUTBOUND",
+      messageType: "pacs.009.001.08",
+      operationalOnly: true,
+    })).toEqual([base]);
+    repository.onModuleDestroy();
+  });
+
+  it("filters operational RMA service and value date before selecting a relationship", () => {
+    const repository = new RmaRepository();
+    const base: RmaRecord = {
+      id: "RMA-VALID",
+      ownBic: "DEMOHKHH",
+      counterpartyBic: "CITIUS33",
+      service: "FIN / FINPLUS",
+      direction: "OUTBOUND",
+      messageTypes: ["pacs.009.001.08"],
+      validFrom: "2026-01-01",
+      validTo: "2027-12-31",
+      maker: "maker.test",
+      source: "SYNTHETIC_DEMO",
+      status: "ACTIVE",
+      version: 1,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    };
+    repository.save(base, "CREATED", "maker.test", "RMA");
+    repository.save({ ...base, id: "RMA-WRONG-SERVICE", service: "FIN", updatedAt: "2026-09-20T00:00:00.000Z" }, "CREATED", "maker.test", "RMA");
+    repository.save({ ...base, id: "RMA-EXPIRED", service: "FINPLUS", validTo: "2026-09-01", updatedAt: "2026-09-21T00:00:00.000Z" }, "CREATED", "maker.test", "RMA");
+
+    expect(repository.findAuthorised({
+      ownBic: "DEMOHKHHXXX",
+      counterpartyBic: "CITIUS33XXX",
+      service: "FINPLUS",
+      direction: "OUTBOUND",
+      messageType: "pacs.009.001.08",
+      at: "2026-09-21",
+      operationalOnly: true,
+    })).toEqual([base]);
+    repository.onModuleDestroy();
+  });
+
   it("projects one RMA index per BIC pair and direction across FIN and FINPLUS", () => {
     const repository = new RmaRepository();
     const base: Omit<RmaRecord, "id" | "service" | "messageTypes"> = {

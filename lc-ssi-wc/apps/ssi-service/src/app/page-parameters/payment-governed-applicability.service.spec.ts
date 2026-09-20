@@ -51,6 +51,60 @@ const applicability = (
 });
 
 describe("PaymentGovernedApplicabilityService", () => {
+  it("uses the configured single-bank Own BIC when the SSI route has no sender BIC", () => {
+    const previous = process.env["OWN_BIC"];
+    process.env["OWN_BIC"] = "DEMOHKHH";
+    try {
+      const ssi = route();
+      delete ssi.route["senderBic"];
+      const check = jest.fn(() => ({ authorised: false }));
+      const service = new PaymentGovernedApplicabilityService(
+        { findPaymentCandidateBindings: jest.fn(() => [{ ssi, applicability: applicability() }]) } as never,
+        undefined,
+        undefined,
+        { resolve: jest.fn(() => ({
+          decision: "RESOLVED", nostroId: "N-1", nostroVersion: 1,
+          accountServicerBic: "DEUTDEFF",
+        })) } as never,
+        { check } as never,
+        { current: jest.fn(() => ({ sha256: "db-sha", method: "logical" })) } as never,
+      );
+
+      expect(service.atomicCandidates({
+        messageType: "MT202", currency: "EUR", bookingEntity: "HK01", valueDate: "2026-09-15",
+      })).toEqual([]);
+      expect(check).toHaveBeenCalledWith(expect.objectContaining({ ownBic: "DEMOHKHH" }));
+    } finally {
+      if (previous === undefined) delete process.env["OWN_BIC"];
+      else process.env["OWN_BIC"] = previous;
+    }
+  });
+
+  it("fails closed when a route sender BIC conflicts with the configured Own BIC", () => {
+    const previous = process.env["OWN_BIC"];
+    process.env["OWN_BIC"] = "DEMOHKHH";
+    try {
+      const ssi = route({ senderBic: "OTHERBIC" });
+      const check = jest.fn();
+      const service = new PaymentGovernedApplicabilityService(
+        { findPaymentCandidateBindings: jest.fn(() => [{ ssi, applicability: applicability() }]) } as never,
+        undefined,
+        undefined,
+        { resolve: jest.fn(() => ({ decision: "RESOLVED" })) } as never,
+        { check } as never,
+        { current: jest.fn(() => ({ sha256: "db-sha", method: "logical" })) } as never,
+      );
+
+      expect(() => service.atomicCandidates({
+        messageType: "MT202", currency: "EUR", bookingEntity: "HK01", valueDate: "2026-09-15",
+      })).toThrow("OWN_BIC_ROUTE_MISMATCH");
+      expect(check).not.toHaveBeenCalled();
+    } finally {
+      if (previous === undefined) delete process.env["OWN_BIC"];
+      else process.env["OWN_BIC"] = previous;
+    }
+  });
+
   it("propagates the exact fixture binding to the payment candidate query", () => {
     const findPaymentCandidates = jest.fn(() => []);
     const service = new PaymentGovernedApplicabilityService({
@@ -121,6 +175,44 @@ describe("PaymentGovernedApplicabilityService", () => {
       },
     ]);
     expect(snapshots.current).toHaveBeenCalledTimes(2);
+  });
+
+  it("checks the active RMA bank relationship without SSI scenario fixture filters", () => {
+    const ssi = { ...route(), fixtureFamily: "MT2-UI-PARITY-V1" };
+    const app = applicability();
+    const check = jest.fn((request: Record<string, unknown>) =>
+      "fixtureFamily" in request || "fixtureBindingId" in request ||
+      request["operationalOnly"] !== true
+        ? { authorised: false }
+        : { authorised: true, rmaId: "RMA-ACTIVE", rmaVersion: 19 },
+    );
+    const service = new PaymentGovernedApplicabilityService(
+      { findPaymentCandidateBindings: jest.fn(() => [{ ssi, applicability: app }]) } as never,
+      undefined,
+      undefined,
+      { resolve: jest.fn(() => ({
+        decision: "RESOLVED", nostroId: "N-1", nostroVersion: 4,
+        accountServicerBic: "DEUTDEFF",
+      })) } as never,
+      { check } as never,
+      { current: jest.fn(() => ({ sha256: "db-sha", method: "logical" })) } as never,
+    );
+
+    const candidates = service.atomicCandidates({
+      messageType: "MT202", currency: "EUR", bookingEntity: "HK01",
+      valueDate: "2026-09-15", fixtureBindingId: "FIXTURE-MT202-OP-DIRECT",
+    });
+
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0]?.rma).toEqual({ id: "RMA-ACTIVE", version: 19 });
+    expect(check).toHaveBeenCalledWith(expect.objectContaining({
+      ownBic: "DEMOHKHH", counterpartyBic: "DEUTDEFF",
+      direction: "OUTBOUND", messageType: "pacs.009.001.08",
+      at: "2026-09-15",
+    }));
+    expect(check.mock.calls[0]?.[0]).not.toHaveProperty("fixtureFamily");
+    expect(check.mock.calls[0]?.[0]).not.toHaveProperty("fixtureBindingId");
+    expect(check.mock.calls[0]?.[0]).toHaveProperty("operationalOnly", true);
   });
 
   it("does not stringify malformed account-servicer metadata", () => {
