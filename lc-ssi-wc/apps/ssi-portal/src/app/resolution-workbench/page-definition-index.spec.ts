@@ -57,6 +57,45 @@ const item: ResolutionPageDefinitionIndexItem = {
 };
 
 describe("filterPageDefinitions", () => {
+  it("omits the generic MESSAGE placeholder from every Trade Finance scenario drawer", () => {
+    const generic = {
+      ...item,
+      businessDomain: "TRADE_FINANCE" as const,
+      transactionGroupId: "TRADE_FINANCE:MT400",
+      messageCode: "MT400",
+      scenarioCount: 2,
+      scenarioLabel: "MESSAGE - Message / direct canonical route",
+      scenarioDetails: [{
+        ...item.scenarioDetails[0]!,
+        scenarioId: "MT400-001",
+        label: "MESSAGE - Message / direct canonical route",
+      }],
+    };
+    const real = {
+      ...generic,
+      definitionId: "PAGE-MT400-002",
+      scenarioOrder: 2,
+      scenarioLabel: "Trade settlement",
+      scenarioDetails: [{
+        ...item.scenarioDetails[0]!,
+        scenarioId: "MT400-002",
+        label: "Trade settlement",
+      }],
+    };
+    const genericOnly = {
+      ...generic,
+      definitionId: "PAGE-MT730-001",
+      transactionGroupId: "TRADE_FINANCE:MT730",
+      messageCode: "MT730",
+      scenarioCount: 1,
+    };
+    const groups = groupPageDefinitions([generic, real, genericOnly]);
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.scenarioCount).toBe(1);
+    expect(scenarioRows(groups[0]!).map(({ label }) => label)).toEqual(["Trade settlement"]);
+    expect(groups[0]?.definitions[0]?.contractSha256).toBe(item.contractSha256);
+    expect(scenarioNavigation(groups[0]!)).toBe("DIRECT");
+  });
   it("finds a synthetic API item without a client catalogue update", () => {
     expect(filterPageDefinitions([item], "79z")).toEqual([]);
     expect(filterPageDefinitions([item], "msg-x")).toEqual([item]);

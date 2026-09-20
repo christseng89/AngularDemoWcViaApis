@@ -70,8 +70,40 @@ export const assertPageDefinitionDomain = (
 export const groupPageDefinitions = (
   items: readonly ResolutionPageDefinitionIndexItem[],
 ): readonly MessageDefinitionGroup[] => {
+  const sourceCounts = new Map<string, number>();
+  for (const item of items)
+    sourceCounts.set(
+      item.transactionGroupId,
+      (sourceCounts.get(item.transactionGroupId) ?? 0) + item.scenarioDetails.length,
+    );
+  if (items.some((item) =>
+    item.businessDomain === "TRADE_FINANCE" &&
+    item.scenarioCount !== sourceCounts.get(item.transactionGroupId),
+  )) throw new Error("PAGE_DEFINITION_SCENARIO_COUNT_MISMATCH");
+  const visible = items.flatMap((item) => {
+    if (item.businessDomain !== "TRADE_FINANCE") return [item];
+    const scenarioDetails = item.scenarioDetails.filter(
+      ({ label }) => label !== "MESSAGE - Message / direct canonical route",
+    );
+    if (!scenarioDetails.length) return [];
+    return [{
+      ...item,
+      scenarioDetails,
+      scenarioLabel: scenarioDetails[0]!.label,
+    }];
+  });
+  const visibleCounts = new Map<string, number>();
+  for (const item of visible)
+    visibleCounts.set(
+      item.transactionGroupId,
+      (visibleCounts.get(item.transactionGroupId) ?? 0) +
+        item.scenarioDetails.length,
+    );
   const groups = new Map<string, MessageDefinitionGroup>();
-  for (const item of items) {
+  for (const source of visible) {
+    const item = source.businessDomain === "TRADE_FINANCE"
+      ? { ...source, scenarioCount: visibleCounts.get(source.transactionGroupId)! }
+      : source;
     if (
       !item.transactionGroupId.trim() ||
       !item.transactionGroupLabel.trim() ||
