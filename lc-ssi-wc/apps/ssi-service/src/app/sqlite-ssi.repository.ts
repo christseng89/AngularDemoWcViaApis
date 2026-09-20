@@ -1,5 +1,6 @@
 import { Injectable, OnModuleDestroy, Optional } from "@nestjs/common";
 import { DatabaseSync } from "node:sqlite";
+import type { RouteResolutionRequest } from "./route-resolution.policy";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -665,6 +666,78 @@ export class SqliteSsiRepository implements OnModuleDestroy {
           String((row as { payload: unknown }).payload),
         ) as SsiApplicabilityRecord,
     );
+  }
+  findRelatedRouteBindings(request: RouteResolutionRequest): {
+    readonly ssi: readonly SsiRecord[];
+    readonly applicability: readonly SsiApplicabilityRecord[];
+  } {
+    this.expireRevisionWorkInProgress();
+    const rows = this.db.prepare(
+      `SELECT s.payload AS ssi_payload, a.payload AS applicability_payload
+       FROM ssi_applicability AS a
+       JOIN ssi AS s ON s.id=a.ssi_id
+       WHERE json_extract(a.payload,'$.status')='ACTIVE'
+         AND json_extract(a.payload,'$.businessFunction') IN (?, 'ANY')
+         AND json_extract(s.payload,'$.route.currency')=?
+         AND COALESCE(json_extract(s.payload,'$.status'),'') NOT IN ('SUPERSEDED','REVOKED')
+       ORDER BY s.updated_at DESC`,
+    ).all(request.businessFunction, request.currency) as Array<{
+      ssi_payload: unknown;
+      applicability_payload: unknown;
+    }>;
+    // Applicability currently accepts non-date-only strings. Keep Date.parse parity
+    // with relatedCandidates after SQL narrows the joined set by route context.
+    const valueTime = Date.parse(request.valueDate);
+    const ssi = new Map<string, SsiRecord>();
+    const applicability = new Map<string, SsiApplicabilityRecord>();
+    for (const row of rows) {
+      const app = JSON.parse(String(row.applicability_payload)) as SsiApplicabilityRecord;
+      if (Date.parse(app.validFrom) > valueTime ||
+          valueTime > Date.parse(app.validTo)) continue;
+      if (!Number.isFinite(Date.parse(app.validFrom)) ||
+          !Number.isFinite(Date.parse(app.validTo))) continue;
+      const record = JSON.parse(String(row.ssi_payload)) as SsiRecord;
+      ssi.set(record.id, record);
+      applicability.set(app.id, app);
+    }
+    return { ssi: [...ssi.values()], applicability: [...applicability.values()] };
+  }
+
+  findRequestDataQualityBindings(
+    request: RouteResolutionRequest,
+  ): readonly PaymentSsiCandidateBinding[] {
+    this.expireRevisionWorkInProgress();
+    const requestedCounterparty = request.counterpartyBic ?? request.counterpartyId;
+    if (!requestedCounterparty ||
+        request.consumer !== "CENTRAL_PAYMENT" ||
+        request.product !== "CENTRAL_PAYMENT" ||
+        request.businessFunction !== "INTERBANK_TRANSFER" ||
+        request.paymentLeg !== "INTERBANK_SETTLEMENT" ||
+        request.direction !== "OUTBOUND") return [];
+    const rows = this.db.prepare(
+      `SELECT s.payload AS ssi_payload, a.payload AS applicability_payload
+       FROM ssi_applicability AS a
+       JOIN ssi AS s ON s.id=a.ssi_id
+       WHERE json_extract(a.payload,'$.status')='ACTIVE'
+         AND json_extract(s.payload,'$.status')='ACTIVE'
+         AND json_extract(a.payload,'$.consumer')='CENTRAL_PAYMENT'
+         AND json_extract(a.payload,'$.product')='CENTRAL_PAYMENT'
+         AND json_extract(a.payload,'$.businessFunction')='INTERBANK_TRANSFER'
+         AND json_extract(a.payload,'$.paymentLeg')='INTERBANK_SETTLEMENT'
+         AND json_extract(a.payload,'$.direction')='OUTBOUND'
+         AND json_extract(s.payload,'$.route.currency')=?
+         AND COALESCE(json_extract(s.payload,'$.route.counterpartyBic'),
+                      json_extract(s.payload,'$.counterpartyId'))=?
+         AND json_extract(s.payload,'$.route.bookingEntity') IN (?, 'ANY')
+       ORDER BY a.id`,
+    ).all(request.currency, requestedCounterparty, request.bookingEntity) as Array<{
+      ssi_payload: unknown;
+      applicability_payload: unknown;
+    }>;
+    return rows.map((row) => ({
+      ssi: JSON.parse(String(row.ssi_payload)) as SsiRecord,
+      applicability: JSON.parse(String(row.applicability_payload)) as SsiApplicabilityRecord,
+    }));
   }
   findPaymentCandidates(query: PaymentSsiCandidateQuery): SsiRecord[] {
     return this.findPaymentCandidateBindings(query).map(({ ssi }) => ssi);

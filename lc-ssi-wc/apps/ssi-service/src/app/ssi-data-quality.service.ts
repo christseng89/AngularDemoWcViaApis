@@ -106,10 +106,26 @@ export class SsiDataQualityService {
   }
 
   issuesFor(request: RouteResolutionRequest): readonly SsiDataIssue[] {
-    return this.scan()
+    const scoped = typeof this.repository.findRequestDataQualityBindings === "function"
+      ? this.repository.findRequestDataQualityBindings(request)
+          .filter(({ ssi, applicability }) =>
+            isGenericApplicability(applicability) &&
+            !isPurposeBuiltGenericRoute(ssi),
+          )
+          .map(({ ssi, applicability }): QuarantinedApplicability => ({
+            ssi,
+            applicability,
+            ssiCode: ssi.route["ssiCode"] ?? "",
+            applicabilityId: applicability.id,
+            violation: PURPOSE_APPLICABILITY_MISMATCH,
+            remediation: PURPOSE_REMEDIATION,
+          }))
+      : this.scan();
+    return scoped
       .filter(({ ssi, applicability }) =>
         this.affectsRequest(ssi, applicability, request),
       )
+      .sort((left, right) => left.applicabilityId.localeCompare(right.applicabilityId))
       .map(({ ssiCode, applicabilityId, violation, remediation }) => ({
         ssiCode,
         applicabilityId,

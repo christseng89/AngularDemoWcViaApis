@@ -734,10 +734,16 @@ export class SsiApplicationService {
   resolve(request: RouteResolutionRequest): unknown {
     this.validateResolutionRequest(request);
     this.requireCoverProfile(request);
+    const bindings = typeof this.repository.findRelatedRouteBindings === "function"
+      ? this.repository.findRelatedRouteBindings(request)
+      : {
+          ssi: this.repository.list(),
+          applicability: this.repository.listApplicability(),
+        };
     const preview = previewResolution(
       request,
-      this.repository.list(),
-      this.repository.listApplicability(),
+      bindings.ssi,
+      bindings.applicability,
     );
     const attemptId = randomUUID();
     const requestHash = hashCanonical({
