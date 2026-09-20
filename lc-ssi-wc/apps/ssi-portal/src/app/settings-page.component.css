@@ -24,37 +24,10 @@
   border-bottom: 1px solid var(--line);
   margin-top: 16px;
 }
-.settings-tabs button {
-  border: 1px solid var(--line);
-  border-bottom: 0;
-  border-radius: 9px 9px 0 0;
-  padding: 12px 18px;
-  background: var(--paper);
-  color: var(--ink);
-  cursor: pointer;
-}
-.settings-tabs button.active {
-  border-color: var(--accent);
-  box-shadow: inset 0 -3px var(--accent);
-  font-weight: 750;
-}
 .index-search {
-  display: grid;
-  gap: 6px;
   max-width: 520px;
   margin: 0 0 16px;
 }
-.index-search span { font-size: 12px; font-weight: 800; }
-.index-search input {
-  width: 100%;
-  min-height: 42px;
-  border: 1px solid #879b9e;
-  border-radius: 7px;
-  background: var(--paper);
-  color: var(--ink);
-  padding: 9px 12px;
-}
-.index-search input:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 .settings-section p {
   color: var(--muted);
   margin: 6px 0;
@@ -197,46 +170,10 @@
   font-size: 12px;
   line-height: 1.55;
 }
-.danger-secondary,
-.danger-primary {
-  min-height: 42px;
-  border-radius: 7px;
-  padding: 0 17px;
-  font-size: 13px;
-  font-weight: 750;
-  cursor: pointer;
-}
-.danger-secondary {
-  border: 1px solid var(--danger-action);
-  background: transparent;
-  color: var(--danger-action);
-}
-.danger-secondary:hover:not(:disabled) {
-  background: var(--danger-action-soft);
-}
-.danger-primary {
-  border: 1px solid transparent;
-  background: var(--danger-action);
-  color: var(--danger-on-action);
-}
-.danger-primary:hover:not(:disabled) {
-  background: var(--danger-action-hover);
-}
-.danger-secondary:focus-visible,
-.danger-primary:focus-visible {
-  outline: 3px solid var(--danger-action-focus);
-  outline-offset: 2px;
-}
-.danger-secondary:disabled,
-.danger-primary:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
 .dialog-backdrop {
   position: fixed;
   inset: 0;
   z-index: 80;
-  background: rgb(3 16 16 / 72%);
   display: grid;
   place-items: center;
   padding: 16px;
@@ -245,30 +182,6 @@
   width: min(560px, calc(100vw - 32px));
   max-height: 90dvh;
   overflow: auto;
-  background: var(--paper);
-  color: var(--ink);
-  border: 1px solid var(--alert-error-border);
-  border-radius: 16px;
-  padding: 28px;
-  box-shadow: 0 24px 80px rgb(0 0 0 / 42%);
-}
-.reload-dialog h2 {
-  font-size: 24px;
-  margin: 8px 0;
-}
-.reload-dialog label {
-  display: block;
-  font-weight: 800;
-  margin: 22px 0 7px;
-}
-.reload-dialog input {
-  width: 100%;
-  min-height: 46px;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  background: var(--soft);
-  color: var(--ink);
-  padding: 0 12px;
 }
 .dialog-actions {
   display: flex;

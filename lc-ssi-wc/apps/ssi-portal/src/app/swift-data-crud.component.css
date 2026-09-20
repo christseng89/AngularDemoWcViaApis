@@ -5,8 +5,8 @@
   display: grid;
   align-content: center;
   gap: 8px;
-  background: #14282d;
-  color: #dfffa5;
+  background: var(--ui-code-surface);
+  color: var(--ui-code-text);
   border-radius: 8px;
   padding: 18px;
 }
@@ -22,7 +22,7 @@
 .upload-button {
   display: inline-flex;
   align-items: center;
-  border: 1px solid #9aaba8;
+  border: 1px solid var(--ui-control-border);
   border-radius: 6px;
   padding: 10px 14px;
   background: var(--paper);
@@ -49,8 +49,8 @@
   cursor: pointer;
 }
 .import-result pre {
-  background: #14282d;
-  color: #dfffa5;
+  background: var(--ui-code-surface);
+  color: var(--ui-code-text);
   padding: 15px;
   border-radius: 7px;
   overflow: auto;
@@ -69,27 +69,8 @@
   }
 }
 .index-search {
-  display: grid;
-  gap: 6px;
   max-width: 520px;
   margin: 0 0 16px;
-}
-.index-search span {
-  font-size: 12px;
-  font-weight: 800;
-}
-.index-search input {
-  width: 100%;
-  min-height: 42px;
-  border: 1px solid #879b9e;
-  border-radius: 7px;
-  background: var(--paper);
-  color: var(--ink);
-  padding: 9px 12px;
-}
-.index-search input:focus-visible {
-  outline: 2px solid var(--blue);
-  outline-offset: 2px;
 }
 .index-loading {
   display: flex;

@@ -80,4 +80,13 @@ describe("SSI form presentation", () => {
     expect(auditTemplate).toContain("<ssi-governed-record-view");
     expect(swiftDataTemplate).toContain("<ssi-governed-record-view");
   });
+
+  it("omits the redundant Active badge in the governed read-only detail", () => {
+    const detailTemplate = readFileSync(
+      join(__dirname, "governed-record-view.component.html"),
+      "utf8",
+    );
+    expect(detailTemplate).toContain('@if (displayStatus() !== "ACTIVE")');
+    expect(detailTemplate).toContain('<span class="status">{{ displayStatus() }}</span>');
+  });
 });
