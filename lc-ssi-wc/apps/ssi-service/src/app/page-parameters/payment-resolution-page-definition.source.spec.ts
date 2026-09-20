@@ -826,6 +826,12 @@ describe("PaymentResolutionPageDefinitionSource", () => {
     expect(scenarios.find(({ scenarioId }) => scenarioId === "MT202COV-OP-CREDIT-57A")?.servicerRelationship).toBe("DIFFERENT");
   });
 
+  it("keeps MT205 domestic onward Receiver rules outside SSI servicer eligibility", () => {
+    const scenarios = paymentDefinition("MT205").scenarios;
+    expect(scenarios.find(({ scenarioId }) => scenarioId === "MT205-OP-STANDARD-DOMESTIC-ONWARD")?.servicerRelationship).toBe("NOT_APPLICABLE");
+    expect(scenarios.find(({ scenarioId }) => scenarioId === "MT205-OP-INITIAL-MT200-201-EQUIVALENCE")?.servicerRelationship).toBe("NOT_APPLICABLE");
+  });
+
   it("does not hard-code USD or HK01 in the Payment definition source", () => {
     const source = readFileSync(
       join(

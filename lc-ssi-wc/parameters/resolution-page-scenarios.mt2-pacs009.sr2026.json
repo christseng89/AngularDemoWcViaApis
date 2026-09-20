@@ -116,7 +116,7 @@
         },
         {
           "scenarioId": "MT205-OP-STANDARD-DOMESTIC-ONWARD",
-          "servicerRelationship": "DIFFERENT",
+          "servicerRelationship": "NOT_APPLICABLE",
           "label": "Standard domestic onward transfer",
           "polarity": "POSITIVE",
           "audience": "OPERATIONAL"
