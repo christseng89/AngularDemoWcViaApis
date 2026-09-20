@@ -7,6 +7,7 @@ import {
 import type { ResolutionPageExecutionResult } from "@ssi/contracts";
 import type { ResolutionWorkbenchViewModel } from "./parameter-model.mapper";
 import { ResolutionGeneratedOutputsComponent } from "./resolution-generated-outputs.component";
+import { resolutionDomainFromOutputs } from "./resolution-result.presenter";
 import { ResolutionResultTableComponent } from "./resolution-result-table.component";
 
 @Component({
@@ -26,6 +27,11 @@ import { ResolutionResultTableComponent } from "./resolution-result-table.compon
         <span class="eyebrow">STEP 04 · RESULT</span>
         <h2>{{ outcomeTitle() }}</h2>
         <p>{{ scenarioLabel() }}</p>
+        @if (resolutionDomain()) {
+          <p>
+            Resolution domain: <strong>{{ resolutionDomain() }}</strong>
+          </p>
+        }
       </div>
       <ssi-resolution-result-table [result]="result()" />
       <ssi-resolution-generated-outputs [outputs]="result().outputs" />
@@ -98,6 +104,9 @@ import { ResolutionResultTableComponent } from "./resolution-result-table.compon
 export class ResolutionEvidenceComponent {
   readonly result = input.required<ResolutionPageExecutionResult>();
   readonly page = input.required<ResolutionWorkbenchViewModel>();
+  readonly resolutionDomain = computed(() =>
+    resolutionDomainFromOutputs(this.result().outputs),
+  );
   readonly scenarioLabel = computed(
     () =>
       this.page().scenarios.find(({ id }) => id === this.result().scenarioId)

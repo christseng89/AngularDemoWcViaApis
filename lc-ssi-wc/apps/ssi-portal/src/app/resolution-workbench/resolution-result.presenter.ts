@@ -57,12 +57,7 @@ const provenanceSummary = (
     .filter((value): value is string => Boolean(value))
     .join(" · ");
 
-const resolvedSourceLabel = (source: string): string =>
-  source === "OWN_NOSTRO" || source === "OWN_SSI_NOSTRO"
-    ? "RESOLVED_FROM_OWN_SSI"
-    : `RESOLVED_FROM_${source}`;
-
-const resultResolutionDomain = (
+export const resolutionDomainFromOutputs = (
   outputs: readonly ResolutionPageGeneratedOutput[],
 ): string => {
   const domain = outputs.find((output) => output.format === "ISO_20022")
@@ -72,7 +67,6 @@ const resultResolutionDomain = (
 
 export const resolutionResultRows = (
   fields: readonly ResolutionPageFieldResult[],
-  outputs: readonly ResolutionPageGeneratedOutput[] = [],
 ): readonly ResolutionResultRow[] =>
   fields.map((field) => ({
     key: `${field.fieldId}:${field.sequenceId}:${field.swiftTag}:${field.swiftOption}`,
@@ -97,11 +91,7 @@ export const resolutionResultRows = (
     reasonCode: field.reasonCode ?? "",
     statusDetail:
       field.reasonCode ||
-      (field.resolutionStatus === "RESOLVED"
-        ? [field.provenance.source, resultResolutionDomain(outputs)]
-            .filter((source): source is string => Boolean(source))
-            .map(resolvedSourceLabel)[0] ?? ""
-        : field.provenance.source ?? ""),
+      (field.provenance.source ? `Source: ${field.provenance.source}` : ""),
     provenance: provenanceSummary(field.provenance),
   }));
 
