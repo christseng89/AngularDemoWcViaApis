@@ -223,6 +223,80 @@ describe("MappingResolutionPageDefinitionSource", () => {
     expect(currency.optionSource?.dependsOnFieldIds).toEqual([]);
   });
 
+  it("characterizes why an OAS-only index cannot preserve fixture-derived currency options", () => {
+    const scenarioCatalogue = {
+      get: () => ({
+        catalogueVersion: "SCN-v1",
+        standardsRelease: "SR2026",
+        messageFamily: "MT347",
+        sourceArtifactId: "parameters/scenarios.json",
+        sourceArtifactSha256: SHA,
+        definitions: [
+          {
+            profileId: "P-MT399-Q9",
+            messageType: "MT399",
+            businessFunction: "FUTURE_GOVERNED_FUNCTION",
+            sequence: "Q9",
+            settlementLeg: "Future settlement leg",
+          },
+        ],
+        scenarios: [
+          {
+            scenarioId: "SCN-USD",
+            testCaseId: "T-USD",
+            profileId: "P-MT399-Q9",
+            label: "USD route",
+            polarity: "POSITIVE",
+            fixtureBindingId: "FIX-USD",
+            expectedHttp: [200],
+            inputValues: { "context.currency": "USD" },
+          },
+        ],
+        inputs: [],
+        crossTagConstraints: [],
+      }),
+    } as never;
+    const manifest = {
+      require: (bindingId: string) => ({
+        bindingId,
+        fixtureSet: "MT347-SR2026-SSI",
+        fixtureVersion: "v1",
+        sourceArtifactSha256: SHA,
+        isolation: "CANONICAL",
+      }),
+    } as never;
+    const fixtureCandidates = {
+      catalogue: () => [
+        {
+          messageType: "MT399",
+          sequence: "Q9",
+          settlementLeg: "Future settlement leg",
+          currency: "EUR",
+        },
+      ],
+    } as never;
+    const withFixture = new MappingResolutionPageDefinitionSource(
+      catalogues,
+      fixtureCandidates,
+      scenarioCatalogue,
+      manifest,
+    ).all()[0]!;
+    const oasOnly = new MappingResolutionPageDefinitionSource(
+      catalogues,
+      undefined,
+      scenarioCatalogue,
+      manifest,
+    ).all()[0]!;
+    const currencyOptions = (definition: typeof withFixture) =>
+      definition.fields
+        .find(({ fieldId }) => fieldId === "context.currency")
+        ?.options?.map(({ value }) => value);
+
+    expect(currencyOptions(withFixture)).toEqual(["EUR", "USD"]);
+    expect(currencyOptions(oasOnly)).toEqual(["USD"]);
+    expect(oasOnly).not.toEqual(withFixture);
+  });
+
   it("does not accept legacy inline page definitions from mapping rows", () => {
     const mt2Catalogue = {
       ...catalogue,
@@ -366,6 +440,71 @@ describe("MappingResolutionPageDefinitionSource", () => {
     expect(source.all()[0]!.scenarios[0]!.fixture.bindingId).toBe(
       "FIX-MT399-Q9-001@v1",
     );
+  });
+
+  it("falls back to fixture candidates when a governed profile has no scenario", () => {
+    const candidate = {
+      bindingId: "FIX-MT399-Q9-001@v1",
+      messageType: "MT399",
+      businessFunction: "FUTURE_GOVERNED_FUNCTION",
+      sequence: "Q9",
+      settlementLeg: "Future settlement leg",
+    };
+    const indexCatalogue = jest.fn(() => [candidate]);
+    const indexCurrencyProjection = jest.fn(() => []);
+    const source = new MappingResolutionPageDefinitionSource(
+      catalogues,
+      { indexCatalogue, indexCurrencyProjection } as never,
+      {
+        get: () => ({
+          definitions: [{
+            profileId: "P-MT399-Q9",
+            messageType: "MT399",
+            sequence: "Q9",
+            settlementLeg: "Future settlement leg",
+          }],
+          scenarios: [],
+          inputs: [],
+          crossTagConstraints: [],
+        }),
+      } as never,
+      new ResolutionPageFixtureManifestService(),
+    );
+
+    expect(source.all()[0]!.scenarios[0]!.fixture.bindingId).toBe(
+      candidate.bindingId,
+    );
+    expect(indexCatalogue).toHaveBeenCalledTimes(1);
+    expect(indexCurrencyProjection).not.toHaveBeenCalled();
+  });
+
+  it("builds governed Treasury and Trade Finance indexes without reading operational fixtures", () => {
+    const policy = new PageParameterEnvironmentPolicy("QA");
+    const catalogue = jest.fn(() => {
+      throw new Error("INDEX_MUST_NOT_READ_DB_FIXTURE");
+    });
+    const indexCatalogue = jest.fn(() => {
+      throw new Error("INDEX_MUST_NOT_READ_FULL_FIXTURE_CANDIDATES");
+    });
+    const indexCurrencyProjection = jest.fn(() => []);
+    const source = new MappingResolutionPageDefinitionSource(
+      new MappingCatalogueService(),
+      { catalogue, indexCatalogue, indexCurrencyProjection } as never,
+      new ResolutionPageScenarioCatalogueService(policy),
+      new ResolutionPageFixtureManifestService(),
+    );
+    const service = new ResolutionPageAggregationService(source, policy);
+
+    const treasury = service.index("SR2026", "TREASURY");
+    const tradeFinance = service.index("SR2026", "TRADE_FINANCE");
+
+    expect(treasury.items.length).toBeGreaterThan(0);
+    expect(tradeFinance.items.length).toBeGreaterThan(0);
+    expect(catalogue).not.toHaveBeenCalled();
+    expect(indexCatalogue).not.toHaveBeenCalled();
+    expect(indexCurrencyProjection).toHaveBeenCalledTimes(1);
+    for (const item of [...treasury.items, ...tradeFinance.items])
+      expect(service.get(item.query).contractSha256).toBe(item.contractSha256);
   });
 
   it("loads the governed 362-case catalogue without embedding scenarios in mapping rows", () => {

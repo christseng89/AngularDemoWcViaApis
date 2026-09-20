@@ -1,9 +1,11 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
 import {
   SqliteSsiRepository,
+  type FinControlledFixtureIndexCurrency,
   type SsiApplicabilityRecord,
   type SsiRecord,
 } from "./sqlite-ssi.repository";
+export type { FinControlledFixtureIndexCurrency } from "./sqlite-ssi.repository";
 
 const FIXTURE_FAMILY = "MT347-SR2026-SSI";
 
@@ -177,6 +179,23 @@ export class FinControlledFixtureService {
       .sort((left, right) => left.bindingId.localeCompare(right.bindingId));
   }
 
+  indexCatalogue(): readonly FinControlledFixtureCandidate[] {
+    return this.visibleGeneration(
+      this.repository
+        .listFinControlledFixtureCatalogueRows()
+        .map(({ ssi, applicability }) => ({
+          ssi: ssi as ControlledSsi,
+          applicability: applicability as ControlledApplicability,
+        })),
+    )
+      .map(({ ssi, applicability }) => this.toCandidate(ssi, applicability))
+      .sort((left, right) => left.bindingId.localeCompare(right.bindingId));
+  }
+
+  indexCurrencyProjection(): readonly FinControlledFixtureIndexCurrency[] {
+    return this.repository.listFinControlledFixtureIndexCurrencies();
+  }
+
   private visibleGeneration<
     T extends { ssi: ControlledSsi; applicability: ControlledApplicability },
   >(rows: readonly T[]): T[] {
@@ -188,8 +207,7 @@ export class FinControlledFixtureService {
     if (versioned.length === 0) return [...rows];
     return versioned.filter(
       ({ ssi }) =>
-        ssi.usageScope === "QA_POSITIVE" &&
-        ssi.operationalVisible === false,
+        ssi.usageScope === "QA_POSITIVE" && ssi.operationalVisible === false,
     );
   }
 

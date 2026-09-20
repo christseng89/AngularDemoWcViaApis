@@ -19,6 +19,7 @@ import type { ResolutionPageDefinitionSource } from "./resolution-page-definitio
 import {
   FinControlledFixtureService,
   type FinControlledFixtureCandidate,
+  type FinControlledFixtureIndexCurrency,
 } from "../fin-controlled-fixture.service";
 import {
   ResolutionPageScenarioCatalogueService,
@@ -720,7 +721,7 @@ export class MappingResolutionPageDefinitionSource implements ResolutionPageDefi
   all(standardsRelease = DEFAULT_RELEASE): readonly ResolutionPageDefinition[] {
     const catalogue = this.catalogues.get(standardsRelease);
     const mappings = catalogue.mappings.filter(relevant);
-    const fixtureCandidates = this.fixtures?.catalogue() ?? [];
+    const configured = this.scenarioCatalogue?.get();
     const businessDatePolicy =
       this.businessDates ?? new PageParameterBusinessDatePolicy();
     const defaultValueDate = businessDatePolicy.firstAvailableDate();
@@ -730,6 +731,30 @@ export class MappingResolutionPageDefinitionSource implements ResolutionPageDefi
         mappings.findIndex((candidate) => sameProfile(candidate, mapping)) ===
         index,
     );
+    const fullyConfigured =
+      configured &&
+      this.fixtureManifest &&
+      this.fixtures?.indexCurrencyProjection &&
+      representatives.every((mapping) =>
+        configured.definitions.some(
+          (profile) =>
+            profile.messageType === mapping.messageType &&
+            profile.sequence === (mapping.sequence ?? "MESSAGE") &&
+            profile.settlementLeg ===
+              (mapping.settlementLeg ?? mapping.sequence ?? "MESSAGE") &&
+            configured.scenarios.some(
+              (scenario) => scenario.profileId === profile.profileId,
+            ),
+        ),
+      );
+    const fixtureCandidates = fullyConfigured
+      ? []
+      : configured && this.fixtureManifest && this.fixtures?.indexCatalogue
+        ? this.fixtures.indexCatalogue()
+        : (this.fixtures?.catalogue() ?? []);
+    const indexCurrencies = fullyConfigured
+      ? this.fixtures!.indexCurrencyProjection()
+      : fixtureCandidates;
     const generated = representatives
       .map((representative) =>
         definitionFor(
@@ -743,12 +768,11 @@ export class MappingResolutionPageDefinitionSource implements ResolutionPageDefi
       .sort((left, right) =>
         left.definitionId.localeCompare(right.definitionId),
       );
-    const configured = this.scenarioCatalogue?.get();
     if (!configured || !this.fixtureManifest) return generated;
     return this.configureGeneratedDefinitions(
       generated,
       configured,
-      fixtureCandidates,
+      indexCurrencies,
       defaultValueDate,
       businessDate,
       this.fixtureManifest,
@@ -758,7 +782,7 @@ export class MappingResolutionPageDefinitionSource implements ResolutionPageDefi
   private configureGeneratedDefinitions(
     generated: readonly ResolutionPageDefinition[],
     configured: ResolutionPageScenarioCatalogue,
-    fixtureCandidates: ReturnType<FinControlledFixtureService["catalogue"]>,
+    fixtureCandidates: readonly FinControlledFixtureIndexCurrency[],
     defaultValueDate: string,
     businessDate: ReturnType<PageParameterBusinessDatePolicy["metadata"]>,
     fixtureManifest: ResolutionPageFixtureManifestService,
@@ -1187,7 +1211,7 @@ export class MappingResolutionPageDefinitionSource implements ResolutionPageDefi
     settlementLeg: string,
     configuredFields: readonly PageParameterField[],
     scenarios: readonly ResolutionPageConfiguredScenario[],
-    fixtureCandidates: readonly FinControlledFixtureCandidate[],
+    fixtureCandidates: readonly FinControlledFixtureIndexCurrency[],
   ): string[] {
     const configuredCurrency = configuredFields.find(
       ({ fieldId }) => fieldId === "context.currency",

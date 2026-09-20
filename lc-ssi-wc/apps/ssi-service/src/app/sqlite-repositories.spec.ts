@@ -1,6 +1,8 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
+import { databaseSnapshotIdentity } from "./database-snapshot-identity.service";
 import {
   revisionWipCutoffAt,
   revisionWipExpiresAt,
@@ -754,7 +756,186 @@ describe("SQLite governed repositories", () => {
         includeFixtureGroup: true,
       }),
     ).toHaveLength(2);
+    expect(
+      repository
+        .listFinControlledFixtureCatalogueRows()
+        .map(({ ssi }) => ssi.id)
+        .sort(),
+    ).toEqual(["SSI-MT400-1", "SSI-MT400-2"]);
+    expect(repository.explainFinControlledFixtureCatalogue()).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining(
+          "SEARCH a USING INDEX idx_ssi_applicability_fin_fixture_lookup",
+        ),
+        expect.stringContaining("SEARCH s USING INDEX"),
+      ]),
+    );
     repository.onModuleDestroy();
+  });
+
+  it("keeps SQLite BINARY applicability ordering when a fixture has duplicate active rows", () => {
+    const repository = new SqliteSsiRepository();
+    const ssi: SsiRecord = {
+      id: "SSI-DUPLICATE-APPLICABILITY",
+      counterpartyId: "CP-TEST",
+      scope: "STANDING",
+      maker: "maker.test",
+      status: "ACTIVE",
+      version: 1,
+      fixtureFamily: "MT347-SR2026-SSI",
+      fixtureBindingId: "FIX-MT401-001@v1",
+      route: {
+        businessFunction: "COLLECTION_PAYMENT_DIRECT",
+        sequence: "MESSAGE",
+        settlementLeg: "MESSAGE",
+        counterpartyBic: "DEUTDEFF",
+        currency: "USD",
+        bookingEntity: "HK01",
+      },
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    } as SsiRecord;
+    repository.save(ssi, "CREATED", "maker.test");
+    const db = new DatabaseSync(process.env["SSI_DATABASE_PATH"]!);
+    try {
+      for (const [id, messageType] of [
+        ["B", "MT400"],
+        ["a", "MT401"],
+      ]) {
+        db.prepare(
+          "INSERT INTO ssi_applicability(id,ssi_id,payload,updated_at) VALUES(?,?,?,?)",
+        ).run(
+          id,
+          ssi.id,
+          JSON.stringify({
+            id,
+            ssiId: ssi.id,
+            fixtureFamily: "MT347-SR2026-SSI",
+            status: "ACTIVE",
+            messageType,
+            currency: "USD",
+          }),
+          ssi.updatedAt,
+        );
+      }
+    } finally {
+      db.close();
+    }
+    try {
+      const previousChoice = repository.listApplicability(ssi.id).at(-1);
+      const indexChoice = repository
+        .listFinControlledFixtureCatalogueRows()
+        .find(({ ssi: row }) => row.id === ssi.id)?.applicability;
+
+      expect(previousChoice?.id).toBe("a");
+      expect(indexChoice?.id).toBe(previousChoice?.id);
+      expect(repository.listFinControlledFixtureIndexCurrencies()).toEqual([
+        {
+          messageType: "MT401",
+          sequence: "MESSAGE",
+          settlementLeg: "MESSAGE",
+          currency: "USD",
+        },
+      ]);
+      repository.save(
+        { ...ssi, route: { ...ssi.route, currency: "\t" } },
+        "UPDATED",
+        "maker.test",
+      );
+      expect(() =>
+        repository.listFinControlledFixtureIndexCurrencies(),
+      ).toThrow("CONTROLLED_FIXTURE_CURRENCY_MISSING");
+      const versioned = {
+        ...ssi,
+        fixtureVariantVersion: "MT347-DEMO-ORACLE-V1.1",
+        datasetVersion: "MT347-DEMO-V1.1",
+        usageScope: "QA_POSITIVE",
+        operationalVisible: 0,
+      } as SsiRecord;
+      repository.save(versioned, "UPDATED", "maker.test");
+      expect(repository.listFinControlledFixtureIndexCurrencies()).toEqual([]);
+      repository.save(
+        { ...versioned, operationalVisible: false } as SsiRecord,
+        "UPDATED",
+        "maker.test",
+      );
+      expect(repository.listFinControlledFixtureIndexCurrencies()).toHaveLength(
+        1,
+      );
+      repository.save(
+        {
+          ...versioned,
+          id: "AAA-OLDER-INVALID-FIXTURE",
+          fixtureBindingId: "\t",
+          operationalVisible: false,
+          updatedAt: "2025-01-01T00:00:00.000Z",
+        } as SsiRecord,
+        "CREATED",
+        "maker.test",
+      );
+      const secondDb = new DatabaseSync(process.env["SSI_DATABASE_PATH"]!);
+      try {
+        secondDb.prepare(
+          "INSERT INTO ssi_applicability(id,ssi_id,payload,updated_at) VALUES(?,?,?,?)",
+        ).run(
+          "AAA-OLDER-APPLICABILITY",
+          "AAA-OLDER-INVALID-FIXTURE",
+          JSON.stringify({
+            id: "AAA-OLDER-APPLICABILITY",
+            ssiId: "AAA-OLDER-INVALID-FIXTURE",
+            fixtureFamily: "MT347-SR2026-SSI",
+            status: "ACTIVE",
+            messageType: "MT401",
+          }),
+          "2025-01-01T00:00:00.000Z",
+        );
+      } finally {
+        secondDb.close();
+      }
+      repository.save(
+        { ...versioned, route: { ...versioned.route, currency: "\t" }, operationalVisible: false } as SsiRecord,
+        "UPDATED",
+        "maker.test",
+      );
+      expect(() => repository.listFinControlledFixtureIndexCurrencies()).toThrow(
+        "CONTROLLED_FIXTURE_CURRENCY_MISSING",
+      );
+    } finally {
+      repository.onModuleDestroy();
+    }
+  });
+
+  it("keeps an expired SSI WIP untouched while reading the Page Definition index catalogue", () => {
+    const repository = new SqliteSsiRepository();
+    const wip = {
+      id: "SSI-EXPIRED-WIP",
+      counterpartyId: "CP-TEST",
+      scope: "STANDING",
+      maker: "maker.test",
+      status: "WIP",
+      version: 1,
+      amendmentOfId: "SSI-ORIGINAL",
+      revisionWipExpiresAt: "2000-01-01T00:00:00.000Z",
+      route: { currency: "USD" },
+      createdAt: "2000-01-01T00:00:00.000Z",
+      updatedAt: "2000-01-01T00:00:00.000Z",
+    } satisfies SsiRecord;
+    repository.save(wip, "WIP_RESERVED", wip.maker);
+    const snapshotDb = new DatabaseSync(process.env["SSI_DATABASE_PATH"]!, {
+      readOnly: true,
+    });
+    try {
+      const before = databaseSnapshotIdentity(snapshotDb).sha256;
+      expect(repository.listFinControlledFixtureCatalogueRows()).toEqual([]);
+      expect(repository.listFinControlledFixtureIndexCurrencies()).toEqual([]);
+      expect(repository.find(wip.id)?.status).toBe("WIP");
+      expect(databaseSnapshotIdentity(snapshotDb).sha256).toBe(before);
+      repository.list();
+      expect(repository.find(wip.id)?.status).toBe("REVOKED");
+    } finally {
+      snapshotDb.close();
+      repository.onModuleDestroy();
+    }
   });
 
   it("finds eligible Nostro accounts inside SQLite and isolates fixture families", () => {

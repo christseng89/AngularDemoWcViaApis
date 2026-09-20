@@ -119,6 +119,80 @@ export interface FinControlledFixtureRepositoryRow {
   readonly applicability: SsiApplicabilityRecord;
 }
 
+export interface FinControlledFixtureIndexCurrency {
+  readonly messageType: string;
+  readonly sequence: string;
+  readonly settlementLeg: string;
+  readonly currency: string;
+}
+
+const FIN_CONTROLLED_CATALOGUE_SQL = `
+  SELECT s.payload AS ssi_payload, a.payload AS applicability_payload
+  FROM ssi_applicability AS a
+  JOIN ssi AS s ON s.id = a.ssi_id
+  WHERE json_extract(a.payload,'$.fixtureFamily') = 'MT347-SR2026-SSI'
+    AND json_extract(a.payload,'$.status') = 'ACTIVE'
+    AND json_extract(s.payload,'$.fixtureFamily') = 'MT347-SR2026-SSI'
+    AND json_extract(s.payload,'$.status') = 'ACTIVE'
+  ORDER BY a.ssi_id, a.id`;
+
+const JS_TRIM_CHARACTERS =
+  "char(9,10,11,12,13,32,160,5760,8192,8193,8194,8195,8196,8197,8198,8199,8200,8201,8202,8232,8233,8239,8287,12288,65279)";
+
+const FIN_CONTROLLED_INDEX_CURRENCIES_SQL = `
+  WITH latest AS MATERIALIZED (
+    SELECT s.id AS ssi_id,
+      s.updated_at AS ssi_updated_at,
+      json_extract(a.payload,'$.messageType') AS message_type,
+      json_extract(s.payload,'$.route.sequence') AS sequence,
+      json_extract(s.payload,'$.route.settlementLeg') AS settlement_leg,
+      json_extract(s.payload,'$.route.currency') AS currency,
+      json_extract(s.payload,'$.fixtureVariantVersion') AS variant_version,
+      json_extract(s.payload,'$.datasetVersion') AS dataset_version,
+      json_extract(s.payload,'$.usageScope') AS usage_scope,
+      json_type(s.payload,'$.operationalVisible') AS visible_type,
+      CASE
+        WHEN json_type(s.payload,'$.fixtureBindingId') != 'text' OR nullif(trim(json_extract(s.payload,'$.fixtureBindingId'), ${JS_TRIM_CHARACTERS}), '') IS NULL THEN 'BINDING_ID'
+        WHEN json_type(a.payload,'$.messageType') != 'text' OR nullif(trim(json_extract(a.payload,'$.messageType'), ${JS_TRIM_CHARACTERS}), '') IS NULL THEN 'MESSAGE_TYPE'
+        WHEN json_type(s.payload,'$.route.businessFunction') != 'text' OR nullif(trim(json_extract(s.payload,'$.route.businessFunction'), ${JS_TRIM_CHARACTERS}), '') IS NULL THEN 'BUSINESS_FUNCTION'
+        WHEN json_type(s.payload,'$.route.sequence') != 'text' OR nullif(trim(json_extract(s.payload,'$.route.sequence'), ${JS_TRIM_CHARACTERS}), '') IS NULL THEN 'SEQUENCE'
+        WHEN json_type(s.payload,'$.route.settlementLeg') != 'text' OR nullif(trim(json_extract(s.payload,'$.route.settlementLeg'), ${JS_TRIM_CHARACTERS}), '') IS NULL THEN 'SETTLEMENT_LEG'
+        WHEN json_type(s.payload,'$.route.counterpartyBic') != 'text' OR nullif(trim(json_extract(s.payload,'$.route.counterpartyBic'), ${JS_TRIM_CHARACTERS}), '') IS NULL THEN 'COUNTERPARTY_BIC'
+        WHEN json_type(s.payload,'$.route.currency') != 'text' OR nullif(trim(json_extract(s.payload,'$.route.currency'), ${JS_TRIM_CHARACTERS}), '') IS NULL THEN 'CURRENCY'
+        WHEN json_type(s.payload,'$.route.bookingEntity') != 'text' OR nullif(trim(json_extract(s.payload,'$.route.bookingEntity'), ${JS_TRIM_CHARACTERS}), '') IS NULL THEN 'BOOKING_ENTITY'
+      END AS invalid_field
+    FROM ssi_applicability AS a
+    JOIN ssi AS s ON s.id = a.ssi_id
+    WHERE json_extract(a.payload,'$.fixtureFamily') = 'MT347-SR2026-SSI'
+      AND json_extract(a.payload,'$.status') = 'ACTIVE'
+      AND json_extract(s.payload,'$.fixtureFamily') = 'MT347-SR2026-SSI'
+      AND json_extract(s.payload,'$.status') = 'ACTIVE'
+      AND NOT EXISTS (
+        SELECT 1 FROM ssi_applicability AS later
+        WHERE later.ssi_id = a.ssi_id
+          AND later.id COLLATE BINARY > a.id
+          AND json_extract(later.payload,'$.fixtureFamily') = 'MT347-SR2026-SSI'
+          AND json_extract(later.payload,'$.status') = 'ACTIVE'
+      )
+  ), visible AS MATERIALIZED (
+    SELECT * FROM latest
+    WHERE NOT EXISTS (
+      SELECT 1 FROM latest
+      WHERE variant_version = 'MT347-DEMO-ORACLE-V1.1'
+        AND dataset_version = 'MT347-DEMO-V1.1'
+    ) OR (
+      variant_version = 'MT347-DEMO-ORACLE-V1.1'
+      AND dataset_version = 'MT347-DEMO-V1.1'
+      AND usage_scope = 'QA_POSITIVE'
+      AND visible_type = 'false'
+    )
+  )
+  SELECT DISTINCT message_type, sequence, settlement_leg, currency,
+    (SELECT invalid_field FROM visible
+     WHERE invalid_field IS NOT NULL ORDER BY ssi_updated_at DESC, ssi_id LIMIT 1) AS first_invalid_field
+  FROM visible
+  ORDER BY message_type, sequence, settlement_leg, currency`;
+
 @Injectable()
 export class SqliteSsiRepository implements OnModuleDestroy {
   private readonly db: DatabaseSync;
@@ -560,6 +634,57 @@ export class SqliteSsiRepository implements OnModuleDestroy {
       };
     });
   }
+  listFinControlledFixtureCatalogueRows(): FinControlledFixtureRepositoryRow[] {
+    const rows = this.db.prepare(FIN_CONTROLLED_CATALOGUE_SQL).all();
+    const latestApplicabilityBySsi = new Map<
+      string,
+      FinControlledFixtureRepositoryRow
+    >();
+    for (const row of rows) {
+      const payloads = row as {
+        ssi_payload: unknown;
+        applicability_payload: unknown;
+      };
+      const candidate = {
+        ssi: JSON.parse(String(payloads.ssi_payload)) as SsiRecord,
+        applicability: JSON.parse(
+          String(payloads.applicability_payload),
+        ) as SsiApplicabilityRecord,
+      };
+      latestApplicabilityBySsi.set(candidate.ssi.id, candidate);
+    }
+    return [...latestApplicabilityBySsi.values()];
+  }
+
+  listFinControlledFixtureIndexCurrencies(): FinControlledFixtureIndexCurrency[] {
+    const rows = this.db
+      .prepare(FIN_CONTROLLED_INDEX_CURRENCIES_SQL)
+      .all() as Array<{
+      message_type: string;
+      sequence: string;
+      settlement_leg: string;
+      currency: string;
+      first_invalid_field: string | null;
+    }>;
+    if (rows[0]?.first_invalid_field)
+      throw new Error(
+        `CONTROLLED_FIXTURE_${rows[0].first_invalid_field}_MISSING`,
+      );
+    return rows.map((row) => ({
+      messageType: row.message_type,
+      sequence: row.sequence,
+      settlementLeg: row.settlement_leg,
+      currency: row.currency,
+    }));
+  }
+
+  explainFinControlledFixtureCatalogue(): string[] {
+    return this.db
+      .prepare(`EXPLAIN QUERY PLAN ${FIN_CONTROLLED_CATALOGUE_SQL}`)
+      .all()
+      .map((row) => String((row as { detail: unknown }).detail));
+  }
+
   findFinControlledFixtures(
     query: FinControlledFixtureRepositoryQuery,
   ): FinControlledFixtureRepositoryRow[] {

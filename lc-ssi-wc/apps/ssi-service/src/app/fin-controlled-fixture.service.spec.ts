@@ -135,6 +135,29 @@ describe("FinControlledFixtureService", () => {
     });
   });
 
+  it("reads the Page Definition index catalogue without full SSI or applicability lists", () => {
+    const optimizedRepository = {
+      listFinControlledFixtureCatalogueRows: jest.fn(() => [
+        { ssi, applicability },
+      ]),
+      list: jest.fn(() => {
+        throw new Error("FULL_SSI_SCAN_NOT_ALLOWED");
+      }),
+      listApplicability: jest.fn(() => {
+        throw new Error("FULL_APPLICABILITY_SCAN_NOT_ALLOWED");
+      }),
+    } as unknown as SqliteSsiRepository;
+
+    const result = new FinControlledFixtureService(
+      optimizedRepository,
+    ).indexCatalogue();
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({ bindingId, currency: "USD" });
+    expect(optimizedRepository.list).not.toHaveBeenCalled();
+    expect(optimizedRepository.listApplicability).not.toHaveBeenCalled();
+  });
+
   it("isolates historical fixtures when the versioned v1.1 graph is present", () => {
     const historical = { ...ssi, id: "ssi-historical" };
     const controlled = {
