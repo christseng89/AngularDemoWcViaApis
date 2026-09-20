@@ -50,6 +50,7 @@ export interface ResolutionWorkbenchViewModel {
   }[];
   readonly scenarios: readonly ScenarioViewModel[];
   readonly selectedScenarioId: string;
+  readonly selectedScenarioLabel: string;
   readonly fixtureBindingId: string;
   readonly execution: PageParameterExecution;
   readonly actionLabel: string;
@@ -279,6 +280,7 @@ export const mapPageDefinition = (
       }))
       .sort(compareScenarioDisplayOrder),
     selectedScenarioId: scenario.scenarioId,
+    selectedScenarioLabel: scenario.label,
     fixtureBindingId: scenario.fixture.bindingId,
     execution: scenario.execution,
     actionLabel: actionLabel(scenario.execution.action),

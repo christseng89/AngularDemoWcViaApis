@@ -146,6 +146,7 @@ describe("mapPageDefinition", () => {
       ]),
     );
     expect(model.actionLabel).toBe("Resolve SSI");
+    expect(model.selectedScenarioLabel).toBe("Future scenario");
     expect(model.fields.map(({ fieldId }) => fieldId)).toEqual([
       "future-choice",
       "future-bank",

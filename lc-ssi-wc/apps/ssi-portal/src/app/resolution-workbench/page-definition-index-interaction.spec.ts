@@ -100,6 +100,15 @@ describe("payment message index interaction contract", () => {
     expect(workbenchTemplate).not.toContain("<details open");
   });
 
+  it("shows the governed selected scenario above the shared workbench", () => {
+    const workbenchTemplate = readFileSync(
+      join(process.cwd(), "apps/ssi-portal/src/app/resolution-workbench/resolution-workbench.component.html"),
+      "utf8",
+    );
+    expect(workbenchTemplate).toContain('SCENARIO · {{ page.selectedScenarioLabel }}');
+    expect(workbenchTemplate).not.toContain("STEP 03 · REVIEW AND RESOLVE");
+  });
+
   it("does not expose a second scenario selector that can bypass audience tabs", () => {
     const workbenchTemplate = readFileSync(
       join(
