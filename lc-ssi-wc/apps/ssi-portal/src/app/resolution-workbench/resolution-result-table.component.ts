@@ -8,6 +8,7 @@ import type { ResolutionPageExecutionResult } from "@ssi/contracts";
 import {
   emptyResolutionMessage,
   resolutionResultRows,
+  resolutionRouteSummary,
 } from "./resolution-result.presenter";
 
 @Component({
@@ -20,6 +21,7 @@ import {
 export class ResolutionResultTableComponent {
   readonly result = input.required<ResolutionPageExecutionResult>();
   readonly rows = computed(() => resolutionResultRows(this.result().fields));
+  readonly route = computed(() => resolutionRouteSummary(this.result().outputs));
   readonly emptyMessage = computed(() =>
     emptyResolutionMessage(this.result().outcome),
   );

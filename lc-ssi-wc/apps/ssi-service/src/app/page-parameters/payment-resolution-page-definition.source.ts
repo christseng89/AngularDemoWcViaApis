@@ -440,7 +440,25 @@ const settlementFields = (messageType: string): PageParameterField[] => {
 };
 
 const validationContextFields = (messageType: string): PageParameterField[] =>
-  messageType.endsWith("COV")
+  messageType === "MT205"
+    ? [{
+        fieldId: "context.previousMessageType",
+        path: "previousMessage.type",
+        label: "Actual previous FI message type",
+        control: "TEXT",
+        dataType: "STRING",
+        required: false,
+        displayOrder: 70,
+        section: "VALIDATION_CONTEXT",
+        visibility: "HIDDEN_EVIDENCE",
+        readOnly: true,
+        options: ["MT202", "MT203", "MT205"].map((type) => ({
+          value: type,
+          label: type,
+        })),
+        constraints: [],
+      }]
+    : messageType.endsWith("COV")
     ? [
         governedContextField("21", "NONE", "SWIFT 21 • Related Reference", 60),
         governedContextField(
@@ -567,6 +585,26 @@ const fieldPolicy = (
   scenarioInputValues: Readonly<Record<string, string | boolean>>,
   scenarioId: string,
 ): PageParameterScenarioFieldPolicy => {
+  if (field.fieldId === "context.previousMessageType" && scenarioId.startsWith("MT205-"))
+    return scenarioId === "MT205-OP-STANDARD-DOMESTIC-ONWARD"
+      ? {
+          fieldId: field.fieldId,
+          applicability: "APPLICABLE",
+          inputOwnership: "TRANSACTION_CONTEXT",
+          visibility: "HIDDEN_EVIDENCE",
+          processingPolicy: "APPLY",
+          required: false,
+          readOnly: true,
+        }
+      : {
+          fieldId: field.fieldId,
+          applicability: "NOT_APPLICABLE",
+          inputOwnership: "SSI_DERIVED",
+          visibility: "HIDDEN_EVIDENCE",
+          processingPolicy: "IGNORE_AUDIT",
+          required: false,
+          readOnly: true,
+        };
   if (field.fieldId === "context.transactionReference")
     return {
       fieldId: field.fieldId,

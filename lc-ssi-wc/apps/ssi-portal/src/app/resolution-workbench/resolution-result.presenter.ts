@@ -65,6 +65,36 @@ export const resolutionDomainFromOutputs = (
   return typeof domain === "string" ? domain.trim() : "";
 };
 
+export interface ResolutionRouteSummary {
+  readonly ssiId: string;
+  readonly ssiCode: string;
+  readonly settlementRouteId: string;
+  readonly nostroId: string;
+  readonly accountId: string;
+  readonly applicabilityId: string;
+}
+
+export const resolutionRouteSummary = (
+  outputs: readonly ResolutionPageGeneratedOutput[],
+): ResolutionRouteSummary | undefined => {
+  const document = outputs.find((output) => output.format === "ISO_20022")?.document;
+  const route = document?.["chosenRoute"];
+  if (!route || typeof route !== "object" || Array.isArray(route)) return undefined;
+  const selected = route as Record<string, unknown>;
+  const value = (key: string): string =>
+    typeof selected[key] === "string" ? selected[key] as string : "";
+  const ssiId = value("ssiId");
+  if (!ssiId) return undefined;
+  return {
+    ssiId,
+    ssiCode: value("ssiCode"),
+    settlementRouteId: value("settlementRouteId"),
+    nostroId: value("nostroId"),
+    accountId: value("accountId"),
+    applicabilityId: value("matchedApplicabilityId"),
+  };
+};
+
 export const resolutionResultRows = (
   fields: readonly ResolutionPageFieldResult[],
 ): readonly ResolutionResultRow[] =>

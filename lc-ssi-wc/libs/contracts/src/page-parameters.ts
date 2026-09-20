@@ -27,7 +27,7 @@ export type PageParameterApplicability = "APPLICABLE" | "NOT_APPLICABLE";
 export type PageParameterServicerRelationship =
   "SAME" | "DIFFERENT" | "NOT_APPLICABLE";
 export type PageParameterInputOwnership =
-  "TRANSACTION_USER" | "SSI_DERIVED" | "SCENARIO_FIXED";
+  "TRANSACTION_USER" | "TRANSACTION_CONTEXT" | "SSI_DERIVED" | "SCENARIO_FIXED";
 export type PageParameterProcessingPolicy = "APPLY" | "IGNORE_AUDIT";
 export type PageParameterDataType =
   | "STRING"

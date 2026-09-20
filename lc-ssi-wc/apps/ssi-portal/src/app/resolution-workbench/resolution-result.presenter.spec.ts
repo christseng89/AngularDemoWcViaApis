@@ -5,6 +5,7 @@ import type {
 import {
   emptyResolutionMessage,
   resolutionDomainFromOutputs,
+  resolutionRouteSummary,
   resolutionResultRows,
 } from "./resolution-result.presenter";
 
@@ -38,6 +39,27 @@ const resolved: ResolutionPageFieldResult = {
 };
 
 describe("resolution result presenter", () => {
+  it("shows the chosen SSI and Nostro even when no governed 5x field was emitted", () => {
+    const outputs: ResolutionPageGeneratedOutput[] = [{
+      outputId: "iso-20022",
+      format: "ISO_20022",
+      label: "pacs.009.001.08",
+      messageIdentity: "pacs.009.001.08",
+      mediaType: "application/json",
+      document: {
+        chosenRoute: {
+          ssiId: "SSI-1", ssiCode: "MT2-USD-CITI-DEBIT-V1",
+          settlementRouteId: "ROUTE-1", nostroId: "NOSTRO-1",
+          accountId: "ACCOUNT-1", matchedApplicabilityId: "APP-1",
+        },
+      },
+    }];
+    expect(resolutionRouteSummary(outputs)).toEqual({
+      ssiId: "SSI-1", ssiCode: "MT2-USD-CITI-DEBIT-V1",
+      settlementRouteId: "ROUTE-1", nostroId: "NOSTRO-1",
+      accountId: "ACCOUNT-1", applicabilityId: "APP-1",
+    });
+  });
   it("maps every API result field without looking it up in input controls", () => {
     expect(resolutionResultRows([resolved])).toEqual([
       expect.objectContaining({

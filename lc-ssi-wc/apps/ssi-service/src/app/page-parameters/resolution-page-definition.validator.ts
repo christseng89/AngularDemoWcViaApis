@@ -226,6 +226,14 @@ const validateScenarioFieldPolicy = (
     (policy.visibility !== "USER_INPUT" || policy.readOnly)
   )
     throw new Error("PAGE_TRANSACTION_USER_POLICY_INVALID");
+  if (
+    policy.inputOwnership === "TRANSACTION_CONTEXT" &&
+    (policy.applicability !== "APPLICABLE" ||
+      policy.visibility !== "HIDDEN_EVIDENCE" ||
+      !policy.readOnly ||
+      policy.processingPolicy !== "APPLY")
+  )
+    throw new Error("PAGE_TRANSACTION_CONTEXT_POLICY_INVALID");
 };
 
 const validateScenarioFieldPolicies = (

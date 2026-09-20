@@ -1477,6 +1477,52 @@ describe("ResolutionPageSubmissionAdapter", () => {
     );
   });
 
+  it.each([undefined, "MT202", "MT203", "MT205"])(
+    "passes optional MT205 onward predecessor %s through governed submission",
+    (previousType) => {
+      const paymentSource = new PaymentResolutionPageDefinitionSource();
+      const paymentPages = new ResolutionPageAggregationService(
+        paymentSource,
+        new PageParameterEnvironmentPolicy("DEMO"),
+      );
+      const paymentDefinition = paymentSource.all("SR2026")
+        .find(({ messageType }) => messageType === "MT205")!;
+      const paymentEnvelope = paymentPages.getByIdentity(
+        paymentDefinition.definitionId, paymentDefinition.definitionVersion,
+      );
+      const paymentScenario = paymentDefinition.scenarios.find(
+        ({ scenarioId }) => scenarioId === "MT205-OP-STANDARD-DOMESTIC-ONWARD",
+      )!;
+      const payment = { execute: jest.fn(() => ({ payment: true })) };
+      const routed = new ResolutionPageSubmissionAdapter(
+        paymentPages, { list: jest.fn() } as never, controlled as never,
+        banks as never, undefined, undefined, undefined, payment as never,
+      );
+
+      routed.execute({
+        definitionId: paymentDefinition.definitionId,
+        definitionVersion: paymentDefinition.definitionVersion,
+        contractSha256: paymentEnvelope.contractSha256,
+        scenarioId: paymentScenario.scenarioId,
+        fixtureBindingId: paymentScenario.fixture.bindingId,
+        values: {
+          "context.currency": "USD",
+          "context.bookingEntity": "HK01",
+          "context.valueDate": "2026-09-14",
+          "context.amount": "1000.00",
+          "context.counterpartyBankServiceId": "BANK-SVC-DEUTDEFF",
+          ...(previousType ? { "context.previousMessageType": previousType } : {}),
+        },
+      });
+
+      const forwarded = payment.execute.mock.calls[0]?.[0] as {
+        submission: { values: Record<string, string | boolean> }
+      };
+      expect(forwarded.submission.values["context.previousMessageType"])
+        .toBe(previousType);
+    },
+  );
+
   it("preserves the governed negative COV oracle through generic submission", () => {
     const paymentSource = new PaymentResolutionPageDefinitionSource();
     const paymentPages = new ResolutionPageAggregationService(

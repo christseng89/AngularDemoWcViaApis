@@ -55,6 +55,28 @@ const definitions = (): readonly ResolutionPageDefinition[] =>
   new PaymentResolutionPageDefinitionSource().all("SR2026");
 
 describe("controlled Payment definition options", () => {
+  it("governs actual MT205 onward predecessor as optional hidden provenance only", () => {
+    const definition = definitions().find(({ messageType }) => messageType === "MT205")!;
+    const field = definition.fields.find(({ fieldId }) => fieldId === "context.previousMessageType");
+    expect(field).toMatchObject({
+      required: false,
+      visibility: "HIDDEN_EVIDENCE",
+      options: [
+        { value: "MT202", label: "MT202" },
+        { value: "MT203", label: "MT203" },
+        { value: "MT205", label: "MT205" },
+      ],
+    });
+    expect(field?.defaultValue).toBeUndefined();
+    const onward = definition.scenarios.find(({ scenarioId }) => scenarioId === "MT205-OP-STANDARD-DOMESTIC-ONWARD")!;
+    expect(onward.inputValues?.["context.previousMessageType"]).toBeUndefined();
+    expect(onward.fieldPolicies?.find(({ fieldId }) => fieldId === field?.fieldId)).toMatchObject({
+      inputOwnership: "TRANSACTION_CONTEXT",
+      visibility: "HIDDEN_EVIDENCE",
+      processingPolicy: "APPLY",
+      required: false,
+    });
+  });
   it("uses coverage and Entity reference instead of runtime SSI candidate options", () => {
     const oldOptions = jest.fn(() => { throw new Error("RUNTIME_SSI_QUERY_FORBIDDEN"); });
     const source = new PaymentResolutionPageDefinitionSource(

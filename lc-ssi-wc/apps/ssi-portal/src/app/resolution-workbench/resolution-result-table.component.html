@@ -1,4 +1,18 @@
 <section class="resolution-results" aria-labelledby="resolution-results-title">
+  @if (route(); as selectedRoute) {
+    <div class="resolution-results__heading">
+      <div>
+        <span class="eyebrow">Selected settlement route</span>
+        <h3>SSI / Nostro result</h3>
+      </div>
+    </div>
+    <dl class="evidence-list">
+      <div><dt>SSI</dt><dd>{{ selectedRoute.ssiCode || selectedRoute.ssiId }}</dd></div>
+      <div><dt>Nostro</dt><dd>{{ selectedRoute.nostroId || "—" }}</dd></div>
+      <div><dt>Account</dt><dd>{{ selectedRoute.accountId || "—" }}</dd></div>
+      <div><dt>Settlement route</dt><dd>{{ selectedRoute.settlementRouteId || "—" }}</dd></div>
+    </dl>
+  }
   <div class="resolution-results__heading">
     <div>
       <span class="eyebrow">Resolved SSI fields</span>
@@ -58,7 +72,11 @@
     </div>
   } @else {
     <output class="resolution-results__empty">
-      {{ emptyMessage() }}
+      @if (route()) {
+        No governed SWIFT 5x field was emitted for this route.
+      } @else {
+        {{ emptyMessage() }}
+      }
     </output>
   }
 </section>
