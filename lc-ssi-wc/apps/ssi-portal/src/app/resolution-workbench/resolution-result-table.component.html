@@ -15,7 +15,6 @@
         </caption>
         <thead>
           <tr>
-            <th scope="col">Sequence</th>
             <th scope="col">Tag + option</th>
             <th scope="col">Role</th>
             <th scope="col">BIC</th>
@@ -29,12 +28,6 @@
         <tbody>
           @for (row of rows(); track row.key) {
             <tr [attr.data-status]="row.status">
-              <td>
-                <strong>{{ row.sequenceId || "—" }}</strong>
-                @if (row.settlementLeg) {
-                  <small>{{ row.settlementLeg }}</small>
-                }
-              </td>
               <td class="result-key">
                 <code>{{ row.tagAndOption || "—" }}</code>
               </td>

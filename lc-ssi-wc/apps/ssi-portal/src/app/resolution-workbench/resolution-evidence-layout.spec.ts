@@ -46,4 +46,14 @@ describe("resolution evidence layout", () => {
     expect(primarySummary).not.toContain("Resolution created");
     expect(primarySummary).not.toContain("Repair queue created");
   });
+
+  it("avoids repeating the selected sequence in the result table", () => {
+    const resultTable = readFileSync(
+      join(directory, "resolution-result-table.component.html"),
+      "utf8",
+    );
+    expect(resultTable).not.toContain('<th scope="col">Sequence</th>');
+    expect(resultTable).not.toContain("row.sequenceId");
+    expect(resultTable).toContain('<th scope="col">Tag + option</th>');
+  });
 });
