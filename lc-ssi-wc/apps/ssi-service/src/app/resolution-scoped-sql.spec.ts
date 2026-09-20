@@ -149,6 +149,18 @@ describe("request-scoped SSI SQL", () => {
     expect(repository.hasCoverProfile({ ...context, bookingEntity: "SG01" })).toBe(false);
     repository.save({ ...cover, route: { ...cover.route, counterpartyBic: "" } }, "UPDATED", "maker.test");
     expect(repository.hasCoverProfile(context)).toBe(true);
+    repository.save({ ...cover, route: { ...cover.route, businessService: "swift.cbprplus.cov. 04" } }, "UPDATED", "maker.test");
+    expect(repository.hasCoverProfile(context)).toBe(false);
+    repository.save({ ...cover, route: { ...cover.route, businessService: "\tswift.cbprplus.cov.04\t" } }, "UPDATED", "maker.test");
+    expect(repository.hasCoverProfile(context)).toBe(true);
+    const abandoned: SsiRecord = {
+      ...ssi("ABANDONED", {}, "WIP"),
+      amendmentOfId: "COVER",
+      revisionWipExpiresAt: "2000-01-01T00:00:00.000Z",
+    };
+    repository.save(abandoned, "WIP_RESERVED", "maker.test");
+    repository.hasCoverProfile({ ...context, counterpartyBic: "UNKNOWNXX" });
+    expect(repository.find(abandoned.id)?.status).toBe("REVOKED");
     repository.save({ ...cover, status: "SUPPRESSED" }, "SUPPRESSED", "maker.test");
     expect(repository.hasCoverProfile(context)).toBe(false);
     repository.onModuleDestroy();

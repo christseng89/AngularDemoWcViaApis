@@ -740,28 +740,41 @@ export class SqliteSsiRepository implements OnModuleDestroy {
     }));
   }
   hasCoverProfile(request: RouteResolutionRequest): boolean {
+    this.expireRevisionWorkInProgress();
     const counterparty = request.counterpartyBic || request.counterpartyId || "";
-    const row = this.db.prepare(
-      `SELECT EXISTS(
-         SELECT 1 FROM ssi AS s
-         WHERE json_extract(s.payload,'$.status')='ACTIVE'
-           AND json_extract(s.payload,'$.route.currency')=?
-           AND json_extract(s.payload,'$.route.bookingEntity')=?
-           AND COALESCE(NULLIF(json_extract(s.payload,'$.route.counterpartyBic'),''),
-                        json_extract(s.payload,'$.counterpartyId'))=?
-           AND instr(',' || replace(COALESCE(json_extract(s.payload,'$.route.messageTypes'),''),' ','') || ',', ',' || ? || ',') > 0
-           AND instr(',' || replace(COALESCE(json_extract(s.payload,'$.route.businessService'),''),' ','') || ',', ',' || ? || ',') > 0
-           AND instr(',' || replace(COALESCE(json_extract(s.payload,'$.route.sourceMessageTypes'),''),' ','') || ',', ',' || ? || ',') > 0
-       ) AS found`,
-    ).get(
+    const rows = this.db.prepare(
+      `SELECT json_extract(s.payload,'$.route.messageTypes') AS message_types,
+              json_extract(s.payload,'$.route.businessService') AS business_services,
+              json_extract(s.payload,'$.route.sourceMessageTypes') AS source_message_types
+       FROM ssi AS s
+       WHERE json_extract(s.payload,'$.status')='ACTIVE'
+         AND json_extract(s.payload,'$.route.currency')=?
+         AND json_extract(s.payload,'$.route.bookingEntity')=?
+         AND COALESCE(NULLIF(json_extract(s.payload,'$.route.counterpartyBic'),''),
+                      json_extract(s.payload,'$.counterpartyId'))=?
+         AND instr(COALESCE(json_extract(s.payload,'$.route.messageTypes'),''), ?) > 0
+         AND instr(COALESCE(json_extract(s.payload,'$.route.businessService'),''), ?) > 0
+         AND instr(COALESCE(json_extract(s.payload,'$.route.sourceMessageTypes'),''), ?) > 0`,
+    ).all(
       request.currency,
       request.bookingEntity,
       counterparty,
       request.messageType,
       "swift.cbprplus.cov.04",
       request.sourceMessageType ?? "",
-    ) as { found: number };
-    return row.found === 1;
+    ) as Array<{
+      message_types: string | null;
+      business_services: string | null;
+      source_message_types: string | null;
+    }>;
+    const hasExactToken = (value: string | null, expected: string): boolean =>
+      Boolean(expected) &&
+      (value ?? "").split(",").map((token) => token.trim()).includes(expected);
+    return rows.some((row) =>
+      hasExactToken(row.message_types, request.messageType) &&
+      hasExactToken(row.business_services, "swift.cbprplus.cov.04") &&
+      hasExactToken(row.source_message_types, request.sourceMessageType ?? ""),
+    );
   }
   findPaymentCandidates(query: PaymentSsiCandidateQuery): SsiRecord[] {
     return this.findPaymentCandidateBindings(query).map(({ ssi }) => ssi);
