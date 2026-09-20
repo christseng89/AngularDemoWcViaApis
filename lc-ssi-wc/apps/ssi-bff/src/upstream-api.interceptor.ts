@@ -157,8 +157,15 @@ export class UpstreamApiInterceptor {
     private readonly random: Random = Math.random,
   ) {}
 
-  async intercept(url: string, init?: RequestInit): Promise<Response> {
-    const policy = readApiRetryPolicy(this.environment);
+  async intercept(url: string, init?: RequestInit, timeoutOverrideMs?: number): Promise<Response> {
+    const sharedPolicy = readApiRetryPolicy(this.environment);
+    if (timeoutOverrideMs !== undefined && (!Number.isSafeInteger(timeoutOverrideMs) || timeoutOverrideMs < 1))
+      throw new Error("Upstream timeout override must be a positive integer");
+    const policy = timeoutOverrideMs === undefined ? sharedPolicy : {
+      ...sharedPolicy,
+      maxElapsedMs: timeoutOverrideMs,
+      requestTimeoutMs: timeoutOverrideMs,
+    };
     const retryableRequest = requestCanBeRetried(init);
     const startedAt = this.clock();
     let retryNumber = 0;

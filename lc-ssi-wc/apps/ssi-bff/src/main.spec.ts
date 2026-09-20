@@ -2,6 +2,7 @@ import "reflect-metadata";
 import { BadGatewayException, HttpException } from "@nestjs/common";
 import { MODULE_METADATA } from "@nestjs/common/constants";
 import { NestFactory } from "@nestjs/core";
+import { UpstreamApiInterceptor } from "./upstream-api.interceptor";
 
 jest.mock("@nestjs/core", () => ({
   NestFactory: {
@@ -61,6 +62,22 @@ describe("SSI BFF forwarding contract", () => {
       counts: { total: 3, active: 1, pending: 1 },
       recent: records,
     });
+  });
+
+  it("gives only Demo Reload a longer non-retryable upstream window", async () => {
+    const intercept = jest.spyOn(UpstreamApiInterceptor.prototype, "intercept")
+      .mockResolvedValue(jsonResponse({ code: "DEMO_DATA_RELOADED" }, 201));
+    try {
+      await controller["reloadDevelopmentData"]({ password: "entered" });
+      expect(intercept).toHaveBeenCalledWith(
+        "http://ssi.test/api/settings/development-data/reload",
+        expect.objectContaining({ method: "POST", body: JSON.stringify({ password: "entered" }) }),
+        120_000,
+      );
+      expect(intercept).toHaveBeenCalledTimes(1);
+    } finally {
+      intercept.mockRestore();
+    }
   });
 
   const proxyCases: Array<{

@@ -80,6 +80,20 @@ describe("UpstreamApiInterceptor", () => {
     ).toBe(true);
   });
 
+  it("allows a bounded Reload request to outlive the shared retry window without changing it", async () => {
+    const fetchImpl = jest.fn().mockResolvedValue(response(201));
+    const timeout = jest.spyOn(global, "setTimeout");
+    try {
+      const interceptor = new UpstreamApiInterceptor(environment(), fetchImpl);
+      await interceptor.intercept("http://service.test/api/settings/development-data/reload", { method: "POST" }, 120_000);
+      expect(timeout).toHaveBeenCalledWith(expect.any(Function), 120_000);
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+      expect(readApiRetryPolicy(environment()).maxElapsedMs).toBe(10_000);
+    } finally {
+      timeout.mockRestore();
+    }
+  });
+
   it("retries a transient GET with exponential delay and jitter", async () => {
     const fetchImpl = jest
       .fn()

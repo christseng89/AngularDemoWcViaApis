@@ -22,10 +22,12 @@ const serviceUrl = () =>
 const referenceUrl = () =>
   process.env["REFERENCE_SERVICE_URL"] ?? "http://localhost:3102";
 const upstreamApiInterceptor = new UpstreamApiInterceptor();
+const DEMO_RELOAD_TIMEOUT_MS = 120_000;
 async function forward(
   baseUrl: string,
   path: string,
   init?: RequestInit,
+  timeoutOverrideMs?: number,
 ): Promise<unknown> {
   try {
     const response = await upstreamApiInterceptor.intercept(
@@ -37,6 +39,7 @@ async function forward(
           ...init?.headers,
         },
       },
+      timeoutOverrideMs,
     );
     const value = (await response.json()) as unknown;
     if (!response.ok)
@@ -50,8 +53,8 @@ async function forward(
     throw new BadGatewayException("Upstream service is unavailable");
   }
 }
-const forwardSsi = (path: string, init?: RequestInit) =>
-  forward(`${serviceUrl()}/api`, path, init);
+const forwardSsi = (path: string, init?: RequestInit, timeoutOverrideMs?: number) =>
+  forward(`${serviceUrl()}/api`, path, init, timeoutOverrideMs);
 const forwardReference = (path: string) =>
   forward(`${referenceUrl()}/mock`, path);
 
@@ -90,7 +93,7 @@ class BffController {
     return forwardSsi("settings/development-data/reload", {
       method: "POST",
       body: JSON.stringify(body),
-    });
+    }, DEMO_RELOAD_TIMEOUT_MS);
   }
   @Get("dashboard") async dashboard(): Promise<unknown> {
     const ssis = (await forwardSsi("ssis")) as Array<{ status: string }>;
