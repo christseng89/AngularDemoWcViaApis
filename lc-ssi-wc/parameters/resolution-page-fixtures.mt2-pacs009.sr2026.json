@@ -30,7 +30,7 @@
       "fixtureSet": "MT2-PACS009-SR2026",
       "fixtureVersion": "2026.09.15-task4-ssi-scope",
       "sourceFile": "parameters/resolution-page-scenarios.mt2-pacs009.sr2026.json",
-      "sourceFileSha256": "39C04578B9DDC1E322C63711ED7E81724E050926A56A15F96178E5486DC38536",
+      "sourceFileSha256": "A157EFF2BBD48327BBD331DBBE98296A19E35AF89502A79E78911796E602BEF2",
       "polarity": "POSITIVE"
     },
     {
@@ -38,7 +38,7 @@
       "fixtureSet": "MT2-PACS009-SR2026",
       "fixtureVersion": "2026.09.15-task4-ssi-scope",
       "sourceFile": "parameters/resolution-page-scenarios.mt2-pacs009.sr2026.json",
-      "sourceFileSha256": "39C04578B9DDC1E322C63711ED7E81724E050926A56A15F96178E5486DC38536",
+      "sourceFileSha256": "A157EFF2BBD48327BBD331DBBE98296A19E35AF89502A79E78911796E602BEF2",
       "polarity": "POSITIVE"
     },
     {
@@ -46,7 +46,7 @@
       "fixtureSet": "MT2-PACS009-SR2026",
       "fixtureVersion": "2026.09.15-task4-ssi-scope",
       "sourceFile": "parameters/resolution-page-scenarios.mt2-pacs009.sr2026.json",
-      "sourceFileSha256": "39C04578B9DDC1E322C63711ED7E81724E050926A56A15F96178E5486DC38536",
+      "sourceFileSha256": "A157EFF2BBD48327BBD331DBBE98296A19E35AF89502A79E78911796E602BEF2",
       "polarity": "POSITIVE"
     },
     {
@@ -54,7 +54,7 @@
       "fixtureSet": "MT2-PACS009-SR2026",
       "fixtureVersion": "2026.09.15-task4-ssi-scope",
       "sourceFile": "parameters/resolution-page-scenarios.mt2-pacs009.sr2026.json",
-      "sourceFileSha256": "39C04578B9DDC1E322C63711ED7E81724E050926A56A15F96178E5486DC38536",
+      "sourceFileSha256": "A157EFF2BBD48327BBD331DBBE98296A19E35AF89502A79E78911796E602BEF2",
       "polarity": "NEGATIVE"
     },
     {
@@ -62,7 +62,7 @@
       "fixtureSet": "MT2-PACS009-SR2026",
       "fixtureVersion": "2026.09.15-task4-ssi-scope",
       "sourceFile": "parameters/resolution-page-scenarios.mt2-pacs009.sr2026.json",
-      "sourceFileSha256": "39C04578B9DDC1E322C63711ED7E81724E050926A56A15F96178E5486DC38536",
+      "sourceFileSha256": "A157EFF2BBD48327BBD331DBBE98296A19E35AF89502A79E78911796E602BEF2",
       "polarity": "BOUNDARY"
     },
     {
@@ -70,7 +70,7 @@
       "fixtureSet": "MT2-PACS009-SR2026",
       "fixtureVersion": "2026.09.15-task4-ssi-scope",
       "sourceFile": "parameters/resolution-page-scenarios.mt2-pacs009.sr2026.json",
-      "sourceFileSha256": "39C04578B9DDC1E322C63711ED7E81724E050926A56A15F96178E5486DC38536",
+      "sourceFileSha256": "A157EFF2BBD48327BBD331DBBE98296A19E35AF89502A79E78911796E602BEF2",
       "polarity": "POSITIVE"
     },
     {
@@ -78,7 +78,7 @@
       "fixtureSet": "MT2-PACS009-SR2026",
       "fixtureVersion": "2026.09.15-task4-ssi-scope",
       "sourceFile": "parameters/resolution-page-scenarios.mt2-pacs009.sr2026.json",
-      "sourceFileSha256": "39C04578B9DDC1E322C63711ED7E81724E050926A56A15F96178E5486DC38536",
+      "sourceFileSha256": "A157EFF2BBD48327BBD331DBBE98296A19E35AF89502A79E78911796E602BEF2",
       "polarity": "POSITIVE"
     },
     {
@@ -86,7 +86,7 @@
       "fixtureSet": "MT2-PACS009-SR2026",
       "fixtureVersion": "2026.09.15-task4-ssi-scope",
       "sourceFile": "parameters/resolution-page-scenarios.mt2-pacs009.sr2026.json",
-      "sourceFileSha256": "39C04578B9DDC1E322C63711ED7E81724E050926A56A15F96178E5486DC38536",
+      "sourceFileSha256": "A157EFF2BBD48327BBD331DBBE98296A19E35AF89502A79E78911796E602BEF2",
       "polarity": "POSITIVE"
     },
     {
@@ -94,7 +94,7 @@
       "fixtureSet": "MT2-PACS009-SR2026",
       "fixtureVersion": "2026.09.15-task4-ssi-scope",
       "sourceFile": "parameters/resolution-page-scenarios.mt2-pacs009.sr2026.json",
-      "sourceFileSha256": "39C04578B9DDC1E322C63711ED7E81724E050926A56A15F96178E5486DC38536",
+      "sourceFileSha256": "A157EFF2BBD48327BBD331DBBE98296A19E35AF89502A79E78911796E602BEF2",
       "polarity": "NEGATIVE"
     },
     {
@@ -102,7 +102,7 @@
       "fixtureSet": "MT2-PACS009-SR2026",
       "fixtureVersion": "2026.09.15-task4-ssi-scope",
       "sourceFile": "parameters/resolution-page-scenarios.mt2-pacs009.sr2026.json",
-      "sourceFileSha256": "39C04578B9DDC1E322C63711ED7E81724E050926A56A15F96178E5486DC38536",
+      "sourceFileSha256": "A157EFF2BBD48327BBD331DBBE98296A19E35AF89502A79E78911796E602BEF2",
       "polarity": "BOUNDARY"
     },
     {
@@ -110,7 +110,7 @@
       "fixtureSet": "MT2-PACS009-SR2026",
       "fixtureVersion": "2026.09.15-task4-ssi-scope",
       "sourceFile": "parameters/resolution-page-scenarios.mt2-pacs009.sr2026.json",
-      "sourceFileSha256": "39C04578B9DDC1E322C63711ED7E81724E050926A56A15F96178E5486DC38536",
+      "sourceFileSha256": "A157EFF2BBD48327BBD331DBBE98296A19E35AF89502A79E78911796E602BEF2",
       "polarity": "POSITIVE"
     },
     {
@@ -118,7 +118,7 @@
       "fixtureSet": "MT2-PACS009-SR2026",
       "fixtureVersion": "2026.09.15-task4-ssi-scope",
       "sourceFile": "parameters/resolution-page-scenarios.mt2-pacs009.sr2026.json",
-      "sourceFileSha256": "39C04578B9DDC1E322C63711ED7E81724E050926A56A15F96178E5486DC38536",
+      "sourceFileSha256": "A157EFF2BBD48327BBD331DBBE98296A19E35AF89502A79E78911796E602BEF2",
       "polarity": "POSITIVE"
     },
     {
@@ -126,7 +126,7 @@
       "fixtureSet": "MT2-PACS009-SR2026",
       "fixtureVersion": "2026.09.15-task4-ssi-scope",
       "sourceFile": "parameters/resolution-page-scenarios.mt2-pacs009.sr2026.json",
-      "sourceFileSha256": "39C04578B9DDC1E322C63711ED7E81724E050926A56A15F96178E5486DC38536",
+      "sourceFileSha256": "A157EFF2BBD48327BBD331DBBE98296A19E35AF89502A79E78911796E602BEF2",
       "polarity": "NEGATIVE"
     },
     {
@@ -134,7 +134,7 @@
       "fixtureSet": "MT2-PACS009-SR2026",
       "fixtureVersion": "2026.09.15-task4-ssi-scope",
       "sourceFile": "parameters/resolution-page-scenarios.mt2-pacs009.sr2026.json",
-      "sourceFileSha256": "39C04578B9DDC1E322C63711ED7E81724E050926A56A15F96178E5486DC38536",
+      "sourceFileSha256": "A157EFF2BBD48327BBD331DBBE98296A19E35AF89502A79E78911796E602BEF2",
       "polarity": "BOUNDARY"
     },
     {
@@ -142,7 +142,7 @@
       "fixtureSet": "MT2-PACS009-SR2026",
       "fixtureVersion": "2026.09.15-task4-ssi-scope",
       "sourceFile": "parameters/resolution-page-scenarios.mt2-pacs009.sr2026.json",
-      "sourceFileSha256": "39C04578B9DDC1E322C63711ED7E81724E050926A56A15F96178E5486DC38536",
+      "sourceFileSha256": "A157EFF2BBD48327BBD331DBBE98296A19E35AF89502A79E78911796E602BEF2",
       "polarity": "POSITIVE"
     },
     {
@@ -150,7 +150,7 @@
       "fixtureSet": "MT2-PACS009-SR2026",
       "fixtureVersion": "2026.09.15-task4-ssi-scope",
       "sourceFile": "parameters/resolution-page-scenarios.mt2-pacs009.sr2026.json",
-      "sourceFileSha256": "39C04578B9DDC1E322C63711ED7E81724E050926A56A15F96178E5486DC38536",
+      "sourceFileSha256": "A157EFF2BBD48327BBD331DBBE98296A19E35AF89502A79E78911796E602BEF2",
       "polarity": "NEGATIVE"
     },
     {
@@ -158,7 +158,7 @@
       "fixtureSet": "MT2-PACS009-SR2026",
       "fixtureVersion": "2026.09.15-task4-ssi-scope",
       "sourceFile": "parameters/resolution-page-scenarios.mt2-pacs009.sr2026.json",
-      "sourceFileSha256": "39C04578B9DDC1E322C63711ED7E81724E050926A56A15F96178E5486DC38536",
+      "sourceFileSha256": "A157EFF2BBD48327BBD331DBBE98296A19E35AF89502A79E78911796E602BEF2",
       "polarity": "BOUNDARY"
     }
   ],

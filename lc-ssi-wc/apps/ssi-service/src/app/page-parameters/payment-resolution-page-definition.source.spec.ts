@@ -820,6 +820,12 @@ describe("PaymentResolutionPageDefinitionSource", () => {
     });
   });
 
+  it("governs the MT202COV standard route as same-servicer without changing the 57A distinction", () => {
+    const scenarios = paymentDefinition("MT202COV").scenarios;
+    expect(scenarios.find(({ scenarioId }) => scenarioId === "MT202COV-OP-STANDARD")?.servicerRelationship).toBe("SAME");
+    expect(scenarios.find(({ scenarioId }) => scenarioId === "MT202COV-OP-CREDIT-57A")?.servicerRelationship).toBe("DIFFERENT");
+  });
+
   it("does not hard-code USD or HK01 in the Payment definition source", () => {
     const source = readFileSync(
       join(

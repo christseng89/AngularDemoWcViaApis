@@ -78,7 +78,7 @@
         },
         {
           "scenarioId": "MT202COV-OP-STANDARD",
-          "servicerRelationship": "DIFFERENT",
+          "servicerRelationship": "SAME",
           "label": "Standard cover transfer",
           "polarity": "POSITIVE",
           "audience": "OPERATIONAL"
