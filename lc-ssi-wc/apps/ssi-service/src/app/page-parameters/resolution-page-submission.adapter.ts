@@ -33,6 +33,9 @@ import { scenarioNvrOutcome } from "./page-parameter-validation-disposition";
 import { DatabaseSnapshotIdentityService } from "../database-snapshot-identity.service";
 import { PaymentGovernedApplicabilityService } from "./payment-governed-applicability.service";
 import { MappingCatalogueService } from "../mapping-catalogue.service";
+import { paymentOwnAccountScenario } from "./payment-own-account-eligibility.policy";
+import { servicerRelationshipMatches } from "./servicer-relationship.policy";
+export { servicerRelationshipMatches } from "./servicer-relationship.policy";
 
 const textValue = (
   values: ResolutionPageSubmission["values"],
@@ -44,14 +47,6 @@ const textValue = (
 
 type ResolutionStatus = ResolutionPageFieldResult["resolutionStatus"];
 type SubmittedValue = ResolutionPageSubmission["values"][string] | undefined;
-
-export const servicerRelationshipMatches = (
-  policy: NonNullable<ResolutionPageScenario["servicerRelationship"]>,
-  ssiBankBic: string,
-  nostroServicerBic: string,
-): boolean =>
-  policy === "NOT_APPLICABLE" ||
-  (policy === "SAME") === (ssiBankBic === nostroServicerBic);
 
 const ROUTING_CONTEXT_FIELDS = new Set([
   "context.transactionReference",
@@ -396,6 +391,19 @@ export class ResolutionPageSubmissionAdapter {
   ): void {
     const route = submission.selectedRouteIdentity;
     const snapshot = submission.eligibilitySnapshot;
+    if (
+      definition.businessDomain === "PAYMENT" &&
+      scenario.polarity === "POSITIVE" &&
+      !paymentOwnAccountScenario(scenario.scenarioId) &&
+      this.paymentRoutes &&
+      (!route || !snapshot)
+    )
+      throw new ConflictException({
+        code: "PAGE_ROUTE_BINDING_REQUIRED",
+        payloadGenerated: false,
+        confirmedResolutionCreated: false,
+        repairQueueCreated: false,
+      });
     if (!route && !snapshot) return;
     const contextSha256 = hashCanonical({
       scenarioId: submission.scenarioId,
@@ -430,6 +438,7 @@ export class ResolutionPageSubmissionAdapter {
       bookingEntity: textValue(submission.values, "context.bookingEntity"),
       valueDate: textValue(submission.values, "context.valueDate"),
       fixtureBindingId: scenario.fixture.bindingId,
+      servicerRelationship: scenario.servicerRelationship,
     });
     const selectedBankId =
       textValue(submission.values, "context.counterpartyBankServiceId") ||

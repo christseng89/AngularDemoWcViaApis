@@ -14,8 +14,13 @@ import type {
 } from "@ssi/contracts";
 import {
   ParameterLookupFacade,
+  lookupItemValue,
   type ParameterLookupContext,
 } from "./parameter-lookup.facade";
+import {
+  selectedLookupBinding,
+  type SelectedLookupBinding,
+} from "./parameter-form-values";
 import {
   BankServicePickerDialogComponent,
   type BankServicePickerItem,
@@ -80,6 +85,7 @@ export class BankServiceLookupComponent {
   readonly disabled = input(false);
   readonly pageSize = input.required<number>();
   readonly valueSelected = output<string>();
+  readonly routeBindingSelected = output<SelectedLookupBinding | null>();
   readonly availabilityChanged = output<boolean>();
   readonly phase = this.facade.phase;
   readonly items = this.facade.items;
@@ -204,6 +210,23 @@ export class BankServiceLookupComponent {
       this.lastAppliedDefaultKey = key;
       this.lastResolutionKey = key;
       this.valueSelected.emit(defaultId);
+    });
+    effect(() => {
+      const item = this.selected();
+      const snapshot = this.facade.eligibilitySnapshot();
+      const selectedValue = this.value();
+      if (
+        this.phase() !== "ready" ||
+        !item?.selectedRouteIdentity ||
+        !snapshot ||
+        lookupItemValue(this.metadata(), item) !== selectedValue
+      ) {
+        this.routeBindingSelected.emit(null);
+        return;
+      }
+      this.routeBindingSelected.emit(
+        selectedLookupBinding(item, { eligibilitySnapshot: snapshot }),
+      );
     });
   }
 

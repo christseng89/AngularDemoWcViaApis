@@ -49,6 +49,59 @@ const applicability = {
 } as SsiApplicabilityRecord;
 
 describe("counterparty SSI coverage boundary", () => {
+  it("resolves the exact eligible SSI selected from a tied Payment route set", () => {
+    const first = {
+      ...generic,
+      id: "SSI-SELECTED",
+      counterpartyId: "CP-CITI",
+      route: {
+        currency: "USD",
+        counterpartyBic: "CITIUS33",
+        counterpartyCountry: "US",
+        accountWithBic: "CITIUS33",
+        accountCurrency: "USD",
+        bookingEntity: "HK01",
+        messageTypes: "pacs.009.001.08",
+        sourceMessageTypes: "MT202COV",
+        businessService: "swift.cbprplus.cov.04",
+        priority: "10",
+        routePreference: "PRIMARY",
+        validFrom: "2026-01-01",
+        validTo: "2027-12-31",
+      },
+    };
+    const second = { ...first, id: "SSI-OTHER" };
+    const rows = [first, second].map((ssi) => ({
+      ...applicability,
+      id: `${ssi.id}:APPL:1`,
+      ssiId: ssi.id,
+      consumer: "CENTRAL_PAYMENT",
+      product: "CENTRAL_PAYMENT",
+      businessFunction: "INTERBANK_TRANSFER",
+      paymentLeg: "INTERBANK_SETTLEMENT",
+    }));
+    const covRequest: RouteResolutionRequest = {
+      ...request,
+      consumer: "CENTRAL_PAYMENT",
+      product: "CENTRAL_PAYMENT",
+      businessFunction: "INTERBANK_TRANSFER",
+      paymentLeg: "INTERBANK_SETTLEMENT",
+      counterpartyBic: "CITIUS33",
+      counterpartyCountry: "US",
+      messageType: "pacs.009.001.08",
+      sourceMessageType: "MT202COV",
+      businessService: "swift.cbprplus.cov.04",
+    };
+    expect(previewResolution(covRequest, [first, second], rows).decision).toBe("SSI_AMBIGUOUS");
+    expect(
+      previewResolution(
+        { ...covRequest, selectedSsiId: first.id },
+        [first, second],
+        rows,
+      ).recommendedRoute?.ssiId,
+    ).toBe(first.id);
+  });
+
   it.each(["AUD", "CAD", "CHF", "CNY", "EUR", "GBP", "HKD", "JPY", "SGD", "USD"])(
     "resolves %s Payment SSI without local clearing-system eligibility",
     (currency) => {

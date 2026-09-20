@@ -1,6 +1,7 @@
 import {
   BadGatewayException,
   BadRequestException,
+  ConflictException,
   HttpException,
   Inject,
   Injectable,
@@ -96,7 +97,33 @@ export class PaymentResolutionPageSubmissionAdapter {
     this.requireProfile(context.definition);
     const request = this.request(context);
     const raw = this.requireResolverSuccess(this.settlements.resolve(request));
+    this.requireSelectedRouteMatch(context.submission, raw);
     return this.result(context, request, raw);
+  }
+
+  private requireSelectedRouteMatch(
+    submission: ResolutionPageSubmission,
+    raw: Json,
+  ): void {
+    const selected = submission.selectedRouteIdentity;
+    if (!selected) return;
+    const chosen = object(raw["chosenRoute"] ?? object(raw["mx"])["chosenRoute"]);
+    if (
+      chosen["ssiId"] === selected.ssi.id &&
+      chosen["ssiVersion"] === selected.ssi.version &&
+      (chosen["applicabilityId"] ?? chosen["matchedApplicabilityId"]) ===
+        selected.applicability.id &&
+      chosen["applicabilityVersion"] === selected.applicability.version &&
+      chosen["nostroId"] === selected.nostro.id &&
+      chosen["nostroVersion"] === selected.nostro.version
+    )
+      return;
+    throw new ConflictException({
+      code: "PAGE_SELECTED_ROUTE_RESULT_MISMATCH",
+      payloadGenerated: false,
+      confirmedResolutionCreated: false,
+      repairQueueCreated: false,
+    });
   }
 
   private requireResolverSuccess(response: unknown): Json {
@@ -208,6 +235,12 @@ export class PaymentResolutionPageSubmissionAdapter {
       valueDate: this.requiredText(values, "context.valueDate"),
       counterpartyCountry: counterparty.country.trim(),
       counterpartyBankServiceId,
+      ...(submission.selectedRouteIdentity
+        ? {
+            selectedSsiId: submission.selectedRouteIdentity.ssi.id,
+            selectedSsiVersion: submission.selectedRouteIdentity.ssi.version,
+          }
+        : {}),
       ...(scenarioCode
         ? {
             scenarioCode,

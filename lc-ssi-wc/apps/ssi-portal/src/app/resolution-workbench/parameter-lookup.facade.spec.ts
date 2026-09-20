@@ -285,6 +285,37 @@ describe("ParameterLookupFacade", () => {
     expect(facade.items()).toEqual([]);
   });
 
+  it("retains the route snapshot together with a selected SSI lookup row", async () => {
+    const snapshot = { snapshotId: "s".repeat(64), contextSha256: "c".repeat(64) };
+    const item = {
+      ...ssiFirst,
+      selectedRouteIdentity: {
+        routeId: "r".repeat(64),
+        definitionId: "PAYMENT:MT202COV",
+        definitionVersion: "v1",
+        fixtureBindingId: "FIXTURE-MT202COV-OP-STANDARD",
+        contextSha256: snapshot.contextSha256,
+        ssi: { id: "SSI-1", version: 1 },
+        applicability: { id: "APPL-1", version: 1 },
+        nostro: { id: "NOSTRO-1", version: 1 },
+        rma: { id: "RMA-1", version: 1 },
+      },
+    };
+    client.lookup.mockReturnValueOnce(of({
+      provider: "SSI_COUNTERPARTY",
+      action: "SSI_COUNTERPARTY",
+      items: [item],
+      eligibilitySnapshot: snapshot,
+    }) as never);
+    const { ParameterLookupFacade } = await import("./parameter-lookup.facade");
+    const facade = new ParameterLookupFacade();
+    await facade.resolve(ssiMetadata, "", ssiContext);
+    facade.select(ssiMetadata, item);
+
+    expect(facade.eligibilitySnapshot()).toEqual(snapshot);
+    expect(facade.selected()?.selectedRouteIdentity).toEqual(item.selectedRouteIdentity);
+  });
+
   it("accepts only an explicit eligible default matching the current currency", async () => {
     const configured = {
       valueField: "bankServiceId" as const,

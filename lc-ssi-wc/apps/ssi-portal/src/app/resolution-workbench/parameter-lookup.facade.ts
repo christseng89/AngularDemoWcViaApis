@@ -88,12 +88,16 @@ export class ParameterLookupFacade {
     null,
   );
   private readonly defaultSelectionState = signal<string | null>(null);
+  private readonly eligibilitySnapshotState = signal<
+    PageParameterLookupEnvelope["eligibilitySnapshot"]
+  >(undefined);
   private readonly errorState = signal<string | null>(null);
 
   readonly phase = this.phaseState.asReadonly();
   readonly items = this.itemsState.asReadonly();
   readonly selected = this.selectedState.asReadonly();
   readonly defaultSelection = this.defaultSelectionState.asReadonly();
+  readonly eligibilitySnapshot = this.eligibilitySnapshotState.asReadonly();
   readonly error = this.errorState.asReadonly();
 
   async search(
@@ -153,6 +157,7 @@ export class ParameterLookupFacade {
     this.itemsState.set([]);
     this.selectedState.set(null);
     this.defaultSelectionState.set(null);
+    this.eligibilitySnapshotState.set(undefined);
     this.errorState.set(null);
   }
 
@@ -170,6 +175,7 @@ export class ParameterLookupFacade {
     if (invalidateSelected) this.selectedState.set(null);
     this.errorState.set(null);
     this.defaultSelectionState.set(null);
+    this.eligibilitySnapshotState.set(undefined);
     try {
       const response = await firstValueFrom(
         this.client.lookup(metadata, request),
@@ -195,6 +201,7 @@ export class ParameterLookupFacade {
       if (selectedId && !selected)
         throw new Error("PAGE_PARAMETER_LOOKUP_IDENTITY_MISMATCH");
       this.itemsState.set(selectedId ? [] : response.items);
+      this.eligibilitySnapshotState.set(response.eligibilitySnapshot);
       if (selectedId) this.selectedState.set(selected ?? null);
       else if (defaultItem) this.selectedState.set(defaultItem);
       else if (invalidateSelected) this.selectedState.set(null);
@@ -204,6 +211,7 @@ export class ParameterLookupFacade {
       if (sequence !== this.sequence) return;
       this.itemsState.set([]);
       this.defaultSelectionState.set(null);
+      this.eligibilitySnapshotState.set(undefined);
       this.phaseState.set("error");
       this.errorState.set(lookupUnavailableMessage(metadata.provider));
     }

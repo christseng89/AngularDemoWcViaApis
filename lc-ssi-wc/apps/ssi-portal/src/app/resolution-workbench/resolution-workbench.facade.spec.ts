@@ -149,6 +149,37 @@ describe("ResolutionWorkbenchFacade", () => {
     expect(facade.result()?.outcome).toBe("REFERENCE_ONLY");
   });
 
+  it("submits the selected route and discovery snapshot with Payment values", async () => {
+    const { ResolutionWorkbenchFacade } =
+      await import("./resolution-workbench.facade");
+    const facade = new ResolutionWorkbenchFacade();
+    await facade.load(query);
+    const routeBinding = {
+      selectedRouteIdentity: {
+        routeId: "r".repeat(64),
+        definitionId: "future-definition",
+        definitionVersion: "r17",
+        fixtureBindingId: "FIXTURE-X",
+        contextSha256: "c".repeat(64),
+        ssi: { id: "SSI-1", version: 1 },
+        applicability: { id: "APPL-1", version: 1 },
+        nostro: { id: "NOSTRO-1", version: 1 },
+        rma: { id: "RMA-1", version: 1 },
+      },
+      eligibilitySnapshot: {
+        snapshotId: "s".repeat(64),
+        contextSha256: "c".repeat(64),
+      },
+    };
+
+    await facade.execute({ "79Z/free text": "entered" }, routeBinding);
+
+    expect(client.execute).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining(routeBinding),
+    );
+  });
+
   it("dismisses the result without discarding the mapped form model", async () => {
     const { ResolutionWorkbenchFacade } =
       await import("./resolution-workbench.facade");

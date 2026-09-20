@@ -1340,7 +1340,7 @@ describe("ResolutionPageSubmissionAdapter", () => {
           applicability: routeIdentity.applicability,
           nostro: {
             ...routeIdentity.nostro,
-            accountServicerBic: "CHASUS33",
+            accountServicerBic: "DEUTDEFF",
           },
           rma: routeIdentity.rma,
           snapshot: { sha256: "DB-SNAPSHOT", method: "logical" },

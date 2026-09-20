@@ -38,6 +38,7 @@
                       [pageSize]="pageSize()"
                       [disabled]="field.readOnly === true || submitting()"
                       (valueSelected)="updateLookup(field.fieldId, $event)"
+                      (routeBindingSelected)="updateRouteBinding($event)"
                     />
                   </fieldset>
                 } @else if (field.control === "CHECKBOX") {

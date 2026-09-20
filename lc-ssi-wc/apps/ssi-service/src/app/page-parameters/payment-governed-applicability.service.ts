@@ -9,6 +9,8 @@ import { PageParameterLookupDefaultsService } from "./page-parameter-lookup-defa
 import { NostroApplicationService } from "../nostro/nostro-application.service";
 import { RmaApplicationService } from "../rma/rma-application.service";
 import { DatabaseSnapshotIdentityService } from "../database-snapshot-identity.service";
+import type { ResolutionPageScenario } from "@ssi/contracts";
+import { servicerRelationshipMatches } from "./servicer-relationship.policy";
 
 const PAYMENT_MESSAGES = new Set(["MT202", "MT202COV", "MT205", "MT205COV"]);
 const PAYMENT_CRITERIA = {
@@ -40,6 +42,7 @@ export interface PaymentApplicabilityQuery {
   readonly currency?: string;
   readonly bookingEntity?: string;
   readonly fixtureBindingId?: string;
+  readonly servicerRelationship?: ResolutionPageScenario["servicerRelationship"];
 }
 
 export interface PaymentAtomicRouteCandidate {
@@ -138,7 +141,13 @@ export class PaymentGovernedApplicabilityService {
         typeof nostro["priority"] === "number" &&
         rma["authorised"] === true &&
         typeof rma["rmaId"] === "string" &&
-        typeof rma["rmaVersion"] === "number"
+        typeof rma["rmaVersion"] === "number" &&
+        (!query.servicerRelationship ||
+          servicerRelationshipMatches(
+            query.servicerRelationship,
+            route["counterpartyBic"] ?? "",
+            typeof accountServicerBic === "string" ? accountServicerBic : "",
+          ))
         ? [
             {
               ssi,

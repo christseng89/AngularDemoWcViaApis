@@ -376,6 +376,7 @@ export class PageParameterLookupService {
       currency: input.currency,
       bookingEntity: input.bookingEntity,
       valueDate: input.valueDate,
+      fixtureBindingId: pageScenario?.fixture.bindingId ?? "",
     });
     const hasAtomic =
       typeof this.paymentApplicability.atomicCandidates === "function";
@@ -383,7 +384,10 @@ export class PageParameterLookupService {
       this.paymentApplicability.atomicCandidates?.({
         ...query,
         ...(pageScenario
-          ? { fixtureBindingId: pageScenario.fixture.bindingId }
+          ? {
+              fixtureBindingId: pageScenario.fixture.bindingId,
+              servicerRelationship: pageScenario.servicerRelationship,
+            }
           : {}),
       }) ?? [];
     const source: Array<{

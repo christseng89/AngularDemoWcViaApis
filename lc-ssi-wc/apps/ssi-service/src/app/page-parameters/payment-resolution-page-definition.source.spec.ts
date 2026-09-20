@@ -814,7 +814,7 @@ describe("PaymentResolutionPageDefinitionSource", () => {
           ]),
       ),
     ).toEqual({
-      "MT202-OP-DIRECT": "DIFFERENT",
+      "MT202-OP-DIRECT": "SAME",
       "MT202-OP-BOOK": "SAME",
       "MT202-OP-CREDIT-57A": "DIFFERENT",
     });

@@ -178,6 +178,28 @@ describe("PaymentGovernedApplicabilityService", () => {
     expect(snapshots.current).toHaveBeenCalledTimes(2);
   });
 
+  it("does not expose a SAME-servicer route to a DIFFERENT-servicer scenario", () => {
+    const ssi = route();
+    const service = new PaymentGovernedApplicabilityService(
+      { findPaymentCandidateBindings: jest.fn(() => [{ ssi, applicability: applicability() }]) } as never,
+      undefined,
+      undefined,
+      { resolve: jest.fn(() => ({
+        decision: "RESOLVED", nostroId: "N-1", nostroVersion: 1,
+        priority: 10, accountServicerBic: "DEUTDEFF",
+      })) } as never,
+      { check: jest.fn(() => ({ authorised: true, rmaId: "R-1", rmaVersion: 1 })) } as never,
+      { current: jest.fn(() => ({ sha256: "db-sha", method: "logical" })) } as never,
+    );
+    const query = {
+      messageType: "MT202COV", currency: "EUR", bookingEntity: "HK01",
+      valueDate: "2026-09-15",
+    };
+
+    expect(service.atomicCandidates({ ...query, servicerRelationship: "DIFFERENT" })).toEqual([]);
+    expect(service.atomicCandidates({ ...query, servicerRelationship: "SAME" })).toHaveLength(1);
+  });
+
   it("checks the active RMA bank relationship without SSI scenario fixture filters", () => {
     const ssi = { ...route(), fixtureFamily: "MT2-UI-PARITY-V1" };
     const app = applicability();

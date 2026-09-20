@@ -25,11 +25,16 @@ import type {
 import { BankServiceLookupComponent } from "./bank-service-lookup.component";
 import type { ParameterLookupContext } from "./parameter-lookup.facade";
 import { dependentInvalidatedFieldIds } from "./parameter-dependencies";
-import { userInputFields, userInputValues } from "./parameter-form-values";
+import {
+  userInputFields,
+  userInputValues,
+  type SelectedLookupBinding,
+} from "./parameter-form-values";
 import { lookupDependenciesSatisfied } from "./lookup-resolution-key";
 
 export interface ParameterFormSubmission {
   readonly values: Readonly<Record<string, ParameterValue>>;
+  readonly routeBinding?: SelectedLookupBinding;
 }
 
 const validatorsFor = (field: ParameterFieldViewModel): ValidatorFn[] => {
@@ -69,6 +74,7 @@ export class GenericParameterFormComponent {
   readonly cancelled = output<void>();
   readonly form = new FormRecord<FormControl<ParameterValue>>({});
   readonly lookupContext = signal<ParameterLookupContext>({});
+  private readonly routeBinding = signal<SelectedLookupBinding | null>(null);
   private readonly formInvalid = signal(true);
   readonly resolveDisabled = computed(
     () => this.submitting() || this.formInvalid(),
@@ -80,6 +86,7 @@ export class GenericParameterFormComponent {
     effect(() => {
       const model = this.model();
       if (!model) return;
+      this.routeBinding.set(null);
       const inputFields = userInputFields(model);
       const controls = Object.fromEntries(
         inputFields.map((field) => [
@@ -130,8 +137,10 @@ export class GenericParameterFormComponent {
             for (const fieldId of dependentInvalidatedFieldIds(
               model.fields,
               field.fieldId,
-            ))
+            )) {
               this.form.controls[fieldId]?.setValue("", { emitEvent: false });
+              this.routeBinding.set(null);
+            }
             this.refreshLookupContext(model);
           }),
         );
@@ -153,8 +162,13 @@ export class GenericParameterFormComponent {
   }
 
   updateLookup(fieldId: string, bankServiceId: string): void {
+    this.routeBinding.set(null);
     this.form.controls[fieldId]?.setValue(bankServiceId);
     this.form.controls[fieldId]?.markAsTouched();
+  }
+
+  updateRouteBinding(binding: SelectedLookupBinding | null): void {
+    this.routeBinding.set(binding);
   }
 
   lookupValue(value: ParameterValue): string {
@@ -169,6 +183,7 @@ export class GenericParameterFormComponent {
     if (!model) return;
     this.submitted.emit({
       values: userInputValues(model, this.form.getRawValue()),
+      ...(this.routeBinding() ? { routeBinding: this.routeBinding()! } : {}),
     });
   }
 

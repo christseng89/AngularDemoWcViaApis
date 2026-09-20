@@ -17,6 +17,7 @@ import {
   mapPageDefinition,
   type ResolutionWorkbenchViewModel,
 } from "./parameter-model.mapper";
+import type { SelectedLookupBinding } from "./parameter-form-values";
 
 type WorkbenchPhase = "idle" | "loading" | "ready" | "submitting";
 
@@ -123,6 +124,7 @@ export class ResolutionWorkbenchFacade {
 
   async execute(
     values: Readonly<Record<string, ParameterValue>>,
+    routeBinding?: SelectedLookupBinding,
   ): Promise<void> {
     const model = this.modelState();
     if (!model || this.submitting()) return;
@@ -139,6 +141,7 @@ export class ResolutionWorkbenchFacade {
           scenarioId: model.selectedScenarioId,
           fixtureBindingId: model.fixtureBindingId,
           contractSha256: model.contractSha256,
+          ...(routeBinding ?? {}),
           values,
         }),
       );

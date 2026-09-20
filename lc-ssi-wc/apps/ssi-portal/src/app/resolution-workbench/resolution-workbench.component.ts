@@ -68,7 +68,9 @@ export class ResolutionWorkbenchComponent {
       activeElement && "focus" in activeElement
         ? (activeElement as HTMLElement)
         : null;
-    void this.facade.execute(submission.values);
+    if (submission.routeBinding)
+      void this.facade.execute(submission.values, submission.routeBinding);
+    else void this.facade.execute(submission.values);
   }
 
   retry(): void {

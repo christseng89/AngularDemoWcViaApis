@@ -340,6 +340,68 @@ describe("PaymentResolutionPageSubmissionAdapter", () => {
     );
   });
 
+  it("passes the selected COV SSI identity to the resolver", () => {
+    const definition = definitionFor("MT202COV");
+    const scenario = scenarioFor(definition, "MT202COV-OP-STANDARD");
+    const context = harness({
+      ...defaultResponse,
+      chosenRoute: {
+        ...defaultResponse.chosenRoute,
+        nostroId: "NOSTRO-PAYMENT-001",
+        nostroVersion: 1,
+      },
+    });
+    const submission = {
+      ...submissionFor(definition, scenario),
+      selectedRouteIdentity: {
+        routeId: SHA,
+        definitionId: definition.definitionId,
+        definitionVersion: definition.definitionVersion,
+        fixtureBindingId: scenario.fixture.bindingId,
+        contextSha256: SHA,
+        ssi: { id: "SSI-PAYMENT-001", version: 3 },
+        applicability: { id: "APP-PAYMENT-001", version: 2 },
+        nostro: { id: "NOSTRO-PAYMENT-001", version: 1 },
+        rma: { id: "RMA-PAYMENT-001", version: 1 },
+      },
+    };
+
+    context.adapter.execute({ definition, scenario, submission });
+
+    expect(context.resolver.resolve).toHaveBeenCalledWith(
+      expect.objectContaining({
+        selectedSsiId: "SSI-PAYMENT-001",
+        selectedSsiVersion: 3,
+      }),
+    );
+  });
+
+  it("rejects a resolver route that differs from the selected complete route", () => {
+    const definition = definitionFor("MT202COV");
+    const scenario = scenarioFor(definition, "MT202COV-OP-STANDARD");
+    const context = harness();
+    const selectedRouteIdentity = {
+      routeId: SHA,
+      definitionId: definition.definitionId,
+      definitionVersion: definition.definitionVersion,
+      fixtureBindingId: scenario.fixture.bindingId,
+      contextSha256: SHA,
+      ssi: { id: "OTHER-SSI", version: 3 },
+      applicability: { id: "APP-PAYMENT-001", version: 2 },
+      nostro: { id: "NOSTRO-PAYMENT-001", version: 1 },
+      rma: { id: "RMA-PAYMENT-001", version: 1 },
+    };
+
+    expect(() => context.adapter.execute({
+      definition,
+      scenario,
+      submission: {
+        ...submissionFor(definition, scenario),
+        selectedRouteIdentity,
+      },
+    })).toThrow();
+  });
+
   it.each([
     ["MT202-OP-BOOK", "BOOK_TRANSFER_SAME_RECEIVER"],
     ["MT202-OP-CREDIT-57A", "CREDIT_ONE_OF_SEVERAL_AT_57A"],

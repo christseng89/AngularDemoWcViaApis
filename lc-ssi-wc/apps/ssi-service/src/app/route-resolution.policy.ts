@@ -28,6 +28,8 @@ export interface RouteResolutionRequest {
   businessService?: string;
   messageType: string;
   sourceMessageType?: string;
+  selectedSsiId?: string;
+  selectedSsiVersion?: number;
   transactionReference: string;
   beneficiaryCustomer?: BeneficiaryCustomerInput;
 }
@@ -626,19 +628,27 @@ export function previewResolution(
     if ("eligible" in evaluation) eligible.push(evaluation.eligible);
     else excludedRoutes.push(evaluation.excluded);
   }
-  eligible.sort(compareRankedRoutes);
-  if (!eligible.length)
+  const selectedEligible = request.selectedSsiId
+    ? eligible.filter(
+        (candidate) =>
+          candidate.ssiId === request.selectedSsiId &&
+          (request.selectedSsiVersion === undefined ||
+            candidate.ssiVersion === request.selectedSsiVersion),
+      )
+    : eligible;
+  selectedEligible.sort(compareRankedRoutes);
+  if (!selectedEligible.length)
     return {
       decision: "NO_ELIGIBLE_ROUTE",
       alternatives: [],
       excludedRoutes,
       explanation: `SSI records exist for ${request.currency}, but every route failed eligibility.`,
     };
-  const first = eligible[0]!;
-  const topRankedCandidates = eligible.filter((candidate) =>
+  const first = selectedEligible[0]!;
+  const topRankedCandidates = selectedEligible.filter((candidate) =>
     sameBusinessRank(candidate, first),
   );
-  const lowerRankedEligibleCandidates = eligible.filter(
+  const lowerRankedEligibleCandidates = selectedEligible.filter(
     (candidate) => !sameBusinessRank(candidate, first),
   );
   if (topRankedCandidates.length > 1)
