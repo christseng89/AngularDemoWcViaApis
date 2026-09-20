@@ -95,6 +95,23 @@ describe("ordinary Resolution Currency SQL discovery", () => {
     ).toEqual([]);
   });
 
+  it("does not count a cross-message applicability as coverage for another SSI message", () => {
+    repository.save(activeSsi("SSI-CROSS", "CHF", ["MT300", "MT320"]), "APPROVE", "checker");
+    repository.replaceApplicability("SSI-CROSS", [{
+      consumer: "TREASURY", product: "FX", businessFunction: "FX_CONFIRMATION",
+      messageType: "MT320", paymentLeg: "SETTLEMENT", direction: "OUTBOUND",
+      status: "ACTIVE", validFrom: "2026-01-01", validTo: "2027-12-31",
+    }], "checker");
+    expect(repository.findResolutionCurrencyCoverage({
+      consumer: "TREASURY", businessFunction: "FX_CONFIRMATION",
+      messageType: "MT300", asOfDate: "2026-09-20",
+    })).toEqual([]);
+    expect(repository.findResolutionCurrencyCoverage({
+      consumer: "TREASURY", businessFunction: "FX_CONFIRMATION",
+      messageType: "MT320", asOfDate: "2026-09-20",
+    })).toEqual(["CHF"]);
+  });
+
   it("preserves the governed MT347 QA_POSITIVE visibility exception but excludes QA_NEGATIVE", () => {
     for (const [id, currency, usageScope] of [
       ["SSI-POS", "USD", "QA_POSITIVE"],

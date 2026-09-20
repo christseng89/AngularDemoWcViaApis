@@ -30,6 +30,24 @@ describe("Resolution currency repository transaction boundary", () => {
     expect(repository.activeResolutionCurrencies("SR2026", "PAYMENT")).toEqual(["USD"]);
   });
 
+  it("uses a deterministic baseline timestamp for identical empty-table bootstraps", () => {
+    repository.bootstrapResolutionCurrencyCoverage(() => [paymentUsd], "2026-09-15");
+    const first = repository.resolutionCurrencyInquiry("SR2026");
+    const second = new SqliteSsiRepository();
+    try {
+      second.bootstrapResolutionCurrencyCoverage(() => [paymentUsd], "2026-09-15");
+      expect(second.resolutionCurrencyInquiry("SR2026")).toEqual(first);
+      expect(first[0]?.updatedAt).toBe("2026-09-15T00:00:00Z");
+    } finally {
+      second.onModuleDestroy();
+    }
+  });
+
+  it("sets a bounded busy timeout before startup writer-lock operations", () => {
+    const db = (repository as unknown as { db: DatabaseSync }).db;
+    expect((db.prepare("PRAGMA busy_timeout").get() as { timeout: number }).timeout).toBeGreaterThanOrEqual(5000);
+  });
+
   it("fails closed if coverage exists without matching initialization control", () => {
     repository.bootstrapResolutionCurrencyCoverage(() => [paymentUsd], "2026-09-15");
     const db = (repository as unknown as { db: DatabaseSync }).db;

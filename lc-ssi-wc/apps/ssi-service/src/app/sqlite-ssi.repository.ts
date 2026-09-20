@@ -214,7 +214,8 @@ export class SqliteSsiRepository implements OnModuleDestroy {
     const path = process.env["SSI_DATABASE_PATH"] ?? "./data/ssi-demo.sqlite";
     mkdirSync(dirname(path), { recursive: true });
     this.db = new DatabaseSync(path);
-    this.db.exec(`PRAGMA journal_mode=WAL;
+    this.db.exec(`PRAGMA busy_timeout=5000;
+      PRAGMA journal_mode=WAL;
       CREATE TABLE IF NOT EXISTS ssi (id TEXT PRIMARY KEY, payload TEXT NOT NULL, updated_at TEXT NOT NULL);
       CREATE INDEX IF NOT EXISTS idx_ssi_updated_at ON ssi(updated_at DESC);
       CREATE INDEX IF NOT EXISTS idx_ssi_status_updated_at ON ssi(
@@ -303,7 +304,7 @@ export class SqliteSsiRepository implements OnModuleDestroy {
       }
       const discovered = discover();
       const result = this.currencyStore().apply(
-        "SR2026", discovered, "FULL_RESYNC", new Date().toISOString(), asOfDate, false,
+        "SR2026", discovered, "FULL_RESYNC", `${asOfDate}T00:00:00Z`, asOfDate, false,
       );
       this.db.exec("COMMIT");
       return result;
@@ -686,6 +687,8 @@ export class SqliteSsiRepository implements OnModuleDestroy {
           AND json_extract(s.payload,'$.status')='ACTIVE'
           AND json_extract(a.payload,'$.consumer')=?
           AND json_extract(a.payload,'$.businessFunction')=?
+          AND (json_type(a.payload,'$.messageType') IS NULL
+            OR json_extract(a.payload,'$.messageType')=?)
           AND json_extract(s.payload,'$.route.businessFunction')=?
           AND json_extract(a.payload,'$.validFrom')<=?
           AND json_extract(a.payload,'$.validTo')>=?
@@ -724,6 +727,7 @@ export class SqliteSsiRepository implements OnModuleDestroy {
       .all(
         query.consumer,
         query.businessFunction,
+        query.messageType,
         query.businessFunction,
         query.asOfDate,
         query.asOfDate,

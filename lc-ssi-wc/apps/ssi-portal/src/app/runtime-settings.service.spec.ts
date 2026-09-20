@@ -19,7 +19,7 @@ describe("RuntimeSettingsService", () => {
     const { RuntimeSettingsService } = await import("./runtime-settings.service");
     const service = new RuntimeSettingsService();
     await expect(firstValueFrom(service.runtime())).resolves.toEqual({ runtimeEnvironment: "demo" });
-    expect(http.get).toHaveBeenCalledWith("http://localhost:3100/api/settings/runtime");
+    expect(http.get).toHaveBeenCalledWith("/api/settings/runtime");
   });
 
   it("posts only the entered control password to reload development data", async () => {
@@ -27,8 +27,19 @@ describe("RuntimeSettingsService", () => {
     const service = new RuntimeSettingsService();
     await expect(firstValueFrom(service.reloadDevelopmentData("entered"))).resolves.toEqual({ code: "DEMO_DATA_RELOADED" });
     expect(http.post).toHaveBeenCalledWith(
-      "http://localhost:3100/api/settings/development-data/reload",
+      "/api/settings/development-data/reload",
       { password: "entered" },
     );
+  });
+
+  it("keeps inquiry and resync on the current Portal origin", async () => {
+    const { RuntimeSettingsService } = await import("./runtime-settings.service");
+    const service = new RuntimeSettingsService();
+    await firstValueFrom(service.resolutionCurrencies(2, 10, "usd", "currency", "desc"));
+    await firstValueFrom(service.resyncResolutionCurrencies());
+    expect(http.get).toHaveBeenCalledWith("/api/settings/resolution-currencies", {
+      params: { page: 2, pageSize: 10, search: "usd", sortBy: "currency", sortDirection: "desc" },
+    });
+    expect(http.post).toHaveBeenCalledWith("/api/settings/resolution-currencies/resync", {});
   });
 });

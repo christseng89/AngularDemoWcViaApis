@@ -37,10 +37,12 @@ export interface CurrencyInquiryContract {
 }
 
 export interface ResolutionCurrencyRow {
+  readonly standardsRelease: string;
   readonly businessDomain: string;
   readonly currency: string;
   readonly status: string;
   readonly source: string;
+  readonly updatedAt: string;
   readonly lastResyncAt: string | null;
 }
 
@@ -50,6 +52,8 @@ export interface ResolutionCurrencyPage {
   readonly pageSize: number;
   readonly totalItems: number;
   readonly totalPages: number;
+  readonly hasPrevious: boolean;
+  readonly hasNext: boolean;
 }
 
 export interface ResolutionCurrencyResyncResult {
@@ -63,7 +67,7 @@ export interface ResolutionCurrencyResyncResult {
 @Injectable({ providedIn: "root" })
 export class RuntimeSettingsService {
   private readonly http = inject(HttpClient);
-  private readonly api = "http://localhost:3100/api/settings";
+  private readonly api = "/api/settings";
 
   runtime(): Observable<RuntimeSettings> {
     return this.http.get<RuntimeSettings>(`${this.api}/runtime`);

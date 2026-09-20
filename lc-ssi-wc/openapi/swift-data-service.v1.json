@@ -1679,6 +1679,35 @@
         }
       }
     },
+    "/settings/resolution-currencies": {
+      "get": {
+        "summary": "Inquire governed resolution currency coverage",
+        "operationId": "inquireResolutionCurrencies",
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "minimum": 1, "default": 1 } },
+          { "name": "pageSize", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100 } },
+          { "name": "businessDomain", "in": "query", "schema": { "$ref": "#/components/schemas/PageParameterBusinessDomain" } },
+          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] } },
+          { "name": "search", "in": "query", "schema": { "type": "string" } },
+          { "name": "sortBy", "in": "query", "schema": { "type": "string", "enum": ["businessDomain", "currency", "status", "source", "lastResyncAt"] } },
+          { "name": "sortDirection", "in": "query", "schema": { "type": "string", "enum": ["asc", "desc"] } }
+        ],
+        "responses": {
+          "200": { "description": "Paged resolution currency coverage", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ResolutionCurrencyInquiryPage" } } } },
+          "400": { "description": "Invalid inquiry parameters" }
+        }
+      }
+    },
+    "/settings/resolution-currencies/resync": {
+      "post": {
+        "summary": "Manually reconcile Demo resolution currency coverage",
+        "operationId": "resyncResolutionCurrencies",
+        "responses": {
+          "200": { "description": "Coverage reconciliation counts", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ResolutionCurrencyResyncResult" } } } },
+          "403": { "description": "Development mode required" }
+        }
+      }
+    },
     "/v1/resolution-page-definitions/index": {
       "get": {
         "summary": "List governed resolution page definitions",
@@ -2024,6 +2053,46 @@
       }
     },
     "schemas": {
+      "ResolutionCurrencyInquiryRow": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["standardsRelease", "businessDomain", "currency", "status", "source", "updatedAt", "lastResyncAt"],
+        "properties": {
+          "standardsRelease": { "type": "string" },
+          "businessDomain": { "$ref": "#/components/schemas/PageParameterBusinessDomain" },
+          "currency": { "$ref": "#/components/schemas/Currency" },
+          "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] },
+          "source": { "type": "string" },
+          "updatedAt": { "type": "string", "format": "date-time" },
+          "lastResyncAt": { "type": ["string", "null"], "format": "date-time" }
+        }
+      },
+      "ResolutionCurrencyInquiryPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["items", "page", "pageSize", "totalItems", "totalPages", "hasPrevious", "hasNext"],
+        "properties": {
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/ResolutionCurrencyInquiryRow" } },
+          "page": { "type": "integer", "minimum": 1 },
+          "pageSize": { "type": "integer", "minimum": 1, "maximum": 100 },
+          "totalItems": { "type": "integer", "minimum": 0 },
+          "totalPages": { "type": "integer", "minimum": 0 },
+          "hasPrevious": { "type": "boolean" },
+          "hasNext": { "type": "boolean" }
+        }
+      },
+      "ResolutionCurrencyResyncResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["discovered", "inserted", "unchanged", "activated", "inactivated"],
+        "properties": {
+          "discovered": { "type": "integer", "minimum": 0 },
+          "inserted": { "type": "integer", "minimum": 0 },
+          "unchanged": { "type": "integer", "minimum": 0 },
+          "activated": { "type": "integer", "minimum": 0 },
+          "inactivated": { "type": "integer", "minimum": 0 }
+        }
+      },
       "PageParameterBusinessDomain": {
         "type": "string",
         "enum": ["TREASURY", "TRADE_FINANCE", "PAYMENT"]
