@@ -22,6 +22,21 @@ const request: RouteResolutionRequest = {
 describe("CounterpartySsiResolutionService", () => {
   const service = new CounterpartySsiResolutionService();
 
+  it.each([
+    ["MT202", "BARCGB22", "UPSTREAM_MESSAGE_CONTEXT"],
+    ["MT203", "CITIUS33", undefined],
+    ["MT205", "CITIUS33", undefined],
+  ])("uses actual %s provenance only for governed downstream MT205 roles", (previousType, beneficiary, creditorSource) => {
+    const result = service.resolve(
+      { ...request, sourceMessageType: "MT205" },
+      { previousMessage: { type: previousType, "21": "RELATED", "52A": "CHASUS33", "58A": "BARCGB22" } },
+    );
+    expect(result["mt"]).toMatchObject({ tags: { "58A": beneficiary } });
+    expect((result["mx"] as Record<string, unknown>)["canonicalRoles"]).toMatchObject(
+      creditorSource ? { creditorSource } : { beneficiaryInstitution: "CITIUS33" },
+    );
+  });
+
   it("renders a canonical MT202 envelope from the resolved Bank Service identity", () => {
     expect(service.resolve(request, {})).toMatchObject({
       mx: {

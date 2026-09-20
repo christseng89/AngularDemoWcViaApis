@@ -591,7 +591,6 @@ describe("PaymentResolutionPageSubmissionAdapter", () => {
   });
 
   it.each([
-    ["MT205-OP-STANDARD-DOMESTIC-ONWARD", "MT202"],
     ["MT205COV-OP-STANDARD", "MT202COV"],
   ])("derives previous-message context for %s", (scenarioId, expectedType) => {
     const definition = definitionFor(
@@ -612,6 +611,62 @@ describe("PaymentResolutionPageSubmissionAdapter", () => {
         previousMessage: expect.objectContaining({ type: expectedType }),
       }),
     );
+  });
+
+  it("does not invent previous-message provenance for MT205 standard onward", () => {
+    const definition = definitionFor("MT205");
+    const scenario = scenarioFor(definition, "MT205-OP-STANDARD-DOMESTIC-ONWARD");
+    const context = harness();
+
+    context.adapter.execute({
+      definition,
+      scenario,
+      submission: submissionFor(definition, scenario),
+    });
+
+    expect(context.resolver.resolve).toHaveBeenCalledWith(
+      expect.not.objectContaining({ previousMessage: expect.anything() }),
+    );
+  });
+
+  it.each(["MT202", "MT203", "MT205"])(
+    "passes actual %s provenance without changing the selected route",
+    (previousType) => {
+      const definition = definitionFor("MT205");
+      const scenario = scenarioFor(definition, "MT205-OP-STANDARD-DOMESTIC-ONWARD");
+      const context = harness();
+      const result = context.adapter.execute({
+        definition,
+        scenario,
+        submission: submissionFor(definition, scenario, {
+          "context.previousMessageType": previousType,
+        }),
+      });
+
+      expect(context.resolver.resolve).toHaveBeenCalledWith(
+        expect.objectContaining({
+          previousMessage: expect.objectContaining({ type: previousType }),
+        }),
+      );
+      expect(result.evidence.selectedSsi).toEqual({ id: "SSI-PAYMENT-001", version: 3 });
+      expect(result.evidence.selectedApplicability).toEqual({ id: "APP-PAYMENT-001", version: 2 });
+    },
+  );
+
+  it("records actual MT205 prior-message provenance in the request audit identity", () => {
+    const definition = definitionFor("MT205");
+    const scenario = scenarioFor(definition, "MT205-OP-STANDARD-DOMESTIC-ONWARD");
+    const requestHashes = ["MT202", "MT203", "MT205"].map((previousType) =>
+      harness().adapter.execute({
+        definition,
+        scenario,
+        submission: submissionFor(definition, scenario, {
+          "context.previousMessageType": previousType,
+        }),
+      }).evidence.requestSha256,
+    );
+
+    expect(new Set(requestHashes).size).toBe(3);
   });
 
   it.each([

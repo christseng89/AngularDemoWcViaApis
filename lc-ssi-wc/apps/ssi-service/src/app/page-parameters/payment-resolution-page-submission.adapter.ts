@@ -71,7 +71,6 @@ const previousMessageType = (
   const supplied = text(values, "context.previousMessageType");
   if (supplied) return supplied;
   if (scenarioId === "MT205-OP-INITIAL-MT200-201-EQUIVALENCE") return "MT200";
-  if (scenarioId === "MT205-OP-STANDARD-DOMESTIC-ONWARD") return "MT202";
   if (messageType === "MT205COV") return "MT202COV";
   return undefined;
 };

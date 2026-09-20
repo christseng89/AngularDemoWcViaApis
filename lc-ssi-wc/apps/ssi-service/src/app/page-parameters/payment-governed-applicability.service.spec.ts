@@ -3,6 +3,7 @@ import type {
   SsiRecord,
 } from "../sqlite-ssi.repository";
 import { PaymentGovernedApplicabilityService } from "./payment-governed-applicability.service";
+import { hashCanonical } from "../canonical-json";
 
 const route = (overrides: Record<string, string> = {}): SsiRecord => ({
   id: "SSI-PAYMENT-1",
@@ -51,6 +52,50 @@ const applicability = (
 });
 
 describe("PaymentGovernedApplicabilityService", () => {
+  it("keeps MT205 SSI, Applicability, Nostro, RMA and rank independent of prior FI message", () => {
+    const ssi = route({ priority: "10" });
+    const app = applicability();
+    const findPaymentCandidateBindings = jest.fn(() => [{ ssi, applicability: app }]);
+    const service = new PaymentGovernedApplicabilityService(
+      { findPaymentCandidateBindings } as never,
+      undefined,
+      undefined,
+      { resolve: jest.fn(() => ({
+        decision: "RESOLVED", nostroId: "N-1", nostroVersion: 4,
+        priority: 10, accountServicerBic: "DEUTDEFF",
+      })) } as never,
+      { check: jest.fn(() => ({ authorised: true, rmaId: "R-1", rmaVersion: 5 })) } as never,
+      { current: jest.fn(() => ({ sha256: "db-sha", method: "logical" })) } as never,
+    );
+
+    const identities = ["MT202", "MT203", "MT205"].map((previousMessageType) => {
+      const [candidate] = service.atomicCandidates({
+        messageType: "MT205", currency: "EUR", bookingEntity: "HK01",
+        valueDate: "2026-09-15", previousMessageType,
+      });
+      expect(candidate).toBeDefined();
+      return {
+        ssiId: candidate!.ssi.id,
+        applicabilityId: candidate!.applicability.id,
+        nostroId: candidate!.nostro.id,
+        rmaId: candidate!.rma.id,
+        priority: candidate!.nostro.priority,
+        routeId: hashCanonical({
+          ssi: { id: candidate!.ssi.id, version: candidate!.ssi.version },
+          applicability: { id: candidate!.applicability.id, version: candidate!.applicability.version },
+          nostro: { id: candidate!.nostro.id, version: candidate!.nostro.version },
+          rma: candidate!.rma,
+        }),
+      };
+    });
+
+    expect(identities[1]).toEqual(identities[0]);
+    expect(identities[2]).toEqual(identities[0]);
+    expect(findPaymentCandidateBindings).toHaveBeenCalledTimes(3);
+    expect(findPaymentCandidateBindings.mock.calls.every(([query]) =>
+      !Object.hasOwn(query, "previousMessageType"),
+    )).toBe(true);
+  });
   it("uses the configured single-bank Own BIC when the SSI route has no sender BIC", () => {
     const previous = process.env["OWN_BIC"];
     process.env["OWN_BIC"] = "DEMOHKHH";
