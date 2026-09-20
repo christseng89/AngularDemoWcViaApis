@@ -17,6 +17,7 @@ import { validateResolutionPageDefinition } from "./resolution-page-definition.v
 import type { ResolutionPageDefinitionSource } from "./resolution-page-definition.source";
 import { PaymentGovernedApplicabilityService } from "./payment-governed-applicability.service";
 import { PageParameterBusinessDatePolicy } from "./page-parameter-business-date.policy";
+import { ResolutionDefinitionOptionsService } from "./resolution-definition-options.service";
 
 const DEFAULT_CATALOGUE = join(
   process.cwd(),
@@ -107,12 +108,13 @@ const requiredConstraint = (fieldId: string) => ({
 const transactionFields = (
   options?: {
     readonly currencies: readonly string[];
-    readonly bookingEntities: readonly string[];
+    readonly bookingEntities: readonly (string | { readonly value: string; readonly label: string })[];
     readonly defaultCurrency?: string;
     readonly defaultBookingEntity?: string;
   },
   defaultValueDate?: string,
   businessDate?: PageParameterField["businessDate"],
+  controlledCurrency = false,
 ): PageParameterField[] => [
   {
     fieldId: "context.transactionReference",
@@ -148,7 +150,7 @@ const transactionFields = (
         }
       : {}),
     optionSource: {
-      source: "GOVERNED_APPLICABILITY",
+      source: controlledCurrency ? "RESOLUTION_CURRENCY_COVERAGE" : "GOVERNED_APPLICABILITY",
       dependsOnFieldIds: [],
       invalidatesFieldIds: ["context.counterpartyBankServiceId"],
       selectionPolicy: "SELECTABLE",
@@ -170,14 +172,12 @@ const transactionFields = (
       : {}),
     ...(options?.bookingEntities.length
       ? {
-          options: options.bookingEntities.map((value) => ({
-            value,
-            label: value,
-          })),
+          options: options.bookingEntities.map((entry) =>
+            typeof entry === "string" ? { value: entry, label: entry } : entry),
         }
       : {}),
     optionSource: {
-      source: "GOVERNED_APPLICABILITY",
+      source: controlledCurrency ? "CONTROLLED_ENTITY_REFERENCE" : "GOVERNED_APPLICABILITY",
       dependsOnFieldIds: [],
       invalidatesFieldIds: ["context.counterpartyBankServiceId"],
       selectionPolicy: "SELECTABLE",
@@ -737,8 +737,22 @@ export class PaymentResolutionPageDefinitionSource implements ResolutionPageDefi
     private readonly governedOptions?: PaymentGovernedApplicabilityService,
     @Optional()
     private readonly businessDates?: PageParameterBusinessDatePolicy,
+    @Optional()
+    private readonly definitionOptions?: ResolutionDefinitionOptionsService,
   ) {
     this.cataloguePath = options?.cataloguePath ?? DEFAULT_CATALOGUE;
+  }
+
+  coverageProfiles(): readonly {
+    readonly messageType: string;
+    readonly businessService: string;
+  }[] {
+    return this.load().catalogue.definitions.map(
+      ({ messageType, businessService }) => ({
+        messageType,
+        businessService,
+      }),
+    );
   }
 
   scenarioPolicy(
@@ -838,9 +852,12 @@ export class PaymentResolutionPageDefinitionSource implements ResolutionPageDefi
     const defaultValueDate = businessDatePolicy.firstAvailableDate();
     const fields = [
       ...transactionFields(
-        this.governedOptions?.options(configured.messageType, defaultValueDate),
+        this.definitionOptions
+          ? this.definitionOptions.payment(configured.messageType, defaultValueDate)
+          : this.governedOptions?.options(configured.messageType, defaultValueDate),
         defaultValueDate,
         businessDatePolicy.metadata(),
+        Boolean(this.definitionOptions),
       ),
       ...validationContextFields(configured.messageType),
       ...settlementFields(configured.messageType),

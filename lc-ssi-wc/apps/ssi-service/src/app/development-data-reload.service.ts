@@ -1,9 +1,16 @@
-import { HttpException, Inject, Injectable, Optional } from "@nestjs/common";
+import { HttpException, Inject, Injectable, Optional, type OnModuleInit } from "@nestjs/common";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { hashCanonical } from "./canonical-json";
+import { ResolutionCurrencyStore } from "./resolution-currency-store";
+import { ResolutionCurrencyCoveragePolicy } from "./resolution-currency-policy";
+import { ResolutionCurrencyCoverageDiscoveryService } from "./resolution-currency-discovery";
+import { SqliteSsiRepository } from "./sqlite-ssi.repository";
+import { MappingCatalogueService } from "./mapping-catalogue.service";
+import { MappingResolutionPageDefinitionSource } from "./page-parameters/mapping-resolution-page-definition.source";
+import { PaymentResolutionPageDefinitionSource } from "./page-parameters/payment-resolution-page-definition.source";
 import {
   databaseSnapshotIdentity,
   normalizeSqliteValue,
@@ -121,8 +128,9 @@ const failure = (status: number, code: string): never => {
 };
 
 @Injectable()
-export class DevelopmentDataReloadService {
+export class DevelopmentDataReloadService implements OnModuleInit {
   private reloading = false;
+  private seedDescriptor: { fixtureId: string; seedSha256: string } | null | undefined;
 
   constructor(
     @Optional()
@@ -130,27 +138,37 @@ export class DevelopmentDataReloadService {
     private readonly environment: RuntimeEnvironment = process.env,
   ) {}
 
+  onModuleInit(): void {
+    this.seedDescriptor = this.loadSeedDescriptor();
+  }
+
+  private loadSeedDescriptor(): { fixtureId: string; seedSha256: string } | null {
+    try {
+      const raw = readFileSync(this.seedPath());
+      return { fixtureId: parseSeed(raw.toString("utf8")).fixtureId, seedSha256: digest(raw) };
+    } catch {
+      return null;
+    }
+  }
+
   status(): DemoReloadStatus {
     const runtime = resolveRuntimeEnvironment(this.environment);
     const password = this.environment["SSI_DEMO_ADMIN_PASSWORD"]?.trim();
-    const seedPath = this.seedPath();
-    try {
-      const raw = readFileSync(seedPath);
-      const seed = parseSeed(raw.toString("utf8"));
+    if (this.seedDescriptor === undefined)
+      this.seedDescriptor = this.loadSeedDescriptor();
+    if (this.seedDescriptor) {
       return {
         ...runtime,
         reloadAvailable: runtime.developmentEnabled && Boolean(password),
-        fixtureId: seed.fixtureId,
-        seedSha256: digest(raw),
-        statusPolicyVersion: "SSI-CONFIG-HTTP-01",
-      };
-    } catch {
-      return {
-        ...runtime,
-        reloadAvailable: false,
+        ...this.seedDescriptor,
         statusPolicyVersion: "SSI-CONFIG-HTTP-01",
       };
     }
+    return {
+      ...runtime,
+      reloadAvailable: false,
+      statusPolicyVersion: "SSI-CONFIG-HTTP-01",
+    };
   }
 
   reload(password: string): DemoReloadResult {
@@ -192,12 +210,16 @@ export class DevelopmentDataReloadService {
         );
         if (integrity !== "ok")
           throw new Error("SQLite integrity check failed");
-        const identity = databaseSnapshotIdentity(database);
-        if (identity.sha256.toLowerCase() !== expectedIdentity.toLowerCase())
+        const canonicalIdentity = databaseSnapshotIdentity(database, Object.keys(seed.tables));
+        if (canonicalIdentity.sha256.toLowerCase() !== expectedIdentity.toLowerCase())
           throw new Error("logical snapshot identity mismatch");
+        if (seed.tables["ssi"] && seed.tables["ssi_applicability"])
+          this.rebuildResolutionCurrencyCoverage(database);
+        const identity = databaseSnapshotIdentity(database);
         database.exec("COMMIT");
+        this.seedDescriptor = { fixtureId: seed.fixtureId, seedSha256: digest(raw) };
         return {
-          ...status,
+          ...this.status(),
           code: "DEMO_DATA_RELOADED",
           completedAt: new Date().toISOString(),
           snapshotHash: identity.sha256,
@@ -233,7 +255,10 @@ export class DevelopmentDataReloadService {
     const expected = Object.keys(seed.tables).sort((left, right) =>
       left.localeCompare(right),
     );
-    if (JSON.stringify(actual) !== JSON.stringify(expected))
+    const controlledDerived = new Set([
+      "resolution_currency_coverage", "resolution_currency_sync_control",
+    ]);
+    if (JSON.stringify(actual.filter((name) => !controlledDerived.has(name))) !== JSON.stringify(expected))
       throw new Error(
         "active database schema does not match the canonical seed",
       );
@@ -248,6 +273,20 @@ export class DevelopmentDataReloadService {
       )
         throw new Error(`table schema mismatch: ${name}`);
     }
+  }
+
+  private rebuildResolutionCurrencyCoverage(database: DatabaseSync): void {
+    new ResolutionCurrencyStore(database);
+    database.exec("DELETE FROM resolution_currency_coverage; DELETE FROM resolution_currency_sync_control;");
+    const repository = new SqliteSsiRepository(database);
+    const policy = new ResolutionCurrencyCoveragePolicy();
+    const discovery = new ResolutionCurrencyCoverageDiscoveryService(
+      new MappingResolutionPageDefinitionSource(new MappingCatalogueService()),
+      new PaymentResolutionPageDefinitionSource(),
+      repository,
+    );
+    const result = discovery.discover(policy.asOfDate);
+    repository.reconcileResolutionCurrenciesWithinTransaction(result.pairs, policy.asOfDate);
   }
 
   private insertTable(

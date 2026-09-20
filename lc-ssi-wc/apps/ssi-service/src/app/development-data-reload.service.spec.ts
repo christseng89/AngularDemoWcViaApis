@@ -2,7 +2,7 @@ import { HttpException } from "@nestjs/common";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { backup, DatabaseSync } from "node:sqlite";
+import { DatabaseSync } from "node:sqlite";
 import { DevelopmentDataReloadService } from "./development-data-reload.service";
 
 const codeOf = (action: () => unknown): { status: number; code: string } => {
@@ -88,6 +88,13 @@ describe("DevelopmentDataReloadService", () => {
     expect(JSON.stringify(status)).not.toContain("secret");
   });
 
+  it("keeps the seed identity loaded on first use instead of rereading it for every Settings request", () => {
+    const service = new DevelopmentDataReloadService(environment());
+    const first = service.status();
+    writeSeed([["CHANGED", "new"]]);
+    expect(service.status().seedSha256).toBe(first.seedSha256);
+  });
+
   it("uses the approved MT1/MT2 canonical seed as the default reload source", () => {
     const status = new DevelopmentDataReloadService(
       environment({ SSI_DEMO_SEED_PATH: undefined }),
@@ -102,16 +109,27 @@ describe("DevelopmentDataReloadService", () => {
   });
 
   it("reloads the approved MT1/MT2 seed twice into an isolated Development DB", async () => {
-    const source = new DatabaseSync("data/ssi-demo.sqlite", { readOnly: true });
+    const canonicalPath = join(directory, "canonical.sqlite");
+    const seed = JSON.parse(readFileSync(join(process.cwd(), "qa", "FIX_DATA", "ssi", "reload-test-data", "ssi-demo.mt1-mt2.v1.approved.canonical.seed.json"), "utf8")) as {
+      schema: { sql: string }[];
+    };
+    const source = new DatabaseSync(canonicalPath);
     try {
-      await backup(source, databasePath);
+      for (const item of seed.schema) source.exec(item.sql);
     } finally {
       source.close();
     }
     const service = new DevelopmentDataReloadService(
-      environment({ SSI_DEMO_SEED_PATH: undefined }),
+      environment({ SSI_DATABASE_PATH: canonicalPath, SSI_DEMO_SEED_PATH: undefined }),
     );
     const first = service.reload("secret");
+    const coverageDb = new DatabaseSync(canonicalPath, { readOnly: true });
+    try {
+      expect((coverageDb.prepare("SELECT COUNT(*) AS count FROM resolution_currency_coverage WHERE status='ACTIVE'").get() as { count: number }).count)
+        .toBe(20);
+    } finally {
+      coverageDb.close();
+    }
     const second = service.reload("secret");
     expect(first).toMatchObject({
       code: "DEMO_DATA_RELOADED",

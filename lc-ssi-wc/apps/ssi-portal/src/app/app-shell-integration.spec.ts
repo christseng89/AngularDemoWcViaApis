@@ -10,13 +10,20 @@ describe("AppComponent shell integration", () => {
   it("delegates shell intent to the existing navigation and refresh handlers", () => {
     const html = template();
     expect(html).toContain("<ssi-app-shell");
-    expect(html).toContain('[view]="view()"');
+    expect(html).toContain('[view]="loadingSsiDashboard() ? \'dashboard\' : view()"');
     expect(html).toContain('[checkerCount]="checkerCount()"');
     expect(html).toContain('[detailOpen]="!!detail.target()"');
     expect(html).toContain('[auditDetailOpen]="routedAuditDetailOpen()"');
     expect(html).toContain('(navigationRequested)="navigate($event)"');
     expect(html).toContain('(refreshRequested)="refresh()"');
     expect(component()).toContain("AppShellComponent,");
+  });
+
+  it("renders the SSI page frame before its lazy Dashboard and data request finish", () => {
+    expect(template()).toContain("@if (loadingSsiDashboard())");
+    expect(template()).toContain('label="Loading SSI records…" variant="screen"');
+    expect(component()).toContain("loadingSsiDashboard(): boolean");
+    expect(component()).toContain("this.loadingRouteView = routeViewFromUrl(event.url)");
   });
 
   it("keeps shared shell content while the SSI deletion overlay belongs to Dashboard", () => {

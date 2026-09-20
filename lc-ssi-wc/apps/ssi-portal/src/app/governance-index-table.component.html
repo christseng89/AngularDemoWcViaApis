@@ -1,4 +1,4 @@
-<section class="panel audit-console">
+<section class="panel audit-console" [class.maintenance-index]="appearance() === 'maintenance'">
   <div class="audit-toolbar">
     <div><span class="kicker">{{ kicker() }}</span><b>{{ instruction() }}</b></div>
     <span class="audit-page-indicator">Page {{ currentPage() }} / {{ totalPages() }}</span>
@@ -8,7 +8,7 @@
       <thead><tr>
         @for (column of columns(); track column.path) {
           <th [attr.aria-sort]="sortPath() === column.path ? (sortDirection() === 'asc' ? 'ascending' : 'descending') : 'none'">
-            <button class="sort-heading" type="button" (click)="sortRequested.emit(column.path)">
+            <button class="sort-heading" [class.sort-header]="appearance() === 'maintenance'" type="button" (click)="sortRequested.emit(column.path)">
               {{ column.label }}
               @if (sortPath() === column.path) { <span aria-hidden="true">{{ sortDirection() === 'asc' ? '↑' : '↓' }}</span> }
             </button>
@@ -18,8 +18,18 @@
       </tr></thead>
       <tbody>
         @for (row of rows(); track row.id) {
-          <tr tabindex="0" [attr.aria-label]="'View ' + row.id" (click)="rowOpened.emit(row.source)" (keydown.enter)="rowOpened.emit(row.source)">
-            @for (cell of row.cells; track $index) { <td>{{ cell }}</td> }
+          <tr [attr.tabindex]="interactiveRows() ? 0 : null" [attr.aria-label]="interactiveRows() ? 'View ' + row.id : null" (click)="interactiveRows() && rowOpened.emit(row.source)" (keydown.enter)="interactiveRows() && rowOpened.emit(row.source)">
+            @for (cell of row.cells; track $index) {
+              <td>
+                @if (columns()[$index]?.presentation === 'status') {
+                  <span class="status" [class.active-status]="cell === 'ACTIVE'">{{ cell }}</span>
+                } @else if (columns()[$index]?.presentation === 'strong') {
+                  <b>{{ cell }}</b>
+                } @else {
+                  {{ cell }}
+                }
+              </td>
+            }
             @for (cell of row.trailing; track $index) { <td>{{ cell || '—' }}</td> }
           </tr>
         } @empty {
@@ -29,11 +39,15 @@
     </table>
   </div>
   <nav class="pager audit-pager" [attr.aria-label]="ariaLabel() + ' pagination'">
-    <span>{{ totalRecords() }} {{ recordLabel() }} · 每頁 {{ pageSize() }} 筆</span>
+    @if (appearance() === 'maintenance') {
+      <span>Page {{ currentPage() }} / {{ totalPages() }} · {{ totalRecords() }} {{ recordLabel() }}</span>
+    } @else {
+      <span>{{ totalRecords() }} {{ recordLabel() }} · 每頁 {{ pageSize() }} 筆</span>
+    }
     <div>
       <button class="ghost" type="button" [disabled]="currentPage() === 1" (click)="pageRequested.emit(-1)">Previous</button>
-      <strong aria-current="page">{{ currentPage() }}</strong>
-      <button class="ghost" type="button" [disabled]="currentPage() === totalPages()" (click)="pageRequested.emit(1)">Next</button>
+      @if (appearance() === 'audit') { <strong aria-current="page">{{ currentPage() }}</strong> }
+      <button class="ghost" type="button" [disabled]="currentPage() >= totalPages()" (click)="pageRequested.emit(1)">Next</button>
     </div>
   </nav>
 </section>

@@ -69,7 +69,7 @@ export function revisionWipCutoffAt(now = new Date()): string {
 export abstract class SqliteGovernedRepository<
   T extends GovernedRecord,
 > implements OnModuleDestroy {
-  private readonly db: DatabaseSync;
+  protected readonly db: DatabaseSync;
   protected constructor(
     private readonly table: string,
     private readonly auditTable: string,

@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
   ServiceUnavailableException,
 } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
@@ -31,6 +32,8 @@ import {
 } from "./payment-settlement-profile";
 import { PaymentMessageIndexService } from "./payment-message-index.service";
 import { revisionWipExpiresAt } from "./shared/sqlite-governed.repository";
+import { ResolutionCurrencyCoverageCoordinator } from "./resolution-currency-coordinator";
+import type { ResolutionCurrencyApplyResult } from "./resolution-currency-store";
 
 export interface CreateSsiCommand {
   counterpartyId: string;
@@ -312,6 +315,7 @@ export class SsiApplicationService {
     private readonly rma: RmaApplicationService,
     private readonly nostro: NostroApplicationService,
     private readonly paymentMessageIndex: PaymentMessageIndexService,
+    @Optional() private readonly currencyCoordinator?: ResolutionCurrencyCoverageCoordinator,
   ) {}
   list(status?: string): Array<
     SsiRecord & {
@@ -597,8 +601,14 @@ export class SsiApplicationService {
       throw new ConflictException("ACTIVE_SSI_APPLICABILITY_REQUIRED");
     if (activates) this.validateRoute(current.route);
     if (action === "APPROVE") {
-      const approved = this.repository.approveWithApplicability(id, actor);
+      let coverageUpdate: ResolutionCurrencyApplyResult | undefined;
+      const approved = this.currencyCoordinator
+        ? this.repository.approveWithApplicability(id, actor, () => {
+            coverageUpdate = this.currencyCoordinator!.discoverApproved(id);
+          })
+        : this.repository.approveWithApplicability(id, actor);
       if (!approved) throw new ConflictException("APPROVAL_STATE_CHANGED");
+      if (coverageUpdate) this.currencyCoordinator?.invalidateAfterCommit(coverageUpdate);
       return approved;
     }
     const status = {

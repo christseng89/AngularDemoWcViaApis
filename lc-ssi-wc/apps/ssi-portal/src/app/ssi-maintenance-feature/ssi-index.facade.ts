@@ -32,7 +32,7 @@ export type SsiIndexRefreshResult = "applied" | "stale" | "error";
 /** State and list orchestration belong to SSI Maintenance, never the app shell. */
 export class SsiIndexFacade {
   private requestSequence = 0;
-  readonly ssiIndexLoading = signal(false);
+  readonly ssiIndexLoading = signal(true);
   readonly rows = signal<readonly SsiRow[]>([]);
   readonly ssiIndexTotalItems = signal(0);
   readonly ssiIndexTotalPages = signal(1);

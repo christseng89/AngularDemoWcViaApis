@@ -8,14 +8,18 @@ import {
   ElementRef,
   inject,
   type OnInit,
+  type OnDestroy,
 } from "@angular/core";
 import { firstValueFrom } from "rxjs";
 import { AlertComponent } from "./alert.component";
 import type { AlertModel } from "./alert.model";
+import { GovernanceIndexTableComponent, type GovernanceIndexColumn, type GovernanceIndexRow } from "./governance-index-table.component";
 import {
   RuntimeSettingsService,
   type DemoReloadResult,
   type RuntimeSettings,
+  type ResolutionCurrencyRow,
+  type ResolutionCurrencyResyncResult,
 } from "./runtime-settings.service";
 
 export type ThemeMode = "system" | "light" | "dark";
@@ -23,7 +27,7 @@ export type ThemeMode = "system" | "light" | "dark";
 @Component({
   selector: "ssi-settings-page",
   standalone: true,
-  imports: [AlertComponent],
+  imports: [AlertComponent, GovernanceIndexTableComponent],
   template: `
     <section class="settings-page" aria-label="Settings controls">
       <section class="settings-section" aria-labelledby="appearance-title">
@@ -62,7 +66,61 @@ export type ThemeMode = "system" | "light" | "dark";
         }
       </section>
 
-      <section class="reload-zone" aria-labelledby="reload-title">
+      <div class="settings-tabs" role="tablist" aria-label="Settings data tools">
+        <button type="button" role="tab" id="reload-tab" aria-controls="reload-panel" [attr.aria-selected]="settingsTab() === 'reload'" [class.active]="settingsTab() === 'reload'" (click)="selectSettingsTab('reload')">Reload Test Data</button>
+        <button type="button" role="tab" id="currency-tab" aria-controls="currency-panel" [attr.aria-selected]="settingsTab() === 'currency'" [class.active]="settingsTab() === 'currency'" (click)="selectSettingsTab('currency')">Inquire Business Currency Index</button>
+      </div>
+
+      @if (settingsTab() === 'currency') {
+      <section id="currency-panel" class="currency-inquiry" role="tabpanel" aria-labelledby="currency-tab">
+        <div class="currency-heading">
+          <div>
+            <p class="eyebrow">CONTROLLED RESOLUTION DATA</p>
+            <h3 id="currency-title">{{ currencyConfig().title }}</h3>
+          </div>
+          @if (runtime()?.developmentEnabled) {
+            <button type="button" class="ghost" [disabled]="currencyBusy() || currencyLoading()" (click)="resyncCurrencies()">{{ currencyBusy() ? "Resyncing…" : "Resync" }}</button>
+          }
+        </div>
+        <label class="index-search" for="currency-search">
+          <span>{{ currencySearchLabel() }}</span>
+          <input id="currency-search" type="search" [placeholder]="currencySearchPlaceholder()" [value]="currencySearchInput()" (input)="onCurrencySearchInput($any($event.target).value)" (keydown.enter)="submitCurrencySearch()" />
+        </label>
+        @if (currencyError(); as failure) {
+          <ssi-alert [model]="failure" variant="inline" />
+          <button type="button" class="ghost" (click)="loadCurrencyInquiry()">Retry</button>
+        } @else if (currencyLoading()) {
+          <p role="status">Loading business currencies…</p>
+        } @else if (currencyColumns().length) {
+          <ssi-governance-index-table
+            appearance="maintenance"
+            ariaLabel="Resolution currency inquiry"
+            kicker="RESOLUTION CURRENCY"
+            instruction="Controlled business currency coverage"
+            emptyText="No business currencies found."
+            recordLabel="records"
+            [columns]="currencyColumns()"
+            [trailingColumns]="[]"
+            [rows]="currencyRows()"
+            [interactiveRows]="false"
+            [currentPage]="currencyPage()"
+            [totalPages]="currencyTotalPages()"
+            [totalRecords]="currencyTotalItems()"
+            [pageSize]="currencyConfig().pageSize"
+            [sortPath]="currencySortBy()"
+            [sortDirection]="currencySortDirection()"
+            (sortRequested)="sortCurrencies($event)"
+            (pageRequested)="changeCurrencyPage($event)"
+          />
+        }
+        @if (currencyResyncResult(); as synced) {
+          <p role="status">Discovered {{ synced.discovered }} · Inserted {{ synced.inserted }} · Unchanged {{ synced.unchanged }} · Inactivated {{ synced.inactivated }}</p>
+        }
+      </section>
+      }
+
+      @if (settingsTab() === 'reload') {
+      <section id="reload-panel" class="reload-zone" role="tabpanel" aria-labelledby="reload-tab">
         @if (runtime(); as current) {
           <div class="reload-header">
             <div>
@@ -83,14 +141,6 @@ export type ThemeMode = "system" | "light" | "dark";
               <dd>
                 <code [title]="current.seedSha256 || ''">{{
                   compactIdentifier(current.seedSha256)
-                }}</code>
-              </dd>
-            </div>
-            <div>
-              <dt>Current snapshot</dt>
-              <dd>
-                <code [title]="current.currentSnapshot.sha256">{{
-                  compactIdentifier(current.currentSnapshot.sha256)
                 }}</code>
               </dd>
             </div>
@@ -124,6 +174,7 @@ export type ThemeMode = "system" | "light" | "dark";
           />
         }
       </section>
+      }
     </section>
 
     @if (confirmationOpen()) {
@@ -176,8 +227,9 @@ export type ThemeMode = "system" | "light" | "dark";
   styleUrl: "./settings-page.component.css",
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class SettingsPageComponent implements OnInit {
+export class SettingsPageComponent implements OnInit, OnDestroy {
   private readonly service = inject(RuntimeSettingsService);
+  private currencySearchTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly passwordInput =
     viewChild<ElementRef<HTMLInputElement>>("passwordInput");
   readonly theme = input.required<ThemeMode>();
@@ -189,6 +241,23 @@ export class SettingsPageComponent implements OnInit {
   readonly password = signal("");
   readonly result = signal<DemoReloadResult | null>(null);
   readonly error = signal<AlertModel | null>(null);
+  readonly settingsTab = signal<"reload" | "currency">("reload");
+  readonly currencyColumns = signal<readonly GovernanceIndexColumn[]>([]);
+  readonly currencyRows = signal<readonly GovernanceIndexRow<ResolutionCurrencyRow>[]>([]);
+  readonly currencyPage = signal(1);
+  readonly currencyTotalPages = signal(1);
+  readonly currencyTotalItems = signal(0);
+  readonly currencyLoading = signal(false);
+  readonly currencyBusy = signal(false);
+  readonly currencyError = signal<AlertModel | null>(null);
+  readonly currencyResyncResult = signal<ResolutionCurrencyResyncResult | null>(null);
+  readonly currencySearchInput = signal("");
+  readonly currencySearch = signal("");
+  readonly currencySearchLabel = signal("Search Business Currency index");
+  readonly currencySearchPlaceholder = signal("Search configured index fields");
+  readonly currencySortBy = signal("businessDomain");
+  readonly currencySortDirection = signal<"asc" | "desc">("asc");
+  readonly currencyLoaded = signal(false);
   readonly themes = [
     { value: "system" as const, label: "System" },
     { value: "light" as const, label: "Light" },
@@ -211,9 +280,113 @@ export class SettingsPageComponent implements OnInit {
     void this.loadRuntime();
   }
 
+  ngOnDestroy(): void {
+    if (this.currencySearchTimer) clearTimeout(this.currencySearchTimer);
+  }
+
+  selectSettingsTab(tab: "reload" | "currency"): void {
+    this.settingsTab.set(tab);
+    if (tab === "currency" && !this.currencyLoaded() && !this.currencyLoading())
+      void this.loadCurrencyInquiry();
+  }
+
+  currencyConfig() {
+    return this.runtime()?.resolutionCurrencyInquiry ?? {
+      title: "Inquire Business Currency Index", sortBy: "businessDomain", sortDirection: "asc" as const, pageSize: 10,
+    };
+  }
+
+  submitCurrencySearch(): void {
+    if (this.currencySearchTimer) clearTimeout(this.currencySearchTimer);
+    this.currencySearch.set(this.currencySearchInput().trim());
+    void this.loadCurrencyInquiry(1);
+  }
+
+  onCurrencySearchInput(value: string): void {
+    this.currencySearchInput.set(value);
+    if (this.currencySearchTimer) clearTimeout(this.currencySearchTimer);
+    this.currencySearchTimer = setTimeout(() => this.submitCurrencySearch(), 300);
+  }
+
+  sortCurrencies(path: string): void {
+    if (!this.currencyColumns().some((column) => column.path === path)) return;
+    this.currencySortDirection.set(this.currencySortBy() === path && this.currencySortDirection() === "asc" ? "desc" : "asc");
+    this.currencySortBy.set(path);
+    void this.loadCurrencyInquiry(1);
+  }
+
+  async loadCurrencyInquiry(page = this.currencyPage()): Promise<void> {
+    this.currencyLoading.set(true);
+    this.currencyError.set(null);
+    try {
+      if (!this.runtime()) await this.loadRuntime();
+      if (!this.runtime()) throw new Error("RUNTIME_SETTINGS_UNAVAILABLE");
+      const [contract, result] = await Promise.all([
+        firstValueFrom(this.service.currencyContract()),
+        firstValueFrom(this.service.resolutionCurrencies(page, this.currencyConfig().pageSize, this.currencySearch(), this.currencySortBy(), this.currencySortDirection())),
+      ]);
+      const inquiry = contract["x-ui-inquiries"]?.find(({ id }) => id === "resolution-currency");
+      if (inquiry?.mode !== "INDEX_ONLY" || inquiry.endpoint !== "settings/resolution-currencies" || !inquiry.columns.length)
+        throw new Error("RESOLUTION_CURRENCY_SCREEN_CONTRACT_MISSING");
+      this.currencyColumns.set(inquiry.columns);
+      this.currencySearchLabel.set(inquiry.search?.label ?? "Search Business Currency index");
+      this.currencySearchPlaceholder.set(inquiry.search?.placeholder ?? "Search configured index fields");
+      this.currencyRows.set(result.items.map((row) => ({
+        id: `${row.businessDomain}-${row.currency}`,
+        cells: inquiry.columns.map(({ path }) => {
+          const value = row[path as keyof ResolutionCurrencyRow];
+          return value == null ? "—" : String(value);
+        }),
+        trailing: [],
+        source: row,
+      })));
+      this.currencyPage.set(result.page);
+      this.currencyTotalPages.set(Math.max(1, result.totalPages));
+      this.currencyTotalItems.set(result.totalItems);
+      this.currencyLoaded.set(true);
+    } catch {
+      this.currencyError.set({
+        severity: "error",
+        title: "Unable to load business currency index",
+        message: "The governed inquiry is temporarily unavailable.",
+        code: "RESOLUTION_CURRENCY_INQUIRY_UNAVAILABLE",
+      });
+    } finally {
+      this.currencyLoading.set(false);
+    }
+  }
+
+  changeCurrencyPage(delta: number): void {
+    const next = this.currencyPage() + delta;
+    if (next >= 1 && next <= this.currencyTotalPages()) void this.loadCurrencyInquiry(next);
+  }
+
+  async resyncCurrencies(): Promise<void> {
+    if (!this.runtime()?.developmentEnabled || this.currencyBusy()) return;
+    this.currencyBusy.set(true);
+    this.currencyError.set(null);
+    try {
+      this.currencyResyncResult.set(await firstValueFrom(this.service.resyncResolutionCurrencies()));
+      await this.loadCurrencyInquiry(1);
+    } catch {
+      this.currencyError.set({
+        severity: "error",
+        title: "Business currency resync failed",
+        message: "Existing coverage remains available; retry after checking the service.",
+        code: "RESOLUTION_CURRENCY_RESYNC_FAILED",
+      });
+    } finally {
+      this.currencyBusy.set(false);
+    }
+  }
+
   async loadRuntime(): Promise<void> {
     try {
       this.runtime.set(await firstValueFrom(this.service.runtime()));
+      if (!this.currencyLoaded()) {
+        this.currencySortBy.set(this.currencyConfig().sortBy);
+        this.currencySortDirection.set(this.currencyConfig().sortDirection);
+      }
     } catch {
       this.error.set({
         severity: "error",
@@ -249,6 +422,7 @@ export class SettingsPageComponent implements OnInit {
       this.confirmationOpen.set(false);
       this.dataReloaded.emit(result);
       await this.loadRuntime();
+      await this.loadCurrencyInquiry(1);
     } catch (error_) {
       const code = this.errorCode(error_);
       this.error.set({

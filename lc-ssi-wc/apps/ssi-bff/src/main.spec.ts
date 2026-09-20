@@ -78,6 +78,19 @@ describe("SSI BFF forwarding contract", () => {
       url: "http://ssi.test/api/settings/runtime",
     },
     {
+      name: "resolution currency inquiry",
+      method: "resolutionCurrencyInquiry",
+      args: ["2", "25", "PAYMENT", "ACTIVE", "USD", "currency", "desc"],
+      url: "http://ssi.test/api/settings/resolution-currencies?page=2&pageSize=25&businessDomain=PAYMENT&status=ACTIVE&search=USD&sortBy=currency&sortDirection=desc",
+    },
+    {
+      name: "resolution currency resync",
+      method: "resyncResolutionCurrencies",
+      args: [],
+      url: "http://ssi.test/api/settings/resolution-currencies/resync",
+      httpMethod: "POST",
+    },
+    {
       name: "development data reload",
       method: "reloadDevelopmentData",
       args: [{ password: "entered" }],

@@ -166,6 +166,12 @@ export class ResolutionPageAggregationService {
     ResolutionPageDefinitionIndexEnvelope
   >();
 
+  /** Call only after a committed controlled-configuration change. */
+  invalidate(): void {
+    this.runtimeDefinitionsByRelease.clear();
+    this.indexByReleaseAndDomain.clear();
+  }
+
   constructor(
     @Inject(RESOLUTION_PAGE_DEFINITION_SOURCE)
     private readonly source: ResolutionPageDefinitionSource,

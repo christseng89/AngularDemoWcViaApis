@@ -10,6 +10,21 @@
       "url": "http://localhost:3100/api"
     }
   ],
+  "x-ui-inquiries": [
+    {
+      "id": "resolution-currency",
+      "endpoint": "settings/resolution-currencies",
+      "mode": "INDEX_ONLY",
+      "search": { "label": "Search Business Currency index", "placeholder": "Search configured index fields" },
+      "columns": [
+        { "path": "businessDomain", "label": "Business Domain", "presentation": "strong" },
+        { "path": "currency", "label": "Currency", "presentation": "strong" },
+        { "path": "status", "label": "Status", "presentation": "status" },
+        { "path": "source", "label": "Source" },
+        { "path": "lastResyncAt", "label": "Last Resync At" }
+      ]
+    }
+  ],
   "x-standards-baseline": {
     "standardsRelease": "SR2026",
     "bicStandard": "ISO 9362",

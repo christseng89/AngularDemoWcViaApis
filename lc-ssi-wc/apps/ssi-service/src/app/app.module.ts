@@ -60,6 +60,11 @@ import { ResolutionPageOasFieldPolicyService } from "./page-parameters/resolutio
 import { ResolutionPageFixtureManifestService } from "./page-parameters/resolution-page-fixture-manifest.service";
 import { ResolutionPageCrossTagValidator } from "./page-parameters/resolution-page-cross-tag.validator";
 import { IndexPaginationPolicy } from "./index-pagination.policy";
+import { ResolutionCurrencyCoveragePolicy } from "./resolution-currency-policy";
+import { ResolutionCurrencyCoverageDiscoveryService } from "./resolution-currency-discovery";
+import { ResolutionCurrencyCoverageCoordinator } from "./resolution-currency-coordinator";
+import { ResolutionCurrencyInquiryPolicy } from "./resolution-currency-inquiry.policy";
+import { ResolutionDefinitionOptionsService } from "./page-parameters/resolution-definition-options.service";
 import { PageParameterLookupDefaultsService } from "./page-parameters/page-parameter-lookup-defaults.service";
 import {
   PAGE_PARAMETER_BUSINESS_CALENDAR,
@@ -91,6 +96,11 @@ import {
   providers: [
     SsiApplicationService,
     SqliteSsiRepository,
+    ResolutionCurrencyCoveragePolicy,
+    ResolutionCurrencyCoverageDiscoveryService,
+    ResolutionCurrencyCoverageCoordinator,
+    ResolutionCurrencyInquiryPolicy,
+    ResolutionDefinitionOptionsService,
     MessageMappingService,
     SampleImportService,
     RmaApplicationService,

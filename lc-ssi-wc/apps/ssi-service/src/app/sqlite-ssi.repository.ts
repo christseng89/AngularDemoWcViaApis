@@ -1,4 +1,4 @@
-import { Injectable, OnModuleDestroy } from "@nestjs/common";
+import { Injectable, OnModuleDestroy, Optional } from "@nestjs/common";
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
@@ -15,6 +15,12 @@ import {
   type OpenRevisionStatus,
 } from "./shared/current-status-projection";
 import { maintenanceIndexStatuses } from "./shared/maintenance-index-status";
+import {
+  ResolutionCurrencyStore,
+  type DiscoveredCurrency,
+  type ResolutionCurrencyApplyResult,
+} from "./resolution-currency-store";
+import type { ResolutionCurrencyCoverageRow } from "./resolution-currency-reconciliation";
 
 export interface SsiRecord {
   id: string;
@@ -98,6 +104,7 @@ export interface PaymentSsiCandidateQuery {
   readonly currency?: string;
   readonly bookingEntity?: string;
   readonly fixtureBindingId?: string;
+  readonly ssiId?: string;
 }
 export interface PaymentSsiCandidateBinding {
   readonly ssi: SsiRecord;
@@ -196,7 +203,14 @@ const FIN_CONTROLLED_INDEX_CURRENCIES_SQL = `
 @Injectable()
 export class SqliteSsiRepository implements OnModuleDestroy {
   private readonly db: DatabaseSync;
-  constructor() {
+  private readonly ownsConnection: boolean;
+  private resolutionCurrencies: ResolutionCurrencyStore | undefined;
+  constructor(@Optional() externalDb?: DatabaseSync) {
+    this.ownsConnection = !externalDb;
+    if (externalDb) {
+      this.db = externalDb;
+      return;
+    }
     const path = process.env["SSI_DATABASE_PATH"] ?? "./data/ssi-demo.sqlite";
     mkdirSync(dirname(path), { recursive: true });
     this.db = new DatabaseSync(path);
@@ -251,6 +265,92 @@ export class SqliteSsiRepository implements OnModuleDestroy {
       CREATE TABLE IF NOT EXISTS audit_event (id INTEGER PRIMARY KEY AUTOINCREMENT, ssi_id TEXT NOT NULL, action TEXT NOT NULL, actor TEXT NOT NULL, payload TEXT NOT NULL, occurred_at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS outbox (id INTEGER PRIMARY KEY AUTOINCREMENT, event_id TEXT UNIQUE NOT NULL, event_type TEXT NOT NULL, payload TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'PENDING', created_at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS inbox (event_id TEXT PRIMARY KEY, event_type TEXT NOT NULL, processed_at TEXT NOT NULL);`);
+  }
+  private currencyStore(): ResolutionCurrencyStore {
+    return (this.resolutionCurrencies ??= new ResolutionCurrencyStore(this.db));
+  }
+  resolutionCurrencyInquiry(standardsRelease: string) {
+    return this.currencyStore().inquiry(standardsRelease);
+  }
+
+  resolutionCurrencyInquiryPage(
+    standardsRelease: string,
+    request: Parameters<ResolutionCurrencyStore["inquiryPage"]>[1],
+  ) {
+    return this.currencyStore().inquiryPage(standardsRelease, request);
+  }
+
+  activeResolutionCurrencies(
+    standardsRelease: string,
+    businessDomain: ResolutionCurrencyCoverageRow["businessDomain"],
+  ): string[] {
+    return this.currencyStore().active(standardsRelease, businessDomain);
+  }
+
+  bootstrapResolutionCurrencyCoverage(
+    discover: () => readonly DiscoveredCurrency[],
+    asOfDate: string,
+  ): ResolutionCurrencyApplyResult {
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      // Recheck while holding the SQLite writer lock: another process may have initialized it.
+      if (this.currencyStore().inquiry("SR2026").length > 0) {
+        const control = this.currencyStore().syncState("SR2026");
+        if (!control?.initialized || control.asOfDate !== asOfDate)
+          throw new Error("RESOLUTION_CURRENCY_BOOTSTRAP_CONTROL_MISMATCH");
+        this.db.exec("COMMIT");
+        return { discovered: 0, inserted: 0, unchanged: 0, activated: 0, inactivated: 0 };
+      }
+      const discovered = discover();
+      const result = this.currencyStore().apply(
+        "SR2026", discovered, "FULL_RESYNC", new Date().toISOString(), asOfDate, false,
+      );
+      this.db.exec("COMMIT");
+      return result;
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      this.resolutionCurrencies = undefined;
+      throw error;
+    }
+  }
+
+  resyncResolutionCurrencyCoverage(
+    discover: () => readonly DiscoveredCurrency[],
+    asOfDate: string,
+  ): ResolutionCurrencyApplyResult {
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const discovered = discover();
+      const result = this.currencyStore().apply(
+        "SR2026", discovered, "FULL_RESYNC", new Date().toISOString(), asOfDate,
+      );
+      this.db.exec("COMMIT");
+      return result;
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      this.resolutionCurrencies = undefined;
+      throw error;
+    }
+  }
+
+  /** Called only from the approval callback while its SQLite transaction is open. */
+  insertApprovedResolutionCurrencies(
+    discovered: readonly DiscoveredCurrency[],
+    asOfDate: string,
+  ): ResolutionCurrencyApplyResult {
+    return this.currencyStore().apply(
+      "SR2026", discovered, "APPROVAL_DISCOVERY", new Date().toISOString(), asOfDate,
+    );
+  }
+
+  /** Caller owns an open SQLite transaction, used by deterministic Demo Reload. */
+  reconcileResolutionCurrenciesWithinTransaction(
+    discovered: readonly DiscoveredCurrency[],
+    asOfDate: string,
+  ): ResolutionCurrencyApplyResult {
+    return this.currencyStore().apply(
+      "SR2026", discovered, "FULL_RESYNC", `${asOfDate}T00:00:00.000Z`, asOfDate, false,
+    );
   }
   list(status?: string): SsiRecord[] {
     this.expireRevisionWorkInProgress();
@@ -569,6 +669,73 @@ export class SqliteSsiRepository implements OnModuleDestroy {
   findPaymentCandidates(query: PaymentSsiCandidateQuery): SsiRecord[] {
     return this.findPaymentCandidateBindings(query).map(({ ssi }) => ssi);
   }
+  findResolutionCurrencyCoverage(query: {
+    readonly consumer: "TREASURY" | "TRADE_FINANCE";
+    readonly businessFunction: string;
+    readonly messageType: string;
+    readonly asOfDate: string;
+    readonly ssiId?: string;
+  }): string[] {
+    const rows = this.db
+      .prepare(
+        `
+        SELECT DISTINCT json_extract(s.payload,'$.route.currency') AS currency
+        FROM ssi_applicability AS a
+        JOIN ssi AS s ON s.id=a.ssi_id
+        WHERE json_extract(a.payload,'$.status')='ACTIVE'
+          AND json_extract(s.payload,'$.status')='ACTIVE'
+          AND json_extract(a.payload,'$.consumer')=?
+          AND json_extract(a.payload,'$.businessFunction')=?
+          AND json_extract(s.payload,'$.route.businessFunction')=?
+          AND json_extract(a.payload,'$.validFrom')<=?
+          AND json_extract(a.payload,'$.validTo')>=?
+          AND COALESCE(json_extract(s.payload,'$.route.validFrom'),'0000-01-01')<=?
+          AND COALESCE(json_extract(s.payload,'$.route.validTo'),'9999-12-31')>=?
+          AND (
+            substr(COALESCE(json_extract(s.payload,'$.usageScope'),''),1,3) <> 'QA_'
+            OR (
+              json_extract(s.payload,'$.fixtureFamily')='MT347-SR2026-SSI'
+              AND json_extract(s.payload,'$.fixtureVariantVersion')='MT347-DEMO-ORACLE-V1.1'
+              AND json_extract(s.payload,'$.datasetVersion')='MT347-DEMO-V1.1'
+              AND json_extract(s.payload,'$.usageScope')='QA_POSITIVE'
+              AND json_type(s.payload,'$.operationalVisible')='false'
+            )
+          )
+          AND length(json_extract(s.payload,'$.route.currency'))=3
+          AND json_extract(s.payload,'$.route.currency') GLOB '[A-Z][A-Z][A-Z]'
+          AND (
+            EXISTS (
+              SELECT 1 FROM json_each(
+                CASE WHEN json_type(s.payload,'$.route.messageTypes')='array'
+                  THEN json_extract(s.payload,'$.route.messageTypes') ELSE '[]' END
+              ) WHERE value=?
+            ) OR (
+              json_type(s.payload,'$.route.messageTypes')='text'
+              AND instr(
+                ',' || replace(json_extract(s.payload,'$.route.messageTypes'),' ','') || ',',
+                ',' || ? || ','
+              )>0
+            )
+          )
+          AND (?='' OR s.id=?)
+        ORDER BY currency
+      `,
+      )
+      .all(
+        query.consumer,
+        query.businessFunction,
+        query.businessFunction,
+        query.asOfDate,
+        query.asOfDate,
+        query.asOfDate,
+        query.asOfDate,
+        query.messageType,
+        query.messageType,
+        query.ssiId ?? "",
+        query.ssiId ?? "",
+      ) as { currency: string }[];
+    return rows.map(({ currency }) => currency);
+  }
   findPaymentCandidateBindings(
     query: PaymentSsiCandidateQuery,
   ): PaymentSsiCandidateBinding[] {
@@ -597,6 +764,7 @@ export class SqliteSsiRepository implements OnModuleDestroy {
            AND instr(',' || replace(COALESCE(json_extract(s.payload,'$.route.sourceMessageTypes'),''),' ','') || ',', ',' || ? || ',') > 0
            AND instr(',' || replace(COALESCE(json_extract(s.payload,'$.route.messageTypes'),''),' ','') || ',', ',' || ? || ',') > 0
            AND instr(',' || replace(COALESCE(json_extract(s.payload,'$.route.businessService'),''),' ','') || ',', ',' || ? || ',') > 0
+           ${query.ssiId ? "AND s.id=?" : ""}
            AND (? = '' OR json_extract(s.payload,'$.route.currency') = ?)
            AND (? = '' OR json_extract(s.payload,'$.route.bookingEntity') = ?)
            AND (? = '' OR EXISTS (SELECT 1 FROM json_each(json_extract(s.payload,'$.fixtureBindingIds')) WHERE value = ?))
@@ -612,6 +780,7 @@ export class SqliteSsiRepository implements OnModuleDestroy {
         query.sourceMessageType,
         query.messageType,
         query.businessService,
+        ...(query.ssiId ? [query.ssiId] : []),
         currency,
         currency,
         bookingEntity,
@@ -633,6 +802,38 @@ export class SqliteSsiRepository implements OnModuleDestroy {
         ) as SsiApplicabilityRecord,
       };
     });
+  }
+  /** Definition discovery projects only currency; executable bindings remain separate. */
+  findPaymentResolutionCurrencies(query: PaymentSsiCandidateQuery): string[] {
+    const rows = this.db.prepare(
+      `SELECT DISTINCT json_extract(s.payload,'$.route.currency') AS currency
+       FROM ssi AS s
+       JOIN ssi_applicability AS a ON a.ssi_id = s.id
+       WHERE json_extract(s.payload,'$.status') = 'ACTIVE'
+         AND json_extract(s.payload,'$.route.routePurpose') = 'INTERBANK_TRANSFER'
+         AND json_extract(a.payload,'$.status') = 'ACTIVE'
+         AND json_extract(a.payload,'$.validFrom') <= ?
+         AND json_extract(a.payload,'$.validTo') >= ?
+         AND json_extract(a.payload,'$.consumer') IN ('CENTRAL_PAYMENT','ANY')
+         AND json_extract(a.payload,'$.product') IN ('CENTRAL_PAYMENT','ANY')
+         AND json_extract(a.payload,'$.businessFunction') IN ('INTERBANK_TRANSFER','ANY')
+         AND json_extract(a.payload,'$.paymentLeg') IN ('INTERBANK_SETTLEMENT','ANY')
+         AND json_extract(a.payload,'$.direction') IN ('OUTBOUND','ANY')
+         AND COALESCE(json_extract(s.payload,'$.route.currency'),'') <> ''
+         AND COALESCE(json_extract(s.payload,'$.route.bookingEntity'),'') <> ''
+         AND COALESCE(json_extract(s.payload,'$.route.validFrom'),'') <= ?
+         AND COALESCE(json_extract(s.payload,'$.route.validTo'),'') >= ?
+         AND instr(',' || replace(COALESCE(json_extract(s.payload,'$.route.sourceMessageTypes'),''),' ','') || ',', ',' || ? || ',') > 0
+         AND instr(',' || replace(COALESCE(json_extract(s.payload,'$.route.messageTypes'),''),' ','') || ',', ',' || ? || ',') > 0
+         AND instr(',' || replace(COALESCE(json_extract(s.payload,'$.route.businessService'),''),' ','') || ',', ',' || ? || ',') > 0
+         ${query.ssiId ? "AND s.id=?" : ""}
+       ORDER BY currency`,
+    ).all(
+      query.valueDate, query.valueDate, query.valueDate, query.valueDate,
+      query.sourceMessageType, query.messageType, query.businessService,
+      ...(query.ssiId ? [query.ssiId] : []),
+    ) as { currency: string }[];
+    return rows.map(({ currency }) => currency);
   }
   listFinControlledFixtureCatalogueRows(): FinControlledFixtureRepositoryRow[] {
     const rows = this.db.prepare(FIN_CONTROLLED_CATALOGUE_SQL).all();
@@ -805,7 +1006,11 @@ export class SqliteSsiRepository implements OnModuleDestroy {
     }
   }
 
-  approveWithApplicability(id: string, actor: string): SsiRecord | undefined {
+  approveWithApplicability(
+    id: string,
+    actor: string,
+    onApproved?: (record: SsiRecord) => void,
+  ): SsiRecord | undefined {
     const now = new Date().toISOString();
     this.db.exec("BEGIN IMMEDIATE");
     try {
@@ -969,10 +1174,12 @@ export class SqliteSsiRepository implements OnModuleDestroy {
         JSON.stringify(approved),
         now,
       );
+      onApproved?.(approved);
       this.db.exec("COMMIT");
       return approved;
     } catch (error) {
       this.db.exec("ROLLBACK");
+      this.resolutionCurrencies = undefined;
       throw error;
     }
   }
@@ -1128,6 +1335,6 @@ export class SqliteSsiRepository implements OnModuleDestroy {
       .all(onlineAuditCutoffUtc());
   }
   onModuleDestroy(): void {
-    this.db.close();
+    if (this.ownsConnection) this.db.close();
   }
 }

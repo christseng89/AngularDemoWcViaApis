@@ -170,6 +170,18 @@ const configurationFailure = (
 };
 
 describe("ResolutionPageAggregationService", () => {
+  it("invalidates both cached Index and full Definition after a committed source change", () => {
+    const first = definition({ title: "Before" });
+    const second = definition({ title: "After" });
+    const all = jest.fn(() => [first]);
+    const service = create({ find: () => [], all });
+    const before = service.index("SR2026");
+    const beforeFull = service.get(query).contractSha256;
+    all.mockImplementation(() => [second]);
+    service.invalidate();
+    expect(service.index("SR2026")).not.toBe(before);
+    expect(service.get(query).contractSha256).not.toBe(beforeFull);
+  });
   it("builds one immutable runtime definition snapshot per standards release for all index domains", () => {
     const payment = definition({
       definitionId: "PAYMENT-MT202-SR2026",

@@ -147,7 +147,7 @@ export interface PageParameterField {
   readonly options?: readonly PageParameterOption[];
   readonly lookup?: PageParameterLookupMetadata;
   readonly optionSource?: PageParameterDependencyMetadata & {
-    readonly source: "GOVERNED_APPLICABILITY";
+    readonly source: "GOVERNED_APPLICABILITY" | "RESOLUTION_CURRENCY_COVERAGE" | "CONTROLLED_ENTITY_REFERENCE";
   };
   readonly constraints: readonly PageParameterConstraint[];
   readonly sequenceId?: string;

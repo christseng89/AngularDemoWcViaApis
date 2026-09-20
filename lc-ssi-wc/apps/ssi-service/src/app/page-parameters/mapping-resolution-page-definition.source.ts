@@ -1,4 +1,5 @@
 import { Injectable, Optional } from "@nestjs/common";
+import { ResolutionDefinitionOptionsService } from "./resolution-definition-options.service";
 import type {
   PageParameterBusinessDateMetadata,
   PageParameterBusinessDomain,
@@ -713,9 +714,34 @@ export class MappingResolutionPageDefinitionSource implements ResolutionPageDefi
     @Optional()
     private readonly businessDates?: PageParameterBusinessDatePolicy,
     @Optional() oasFieldPolicies?: ResolutionPageOasFieldPolicyService,
+    @Optional() private readonly definitionOptions?: ResolutionDefinitionOptionsService,
   ) {
     this.oasFieldPolicies =
       oasFieldPolicies ?? new ResolutionPageOasFieldPolicyService();
+  }
+
+  coverageProfiles(standardsRelease = DEFAULT_RELEASE): readonly {
+    readonly businessDomain: PageParameterBusinessDomain;
+    readonly messageType: string;
+    readonly businessFunction: string;
+  }[] {
+    const profiles = this.catalogues
+      .get(standardsRelease)
+      .mappings.filter(relevant)
+      .map(({ messageType, businessFunction }) => ({
+        businessDomain: displayIdentity(messageType).businessDomain,
+        messageType,
+        businessFunction,
+      }));
+    return profiles.filter(
+      (profile, index) =>
+        profiles.findIndex(
+          (candidate) =>
+            candidate.businessDomain === profile.businessDomain &&
+            candidate.messageType === profile.messageType &&
+            candidate.businessFunction === profile.businessFunction,
+        ) === index,
+    );
   }
 
   all(standardsRelease = DEFAULT_RELEASE): readonly ResolutionPageDefinition[] {
@@ -747,12 +773,12 @@ export class MappingResolutionPageDefinitionSource implements ResolutionPageDefi
             ),
         ),
       );
-    const fixtureCandidates = fullyConfigured
+    const fixtureCandidates = this.definitionOptions ? [] : fullyConfigured
       ? []
       : configured && this.fixtureManifest && this.fixtures?.indexCatalogue
         ? this.fixtures.indexCatalogue()
         : (this.fixtures?.catalogue() ?? []);
-    const indexCurrencies = fullyConfigured
+    const indexCurrencies = this.definitionOptions ? [] : fullyConfigured
       ? this.fixtures!.indexCurrencyProjection()
       : fixtureCandidates;
     const generated = representatives
@@ -1213,6 +1239,11 @@ export class MappingResolutionPageDefinitionSource implements ResolutionPageDefi
     scenarios: readonly ResolutionPageConfiguredScenario[],
     fixtureCandidates: readonly FinControlledFixtureIndexCurrency[],
   ): string[] {
+    if (this.definitionOptions) {
+      if (definition.businessDomain !== "TREASURY" && definition.businessDomain !== "TRADE_FINANCE")
+        throw new Error("RESOLUTION_CURRENCY_UNSUPPORTED_DOMAIN");
+      return [...this.definitionOptions.currencies(definition.businessDomain, definition.messageType).currencies];
+    }
     const configuredCurrency = configuredFields.find(
       ({ fieldId }) => fieldId === "context.currency",
     );
@@ -1261,7 +1292,7 @@ export class MappingResolutionPageDefinitionSource implements ResolutionPageDefi
     );
     return withRenderedLookupDependencies([
       ...definition.fields.map((field) =>
-        this.withCurrencyOptions(field, currencyValues),
+        this.withCurrencyOptions(field, currencyValues, definition),
       ),
       ...governedExtraFields,
       ...oasFields,
@@ -1288,19 +1319,24 @@ export class MappingResolutionPageDefinitionSource implements ResolutionPageDefi
   private withCurrencyOptions(
     field: PageParameterField,
     currencyValues: readonly string[],
+    definition: ResolutionPageDefinition,
   ): PageParameterField {
     if (field.fieldId !== "context.currency") return field;
     const singleCurrency = currencyValues.length === 1;
-    const defaultValue = currencyValues.includes("USD")
-      ? "USD"
-      : currencyValues[0];
+    const configuredDefault = this.definitionOptions &&
+      (definition.businessDomain === "TREASURY" || definition.businessDomain === "TRADE_FINANCE")
+      ? this.definitionOptions.currencies(definition.businessDomain, definition.messageType).defaultCurrency
+      : undefined;
+    const defaultValue = this.definitionOptions
+      ? configuredDefault
+      : currencyValues.includes("USD") ? "USD" : currencyValues[0];
     return {
       ...withoutDefaultValue(field),
       control: "SELECT",
       options: currencyValues.map((value) => ({ value, label: value })),
       ...(defaultValue ? { defaultValue } : {}),
       optionSource: {
-        source: "GOVERNED_APPLICABILITY",
+        source: this.definitionOptions ? "RESOLUTION_CURRENCY_COVERAGE" : "GOVERNED_APPLICABILITY",
         dependsOnFieldIds: [],
         invalidatesFieldIds: [COUNTERPARTY_FIELD_ID],
         selectionPolicy: singleCurrency
@@ -1309,7 +1345,9 @@ export class MappingResolutionPageDefinitionSource implements ResolutionPageDefi
         ...(singleCurrency
           ? {
               restrictionMessage:
-                "This governed scenario currently has one SSI-applicable currency.",
+                this.definitionOptions
+                  ? "This governed resolution currently supports one currency."
+                  : "This governed scenario currently has one SSI-applicable currency.",
             }
           : {}),
       },

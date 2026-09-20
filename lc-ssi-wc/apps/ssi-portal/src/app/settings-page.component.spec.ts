@@ -1,4 +1,5 @@
 import { of, throwError } from "rxjs";
+import { readFileSync } from "node:fs";
 
 type TestSignal<T> = (() => T) & { set(value: T): void };
 const testSignal = <T>(initial: T): TestSignal<T> => {
@@ -18,11 +19,13 @@ const runtime = {
   fixtureId: "SSI-DEMO",
   seedSha256: "a".repeat(64),
   statusPolicyVersion: "SSI-CONFIG-HTTP-01",
-  currentSnapshot: { sha256: "b".repeat(64), method: "LOGICAL" },
 };
 let reloadError = false;
 let runtimeError = false;
 const service = {
+  currencyContract: jest.fn(() => of({ "x-ui-inquiries": [{ id: "resolution-currency", endpoint: "settings/resolution-currencies", mode: "INDEX_ONLY", columns: [{ path: "currency", label: "Currency" }] }] })),
+  resolutionCurrencies: jest.fn(() => of({ items: [{ businessDomain: "PAYMENT", currency: "USD", status: "ACTIVE", source: "SSI", lastResyncAt: null }], page: 1, pageSize: 25, totalItems: 1, totalPages: 1 })),
+  resyncResolutionCurrencies: jest.fn(() => of({ discovered: 1, inserted: 0, unchanged: 1, activated: 0, inactivated: 0 })),
   runtime: jest.fn(() =>
     runtimeError
       ? throwError(() => new Error("runtime unavailable"))
@@ -58,11 +61,16 @@ jest.mock("@angular/core", () => ({
 }));
 jest.mock("@angular/common", () => ({ UpperCasePipe: class {} }));
 jest.mock("./alert.component", () => ({ AlertComponent: class {} }));
+jest.mock("./governance-index-table.component", () => ({ GovernanceIndexTableComponent: class {} }));
 jest.mock("./runtime-settings.service", () => ({
   RuntimeSettingsService: class {},
 }));
 
 describe("SettingsPageComponent", () => {
+  it("does not request or render a DB logical snapshot on ordinary Settings load", () => {
+    const source = readFileSync("apps/ssi-portal/src/app/settings-page.component.ts", "utf8");
+    expect(source).not.toContain("currentSnapshot");
+  });
   beforeEach(() => {
     reloadError = false;
     runtimeError = false;
@@ -76,6 +84,55 @@ describe("SettingsPageComponent", () => {
     component.ngOnInit();
     await Promise.resolve();
     expect(component.runtime()).toEqual(runtime);
+  });
+
+  it("loads OAS-governed Index-only inquiry and resyncs without edit actions", async () => {
+    const { SettingsPageComponent } = await import("./settings-page.component");
+    const component = new SettingsPageComponent();
+    await component.loadCurrencyInquiry();
+    expect(component.currencyColumns()).toEqual([{ path: "currency", label: "Currency" }]);
+    expect(component.currencyRows()).toHaveLength(1);
+    component.runtime.set(runtime);
+    await component.resyncCurrencies();
+    expect(service.resyncResolutionCurrencies).toHaveBeenCalled();
+    expect(service.resolutionCurrencies).toHaveBeenCalledTimes(2);
+    const source = readFileSync("apps/ssi-portal/src/app/settings-page.component.ts", "utf8");
+    expect(source).toContain("<ssi-governance-index-table");
+    expect(source).toContain("[interactiveRows]=\"false\"");
+    expect(source).toContain('appearance="maintenance"');
+    expect(source).toContain('recordLabel="records"');
+  });
+
+  it("loads currency inquiry only when its Settings tab is selected", async () => {
+    const { SettingsPageComponent } = await import("./settings-page.component");
+    const component = new SettingsPageComponent();
+    component.ngOnInit();
+    await Promise.resolve();
+    expect(component.settingsTab()).toBe("reload");
+    expect(service.resolutionCurrencies).not.toHaveBeenCalled();
+    component.selectSettingsTab("currency");
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(service.resolutionCurrencies).toHaveBeenCalledTimes(1);
+    component.selectSettingsTab("reload");
+    component.selectSettingsTab("currency");
+    expect(service.resolutionCurrencies).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses server environment title, sort and page size, with DB-backed search", async () => {
+    const { SettingsPageComponent } = await import("./settings-page.component");
+    const component = new SettingsPageComponent();
+    component.runtime.set({ ...runtime, resolutionCurrencyInquiry: {
+      title: "Business Currency Coverage", sortBy: "currency", sortDirection: "desc", pageSize: 15,
+    } });
+    component.currencySortBy.set("currency");
+    component.currencySortDirection.set("desc");
+    component.currencySearchInput.set("usd");
+    component.submitCurrencySearch();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(component.currencyConfig().title).toBe("Business Currency Coverage");
+    expect(service.resolutionCurrencies).toHaveBeenCalledWith(1, 15, "usd", "currency", "desc");
   });
 
   it("opens and closes confirmation without retaining the password", async () => {

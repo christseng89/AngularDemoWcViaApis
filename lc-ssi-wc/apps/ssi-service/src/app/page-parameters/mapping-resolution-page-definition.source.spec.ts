@@ -68,6 +68,16 @@ const catalogues = {
 } as unknown as MappingCatalogueService;
 
 describe("MappingResolutionPageDefinitionSource", () => {
+  it("exposes controlled currency discovery profiles without fixture projection", () => {
+    const source = new MappingResolutionPageDefinitionSource({
+      get: () => catalogue,
+    } as MappingCatalogueService);
+    expect(source.coverageProfiles("SR2026")).toContainEqual({
+      businessDomain: "TREASURY",
+      messageType: "MT399",
+      businessFunction: "FUTURE_GOVERNED_FUNCTION",
+    });
+  });
   it("creates an extensible definition from governed mapping data without a message switch", () => {
     const source = new MappingResolutionPageDefinitionSource(catalogues);
 
@@ -457,12 +467,14 @@ describe("MappingResolutionPageDefinitionSource", () => {
       { indexCatalogue, indexCurrencyProjection } as never,
       {
         get: () => ({
-          definitions: [{
-            profileId: "P-MT399-Q9",
-            messageType: "MT399",
-            sequence: "Q9",
-            settlementLeg: "Future settlement leg",
-          }],
+          definitions: [
+            {
+              profileId: "P-MT399-Q9",
+              messageType: "MT399",
+              sequence: "Q9",
+              settlementLeg: "Future settlement leg",
+            },
+          ],
           scenarios: [],
           inputs: [],
           crossTagConstraints: [],
@@ -505,6 +517,25 @@ describe("MappingResolutionPageDefinitionSource", () => {
     expect(indexCurrencyProjection).toHaveBeenCalledTimes(1);
     for (const item of [...treasury.items, ...tradeFinance.items])
       expect(service.get(item.query).contractSha256).toBe(item.contractSha256);
+  });
+
+  it("uses controlled coverage without executing the old fixture currency projection", () => {
+    const policy = new PageParameterEnvironmentPolicy("QA");
+    const oldProjection = jest.fn(() => { throw new Error("RUNTIME_CURRENCY_SQL_FORBIDDEN"); });
+    const options = { currencies: jest.fn(() => ({ currencies: ["EUR", "USD"], defaultCurrency: "USD" })) };
+    const source = new MappingResolutionPageDefinitionSource(
+      new MappingCatalogueService(),
+      { indexCurrencyProjection: oldProjection } as never,
+      new ResolutionPageScenarioCatalogueService(policy),
+      new ResolutionPageFixtureManifestService(),
+      undefined, undefined, options as never,
+    );
+    const definition = source.all("SR2026").find(({ businessDomain }) => businessDomain === "TREASURY")!;
+    expect(definition.fields.find(({ fieldId }) => fieldId === "context.currency")?.options)
+      .toEqual([{ value: "EUR", label: "EUR" }, { value: "USD", label: "USD" }]);
+    expect(definition.fields.find(({ fieldId }) => fieldId === "context.currency")?.optionSource?.source)
+      .toBe("RESOLUTION_CURRENCY_COVERAGE");
+    expect(oldProjection).not.toHaveBeenCalled();
   });
 
   it("loads the governed 362-case catalogue without embedding scenarios in mapping rows", () => {

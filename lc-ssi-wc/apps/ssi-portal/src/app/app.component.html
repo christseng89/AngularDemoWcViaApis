@@ -1,5 +1,5 @@
 <ssi-app-shell
-  [view]="view()"
+  [view]="loadingSsiDashboard() ? 'dashboard' : view()"
   [checkerCount]="checkerCount()"
   [detailOpen]="!!detail.target()"
   [auditDetailOpen]="routedAuditDetailOpen()"
@@ -103,7 +103,14 @@
     </section>
   } @else {
     @if (routeLoading()) {
-      <ssi-loading-state label="Loading workspace…" />
+      @if (loadingSsiDashboard()) {
+        <section class="panel" aria-busy="true">
+          <div class="loading-page-frame" aria-hidden="true"><span></span><span></span></div>
+          <ssi-loading-state label="Loading SSI records…" variant="screen" />
+        </section>
+      } @else {
+        <ssi-loading-state label="Loading workspace…" />
+      }
     }
   }
   <div

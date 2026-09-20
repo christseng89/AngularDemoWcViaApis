@@ -243,6 +243,7 @@ describe("SsiApplicationService governed lifecycle", () => {
   const harness = (
     initial = [record],
     applicabilityRows: Array<typeof applicability> = [applicability],
+    currencyCoordinator?: { discoverApproved: (id: string) => void },
   ) => {
     const records = [...initial];
     const repository = {
@@ -271,9 +272,28 @@ describe("SsiApplicationService governed lifecycle", () => {
         {} as RmaApplicationService,
         {} as NostroApplicationService,
         new PaymentMessageIndexService(),
+        currencyCoordinator as never,
       ),
     };
   };
+
+  it("discovers new currency inside the normal approval transaction", () => {
+    const pending = { ...record, status: "PENDING_APPROVAL" };
+    const coordinator = {
+      discoverApproved: jest.fn(() => ({ inserted: 1, activated: 0, inactivated: 0 })),
+      invalidateAfterCommit: jest.fn(),
+    };
+    const { service, repository } = harness([pending], [applicability], coordinator);
+    repository.approveWithApplicability.mockImplementation((id, actor, onApproved?: () => void) => {
+      onApproved?.();
+      return { ...pending, status: "ACTIVE", checker: actor, version: 2 };
+    });
+    expect(service.transition(pending.id, "APPROVE", "checker")).toMatchObject({ status: "ACTIVE" });
+    expect(coordinator.discoverApproved).toHaveBeenCalledWith(pending.id);
+    expect(coordinator.invalidateAfterCommit).toHaveBeenCalledWith(
+      expect.objectContaining({ inserted: 1 }),
+    );
+  });
 
   it("lists explicit ownership with each record's applicability", () => {
     const { service: current, repository } = harness();

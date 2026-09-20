@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "1.0",
+  "standardsRelease": "SR2026",
+  "discoveryAsOfDate": "2026-09-15",
+  "defaults": [
+    { "businessDomain": "PAYMENT", "currency": "USD", "bookingEntity": "HK01" },
+    { "businessDomain": "TREASURY", "currency": "USD" },
+    { "businessDomain": "TRADE_FINANCE", "currency": "USD" }
+  ]
+}

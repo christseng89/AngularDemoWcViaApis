@@ -8,6 +8,7 @@ import {
 export interface GovernanceIndexColumn {
   label: string;
   path: string;
+  presentation?: "strong" | "status";
 }
 
 export interface GovernanceIndexRow<T = unknown> {
@@ -38,6 +39,8 @@ export class GovernanceIndexTableComponent {
   readonly totalPages = input.required<number>();
   readonly totalRecords = input.required<number>();
   readonly pageSize = input.required<number>();
+  readonly interactiveRows = input(true);
+  readonly appearance = input<"audit" | "maintenance">("audit");
 
   readonly sortRequested = output<string>();
   readonly rowOpened = output<unknown>();

@@ -9,7 +9,12 @@ export interface RuntimeSettings {
   readonly fixtureId?: string;
   readonly seedSha256?: string;
   readonly statusPolicyVersion: string;
-  readonly currentSnapshot: { readonly sha256: string; readonly method: string };
+  readonly resolutionCurrencyInquiry?: {
+    readonly title: string;
+    readonly sortBy: string;
+    readonly sortDirection: "asc" | "desc";
+    readonly pageSize: number;
+  };
 }
 
 export interface DemoReloadResult {
@@ -19,6 +24,40 @@ export interface DemoReloadResult {
   readonly snapshotIdentityMethod: string;
   readonly seedSha256?: string;
   readonly importedRows: Readonly<Record<string, number>>;
+}
+
+export interface CurrencyInquiryContract {
+  readonly "x-ui-inquiries": readonly {
+    readonly id: string;
+    readonly endpoint: string;
+    readonly mode: string;
+    readonly search?: { readonly label: string; readonly placeholder: string };
+    readonly columns: readonly { readonly path: string; readonly label: string; readonly presentation?: "strong" | "status" }[];
+  }[];
+}
+
+export interface ResolutionCurrencyRow {
+  readonly businessDomain: string;
+  readonly currency: string;
+  readonly status: string;
+  readonly source: string;
+  readonly lastResyncAt: string | null;
+}
+
+export interface ResolutionCurrencyPage {
+  readonly items: readonly ResolutionCurrencyRow[];
+  readonly page: number;
+  readonly pageSize: number;
+  readonly totalItems: number;
+  readonly totalPages: number;
+}
+
+export interface ResolutionCurrencyResyncResult {
+  readonly discovered: number;
+  readonly inserted: number;
+  readonly unchanged: number;
+  readonly activated: number;
+  readonly inactivated: number;
 }
 
 @Injectable({ providedIn: "root" })
@@ -32,5 +71,19 @@ export class RuntimeSettingsService {
 
   reloadDevelopmentData(password: string): Observable<DemoReloadResult> {
     return this.http.post<DemoReloadResult>(`${this.api}/development-data/reload`, { password });
+  }
+
+  currencyContract(): Observable<CurrencyInquiryContract> {
+    return this.http.get<CurrencyInquiryContract>("/openapi/swift-data-service.v1.json");
+  }
+
+  resolutionCurrencies(page: number, pageSize: number, search: string, sortBy: string, sortDirection: "asc" | "desc"): Observable<ResolutionCurrencyPage> {
+    return this.http.get<ResolutionCurrencyPage>(`${this.api}/resolution-currencies`, {
+      params: { page, pageSize, search, sortBy, sortDirection },
+    });
+  }
+
+  resyncResolutionCurrencies(): Observable<ResolutionCurrencyResyncResult> {
+    return this.http.post<ResolutionCurrencyResyncResult>(`${this.api}/resolution-currencies/resync`, {});
   }
 }

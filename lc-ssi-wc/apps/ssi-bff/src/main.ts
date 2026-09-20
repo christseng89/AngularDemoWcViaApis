@@ -68,6 +68,22 @@ class BffController {
   @Get("settings/runtime") runtimeSettings(): Promise<unknown> {
     return forwardSsi("settings/runtime");
   }
+  @Get("settings/resolution-currencies") resolutionCurrencyInquiry(
+    @Query("page") page = "",
+    @Query("pageSize") pageSize = "",
+    @Query("businessDomain") businessDomain = "",
+    @Query("status") status = "",
+    @Query("search") search = "",
+    @Query("sortBy") sortBy = "",
+    @Query("sortDirection") sortDirection = "",
+  ): Promise<unknown> {
+    return forwardSsi(`settings/resolution-currencies${listQuery({
+      page, pageSize, businessDomain, status, search, sortBy, sortDirection,
+    })}`);
+  }
+  @Post("settings/resolution-currencies/resync") resyncResolutionCurrencies(): Promise<unknown> {
+    return forwardSsi("settings/resolution-currencies/resync", { method: "POST" });
+  }
   @Post("settings/development-data/reload") reloadDevelopmentData(
     @Body() body: unknown,
   ): Promise<unknown> {

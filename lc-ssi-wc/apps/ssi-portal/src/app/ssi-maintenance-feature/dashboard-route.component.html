@@ -1,5 +1,19 @@
 @if (index.ssiIndexLoading() && index.rows().length === 0) {
-  <ssi-loading-state label="Loading SSI records…" />
+  <section class="panel" aria-busy="true">
+    <div class="panel-title">
+      <div>
+        <p class="kicker">CURRENT OPERATING RECORDS</p>
+        <h2>Settlement Instructions</h2>
+        <p class="subtitle">預設隱藏 REVOKED／SUPERSEDED；完整歷史可在「稽核與事件」查看。</p>
+      </div>
+      <button class="primary" type="button" disabled>Add SSI</button>
+    </div>
+    <div class="catalog-tabs" aria-label="SSI ownership indexes">
+      <button type="button" disabled>Own SSI</button>
+      <button type="button" disabled>Counterparty SSI</button>
+    </div>
+    <ssi-loading-state label="Loading SSI records…" variant="screen" />
+  </section>
 } @else {
   <section class="metrics">
     <article>

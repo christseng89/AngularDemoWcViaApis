@@ -41,6 +41,7 @@ export const normalizeSqliteValue = (value: SqlValue | undefined): null | number
 
 export const databaseSnapshotIdentity = (
   database: DatabaseSync,
+  includedTables?: readonly string[],
 ): { sha256: string; method: string } => {
   const tables = database
     .prepare(
@@ -49,7 +50,10 @@ export const databaseSnapshotIdentity = (
        ORDER BY name`,
     )
     .all() as Array<{ name: string; sql: string | null }>;
-  const snapshot = tables.map(({ name, sql }) => {
+  const selected = includedTables
+    ? tables.filter(({ name }) => includedTables.includes(name))
+    : tables;
+  const snapshot = selected.map(({ name, sql }) => {
     const columns = database
       .prepare(`PRAGMA table_info(${quoteSqliteIdentifier(name)})`)
       .all() as Array<{ name: string }>;

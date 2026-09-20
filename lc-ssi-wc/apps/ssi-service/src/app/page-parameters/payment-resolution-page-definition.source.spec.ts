@@ -54,6 +54,32 @@ const SR2026_CONTINGENCY_NVR_SHA256 =
 const definitions = (): readonly ResolutionPageDefinition[] =>
   new PaymentResolutionPageDefinitionSource().all("SR2026");
 
+describe("controlled Payment definition options", () => {
+  it("uses coverage and Entity reference instead of runtime SSI candidate options", () => {
+    const oldOptions = jest.fn(() => { throw new Error("RUNTIME_SSI_QUERY_FORBIDDEN"); });
+    const source = new PaymentResolutionPageDefinitionSource(
+      undefined,
+      { options: oldOptions } as never,
+      undefined,
+      { payment: () => ({
+        currencies: ["EUR", "USD"],
+        bookingEntities: [{ value: "HK01", label: "HK01 — Hong Kong Branch" }],
+        defaultCurrency: "USD", defaultBookingEntity: "HK01",
+      }) } as never,
+    );
+    const definition = source.all("SR2026")[0]!;
+    expect(definition.fields.find(({ fieldId }) => fieldId === "context.currency")?.options)
+      .toEqual([{ value: "EUR", label: "EUR" }, { value: "USD", label: "USD" }]);
+    expect(definition.fields.find(({ fieldId }) => fieldId === "context.currency")?.optionSource?.source)
+      .toBe("RESOLUTION_CURRENCY_COVERAGE");
+    expect(definition.fields.find(({ fieldId }) => fieldId === "context.bookingEntity")?.options)
+      .toEqual([{ value: "HK01", label: "HK01 — Hong Kong Branch" }]);
+    expect(definition.fields.find(({ fieldId }) => fieldId === "context.bookingEntity")?.optionSource?.source)
+      .toBe("CONTROLLED_ENTITY_REFERENCE");
+    expect(oldOptions).not.toHaveBeenCalled();
+  });
+});
+
 const scenarioSortKey = (
   scenario: ResolutionPageScenario,
 ): readonly [number, string] => [
@@ -122,6 +148,24 @@ const artifactSha256 = (relativePath: string): string =>
     .digest("hex");
 
 describe("PaymentResolutionPageDefinitionSource", () => {
+  it("exposes governed coverage profiles without constructing SSI-derived definitions", () => {
+    const options = {
+      options: jest.fn(() => {
+        throw new Error("SSI_QUERY_CALLED");
+      }),
+    };
+    const source = new PaymentResolutionPageDefinitionSource(
+      undefined,
+      options as never,
+    );
+    expect(source.coverageProfiles()).toEqual([
+      { messageType: "MT202", businessService: "swift.cbprplus.04" },
+      { messageType: "MT202COV", businessService: "swift.cbprplus.cov.04" },
+      { messageType: "MT205", businessService: "swift.cbprplus.04" },
+      { messageType: "MT205COV", businessService: "swift.cbprplus.cov.04" },
+    ]);
+    expect(options.options).not.toHaveBeenCalled();
+  });
   it("publishes exactly the four executable MT2/pacs.009 messages", () => {
     const published = definitions();
 

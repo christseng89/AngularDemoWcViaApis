@@ -132,6 +132,7 @@ export class AppComponent implements OnInit, OnDestroy {
   readonly routeLoading = signal(false);
   private lastWorkbenchView: WorkbenchView = this.savedWorkbenchView();
   private pendingRouteTarget: View | null = null;
+  private loadingRouteView: View | null = null;
   private latestNavigationId = 0;
   private releasedMakerWipDuringNavigation = false;
   private readonly routerEventsSubscription: Subscription;
@@ -402,6 +403,7 @@ export class AppComponent implements OnInit, OnDestroy {
   private onRouterEvent(event: unknown): void {
     if (event instanceof NavigationStart) {
       this.latestNavigationId = event.id;
+      this.loadingRouteView = routeViewFromUrl(event.url);
       this.routeLoading.set(true);
       return;
     }
@@ -434,6 +436,7 @@ export class AppComponent implements OnInit, OnDestroy {
         );
       }
       this.pendingRouteTarget = null;
+      this.loadingRouteView = null;
       this.commitRouteView(target);
       this.routeLoading.set(false);
       if (event.urlAfterRedirects === "/" && isWorkbenchView(target)) {
@@ -455,6 +458,7 @@ export class AppComponent implements OnInit, OnDestroy {
     if (event instanceof NavigationSkipped) {
       if (event.id === this.latestNavigationId) {
         this.pendingRouteTarget = null;
+        this.loadingRouteView = null;
         this.routeLoading.set(false);
       }
       return;
@@ -469,6 +473,7 @@ export class AppComponent implements OnInit, OnDestroy {
         return;
       }
       this.pendingRouteTarget = null;
+      this.loadingRouteView = null;
       this.routeLoading.set(false);
       if (released || this.releasedMakerWipDuringNavigation) {
         this.releasedMakerWipDuringNavigation = false;
@@ -485,6 +490,12 @@ export class AppComponent implements OnInit, OnDestroy {
         });
       }
     }
+  }
+
+  loadingSsiDashboard(): boolean {
+    return this.routeLoading() &&
+      (this.loadingRouteView === "dashboard" ||
+        (this.loadingRouteView === null && this.view() === "dashboard"));
   }
 
   private commitRouteView(view: View): void {
