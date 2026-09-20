@@ -165,7 +165,7 @@
       "scenarios": [
         {
           "scenarioId": "MT205COV-OP-CONTINUATION",
-          "servicerRelationship": "DIFFERENT",
+          "servicerRelationship": "NOT_APPLICABLE",
           "label": "Same-country cover continuation",
           "polarity": "POSITIVE",
           "audience": "OPERATIONAL"
