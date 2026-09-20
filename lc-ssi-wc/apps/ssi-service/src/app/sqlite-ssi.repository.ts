@@ -99,7 +99,6 @@ export type SsiApplicabilityInput = Omit<
 export interface PaymentSsiCandidateQuery {
   readonly sourceMessageType: string;
   readonly messageType: string;
-  readonly businessService: string;
   readonly valueDate: string;
   readonly currency?: string;
   readonly bookingEntity?: string;
@@ -767,7 +766,6 @@ export class SqliteSsiRepository implements OnModuleDestroy {
            AND COALESCE(json_extract(s.payload,'$.route.validTo'),'') >= ?
            AND instr(',' || replace(COALESCE(json_extract(s.payload,'$.route.sourceMessageTypes'),''),' ','') || ',', ',' || ? || ',') > 0
            AND instr(',' || replace(COALESCE(json_extract(s.payload,'$.route.messageTypes'),''),' ','') || ',', ',' || ? || ',') > 0
-           AND instr(',' || replace(COALESCE(json_extract(s.payload,'$.route.businessService'),''),' ','') || ',', ',' || ? || ',') > 0
            ${query.ssiId ? "AND s.id=?" : ""}
            AND (? = '' OR json_extract(s.payload,'$.route.currency') = ?)
            AND (? = '' OR json_extract(s.payload,'$.route.bookingEntity') = ?)
@@ -783,7 +781,6 @@ export class SqliteSsiRepository implements OnModuleDestroy {
         query.valueDate,
         query.sourceMessageType,
         query.messageType,
-        query.businessService,
         ...(query.ssiId ? [query.ssiId] : []),
         currency,
         currency,
@@ -829,12 +826,11 @@ export class SqliteSsiRepository implements OnModuleDestroy {
          AND COALESCE(json_extract(s.payload,'$.route.validTo'),'') >= ?
          AND instr(',' || replace(COALESCE(json_extract(s.payload,'$.route.sourceMessageTypes'),''),' ','') || ',', ',' || ? || ',') > 0
          AND instr(',' || replace(COALESCE(json_extract(s.payload,'$.route.messageTypes'),''),' ','') || ',', ',' || ? || ',') > 0
-         AND instr(',' || replace(COALESCE(json_extract(s.payload,'$.route.businessService'),''),' ','') || ',', ',' || ? || ',') > 0
          ${query.ssiId ? "AND s.id=?" : ""}
        ORDER BY currency`,
     ).all(
       query.valueDate, query.valueDate, query.valueDate, query.valueDate,
-      query.sourceMessageType, query.messageType, query.businessService,
+      query.sourceMessageType, query.messageType,
       ...(query.ssiId ? [query.ssiId] : []),
     ) as { currency: string }[];
     return rows.map(({ currency }) => currency);

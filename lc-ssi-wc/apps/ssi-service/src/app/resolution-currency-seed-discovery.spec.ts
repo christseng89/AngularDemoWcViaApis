@@ -64,12 +64,40 @@ describe("approved synthetic seed currency discovery", () => {
       const query = {
         sourceMessageType: profile.messageType,
         messageType: "pacs.009.001.08",
-        businessService: profile.businessService,
         valueDate: "2026-09-15",
       };
       const original = [...new Set(repository.findPaymentCandidateBindings(query)
         .map(({ ssi }) => ssi.route.currency as string))].sort();
       expect(repository.findPaymentResolutionCurrencies(query)).toEqual(original);
+    }
+  });
+
+  it("keeps MT202/205 and pacs.009 Core/COV candidate identities and settlement routes across ten governed currencies", () => {
+    const currencies = ["AUD", "CAD", "CHF", "CNY", "EUR", "GBP", "HKD", "JPY", "SGD", "USD"];
+    for (const sourceMessageType of ["MT202", "MT202COV", "MT205", "MT205COV"]) {
+      for (const currency of currencies) {
+        const candidates = repository.findPaymentCandidateBindings({
+          sourceMessageType,
+          messageType: "pacs.009.001.08",
+          valueDate: "2026-09-15",
+          currency,
+          bookingEntity: "HK01",
+        });
+        expect(candidates.length).toBeGreaterThan(0);
+        const seen = new Set<string>();
+        for (const { ssi, applicability } of candidates) {
+          expect(seen.has(ssi.id)).toBe(false);
+          seen.add(ssi.id);
+          expect(ssi.route.sourceMessageTypes?.split(",")).toContain(sourceMessageType);
+          expect(ssi.route.currency).toBe(currency);
+          expect(ssi.route.bookingEntity).toBe("HK01");
+          expect(ssi.route.accountId).toBeTruthy();
+          expect(ssi.route.actualReceiverBic).toBeTruthy();
+          expect(applicability.ssiId).toBe(ssi.id);
+        }
+        const ranking = candidates.map(({ ssi }) => Number(ssi.route.priority));
+        expect(ranking).toEqual([...ranking].sort((a, b) => a - b));
+      }
     }
   });
 });

@@ -192,6 +192,19 @@ describe("PaymentGovernedApplicabilityService", () => {
     ).toEqual([]);
   });
 
+  it("does not require downstream businessService metadata in the SSI candidate fallback", () => {
+    const core = route({ businessService: "", sourceMessageTypes: "MT202,MT205" });
+    const cov = { ...route({ businessService: "", sourceMessageTypes: "MT202COV,MT205COV" }), id: "SSI-COV" };
+    const service = new PaymentGovernedApplicabilityService({
+      list: () => [core, cov],
+      listApplicability: () => [applicability(), applicability({ id: "SSI-COV:APPL:1", ssiId: "SSI-COV" })],
+    } as never);
+    expect(service.candidates({ messageType: "MT202", valueDate: "2026-09-15" }).map(({ id }) => id))
+      .toEqual([core.id]);
+    expect(service.candidates({ messageType: "MT202COV", valueDate: "2026-09-15" }).map(({ id }) => id))
+      .toEqual([cov.id]);
+  });
+
   it("excludes rows with inactive or expired applicability", () => {
     const service = new PaymentGovernedApplicabilityService({
       list: () => [route()],

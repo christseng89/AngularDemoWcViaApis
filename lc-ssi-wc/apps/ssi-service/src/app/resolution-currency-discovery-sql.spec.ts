@@ -178,7 +178,6 @@ describe("ordinary Resolution Currency SQL discovery", () => {
     const query = {
       sourceMessageType: "MT202",
       messageType: "pacs.009.001.08",
-      businessService: "swift.cbprplus.04",
       valueDate: "2026-09-20",
     };
     expect(repository.findPaymentCandidateBindings(query)).toHaveLength(2);
@@ -190,4 +189,54 @@ describe("ordinary Resolution Currency SQL discovery", () => {
         .map(({ ssi }) => ssi.id),
     ).toEqual(["SSI-PAY-EUR"]);
   });
+
+  it.each(["MT202", "MT202COV", "MT205", "MT205COV"])(
+    "keeps %s pacs.009 SSI discovery independent of downstream businessService while preserving Core/COV routes",
+    (sourceMessageType) => {
+      for (const [suffix, supportedMessage] of [
+        ["CORE", "MT202,MT205"],
+        ["COV", "MT202COV,MT205COV"],
+      ]) {
+        const id = `SSI-${suffix}`;
+        repository.save(
+          {
+            ...activeSsi(id, "USD", "pacs.009.001.08"),
+            route: {
+              routePurpose: "INTERBANK_TRANSFER",
+              sourceMessageTypes: supportedMessage,
+              messageTypes: "pacs.009.001.08",
+              businessService: suffix === "CORE" ? "swift.cbprplus.04" : "swift.cbprplus.cov.04",
+              currency: "USD",
+              bookingEntity: "HK01",
+              accountId: `ACCOUNT-${suffix}`,
+              actualReceiverBic: `RECEIVER-${suffix}`,
+              validFrom: "2026-01-01",
+              validTo: "2027-12-31",
+            },
+          },
+          "APPROVE",
+          "checker",
+        );
+        repository.replaceApplicability(id, [{
+          consumer: "CENTRAL_PAYMENT", product: "CENTRAL_PAYMENT",
+          businessFunction: "INTERBANK_TRANSFER", paymentLeg: "INTERBANK_SETTLEMENT",
+          direction: "OUTBOUND", status: "ACTIVE",
+          validFrom: "2026-01-01", validTo: "2027-12-31",
+        }], "checker");
+      }
+      const query = {
+        sourceMessageType,
+        messageType: "pacs.009.001.08",
+        businessService: "nonmatching.profile.only",
+        valueDate: "2026-09-20",
+        currency: "USD",
+        bookingEntity: "HK01",
+      };
+      const expected = sourceMessageType.endsWith("COV") ? "COV" : "CORE";
+      expect(repository.findPaymentCandidateBindings(query).map(({ ssi }) => [
+        ssi.id, ssi.route["accountId"], ssi.route["actualReceiverBic"],
+      ])).toEqual([[`SSI-${expected}`, `ACCOUNT-${expected}`, `RECEIVER-${expected}`]]);
+      expect(repository.findPaymentResolutionCurrencies(query)).toEqual(["USD"]);
+    },
+  );
 });

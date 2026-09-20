@@ -82,7 +82,6 @@ export class PaymentGovernedApplicabilityService {
     const bindings = this.repository.findPaymentCandidateBindings({
       sourceMessageType: query.messageType,
       messageType: "pacs.009.001.08",
-      businessService,
       valueDate: query.valueDate,
       ...(query.currency ? { currency: query.currency } : {}),
       ...(query.bookingEntity ? { bookingEntity: query.bookingEntity } : {}),
@@ -154,14 +153,10 @@ export class PaymentGovernedApplicabilityService {
 
   candidates(query: PaymentApplicabilityQuery): readonly SsiRecord[] {
     if (!PAYMENT_MESSAGES.has(query.messageType)) return [];
-    const businessService = query.messageType.endsWith("COV")
-      ? "swift.cbprplus.cov.04"
-      : "swift.cbprplus.04";
     if (typeof this.repository.findPaymentCandidates === "function")
       return this.repository.findPaymentCandidates({
         sourceMessageType: query.messageType,
         messageType: "pacs.009.001.08",
-        businessService,
         valueDate: query.valueDate,
         ...(query.currency ? { currency: query.currency } : {}),
         ...(query.bookingEntity ? { bookingEntity: query.bookingEntity } : {}),
@@ -182,7 +177,6 @@ export class PaymentGovernedApplicabilityService {
         eligibleSsiIds.has(row.id) &&
         hasToken(route["sourceMessageTypes"], query.messageType) &&
         hasToken(route["messageTypes"], "pacs.009.001.08") &&
-        hasToken(route["businessService"], businessService) &&
         Boolean(route["currency"]?.trim()) &&
         Boolean(route["bookingEntity"]?.trim()) &&
         effective(

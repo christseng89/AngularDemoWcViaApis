@@ -44,7 +44,6 @@ export class ResolutionCurrencyCoverageDiscoveryService {
       const currencies = this.repository.findPaymentResolutionCurrencies({
         sourceMessageType: profile.messageType,
         messageType: "pacs.009.001.08",
-        businessService: profile.businessService,
         valueDate: asOfDate,
         ...(ssiId ? { ssiId } : {}),
       });
