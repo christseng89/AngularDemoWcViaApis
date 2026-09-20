@@ -51,6 +51,16 @@ const config = {
 };
 
 describe("ResolutionPageScenarioCatalogueService", () => {
+  it("names the 11 Trade Finance MESSAGE scenarios without the redundant prefix", () => {
+    const scenarios = new ResolutionPageScenarioCatalogueService(
+      new PageParameterEnvironmentPolicy("QA"),
+    ).get().scenarios;
+    const messageTypes = ["MT400", "MT730", "MT734", "MT742", "MT750", "MT752", "MT754", "MT756", "MT765", "MT768", "MT769"];
+    for (const messageType of messageTypes) {
+      const scenario = scenarios.find(({ scenarioId }) => scenarioId === `${messageType}-001`);
+      expect(scenario?.label).toBe("direct canonical route");
+    }
+  });
   const path = join(tmpdir(), `resolution-page-scenarios-${process.pid}.json`);
   beforeAll(() => writeFileSync(path, JSON.stringify(config)));
 

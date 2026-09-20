@@ -28249,7 +28249,7 @@
     {
       "scenarioId": "MT400-001",
       "messageType": "MT400",
-      "businessScenario": "MESSAGE - Message / direct canonical route",
+      "businessScenario": "direct canonical route",
       "sequence": "MESSAGE",
       "settlementLeg": "Message",
       "polarity": "POSITIVE",
@@ -28657,7 +28657,7 @@
     {
       "scenarioId": "MT730-001",
       "messageType": "MT730",
-      "businessScenario": "MESSAGE - Message / direct canonical route",
+      "businessScenario": "direct canonical route",
       "sequence": "MESSAGE",
       "settlementLeg": "Message",
       "polarity": "POSITIVE",
@@ -29031,7 +29031,7 @@
     {
       "scenarioId": "MT734-001",
       "messageType": "MT734",
-      "businessScenario": "MESSAGE - Message / direct canonical route",
+      "businessScenario": "direct canonical route",
       "sequence": "MESSAGE",
       "settlementLeg": "Message",
       "polarity": "POSITIVE",
@@ -29405,7 +29405,7 @@
     {
       "scenarioId": "MT742-001",
       "messageType": "MT742",
-      "businessScenario": "MESSAGE - Message / direct canonical route",
+      "businessScenario": "direct canonical route",
       "sequence": "MESSAGE",
       "settlementLeg": "Message",
       "polarity": "POSITIVE",
@@ -29779,7 +29779,7 @@
     {
       "scenarioId": "MT750-001",
       "messageType": "MT750",
-      "businessScenario": "MESSAGE - Message / direct canonical route",
+      "businessScenario": "direct canonical route",
       "sequence": "MESSAGE",
       "settlementLeg": "Message",
       "polarity": "POSITIVE",
@@ -30153,7 +30153,7 @@
     {
       "scenarioId": "MT752-001",
       "messageType": "MT752",
-      "businessScenario": "MESSAGE - Message / direct canonical route",
+      "businessScenario": "direct canonical route",
       "sequence": "MESSAGE",
       "settlementLeg": "Message",
       "polarity": "POSITIVE",
@@ -30542,7 +30542,7 @@
     {
       "scenarioId": "MT754-001",
       "messageType": "MT754",
-      "businessScenario": "MESSAGE - Message / direct canonical route",
+      "businessScenario": "direct canonical route",
       "sequence": "MESSAGE",
       "settlementLeg": "Message",
       "polarity": "POSITIVE",
@@ -30916,7 +30916,7 @@
     {
       "scenarioId": "MT756-001",
       "messageType": "MT756",
-      "businessScenario": "MESSAGE - Message / direct canonical route",
+      "businessScenario": "direct canonical route",
       "sequence": "MESSAGE",
       "settlementLeg": "Message",
       "polarity": "POSITIVE",
@@ -31305,7 +31305,7 @@
     {
       "scenarioId": "MT765-001",
       "messageType": "MT765",
-      "businessScenario": "MESSAGE - Message / direct canonical route",
+      "businessScenario": "direct canonical route",
       "sequence": "MESSAGE",
       "settlementLeg": "MESSAGE",
       "polarity": "POSITIVE",
@@ -31788,7 +31788,7 @@
     {
       "scenarioId": "MT768-001",
       "messageType": "MT768",
-      "businessScenario": "MESSAGE - Message / direct canonical route",
+      "businessScenario": "direct canonical route",
       "sequence": "MESSAGE",
       "settlementLeg": "Message",
       "polarity": "POSITIVE",
@@ -32162,7 +32162,7 @@
     {
       "scenarioId": "MT769-001",
       "messageType": "MT769",
-      "businessScenario": "MESSAGE - Message / direct canonical route",
+      "businessScenario": "direct canonical route",
       "sequence": "MESSAGE",
       "settlementLeg": "Message",
       "polarity": "POSITIVE",
