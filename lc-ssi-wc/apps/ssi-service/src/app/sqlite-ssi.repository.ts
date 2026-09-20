@@ -739,6 +739,30 @@ export class SqliteSsiRepository implements OnModuleDestroy {
       applicability: JSON.parse(String(row.applicability_payload)) as SsiApplicabilityRecord,
     }));
   }
+  hasCoverProfile(request: RouteResolutionRequest): boolean {
+    const counterparty = request.counterpartyBic || request.counterpartyId || "";
+    const row = this.db.prepare(
+      `SELECT EXISTS(
+         SELECT 1 FROM ssi AS s
+         WHERE json_extract(s.payload,'$.status')='ACTIVE'
+           AND json_extract(s.payload,'$.route.currency')=?
+           AND json_extract(s.payload,'$.route.bookingEntity')=?
+           AND COALESCE(NULLIF(json_extract(s.payload,'$.route.counterpartyBic'),''),
+                        json_extract(s.payload,'$.counterpartyId'))=?
+           AND instr(',' || replace(COALESCE(json_extract(s.payload,'$.route.messageTypes'),''),' ','') || ',', ',' || ? || ',') > 0
+           AND instr(',' || replace(COALESCE(json_extract(s.payload,'$.route.businessService'),''),' ','') || ',', ',' || ? || ',') > 0
+           AND instr(',' || replace(COALESCE(json_extract(s.payload,'$.route.sourceMessageTypes'),''),' ','') || ',', ',' || ? || ',') > 0
+       ) AS found`,
+    ).get(
+      request.currency,
+      request.bookingEntity,
+      counterparty,
+      request.messageType,
+      "swift.cbprplus.cov.04",
+      request.sourceMessageType ?? "",
+    ) as { found: number };
+    return row.found === 1;
+  }
   findPaymentCandidates(query: PaymentSsiCandidateQuery): SsiRecord[] {
     return this.findPaymentCandidateBindings(query).map(({ ssi }) => ssi);
   }

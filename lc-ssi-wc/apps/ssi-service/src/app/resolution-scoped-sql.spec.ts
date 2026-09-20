@@ -129,4 +129,28 @@ describe("request-scoped SSI SQL", () => {
     expect(repository.findRelatedRouteBindings(request).ssi.map(({ id }) => id)).not.toContain(expired.id);
     repository.onModuleDestroy();
   });
+
+  it("checks an exact COV profile in SQL without loading all SSI records", () => {
+    const repository = new SqliteSsiRepository();
+    const cover = ssi("COVER", {
+      businessService: "swift.cbprplus.cov.04",
+      sourceMessageTypes: "MT202COV,MT205COV",
+    });
+    repository.save(cover, "CREATED", "maker.test");
+    const context = {
+      ...request,
+      sourceMessageType: "MT202COV",
+      businessService: "swift.cbprplus.cov.04",
+    };
+    expect(repository.hasCoverProfile(context)).toBe(true);
+    expect(repository.hasCoverProfile({ ...context, sourceMessageType: "MT205COV" })).toBe(true);
+    expect(repository.hasCoverProfile({ ...context, sourceMessageType: "MT202" })).toBe(false);
+    expect(repository.hasCoverProfile({ ...context, counterpartyBic: "CHASUS33" })).toBe(false);
+    expect(repository.hasCoverProfile({ ...context, bookingEntity: "SG01" })).toBe(false);
+    repository.save({ ...cover, route: { ...cover.route, counterpartyBic: "" } }, "UPDATED", "maker.test");
+    expect(repository.hasCoverProfile(context)).toBe(true);
+    repository.save({ ...cover, status: "SUPPRESSED" }, "SUPPRESSED", "maker.test");
+    expect(repository.hasCoverProfile(context)).toBe(false);
+    repository.onModuleDestroy();
+  });
 });

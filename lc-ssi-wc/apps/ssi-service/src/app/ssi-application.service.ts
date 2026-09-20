@@ -1038,9 +1038,9 @@ export class SsiApplicationService {
     const exactCounterparty = request.counterpartyBic || request.counterpartyId;
     const profileAvailable =
       request.businessService === COV_BUSINESS_SERVICE &&
-      this.repository
-        .list()
-        .some(
+      (typeof this.repository.hasCoverProfile === "function"
+        ? this.repository.hasCoverProfile(request)
+        : this.repository.list().some(
           (candidate) =>
             candidate.status === "ACTIVE" &&
             candidate.route["currency"] === request.currency &&
@@ -1056,7 +1056,7 @@ export class SsiApplicationService {
             routeList(candidate.route, "sourceMessageTypes").includes(
               sourceMessageType,
             ),
-        );
+        ));
     if (!profileAvailable)
       throw new ServiceUnavailableException("PROFILE_INCOMPLETE");
   }
