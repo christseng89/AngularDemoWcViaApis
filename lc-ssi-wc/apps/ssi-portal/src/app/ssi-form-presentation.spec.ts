@@ -81,12 +81,17 @@ describe("SSI form presentation", () => {
     expect(swiftDataTemplate).toContain("<ssi-governed-record-view");
   });
 
-  it("omits the redundant Active badge in the governed read-only detail", () => {
+  it("omits the Active badge only when the governed view requests it", () => {
     const detailTemplate = readFileSync(
       join(__dirname, "governed-record-view.component.html"),
       "utf8",
     );
-    expect(detailTemplate).toContain('@if (displayStatus() !== "ACTIVE")');
+    const swiftDataTemplate = readFileSync(
+      join(__dirname, "swift-data-crud.component.html"),
+      "utf8",
+    );
+    expect(detailTemplate).toContain('hideActiveStatus() && displayStatus() === "ACTIVE"');
     expect(detailTemplate).toContain('<span class="status">{{ displayStatus() }}</span>');
+    expect(swiftDataTemplate).toContain('[hideActiveStatus]="resourceId() === \'rma\'"');
   });
 });

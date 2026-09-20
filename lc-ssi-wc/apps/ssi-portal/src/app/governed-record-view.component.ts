@@ -21,6 +21,7 @@ export class GovernedRecordViewComponent {
   readonly recordId = input.required<string>();
   readonly version = input.required<number>();
   readonly status = input.required<string>();
+  readonly hideActiveStatus = input(false);
   readonly fields = input.required<readonly FormlyFieldConfig[]>();
   readonly model = input.required<Record<string, unknown>>();
   readonly kicker = input("OAS → PARAMETERS → SCREEN · READ ONLY");

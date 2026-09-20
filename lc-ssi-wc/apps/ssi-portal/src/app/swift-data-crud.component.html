@@ -425,6 +425,7 @@
       [recordId]="row.id"
       [version]="row.version"
       [status]="row.status"
+      [hideActiveStatus]="resourceId() === 'rma'"
       [fields]="fields()"
       [model]="detailModel()"
       (closed)="cancelWork()"

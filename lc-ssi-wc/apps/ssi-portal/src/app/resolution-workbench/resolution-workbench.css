@@ -222,29 +222,12 @@ small {
 code {
   display: inline-block;
   margin-top: 0.75rem;
-  color: var(--ui-text-muted);
   overflow-wrap: anywhere;
 }
 .loading-state,
 .empty-state {
   padding: 2rem;
   text-align: center;
-  color: var(--ui-text-muted);
-}
-.loading-pulse {
-  display: inline-block;
-  width: 0.75rem;
-  height: 0.75rem;
-  margin-right: 0.6rem;
-  border-radius: 50%;
-  background: var(--ui-action);
-  animation: pulse 1s ease-in-out infinite alternate;
-}
-@keyframes pulse {
-  to {
-    opacity: 0.25;
-    transform: scale(0.8);
-  }
 }
 @media (max-width: 720px) {
   .workbench-header,
@@ -254,11 +237,6 @@ code {
   }
   .parameter-field--wide {
     grid-column: span 1;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .loading-pulse {
-    animation: none;
   }
 }
 .definition-index-workspace {
@@ -539,24 +517,13 @@ code {
 }
 .resolution-result-table td small {
   margin-top: 0.2rem;
-  color: var(--ui-text-muted);
 }
 .resolution-result-table code {
   white-space: pre-wrap;
 }
-.result-status[data-status="RESOLVED"] {
-  color: var(--ui-action);
-}
-.result-status[data-status="NOT_REQUIRED"],
-.result-status[data-status="N_A"] {
-  color: var(--ui-text-muted);
-}
 .resolution-results__empty {
   margin: 0;
   padding: 1rem;
-  border: 1px dashed color-mix(in srgb, currentColor 22%, transparent);
-  border-radius: 0.65rem;
-  color: var(--ui-text-muted);
 }
 
 .generated-outputs {

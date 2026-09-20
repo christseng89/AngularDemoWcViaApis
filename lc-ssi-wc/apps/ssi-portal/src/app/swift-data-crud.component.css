@@ -5,13 +5,6 @@
   display: grid;
   align-content: center;
   gap: 8px;
-  background: var(--ui-code-surface);
-  color: var(--ui-code-text);
-  border-radius: 8px;
-  padding: 18px;
-}
-.baseline span {
-  font-size: 12px;
 }
 .toolbar {
   display: flex;
@@ -19,42 +12,15 @@
   flex-wrap: wrap;
   justify-content: flex-end;
 }
-.upload-button {
-  display: inline-flex;
-  align-items: center;
-  border: 1px solid var(--ui-control-border);
-  border-radius: 6px;
-  padding: 10px 14px;
-  background: var(--paper);
-  color: var(--ink);
-  font-weight: 750;
-  cursor: pointer;
-}
-.upload-button input {
-  display: none;
-}
 .oas-form {
-  border: 1px solid var(--line);
-  border-left: 5px solid var(--mint);
-  border-radius: 8px;
-  padding: 20px;
   margin: 18px 0;
   max-width: 850px;
 }
 .import-result {
   margin-top: 18px;
 }
-.import-result summary {
-  font-weight: 800;
-  cursor: pointer;
-}
 .import-result pre {
-  background: var(--ui-code-surface);
-  color: var(--ui-code-text);
-  padding: 15px;
-  border-radius: 7px;
   overflow: auto;
-  font-size: 11px;
 }
 @media (max-width: 760px) {
   .swift-data-intro {
@@ -76,34 +42,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 40px;
   margin: 10px 0;
-  padding: 8px 12px;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  background: var(--paper);
-  color: var(--ink);
-  font-weight: 750;
-}
-.index-spinner {
-  width: 18px;
-  height: 18px;
-  border: 2px solid var(--line);
-  border-top-color: var(--mint);
-  border-radius: 50%;
-  animation: index-spinner-rotate 0.7s linear infinite;
-}
-@keyframes index-spinner-rotate {
-  to {
-    transform: rotate(360deg);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .index-spinner {
-    animation: none;
-    border-top-color: var(--line);
-    background: var(--mint);
-  }
 }
 .revision-action-cell {
   min-width: 9.5rem;

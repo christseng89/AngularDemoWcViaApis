@@ -6,7 +6,7 @@
       <p class="subtitle">{{ recordId() }} · v{{ version() }}</p>
     </div>
     <div class="readonly-page-actions">
-      @if (displayStatus() !== "ACTIVE") {
+      @if (!(hideActiveStatus() && displayStatus() === "ACTIVE")) {
         <span class="status">{{ displayStatus() }}</span>
       }
       <button

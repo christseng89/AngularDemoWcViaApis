@@ -112,4 +112,22 @@ describe("portal visual design system", () => {
       expect(css).toContain("font-family: var(--font-ui)");
     }
   });
+
+  it("keeps Message Type access labels readable in both themes", () => {
+    expect(globalStyles).toMatch(/\.message-type-field \.direction-access\s*\{[^}]*color:\s*var\(--ui-accent-ink\)/);
+  });
+
+  it("keeps shared control and loading visuals out of feature CSS", () => {
+    const settings = featureStyles.find(({ path }) => path.includes("settings-page"))?.css ?? "";
+    const swiftData = featureStyles.find(({ path }) => path.includes("swift-data-crud"))?.css ?? "";
+    const workbench = featureStyles.find(({ path }) => path.includes("resolution-workbench"))?.css ?? "";
+    expect(settings).not.toContain(".theme-options label {");
+    expect(swiftData).not.toContain(".upload-button {");
+    expect(swiftData).not.toContain(".index-spinner {");
+    expect(workbench).not.toContain(".loading-pulse {");
+    expect(workbench).not.toContain('.result-status[data-status="RESOLVED"]');
+    for (const selector of [".theme-options label", ".upload-button", ".index-spinner", ".loading-pulse", '.result-status[data-status="RESOLVED"]']) {
+      expect(globalStyles).toContain(selector);
+    }
+  });
 });
