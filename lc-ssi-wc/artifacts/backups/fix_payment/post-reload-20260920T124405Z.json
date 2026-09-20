@@ -1,0 +1,18 @@
+{
+  "purpose": "Payment SSI post-Reload Test Data backup",
+  "createdAtUtc": "20260920T124405Z",
+  "source": "data/ssi-demo.sqlite",
+  "backup": "artifacts/backups/fix_payment/post-reload-20260920T124405Z.sqlite",
+  "sha256": "52596EAD6B1F5819BA7E7A48F386BA6D1A7FA2FE8FFF5FBFD831B9A7C8B93299",
+  "integrity": "ok",
+  "rowCounts": {
+    "ssi": 10637,
+    "ssi_applicability": 10973,
+    "nostro_account": 2119,
+    "rma_authorisation": 5657,
+    "rma_audit_event": 6603
+  },
+  "reloadSeedSha256": "F9EBDF0A06CB2F9F269F7A9F0C73C2BDDB568F6E45C9F93C34680422E681F662",
+  "reloadSnapshotHash": "a42089a7e21a30ad69d0d1ef4b72d516e29c0497a33e63ac75e6bf3263f77392",
+  "gitBranch": "fix_payment"
+}
