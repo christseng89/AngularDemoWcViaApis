@@ -17,4 +17,10 @@ describe("resolution workbench desktop density", () => {
     expect(stylesheet).toContain("padding: clamp(0.8rem, 1.4vw, 1.15rem);");
     expect(stylesheet).not.toMatch(/zoom\s*:/);
   });
+
+  it("contains offscreen table labels within the horizontal scroll region", () => {
+    expect(stylesheet).toMatch(
+      /\.index-table-scroll,\s*\.scenario-table-scroll\s*\{[^}]*position:\s*relative;[^}]*overflow-x:\s*auto;/,
+    );
+  });
 });

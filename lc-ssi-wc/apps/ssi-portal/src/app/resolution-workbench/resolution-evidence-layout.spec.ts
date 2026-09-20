@@ -56,4 +56,23 @@ describe("resolution evidence layout", () => {
     expect(resultTable).not.toContain("row.sequenceId");
     expect(resultTable).toContain('<th scope="col">Tag + option</th>');
   });
+
+  it("shows the business role label once, with the primary value style", () => {
+    const resultTable = readFileSync(
+      join(directory, "resolution-result-table.component.html"),
+      "utf8",
+    );
+    expect(resultTable).toContain('<strong>{{ row.displayFieldName || "—" }}</strong>');
+    expect(resultTable).not.toContain("row.role ||");
+  });
+
+  it("omits the duplicated rendered value column from the primary table", () => {
+    const resultTable = readFileSync(
+      join(directory, "resolution-result-table.component.html"),
+      "utf8",
+    );
+    expect(resultTable).not.toContain('<th scope="col">Rendered value</th>');
+    expect(resultTable).not.toContain("row.renderedValue");
+    expect(resultTable).toContain('<th scope="col">BIC</th>');
+  });
 });

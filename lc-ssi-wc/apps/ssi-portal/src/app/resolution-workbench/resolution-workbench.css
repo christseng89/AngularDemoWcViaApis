@@ -270,6 +270,7 @@ code {
 }
 .index-table-scroll,
 .scenario-table-scroll {
+  position: relative;
   overflow-x: auto;
   border-block: 1px solid var(--workbench-line);
 }

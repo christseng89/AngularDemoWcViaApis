@@ -83,6 +83,29 @@ describe("resolution result presenter", () => {
     expect(row?.tagAndOption).toBe("79");
   });
 
+  it("omits the repeated Tag + option prefix from the displayed role description", () => {
+    const [row] = resolutionResultRows([
+      {
+        ...resolved,
+        swiftTag: "58",
+        swiftOption: "A",
+        fieldName: "SWIFT 58A • BENEFICIARY INSTITUTION",
+      },
+    ]);
+    expect(row).toMatchObject({
+      tagAndOption: "58A",
+      fieldName: "SWIFT 58A • BENEFICIARY INSTITUTION",
+      displayFieldName: "BENEFICIARY INSTITUTION",
+    });
+  });
+
+  it("keeps an unmatched governed description intact", () => {
+    const [row] = resolutionResultRows([
+      { ...resolved, fieldName: "SWIFT 58A • BENEFICIARY INSTITUTION" },
+    ]);
+    expect(row?.displayFieldName).toBe("SWIFT 58A • BENEFICIARY INSTITUTION");
+  });
+
   it("distinguishes an empty not-required result from an absent result", () => {
     expect(emptyResolutionMessage("NOT_REQUIRED")).toBe(
       "Field-level SSI is not required for this scenario.",

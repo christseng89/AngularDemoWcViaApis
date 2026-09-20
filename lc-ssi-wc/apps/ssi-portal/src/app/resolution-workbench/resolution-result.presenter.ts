@@ -12,6 +12,7 @@ export interface ResolutionResultRow {
   readonly tagAndOption: string;
   readonly role: string;
   readonly fieldName: string;
+  readonly displayFieldName: string;
   readonly renderedValue: string;
   readonly bic: string;
   readonly institutionName: string;
@@ -26,6 +27,13 @@ export interface ResolutionResultRow {
 const statusLabel = (
   status: ResolutionPageFieldResult["resolutionStatus"],
 ): string => status.replaceAll("_", " ");
+
+const displayFieldName = (name: string, tagAndOption: string): string => {
+  const repeatedPrefix = `SWIFT ${tagAndOption} • `;
+  return name.startsWith(repeatedPrefix)
+    ? name.slice(repeatedPrefix.length).trim()
+    : name;
+};
 
 const provenanceSummary = (
   provenance: ResolutionPageFieldResult["provenance"],
@@ -59,6 +67,10 @@ export const resolutionResultRows = (
     tagAndOption: `${field.swiftTag}${field.swiftOption}`,
     role: field.role,
     fieldName: field.fieldName,
+    displayFieldName: displayFieldName(
+      field.fieldName,
+      `${field.swiftTag}${field.swiftOption}`,
+    ),
     renderedValue: field.value ?? "",
     bic: field.institution?.bic ?? "",
     institutionName: field.institution?.name ?? "",

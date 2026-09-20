@@ -21,7 +21,6 @@
             <th scope="col">Institution</th>
             <th scope="col">Account</th>
             <th scope="col">Party ID</th>
-            <th scope="col">Rendered value</th>
             <th scope="col">Status</th>
           </tr>
         </thead>
@@ -32,10 +31,7 @@
                 <code>{{ row.tagAndOption || "—" }}</code>
               </td>
               <td>
-                <strong>{{ row.role || "—" }}</strong>
-                @if (row.fieldName) {
-                  <small>{{ row.fieldName }}</small>
-                }
+                <strong>{{ row.displayFieldName || "—" }}</strong>
               </td>
               <td class="result-key">
                 <code>{{ row.bic || "—" }}</code>
@@ -46,9 +42,6 @@
               </td>
               <td>
                 <code>{{ row.partyIdentifier || "—" }}</code>
-              </td>
-              <td>
-                <code>{{ row.renderedValue || "—" }}</code>
               </td>
               <td>
                 <span class="result-status" [attr.data-status]="row.status">
