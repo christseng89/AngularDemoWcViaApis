@@ -272,6 +272,7 @@ export class NostroApplicationService {
       decision: "RESOLVED",
       nostroId: selected.id,
       nostroVersion: selected.version,
+      priority: selected.priority,
       accountReference: selected.accountReference,
       ownLegalEntityId: selected.ownLegalEntityId,
       allowedBookingEntities: selected.allowedBookingEntities ?? [],

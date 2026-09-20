@@ -49,6 +49,65 @@ const applicability = {
 } as SsiApplicabilityRecord;
 
 describe("counterparty SSI coverage boundary", () => {
+  it.each(["AUD", "CAD", "CHF", "CNY", "EUR", "GBP", "HKD", "JPY", "SGD", "USD"])(
+    "resolves %s Payment SSI without local clearing-system eligibility",
+    (currency) => {
+      const paymentRequest: RouteResolutionRequest = {
+        ...request,
+        consumer: "CENTRAL_PAYMENT",
+        product: "CENTRAL_PAYMENT",
+        businessFunction: "INTERBANK_TRANSFER",
+        paymentLeg: "INTERBANK_SETTLEMENT",
+        counterpartyBic: "CTBAAU2S",
+        counterpartyCountry: "AU",
+        settlementCountry: "AU",
+        settlementMarket: "CORRESPONDENT_BANKING",
+        clearingSystem: "RITS",
+        currency,
+        messageType: "pacs.009.001.08",
+        sourceMessageType: "MT202",
+      };
+      const ssi = {
+        id: "SSI-AUD-CTBA",
+        counterpartyId: "CP-CTBA",
+        status: "ACTIVE",
+        version: 1,
+        route: {
+          currency,
+          counterpartyBic: "CTBAAU2S",
+          counterpartyCountry: "AU",
+          accountWithBic: "CTBAAU2S",
+          accountCurrency: currency,
+          settlementCountry: "AU",
+          settlementMarket: "CORRESPONDENT_BANKING",
+          clearingSystem: "CORRESPONDENT_CHAIN",
+          bookingEntity: "HK01",
+          messageTypes: "pacs.009.001.08",
+          sourceMessageTypes: "MT202",
+          validFrom: "2026-01-01",
+          validTo: "2027-12-31",
+          priority: "10",
+        },
+      };
+      const row = {
+        ...applicability,
+        id: "SSI-AUD-CTBA:APPL:1",
+        ssiId: ssi.id,
+        consumer: "CENTRAL_PAYMENT",
+        product: "CENTRAL_PAYMENT",
+        businessFunction: "INTERBANK_TRANSFER",
+        paymentLeg: "INTERBANK_SETTLEMENT",
+      };
+
+      const result = previewResolution(paymentRequest, [ssi], [row]);
+      expect(result.decision).toBe("RESOLVED");
+      expect(result.recommendedRoute?.ssiId).toBe(ssi.id);
+      expect(result.recommendedRoute?.evidence.some(({ criterion }) => criterion.startsWith("CLEARING_"))).toBe(false);
+      expect(previewResolution({ ...paymentRequest, settlementCountry: "NZ" }, [ssi], [row]).decision).toBe("NO_ELIGIBLE_ROUTE");
+      expect(previewResolution({ ...paymentRequest, settlementMarket: "AU_DOMESTIC" }, [ssi], [row]).decision).toBe("NO_ELIGIBLE_ROUTE");
+    },
+  );
+
   it("requires an explicit COV business service and source-message allow-list", () => {
     const coverRequest: RouteResolutionRequest = {
       ...request,

@@ -1,5 +1,4 @@
 import type { SsiApplicabilityRecord } from "./sqlite-ssi.repository";
-import { CLEARING_SYSTEMS } from "./clearing-systems.reference";
 
 export interface BeneficiaryCustomerInput {
   readonly customerId: string;
@@ -79,15 +78,6 @@ interface Candidate {
 
 const compatible = (actual: string | undefined, expected: string): boolean =>
   actual === "ANY" || actual === expected;
-const clearingCountryCompatible = (
-  clearing: (typeof CLEARING_SYSTEMS)[number] | undefined,
-  country: string,
-): boolean =>
-  Boolean(
-    clearing &&
-    (clearing.settlementCountry === country ||
-      clearing.eligibleCountries.includes(country)),
-  );
 const check = (
   criterion: string,
   pass: boolean,
@@ -177,26 +167,10 @@ function hasExactCounterpartyCoverage(
   });
 }
 
-function clearingReferenceFor(
-  route: Readonly<Record<string, string>>,
-  request: RouteResolutionRequest,
-  valueTime: number,
-): (typeof CLEARING_SYSTEMS)[number] | undefined {
-  return CLEARING_SYSTEMS.find(
-    (system) =>
-      system.code === route["clearingSystem"] &&
-      system.status === "ACTIVE" &&
-      system.supportedCurrency === request.currency &&
-      Date.parse(system.validFrom) <= valueTime &&
-      valueTime <= Date.parse(system.validTo),
-  );
-}
-
 interface EvidenceContext {
   readonly request: RouteResolutionRequest;
   readonly candidate: Candidate;
   readonly applicability: SsiApplicabilityRecord | undefined;
-  readonly clearingReference: (typeof CLEARING_SYSTEMS)[number] | undefined;
   readonly requestedCounterparty: string;
   readonly candidateIdentity: string;
   readonly candidateBic: string;
@@ -291,21 +265,16 @@ function counterpartyEvidence(context: EvidenceContext): ResolutionEvidence[] {
   ];
 }
 
-function clearingEvidence({
+function settlementContextEvidence({
   request,
   candidate,
-  clearingReference,
 }: EvidenceContext): ResolutionEvidence[] {
   const route = candidate.route;
   return [
     check(
       "SETTLEMENT_COUNTRY",
       !request.settlementCountry ||
-        (compatible(route["settlementCountry"], request.settlementCountry) &&
-          clearingCountryCompatible(
-            clearingReference,
-            request.settlementCountry,
-          )),
+        compatible(route["settlementCountry"], request.settlementCountry),
       request.settlementCountry || "DERIVE_FROM_ROUTE",
       route["settlementCountry"] ?? "",
       "SETTLEMENT_COUNTRY_MISMATCH",
@@ -317,30 +286,6 @@ function clearingEvidence({
       request.settlementMarket || "DERIVE_FROM_ROUTE",
       route["settlementMarket"] ?? "",
       "SETTLEMENT_MARKET_MISMATCH",
-    ),
-    check(
-      "CLEARING_SYSTEM",
-      !request.clearingSystem ||
-        compatible(route["clearingSystem"], request.clearingSystem),
-      request.clearingSystem || "DERIVE_FROM_ROUTE",
-      route["clearingSystem"] ?? "",
-      "CLEARING_SYSTEM_MISMATCH",
-    ),
-    check(
-      "CLEARING_STANDING_DATA",
-      Boolean(clearingReference),
-      `${request.currency} active governed clearing system`,
-      route["clearingSystem"] ?? "",
-      "CLEARING_SYSTEM_NOT_ACTIVE_OR_CURRENCY_COMPATIBLE",
-    ),
-    check(
-      "CLEARING_SCHEME_TYPE",
-      Boolean(clearingReference) &&
-        (!route["schemeType"] ||
-          route["schemeType"] === clearingReference?.schemeType),
-      clearingReference?.schemeType ?? "ACTIVE_REFERENCE_REQUIRED",
-      route["schemeType"] ?? clearingReference?.schemeType ?? "",
-      "CLEARING_SCHEME_TYPE_MISMATCH",
     ),
   ];
 }
@@ -487,14 +432,6 @@ function routeEvidence(context: EvidenceContext): ResolutionEvidence[] {
       `${route["minimumAmount"] ?? "OPEN"}..${route["maximumAmount"] ?? "OPEN"}`,
       "AMOUNT_LIMIT_EXCEEDED",
     ),
-    {
-      criterion: "LIVE_CLEARING_PARTICIPATION",
-      outcome: "NOT_EVALUATED",
-      expected:
-        request.clearingSystem || route["clearingSystem"] || "UNSPECIFIED",
-      actual: "STANDING_DATA_VALIDATED_LIVE_DIRECTORY_REQUIRED",
-      reasonCode: "LIVE_REACHABILITY_NOT_EVALUATED",
-    },
   ];
 }
 
@@ -516,7 +453,7 @@ function evidenceFor(context: EvidenceContext): ResolutionEvidence[] {
     ),
     ...applicabilityEvidence(context),
     ...counterpartyEvidence(context),
-    ...clearingEvidence(context),
+    ...settlementContextEvidence(context),
     ...routeEvidence(context),
   ];
 }
@@ -549,7 +486,6 @@ function candidateEvidenceContext(
       records,
       valueTime,
     ),
-    clearingReference: clearingReferenceFor(route, request, valueTime),
     requestedCounterparty,
     candidateIdentity,
     candidateBic,

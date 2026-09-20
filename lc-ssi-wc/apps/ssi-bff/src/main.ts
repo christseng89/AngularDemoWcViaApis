@@ -23,6 +23,7 @@ const referenceUrl = () =>
   process.env["REFERENCE_SERVICE_URL"] ?? "http://localhost:3102";
 const upstreamApiInterceptor = new UpstreamApiInterceptor();
 const DEMO_RELOAD_TIMEOUT_MS = 120_000;
+const PAYMENT_RESOLUTION_TIMEOUT_MS = 30_000;
 async function forward(
   baseUrl: string,
   path: string,
@@ -431,7 +432,7 @@ class BffController {
     return forwardSsi("v1/resolution-page-definitions/execute", {
       method: "POST",
       body: JSON.stringify(body),
-    });
+    }, PAYMENT_RESOLUTION_TIMEOUT_MS);
   }
   @Get("reference/fin-controlled-fixtures") finControlledFixtures(
     @Query("messageType") messageType = "",

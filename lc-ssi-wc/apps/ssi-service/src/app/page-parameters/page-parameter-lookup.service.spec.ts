@@ -79,12 +79,7 @@ describe("PageParameterLookupService", () => {
         bic: "DEUTDEFF",
       }),
     ]);
-    expect(result.defaultSelection).toEqual({
-      valueField: "bankServiceId",
-      value: "BANK-SVC-DEUTDEFF",
-      reasonCode: "GOVERNED_CURRENCY_DEFAULT",
-      dependency: { fieldId: "context.currency", value: "EUR" },
-    });
+    expect(result.defaultSelection).toBeUndefined();
     expect(applicability.candidates).toHaveBeenCalledWith({
       messageType: "MT202",
       currency: "EUR",
@@ -887,5 +882,45 @@ describe("PageParameterLookupService", () => {
     expect(() =>
       service.ssiCounterparties({ ...context, sequence: "B" }),
     ).toThrow(BadRequestException);
+  });
+
+  it("defaults Payment to the unique lowest-priority eligible transaction-currency Nostro", () => {
+    const banks = ["BARCGB22", "CHASUS33", "CITIUS33"];
+    const candidates = banks.map((bic, index) => ({
+      ssi: { id: `SSI-${bic}`, version: 1, route: { counterpartyBic: bic, currency: "USD" } },
+      applicability: { id: `APPL-${bic}`, version: 1 },
+      nostro: { id: `NOSTRO-${bic}`, version: 1, accountServicerBic: bic, priority: [30, 20, 10][index] },
+      rma: { id: `RMA-${bic}`, version: 1 },
+      snapshot: { sha256: "snapshot", method: "TEST" },
+    }));
+    const service = new PageParameterLookupService(
+      { search: jest.fn((bic: string) => [{ bankServiceId: `BANK-SVC-${bic}`, bic, name: bic }]) } as never,
+      fixtures as never,
+      scenarios as never,
+      { find: jest.fn(() => ({ defaultBankServiceId: "BANK-SVC-DEUTDEFF" })) } as never,
+      { scenarioPolicy: jest.fn(() => ({ sequenceIds: ["A"], polarity: "POSITIVE", expectedHttp: [200] })) } as never,
+      { atomicCandidates: jest.fn(() => candidates) } as never,
+    );
+    const context = { scenarioId: "MT202-OP-DIRECT", messageType: "MT202", sequence: "A", currency: "USD", bookingEntity: "HK01", valueDate: "2026-09-21" };
+
+    const result = service.ssiCounterparties(context);
+    expect(result.items.map(({ bic }) => bic)).toEqual(banks);
+    expect(result.defaultSelection).toEqual({
+      valueField: "bankServiceId",
+      value: "BANK-SVC-CITIUS33",
+      reasonCode: "GOVERNED_PRIORITY_DEFAULT",
+      dependency: { fieldId: "context.currency", value: "USD" },
+    });
+    expect(service.ssiCounterparties({ ...context, query: "CITI" }).defaultSelection).toBeUndefined();
+
+    candidates[1]!.nostro.priority = 10;
+    expect(service.ssiCounterparties(context).defaultSelection).toBeUndefined();
+    candidates[1]!.nostro.priority = 20;
+    candidates.push({
+      ...candidates[2]!,
+      ssi: { ...candidates[2]!.ssi, id: "SSI-CITI-SECOND" },
+      nostro: { ...candidates[2]!.nostro, id: "NOSTRO-CITI-SECOND", priority: 40 },
+    });
+    expect(service.ssiCounterparties(context).defaultSelection).toBeUndefined();
   });
 });

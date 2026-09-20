@@ -49,6 +49,7 @@ export interface PaymentAtomicRouteCandidate {
     readonly id: string;
     readonly version: number;
     readonly accountServicerBic: string;
+    readonly priority: number;
   };
   readonly rma: { readonly id: string; readonly version: number };
   readonly snapshot: { readonly sha256: string; readonly method: string };
@@ -134,6 +135,7 @@ export class PaymentGovernedApplicabilityService {
       return nostro["decision"] === "RESOLVED" &&
         typeof nostro["nostroId"] === "string" &&
         typeof nostro["nostroVersion"] === "number" &&
+        typeof nostro["priority"] === "number" &&
         rma["authorised"] === true &&
         typeof rma["rmaId"] === "string" &&
         typeof rma["rmaVersion"] === "number"
@@ -144,6 +146,7 @@ export class PaymentGovernedApplicabilityService {
               nostro: {
                 id: nostro["nostroId"],
                 version: nostro["nostroVersion"],
+                priority: nostro["priority"],
                 accountServicerBic:
                   typeof accountServicerBic === "string"
                     ? accountServicerBic

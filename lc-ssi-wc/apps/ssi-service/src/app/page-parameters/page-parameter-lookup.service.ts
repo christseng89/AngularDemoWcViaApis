@@ -412,23 +412,28 @@ export class PageParameterLookupService {
           ),
       )
       .sort((left, right) => (left.bic ?? "").localeCompare(right.bic ?? ""));
-    const configuredDefault = this.defaults?.find({
-      scenarioId: input.scenarioId,
-      messageType: input.messageType,
-      sequence: input.sequence,
-      currency: input.currency,
-      bookingEntity: input.bookingEntity,
-      polarity: scenario.polarity,
-      expectedHttp: scenario.expectedHttp,
-    });
-    const eligibleDefaults = configuredDefault
-      ? items.filter(
-          ({ bankServiceId }) =>
-            bankServiceId === configuredDefault.defaultBankServiceId,
-        )
-      : [];
+    const ranked = source
+      .filter(
+        (entry) =>
+          entry.candidate &&
+          Number.isInteger(entry.candidate.nostro.priority) &&
+          items.some(
+            ({ bic }) => bic === entry.record.route["counterpartyBic"],
+          ),
+      )
+      .sort(
+        (left, right) =>
+          left.candidate!.nostro.priority - right.candidate!.nostro.priority,
+      );
     const eligibleDefault =
-      eligibleDefaults.length === 1 ? eligibleDefaults[0] : undefined;
+      ranked.length &&
+      (ranked.length === 1 ||
+        ranked[0]!.candidate!.nostro.priority <
+          ranked[1]!.candidate!.nostro.priority)
+        ? items.find(
+            ({ bic }) => bic === ranked[0]!.record.route["counterpartyBic"],
+          )
+        : undefined;
     return {
       provider: "SSI_COUNTERPARTY",
       action: "SSI_COUNTERPARTY",
@@ -442,12 +447,16 @@ export class PageParameterLookupService {
             },
           }
         : {}),
-      ...(!term && eligibleDefault?.bankServiceId
+      ...(!term &&
+      eligibleDefault?.bankServiceId &&
+      items.filter(
+        ({ bankServiceId }) => bankServiceId === eligibleDefault.bankServiceId,
+      ).length === 1
         ? {
             defaultSelection: {
               valueField: "bankServiceId" as const,
               value: eligibleDefault.bankServiceId,
-              reasonCode: "GOVERNED_CURRENCY_DEFAULT" as const,
+              reasonCode: "GOVERNED_PRIORITY_DEFAULT" as const,
               dependency: {
                 fieldId: "context.currency" as const,
                 value: input.currency,

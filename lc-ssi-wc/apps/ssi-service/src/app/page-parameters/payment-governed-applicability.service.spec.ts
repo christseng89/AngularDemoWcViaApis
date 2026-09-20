@@ -145,6 +145,7 @@ describe("PaymentGovernedApplicabilityService", () => {
           decision: "RESOLVED",
           nostroId: "N-1",
           nostroVersion: 4,
+          priority: 10,
           accountServicerBic: "DEUTDEFF",
         })),
       } as never,
@@ -169,7 +170,7 @@ describe("PaymentGovernedApplicabilityService", () => {
       {
         ssi,
         applicability: app,
-        nostro: { id: "N-1", version: 4, accountServicerBic: "DEUTDEFF" },
+        nostro: { id: "N-1", version: 4, accountServicerBic: "DEUTDEFF", priority: 10 },
         rma: { id: "R-1", version: 5 },
         snapshot: { sha256: "db-sha", method: "logical" },
       },
@@ -192,6 +193,7 @@ describe("PaymentGovernedApplicabilityService", () => {
       undefined,
       { resolve: jest.fn(() => ({
         decision: "RESOLVED", nostroId: "N-1", nostroVersion: 4,
+        priority: 10,
         accountServicerBic: "DEUTDEFF",
       })) } as never,
       { check } as never,
@@ -234,6 +236,7 @@ describe("PaymentGovernedApplicabilityService", () => {
           decision: "RESOLVED",
           nostroId: "N-1",
           nostroVersion: 4,
+          priority: 10,
           accountServicerBic: { unexpected: true },
         })),
       } as never,

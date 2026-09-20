@@ -64,7 +64,7 @@ describe("SSI BFF forwarding contract", () => {
     });
   });
 
-  it("gives only Demo Reload a longer non-retryable upstream window", async () => {
+  it("gives Demo Reload a longer non-retryable upstream window", async () => {
     const intercept = jest.spyOn(UpstreamApiInterceptor.prototype, "intercept")
       .mockResolvedValue(jsonResponse({ code: "DEMO_DATA_RELOADED" }, 201));
     try {
@@ -75,6 +75,22 @@ describe("SSI BFF forwarding contract", () => {
         120_000,
       );
       expect(intercept).toHaveBeenCalledTimes(1);
+    } finally {
+      intercept.mockRestore();
+    }
+  });
+
+  it("allows the Payment SSI execute request to finish beyond the default ten-second BFF window", async () => {
+    const intercept = jest.spyOn(UpstreamApiInterceptor.prototype, "intercept")
+      .mockResolvedValue(jsonResponse({ outcome: "RESOLVED" }));
+    try {
+      const body = { scenarioId: "MT202-OP-DIRECT" };
+      await controller["executeResolutionPage"](body);
+      expect(intercept).toHaveBeenCalledWith(
+        "http://ssi.test/api/v1/resolution-page-definitions/execute",
+        expect.objectContaining({ method: "POST", body: JSON.stringify(body) }),
+        30_000,
+      );
     } finally {
       intercept.mockRestore();
     }

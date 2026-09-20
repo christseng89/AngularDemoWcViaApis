@@ -279,6 +279,7 @@ describe("NostroApplicationService", () => {
       decision: "RESOLVED",
       nostroId: "LOW",
       nostroVersion: 9,
+      priority: 5,
       accountReference: "ACCOUNT-1",
       ownLegalEntityId: "HK01",
       allowedBookingEntities: ["HK01"],
