@@ -13,11 +13,11 @@ const sha256 = (value) =>
 
 const paths = [
   "apps/ssi-portal/src/app/app.component.html",
-  "apps/ssi-portal/src/app/ssi-index-approved-visibility.spec.ts",
+  "apps/ssi-portal/src/test/app/ssi-index-approved-visibility.spec.ts",
   "apps/ssi-portal/src/app/ssi-maintenance-index.ts",
-  "apps/ssi-portal/src/app/ssi-maintenance-index.spec.ts",
+  "apps/ssi-portal/src/test/app/ssi-maintenance-index.spec.ts",
   "apps/ssi-service/src/app/sqlite-ssi.repository.ts",
-  "apps/ssi-service/src/app/sqlite-repositories.spec.ts",
+  "apps/ssi-service/src/test/app/sqlite-repositories.spec.ts",
 ];
 const final = Object.fromEntries(
   paths.map((path) => [path, normalize(fs.readFileSync(path, "utf8"))]),

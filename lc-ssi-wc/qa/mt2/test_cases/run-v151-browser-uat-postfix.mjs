@@ -246,7 +246,7 @@ try {
     },
     browserExecuted: { results, northstar, stale, race, consoleErrors },
     automatedEvidence: {
-      governedDelayedResponseComponentTest: "apps/ssi-portal/src/app/component-behavior.spec.ts",
+      governedDelayedResponseComponentTest: "apps/ssi-portal/src/test/app/component-behavior.spec.ts",
       distinction: "UI-RACE-01 is also browser-executed here using a governed 1500 ms Playwright response delay; component evidence remains separate corroboration.",
     },
   };

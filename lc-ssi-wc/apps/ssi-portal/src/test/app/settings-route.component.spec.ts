@@ -1,0 +1,31 @@
+const loadRuntime = jest.fn().mockResolvedValue(undefined);
+
+jest.mock("@angular/core", () => ({
+  Component: () => (target: unknown) => target,
+  inject: () => ({ theme: () => "dark", setTheme: jest.fn() }),
+  output: () => ({ emit: jest.fn() }),
+  viewChild: () => () => ({ loadRuntime }),
+  ChangeDetectionStrategy: { OnPush: "OnPush" },
+}));
+jest.mock("../../app/settings-page.component", () => ({
+  SettingsPageComponent: class {},
+}));
+jest.mock("../../app/theme.service", () => ({ ThemeService: class {} }));
+
+import { SettingsRouteComponent } from "../../app/settings-route.component";
+
+describe("SettingsRouteComponent", () => {
+  it("binds the shared theme service and relays reload without owning API state", () => {
+    const route = new SettingsRouteComponent();
+    expect(route.themeService.theme()).toBe("dark");
+    route.dataReloaded.emit();
+    expect(route.dataReloaded.emit).toHaveBeenCalledTimes(1);
+    expect("http" in route).toBe(false);
+  });
+
+  it("refreshes only the current Settings page runtime metadata", async () => {
+    const route = new SettingsRouteComponent();
+    await route.refresh();
+    expect(loadRuntime).toHaveBeenCalledTimes(1);
+  });
+});
