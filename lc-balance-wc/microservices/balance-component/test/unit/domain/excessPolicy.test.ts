@@ -23,6 +23,7 @@ describe('unified excess policy (v11.15)', () => {
       { configuredMaximumUsd: '-0.01', allowancePercentage: '10' },
       { configuredMaximumUsd: '100', allowancePercentage: '-0.01' },
       { configuredMaximumUsd: 'invalid', allowancePercentage: '10' },
+      { configuredMaximumUsd: '100', allowancePercentage: 'invalid' },
     ])('rejects invalid policy values before routing: %#', (policy) => {
       expect(() => selectExcessProcessingRoute(policy)).toThrow();
     });
