@@ -2,7 +2,14 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { DatabaseSync } from 'node:sqlite';
 import { createDb, type Db } from '../../../src/db';
+
+function openRaw(dbPath: string): Db {
+  const db = new DatabaseSync(dbPath);
+  db.exec('PRAGMA foreign_keys = ON');
+  return db;
+}
 
 function seedReferencedExcessFacts(db: Db): void {
   db.prepare(
@@ -80,7 +87,7 @@ describe('cleanup scripts with immutable Excess facts', () => {
     });
 
     expect(result.status).toBe(0);
-    db = createDb(dbPath);
+    db = openRaw(dbPath);
     expect(db.prepare('SELECT COUNT(*) AS count FROM balance_contracts').get()).toEqual({ count: 0 });
     expect(db.prepare('SELECT COUNT(*) AS count FROM excess_ledger_events').get()).toEqual({ count: 0 });
     expect(db.prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'immutable_%'").get()).toEqual({ count: 10 });
@@ -102,9 +109,33 @@ describe('cleanup scripts with immutable Excess facts', () => {
     });
 
     expect(result.status).toBe(0);
-    db = createDb(dbPath);
+    db = openRaw(dbPath);
     expect(db.prepare('SELECT COUNT(*) AS count FROM balance_contracts WHERE lc_number = ?').get('LC-CLEAN')).toEqual({ count: 0 });
     expect(db.prepare('SELECT COUNT(*) AS count FROM excess_accounts').get()).toEqual({ count: 0 });
+    expect(db.prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'immutable_%'").get()).toEqual({ count: 10 });
+    db.close();
+    rmSync(directory, { recursive: true, force: true });
+  });
+
+  test('cleanup failure rolls back deletes and immutable-trigger suspension', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'balance-cleanup-rollback-'));
+    const dbPath = join(directory, 'balance.sqlite');
+    let db = createDb(dbPath);
+    seedReferencedExcessFacts(db);
+    db.exec('CREATE TABLE cleanup_blocker (movement_id TEXT NOT NULL REFERENCES balance_movements(movement_id))');
+    db.prepare('INSERT INTO cleanup_blocker (movement_id) VALUES (?)').run('movement-1');
+    db.close();
+
+    const result = spawnSync(process.execPath, [resolve(__dirname, '../../../scripts/cleanup-all.mjs')], {
+      cwd: resolve(__dirname, '../../..'),
+      env: { ...process.env, DB_PATH: dbPath },
+      encoding: 'utf8',
+    });
+
+    expect(result.status).not.toBe(0);
+    db = openRaw(dbPath);
+    expect(db.prepare('SELECT COUNT(*) AS count FROM balance_movements').get()).toEqual({ count: 1 });
+    expect(db.prepare('SELECT COUNT(*) AS count FROM excess_ledger_events').get()).toEqual({ count: 1 });
     expect(db.prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'immutable_%'").get()).toEqual({ count: 10 });
     db.close();
     rmSync(directory, { recursive: true, force: true });
