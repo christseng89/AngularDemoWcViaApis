@@ -30,32 +30,36 @@
 
 ### Requirement: Maker Submit FX Fail-Closed
 
-Maker Submit MUST 在建立任何 pending facts 前取得 Approved、Effective 且 fresh 的 Booking Rate。Rate missing、provider timeout／failure、pair 不符或未 Approved／Effective SHALL 回傳 `FX_RATE_UNAVAILABLE`；age 超過 Max Staleness SHALL 回傳 `FX_RATE_STALE`。
+僅當 resolved policy 的 `configuredMaximumUsd > 0` 且 `allowancePercentage > 0` 時，Maker Submit MUST 在建立任何 pending facts 前取得 Approved、Effective 且 fresh 的 Booking Rate。Rate missing、provider timeout／failure、pair 不符或未 Approved／Effective SHALL 回傳 `FX_RATE_UNAVAILABLE`；age 超過 Max Staleness SHALL 回傳 `FX_RATE_STALE`。任一配置值為零時 SHALL 改用 `Zero Allowance Skips Currency Exchange`。
 
 #### Scenario: Maker Rate Unavailable
 
+- **GIVEN** `configuredMaximumUsd > 0` 且 `allowancePercentage > 0`
 - **WHEN** 非 USD Maker Submit 無法取得合格 Booking Rate
 - **THEN** Maker Submit SHALL NOT 被允許，Excess Limit Validation SHALL NOT 完成
 - **AND** Pending Transaction 與 Pending Excess Reservation SHALL NOT 建立
 
 #### Scenario: Maker Rate Stale
 
+- **GIVEN** `configuredMaximumUsd > 0` 且 `allowancePercentage > 0`
 - **WHEN** 非 USD Maker Submit 取得的 Booking Rate 超過 Max Staleness
 - **THEN** API SHALL 回傳 `FX_RATE_STALE`
 - **AND** SHALL NOT 建立 transaction、reservation 或 FX pending state
 
 ### Requirement: Checker Release Revaluation
 
-Checker Release SHALL 以 release decision time 的最新合格 Booking Rate 重新計算 Excess USD Equivalent 與 allowance，且 SHALL NOT 只重用 Maker rate。
+僅當 resolved policy 的 `configuredMaximumUsd > 0` 且 `allowancePercentage > 0` 時，Checker Release SHALL 以 release decision time 的最新合格 Booking Rate 重新計算 Excess USD Equivalent 與 allowance，且 SHALL NOT 只重用 Maker rate。任一配置值為零時 SHALL 依 BD-03 使用既有 Checker sufficiency flow，且不得執行 FX revaluation。
 
 #### Scenario: Release Rate 可用且仍在 Allowance 內
 
+- **GIVEN** `configuredMaximumUsd > 0` 且 `allowancePercentage > 0`
 - **WHEN** Checker 取得最新 Approved／Effective／fresh rate 且 revalued excess 未超限
 - **THEN** Release SHALL 原子核准 movement 並轉換 pending reservation
 - **AND** Checker FX snapshot SHALL 與 Maker snapshot 分別保存
 
 #### Scenario: Release Rate Unavailable 或 Stale
 
+- **GIVEN** `configuredMaximumUsd > 0` 且 `allowancePercentage > 0`
 - **WHEN** Checker Release 無法取得合格 rate 或 rate 已 stale
 - **THEN** Release SHALL NOT 被允許並回傳對應 `FX_RATE_UNAVAILABLE` 或 `FX_RATE_STALE`
 - **AND** Pending Transaction 與 Pending Excess Reservation SHALL 保留不變
@@ -109,6 +113,7 @@ Production Currency Exchange MUST 回傳 provider-supplied `BOOKING` rate 及其
 
 #### Scenario: Production Maker Has No Provider Booking Rate
 
+- **GIVEN** `configuredMaximumUsd > 0` 且 `allowancePercentage > 0`
 - **WHEN** 非 USD Maker Submit 的 production provider 未提供合格 Booking Rate，即使 Buy／Sell rates 可用
 - **THEN** API SHALL 回傳 `FX_RATE_UNAVAILABLE`
 - **AND** Excess Limit Validation SHALL NOT 完成
@@ -116,6 +121,7 @@ Production Currency Exchange MUST 回傳 provider-supplied `BOOKING` rate 及其
 
 #### Scenario: Production Checker Has No Provider Booking Rate
 
+- **GIVEN** `configuredMaximumUsd > 0` 且 `allowancePercentage > 0`
 - **WHEN** Checker Release 的 production provider 未提供合格 Booking Rate，即使 Buy／Sell rates 可用
 - **THEN** Release SHALL NOT 被允許並 SHALL 回傳 `FX_RATE_UNAVAILABLE`
 - **AND** Pending Transaction 與 Pending Excess Reservation SHALL 保留不變
@@ -126,6 +132,7 @@ USD transaction SHALL 使用 exact rate 1 與 internal `USD_PAR` evidence，不�
 
 #### Scenario: USD Excess
 
+- **GIVEN** `configuredMaximumUsd > 0` 且 `allowancePercentage > 0`
 - **WHEN** A8／A3／A3S／B3 transaction currency 為 USD
 - **THEN** USD Equivalent SHALL 等於 Excess Amount 並 snapshot `USD_PAR`
 

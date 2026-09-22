@@ -75,7 +75,7 @@
 - [ ] 7.8 Run all Balance microservice unit／integration tests and coverage gates; document commands and results.
 - [ ] 7.9 Run all Angular unit tests、coverage and browser acceptance; retain existing A1–A11／B1–B7 characterization evidence except intentionally replaced hard-reject assertions.
 - [ ] 7.10 Run Backend and Business Case Runner full suite against real Balance microservice plus virtual FX adapter.
-- [ ] 7.11 Add the BD-03 A8／A3／A3S／B3 matrix for zero configured maximum、zero percentage、either-zero combinations、within-capacity success、over-capacity legacy rejection、zero FX calls and zero Excess writes.
+- [ ] 7.11 Add a parameterized BD-03 matrix for each of `(configuredMaximumUsd, allowancePercentage) = (0, 0)`, `(0, positive)` and `(positive, 0)` × A8／A3／A3S／B3 × Maker within-capacity／Maker over-capacity／Checker Release／Fix within-capacity／Fix over-capacity. Assert exact legacy success or `409 INSUFFICIENT_AVAILABLE_BALANCE` code／message, forbid `FX_RATE_UNAVAILABLE`／`FX_RATE_STALE`／`EXCESS_LIMIT_EXCEEDED`, assert Currency Exchange spy count = 0, and assert unchanged before／after counts for `USD_PAR`, `fx_rate_snapshot`, `ExcessDecision`, Pending Excess Reservation, Approved Excess utilization and Excess ledger rows.
 
 ## 8. Documentation, Validation and Release Gate
 

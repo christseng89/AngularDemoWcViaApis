@@ -2,13 +2,14 @@
 
 ### Requirement: Zero Allowance Legacy Regression
 
-Runner SHALL 對 A8、A3、A3S、B3 分別覆蓋 `configuredMaximumUsd = 0`、`allowancePercentage = 0` 與任一為零的組合，並證明 within-capacity 維持原成功行為、over-capacity 維持原 `INSUFFICIENT_AVAILABLE_BALANCE` hard-reject，且 Currency Exchange／Excess persistence 均為 zero interaction／zero write。
+Runner SHALL 對 A8、A3、A3S、B3 分別覆蓋三個明確配置 row：`(configuredMaximumUsd, allowancePercentage) = (0, 0)`、`(0, positive)`、`(positive, 0)`，並證明 within-capacity 維持原成功行為、over-capacity 維持原 `INSUFFICIENT_AVAILABLE_BALANCE` hard-reject。每一 config × function × command-path case SHALL 證明 Currency Exchange request count 為零，且 `USD_PAR`、`fx_rate_snapshot`、`ExcessDecision`、Pending Excess Reservation、Approved Excess utilization 與 Excess ledger row 的 before／after count 均不變。
 
 #### Scenario: Four-function Legacy Matrix
 
-- **WHEN** Runner 執行 A8／A3／A3S／B3 的 zero-cap 與 zero-percentage cases
-- **THEN** 每一功能 SHALL 驗證原 success／reject boundary、既有 error code／message 與 Maker／Checker lifecycle
-- **AND** SHALL 驗證沒有 FX lookup、reservation、Approved Excess 或 ledger event
+- **WHEN** Runner 對三個 zero-config rows 與 A8／A3／A3S／B3 執行 Maker within-capacity、Maker over-capacity、Checker Release、Fix within-capacity 與 Fix over-capacity cases
+- **THEN** 每一 case SHALL 驗證原 success／reject boundary、既有 `409 INSUFFICIENT_AVAILABLE_BALANCE` code／message 與 Maker／Checker／Fix lifecycle
+- **AND** SHALL 以 spy 與 before／after database counts 驗證沒有 Currency Exchange request、`USD_PAR`、`fx_rate_snapshot`、`ExcessDecision`、Pending Excess Reservation、Approved Excess utilization 或 Excess ledger row
+- **AND** 所有 zero-route response SHALL NOT 回傳 `FX_RATE_UNAVAILABLE`、`FX_RATE_STALE` 或 `EXCESS_LIMIT_EXCEEDED`
 
 ### Requirement: v11.15 Excess Regression Suite
 
@@ -53,9 +54,17 @@ Runner SHALL 驗證 A8 Approved Excess attribution 經 A3S capacity transfer 後
 
 #### Scenario: Old Hard-reject Assertions
 
+- **GIVEN** `configuredMaximumUsd > 0` 且 `allowancePercentage > 0`
 - **WHEN** 舊 case 期待 A8／A3／A3S／B3 只因超過 Tight Available 被拒絕
 - **THEN** case SHALL 改為依 allowance 與 FX 結果判定
 - **AND** 其他 domain rejection SHALL 不被放寬
+
+#### Scenario: Zero Allowance Preserves Old Hard-reject
+
+- **GIVEN** `configuredMaximumUsd = 0` 或 `allowancePercentage = 0`
+- **WHEN** 舊 case 的 A8／A3／A3S／B3 超過既有 Tight Available／sufficiency boundary
+- **THEN** 原 `409 INSUFFICIENT_AVAILABLE_BALANCE` code 與 message SHALL 保持不變
+- **AND** case SHALL NOT 改為依 allowance 或 FX 結果判定
 
 ### Requirement: Virtual Booking Rate Regression
 
