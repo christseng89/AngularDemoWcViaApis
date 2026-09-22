@@ -2,7 +2,7 @@
 
 ### Requirement: A3 到單
 
-A3 SHALL 為符合資格且已 Release 的進口 LC 建立虛擬 LC UTILIZE Earmark，並 SHALL 將 LC 最終完成延後至 A4 或 A6。Amount 超過 parent Tight Available 時，系統 SHALL 將差額作為 Excess 驗證，而不是直接 hard-reject。
+A3 SHALL 為符合資格且已 Release 的進口 LC 建立虛擬 LC UTILIZE Earmark，並 SHALL 將 LC 最終完成延後至 A4 或 A6。僅當 resolved policy 的 `configuredMaximumUsd > 0` 且 `allowancePercentage > 0` 時，Amount 超過 parent Tight Available 的差額 SHALL 作為 Excess 驗證；任一配置值為零時 SHALL 使用變更前既有 sufficiency hard-reject。
 
 #### Scenario: A3 Acknowledgement
 
@@ -22,9 +22,16 @@ A3 SHALL 為符合資格且已 Release 的進口 LC 建立虛擬 LC UTILIZE Earm
 - **THEN** 服務 SHALL 回傳 `EXCESS_LIMIT_EXCEEDED`
 - **AND** SHALL NOT 建立 LC UTILIZE Earmark 或 Excess Reservation
 
+#### Scenario: A3 Zero Allowance 超過 Tight Available
+
+- **GIVEN** `configuredMaximumUsd = 0` 或 `allowancePercentage = 0`
+- **WHEN** A3 Amount 超過服務端重新計算的 LC Tight Available
+- **THEN** 服務 SHALL 回傳既有 `409 INSUFFICIENT_AVAILABLE_BALANCE` code 與 message
+- **AND** SHALL 維持 zero-write，且 SHALL NOT 呼叫 FX 或建立任何 Excess fact
+
 ### Requirement: A3S 到單連同提貨擔保
 
-A3S SHALL 原子使用所選 SG 的 Eligible SG Capacity 並建立關聯 LC Arrival，同時 SHALL 防止 parent capacity 與 Approved Excess 重複計算；A3S capacity redemption SHALL NOT 自動解除 SG legal／contingent liability。
+A3S SHALL 原子使用所選 SG 的 Eligible SG Capacity 並建立關聯 LC Arrival，同時 SHALL 防止 parent capacity 與 Approved Excess 重複計算；A3S capacity redemption SHALL NOT 自動解除 SG legal／contingent liability。只有在 resolved policy 的 `configuredMaximumUsd > 0` 且 `allowancePercentage > 0` 時，超過 Eligible SG Capacity 的未覆蓋差額 MAY 進入 Covered／Excess 驗證；任一配置值為零時，該差額 SHALL 使用變更前既有 parent sufficiency 邏輯。
 
 #### Scenario: SG 覆蓋單據金額
 
@@ -44,9 +51,16 @@ A3S SHALL 原子使用所選 SG 的 Eligible SG Capacity 並建立關聯 LC Arri
 - **THEN** 服務 SHALL 拒絕該 A3S
 - **AND** LC Arrival、capacity redemption 與 Excess Reservation SHALL NOT 部分建立
 
+#### Scenario: A3S Zero Allowance 的未覆蓋差額
+
+- **GIVEN** `configuredMaximumUsd = 0` 或 `allowancePercentage = 0`
+- **WHEN** A3S Bill 超過所選 SG Eligible Capacity Outstanding，且未覆蓋差額超過既有 parent capacity
+- **THEN** 服務 SHALL 回傳既有 `409 INSUFFICIENT_AVAILABLE_BALANCE` code 與 message
+- **AND** SHALL 維持 zero-write，且 SHALL NOT 呼叫 FX 或建立第二次 Excess attribution
+
 ### Requirement: A8 提貨擔保開立
 
-A8 SHALL 要求 SG Number 作為新 SHGT natural key 的一部分。Amount 超過目前 parent Tight Available 時，系統 SHALL 將差額作為 Excess 驗證；Checker Release SHALL 初始化與 Approved SG Amount 相等、含 Covered／Excess attribution 的 Eligible SG Capacity Outstanding。
+A8 SHALL 要求 SG Number 作為新 SHGT natural key 的一部分。僅當 resolved policy 的 `configuredMaximumUsd > 0` 且 `allowancePercentage > 0` 時，Amount 超過目前 parent Tight Available 的差額 SHALL 作為 Excess 驗證；任一配置值為零時 SHALL 使用變更前既有 sufficiency hard-reject。Excess-enabled A8 的 Checker Release SHALL 初始化與 Approved SG Amount 相等、含 Covered／Excess attribution 的 Eligible SG Capacity Outstanding。
 
 #### Scenario: SG 核准
 
@@ -66,6 +80,13 @@ A8 SHALL 要求 SG Number 作為新 SHGT natural key 的一部分。Amount 超�
 - **WHEN** A8 Excess USD Equivalent 超過 owner available allowance
 - **THEN** 服務 SHALL 回傳 `EXCESS_LIMIT_EXCEEDED`
 - **AND** SHALL NOT 建立 SHGT Movement、Eligible SG Capacity 或 reservation
+
+#### Scenario: A8 Zero Allowance 超過 Parent Tight Available
+
+- **GIVEN** `configuredMaximumUsd = 0` 或 `allowancePercentage = 0`
+- **WHEN** A8 Amount 超過 parent Tight Available
+- **THEN** 服務 SHALL 回傳既有 `409 INSUFFICIENT_AVAILABLE_BALANCE` code 與 message
+- **AND** SHALL 維持 zero-write，且 SHALL NOT 呼叫 FX 或建立任何 Excess fact
 
 ## ADDED Requirements
 

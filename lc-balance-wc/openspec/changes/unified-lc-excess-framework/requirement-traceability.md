@@ -54,15 +54,15 @@
 
 ## Conflict Resolution Register
 
-| Conflict                           | Resolution in this Change                                                                  | Evidence gate                                 |
-| ---------------------------------- | ------------------------------------------------------------------------------------------ | --------------------------------------------- |
-| C-01 A3 hard-reject                | Modified A3 permits allowance-controlled Excess                                            | A3 exact／over-limit regression               |
-| C-02 A8 hard-reject                | Modified A8 permits allowance-controlled Excess                                            | A8 and cancellation regression                |
-| C-03 B3 hard-reject                | Modified B3 permits allowance-controlled Excess                                            | B3／B4 persistence regression                 |
-| C-04 A3S legal redemption coupling | Separate Eligible SG Capacity from SG legal liability                                      | A8→A3S anti-double-counting and A9 regression |
-| C-05 Generic Fix Pending           | Amount exception limited to A8／A3／A3S／B3                                                | API／UI protected-field tests                 |
-| C-06 Approved Excess lifecycle     | Append-only owner ledger survives downstream completion                                    | A4／A6／B4／A9 regression                     |
-| C-07 Current OpenSpec truth        | Delta specs replace conflicting current requirements only after implementation and archive | strict validation before and after archive    |
+| Conflict                           | Resolution in this Change                                                                                                                                  | Evidence gate                                           |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| C-01 A3 hard-reject                | Modified A3 permits allowance-controlled Excess only when both policy values are greater than zero; BD-03 preserves legacy hard-reject when either is zero | A3 exact／over-limit plus zero-config legacy regression |
+| C-02 A8 hard-reject                | Modified A8 permits allowance-controlled Excess only when both policy values are greater than zero; BD-03 preserves legacy hard-reject when either is zero | A8／cancellation plus zero-config legacy regression     |
+| C-03 B3 hard-reject                | Modified B3 permits allowance-controlled Excess only when both policy values are greater than zero; BD-03 preserves legacy hard-reject when either is zero | B3／B4 persistence plus zero-config legacy regression   |
+| C-04 A3S legal redemption coupling | Separate Eligible SG Capacity from SG legal liability                                                                                                      | A8→A3S anti-double-counting and A9 regression           |
+| C-05 Generic Fix Pending           | Amount exception limited to A8／A3／A3S／B3                                                                                                                | API／UI protected-field tests                           |
+| C-06 Approved Excess lifecycle     | Append-only owner ledger survives downstream completion                                                                                                    | A4／A6／B4／A9 regression                               |
+| C-07 Current OpenSpec truth        | Delta specs replace conflicting current requirements only after implementation and archive                                                                 | strict validation before and after archive              |
 
 ## Decision Traceability
 

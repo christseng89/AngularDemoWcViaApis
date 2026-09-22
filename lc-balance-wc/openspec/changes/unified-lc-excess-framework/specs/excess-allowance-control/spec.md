@@ -27,22 +27,24 @@
 
 ### Requirement: Unified Covered and Excess Split
 
-系統 SHALL 對 A8、A3、A3S、B3 使用相同的精確十進位規則，把交易金額拆分為 `Covered Amount = min(Transaction Amount, non-negative authoritative covered capacity)` 與 `Excess Amount = Transaction Amount - Covered Amount`，且兩者總和 MUST 等於交易金額。
+當 resolved policy 的 `configuredMaximumUsd > 0` 且 `allowancePercentage > 0` 時，系統 SHALL 對 A8、A3、A3S、B3 使用相同的精確十進位規則，把交易金額拆分為 `Covered Amount = min(Transaction Amount, non-negative authoritative covered capacity)` 與 `Excess Amount = Transaction Amount - Covered Amount`，且兩者總和 MUST 等於交易金額。任一配置值為零時 SHALL 改用 `Zero Allowance Uses Legacy Sufficiency`，不得建立 Covered／Excess attribution。
 
 #### Scenario: 交易部分由 Capacity 覆蓋
 
+- **GIVEN** `configuredMaximumUsd > 0` 且 `allowancePercentage > 0`
 - **WHEN** 交易金額為 120，authoritative covered capacity 為 100
 - **THEN** Covered Amount SHALL 為 100，Excess Amount SHALL 為 20
 
 #### Scenario: Capacity 為負數
 
+- **GIVEN** `configuredMaximumUsd > 0` 且 `allowancePercentage > 0`
 - **WHEN** raw covered capacity 小於零
 - **THEN** sufficiency calculation SHALL 以零作 Covered Amount 下限
 - **AND** 全部交易金額 SHALL 成為 Excess Amount
 
 ### Requirement: Owner-level Excess Allowance
 
-Import LC SHALL 作為其 A8、A3、A3S 的唯一 allowance owner；Export Confirmation SHALL 作為其 B3 的唯一 allowance owner。系統 MUST 以 Configured Maximum USD Equivalent、Approved Excess、其他 Pending Excess Reservations 與本次 Proposed Excess USD Equivalent 驗證可用 allowance。
+僅當 resolved policy 的 `configuredMaximumUsd > 0` 且 `allowancePercentage > 0` 時，Import LC SHALL 作為其 A8、A3、A3S 的唯一 allowance owner，Export Confirmation SHALL 作為其 B3 的唯一 allowance owner。系統 MUST 以 Configured Maximum USD Equivalent、Approved Excess、其他 Pending Excess Reservations 與本次 Proposed Excess USD Equivalent 驗證可用 allowance。
 
 #### Scenario: Proposed Excess 在 Allowance 內
 
@@ -58,7 +60,7 @@ Import LC SHALL 作為其 A8、A3、A3S 的唯一 allowance owner；Export Confi
 
 ### Requirement: Pending and Approved Excess Lifecycle
 
-Pending Excess Reservation SHALL 只在 Maker Submit 成功時建立，並 SHALL 在 Checker Release 成功時原子轉為 Approved Excess。Reject 或 Delete Pending MUST 釋放 reservation；downstream completion MUST NOT 釋放 Approved Excess。
+對 `configuredMaximumUsd > 0` 且 `allowancePercentage > 0` 的 Excess-enabled owner，Pending Excess Reservation SHALL 只在 Maker Submit 成功時建立，並 SHALL 在 Checker Release 成功時原子轉為 Approved Excess。Reject 或 Delete Pending MUST 釋放 reservation；downstream completion MUST NOT 釋放 Approved Excess。
 
 #### Scenario: Checker Release 成功
 

@@ -2,7 +2,7 @@
 
 ### Requirement: B3 提示單據
 
-B3 SHALL 在合資格 Confirmation 下建立 `EPLC_EXAMINATION` memo-only Earmark，在 Maker 與 Checker 階段保持可見，並 SHALL NOT 直接減少 Confirmation Confirmed Balance。Amount 超過 Confirmation Tight Available 時，差額 SHALL 作為 Excess 驗證，而不是直接 hard-reject。
+B3 SHALL 在合資格 Confirmation 下建立 `EPLC_EXAMINATION` memo-only Earmark，在 Maker 與 Checker 階段保持可見，並 SHALL NOT 直接減少 Confirmation Confirmed Balance。僅當 resolved policy 的 `configuredMaximumUsd > 0` 且 `allowancePercentage > 0` 時，Amount 超過 Confirmation Tight Available 的差額 SHALL 作為 Excess 驗證；任一配置值為零時 SHALL 使用變更前既有 sufficiency hard-reject。
 
 #### Scenario: Presentation 已 Release
 
@@ -21,6 +21,13 @@ B3 SHALL 在合資格 Confirmation 下建立 `EPLC_EXAMINATION` memo-only Earmar
 - **WHEN** B3 Excess USD Equivalent 超過 owner available allowance
 - **THEN** 服務 SHALL 回傳 `EXCESS_LIMIT_EXCEEDED`
 - **AND** SHALL NOT 建立 `EPLC_EXAMINATION` Earmark 或 reservation
+
+#### Scenario: B3 Zero Allowance 超過 Tight Available
+
+- **GIVEN** `configuredMaximumUsd = 0` 或 `allowancePercentage = 0`
+- **WHEN** B3 Amount 超過 Confirmation Tight Available
+- **THEN** 服務 SHALL 回傳既有 `409 INSUFFICIENT_AVAILABLE_BALANCE` code 與 message
+- **AND** SHALL 維持 zero-write，且 SHALL NOT 呼叫 FX 或建立任何 Excess fact
 
 ## ADDED Requirements
 

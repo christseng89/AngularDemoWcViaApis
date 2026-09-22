@@ -2,7 +2,7 @@
 
 ### Requirement: 服務端權威重新驗證
 
-Checker 完成交易前，服務 SHALL 重新讀取目前 movement、contract、相依餘額、Excess ledgers 與有效 policy，並對非 USD A8／A3／A3S／B3 使用 release time 最新 Approved／Effective／fresh Booking Rate 重新驗證 eligibility 與 allowance。
+Checker 完成交易前，服務 SHALL 重新讀取目前 movement、contract、相依餘額與有效 policy。僅對 resolved policy 的 `configuredMaximumUsd > 0` 且 `allowancePercentage > 0` 的 Excess-enabled A8／A3／A3S／B3，服務 SHALL 讀取 Excess ledgers，並對非 USD movement 使用 release time 最新 Approved／Effective／fresh Booking Rate 重新驗證 eligibility 與 allowance。任一配置值為零時 SHALL 使用原有 Checker sufficiency 流程，不得呼叫 FX 或建立 Excess fact。
 
 #### Scenario: Maker Submit 後 capacity 改變
 
@@ -21,9 +21,16 @@ Checker 完成交易前，服務 SHALL 重新讀取目前 movement、contract、
 - **WHEN** 不同 Checker Release 且重新讀取的 facts 與 FX evidence 仍符合資格
 - **THEN** 服務 SHALL 在單一 transaction 核准 movement、轉換 reservation 並保存 Checker snapshot
 
+#### Scenario: Zero Allowance Checker Release
+
+- **GIVEN** `configuredMaximumUsd = 0` 或 `allowancePercentage = 0`
+- **WHEN** Checker Release A8／A3／A3S／B3
+- **THEN** 服務 SHALL 依變更前既有 sufficiency 與 Maker／Checker 規則重新驗證
+- **AND** SHALL NOT 呼叫 FX、要求 Booking Rate、轉換 reservation 或保存 Excess snapshot
+
 ### Requirement: Fix Pending 限制
 
-Fix Pending SHALL 只修改 function policy 允許的欄位。只有 pending A8、A3、A3S、B3 MAY 修改 monetary amount；其他 functions MUST 保持 identity、reference、currency、monetary 與 linked-movement fields protected。Amount Fix MUST 重跑 Maker FX／allowance gate 並原子替換 reservation。
+Fix Pending SHALL 只修改 function policy 允許的欄位。只有 pending A8、A3、A3S、B3 MAY 修改 monetary amount；其他 functions MUST 保持 identity、reference、currency、monetary 與 linked-movement fields protected。對 Excess-enabled owner，Amount Fix MUST 重跑 Maker FX／allowance gate 並原子替換 reservation；若 resolved policy 的任一配置值為零，Amount Fix MUST 重跑變更前既有 sufficiency gate，且不得呼叫 FX 或建立／替換 Excess reservation。
 
 #### Scenario: 修正 remarks
 
@@ -45,9 +52,18 @@ Fix Pending SHALL 只修改 function policy 允許的欄位。只有 pending A8�
 
 #### Scenario: Amount Fix 的 FX 失敗
 
+- **GIVEN** `configuredMaximumUsd > 0` 且 `allowancePercentage > 0`
 - **WHEN** Amount Fix 無法取得合格 rate
 - **THEN** API SHALL 回傳 `FX_RATE_UNAVAILABLE` 或 `FX_RATE_STALE`
 - **AND** 原 pending movement 與 reservation SHALL 完全不變
+
+#### Scenario: Zero Allowance Amount Fix
+
+- **GIVEN** `configuredMaximumUsd = 0` 或 `allowancePercentage = 0`
+- **WHEN** Maker 修正 pending A8／A3／A3S／B3 Amount
+- **THEN** 服務 SHALL 重跑變更前既有 sufficiency gate
+- **AND** SHALL NOT 呼叫 FX 或建立／替換 Excess reservation
+- **AND** 若修正後 Amount 超過既有 capacity，SHALL 回傳既有 `409 INSUFFICIENT_AVAILABLE_BALANCE` code 與 message 並保持原 pending movement 不變
 
 #### Scenario: 其他 Function 嘗試修正 Amount
 

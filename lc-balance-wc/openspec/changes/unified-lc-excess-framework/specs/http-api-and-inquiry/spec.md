@@ -17,9 +17,18 @@ Balance Component HTTP API SHALL 只提供目前 OpenAPI contract 記載的 requ
 
 #### Scenario: FX Rate Unavailable
 
+- **GIVEN** `configuredMaximumUsd > 0` 且 `allowancePercentage > 0`
 - **WHEN** 非 USD Maker Submit 無法完成 FX gate
 - **THEN** API SHALL 回傳已記載的 non-success status、`FX_RATE_UNAVAILABLE` 與可診斷 fields
 - **AND** SHALL NOT 洩漏 provider credential、stack trace 或內部 path
+
+#### Scenario: Zero Allowance Over-capacity Request
+
+- **GIVEN** `configuredMaximumUsd = 0` 或 `allowancePercentage = 0`
+- **WHEN** A8／A3／A3S／B3 request 超過既有 authoritative capacity
+- **THEN** API SHALL 回傳既有 `409 INSUFFICIENT_AVAILABLE_BALANCE` code 與 message
+- **AND** SHALL NOT 回傳 `FX_RATE_UNAVAILABLE`、`FX_RATE_STALE` 或 `EXCESS_LIMIT_EXCEEDED`
+- **AND** SHALL 維持 zero-write
 
 #### Scenario: 有效 Excess Request
 
