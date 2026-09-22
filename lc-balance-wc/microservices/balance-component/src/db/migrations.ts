@@ -17,6 +17,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 import {
   CONTRACT_STATUS_VALUES,
+  EXCESS_SCHEMA_SQL,
   EXPOSURE_NATURE_VALUES,
   INSTRUMENT_TYPE_VALUES,
   MOVEMENT_STATUS_VALUES,
@@ -84,7 +85,7 @@ export const MIGRATIONS: Migration[] = [
   {
     id: 6,
     description:
-      'Add root_event_snapshot to balance_movements (2026-08-17, Inquire Events Balance Tabs — the parent LC/Confirmation\'s own plain balance for a child-ledger movement — see types.ts BalanceMovement.rootEventSnapshot)',
+      "Add root_event_snapshot to balance_movements (2026-08-17, Inquire Events Balance Tabs — the parent LC/Confirmation's own plain balance for a child-ledger movement — see types.ts BalanceMovement.rootEventSnapshot)",
     up: (db) => {
       const columns = (db.prepare('PRAGMA table_info(balance_movements)').all() as { name: string }[]).map((c) => c.name);
       if (!columns.includes('root_event_snapshot')) db.exec('ALTER TABLE balance_movements ADD COLUMN root_event_snapshot TEXT');
@@ -151,7 +152,7 @@ export const MIGRATIONS: Migration[] = [
   {
     id: 13,
     description:
-      'Add CHECK constraints on every enum-typed column (instrument_type/status/tenor_type on balance_contracts; movement_type/exposure_nature/status on balance_movements) and a real FK REFERENCES on reversal_of_movement_id (balance_movements) — 2026-08-21, analysis/Balance-Component-DB-Optimization-Analysis.md P1. SQLite ALTER TABLE can only ADD COLUMN, never add a CHECK or REFERENCES to an existing column, so this rebuilds both tables via the official SQLite "12-step" procedure (PRAGMA foreign_keys=OFF, create the new table with the constraints already in place, copy every row across with an explicit column list — never SELECT *, so a column-order mismatch fails loudly instead of silently misaligning data — drop the old table, rename the new one into place, recreate every index, PRAGMA foreign_keys=ON), inside one explicit transaction so a failure partway through never leaves the database in a half-rebuilt state. schema.ts already creates both tables with these same constraints for a brand-new database (CREATE TABLE IF NOT EXISTS is a no-op there since it only checks the table name) — this migration is what actually applies them to a pre-existing on-disk DB file. Verified against the live dev DB (2026-08-21, SELECT DISTINCT ... GROUP BY per column) before writing this: every value already persisted in every affected column is already a legal member of its own CHECK list, so this migration is expected to succeed against real data, not just an empty database — if it ever throws against a real deployment\'s DB, that is a genuine pre-existing bad value, not a false positive to relax the CHECK for (see this file\'s own import from schema.ts for the exact legal-value lists and their own authority — types.ts for 5 of the 6 enum columns, BalanceService\'s own movementTypeRegistry for movement_type, which has no types.ts union). 2026-08-29 (broadened dead-code cleanup) — this rebuild ALSO drops supersedes_balance_contract_id/superseded_by_balance_contract_id (balance_contracts) and superseded_movement_id (balance_movements) here, not merely narrows their CHECK: schema.ts\'s own fresh CREATE TABLE no longer declares any of the three (the reserved, zero-call-site contract-versioning mechanism they backed — markSuperseded() — was removed the same day), and this migration is the first rebuild in the chain — carrying them forward into a later migration first would break a brand-new install, which never had the columns to select from in the first place.',
+      "Add CHECK constraints on every enum-typed column (instrument_type/status/tenor_type on balance_contracts; movement_type/exposure_nature/status on balance_movements) and a real FK REFERENCES on reversal_of_movement_id (balance_movements) — 2026-08-21, analysis/Balance-Component-DB-Optimization-Analysis.md P1. SQLite ALTER TABLE can only ADD COLUMN, never add a CHECK or REFERENCES to an existing column, so this rebuilds both tables via the official SQLite \"12-step\" procedure (PRAGMA foreign_keys=OFF, create the new table with the constraints already in place, copy every row across with an explicit column list — never SELECT *, so a column-order mismatch fails loudly instead of silently misaligning data — drop the old table, rename the new one into place, recreate every index, PRAGMA foreign_keys=ON), inside one explicit transaction so a failure partway through never leaves the database in a half-rebuilt state. schema.ts already creates both tables with these same constraints for a brand-new database (CREATE TABLE IF NOT EXISTS is a no-op there since it only checks the table name) — this migration is what actually applies them to a pre-existing on-disk DB file. Verified against the live dev DB (2026-08-21, SELECT DISTINCT ... GROUP BY per column) before writing this: every value already persisted in every affected column is already a legal member of its own CHECK list, so this migration is expected to succeed against real data, not just an empty database — if it ever throws against a real deployment's DB, that is a genuine pre-existing bad value, not a false positive to relax the CHECK for (see this file's own import from schema.ts for the exact legal-value lists and their own authority — types.ts for 5 of the 6 enum columns, BalanceService's own movementTypeRegistry for movement_type, which has no types.ts union). 2026-08-29 (broadened dead-code cleanup) — this rebuild ALSO drops supersedes_balance_contract_id/superseded_by_balance_contract_id (balance_contracts) and superseded_movement_id (balance_movements) here, not merely narrows their CHECK: schema.ts's own fresh CREATE TABLE no longer declares any of the three (the reserved, zero-call-site contract-versioning mechanism they backed — markSuperseded() — was removed the same day), and this migration is the first rebuild in the chain — carrying them forward into a later migration first would break a brand-new install, which never had the columns to select from in the first place.",
     up: (db) => {
       db.exec('PRAGMA foreign_keys = OFF');
       try {
@@ -313,7 +314,7 @@ export const MIGRATIONS: Migration[] = [
   {
     id: 15,
     description:
-      'Rebuild balance_contracts/balance_movements to widen the status/movement_type CHECK constraints to include EXPIRED and EXPIRE/AMEND_EXPIRY_DATE/REVERSAL/REOPEN (2026-08-25, F1 external BA review) — same 12-step rebuild procedure as migration 13, since SQLite cannot ALTER an existing CHECK constraint. Includes migration 14\'s two new columns in the rebuilt balance_contracts (a fresh DB never needs this — schema.ts already declares both with the widened CHECK lists via CREATE TABLE IF NOT EXISTS; this only matters for a pre-existing on-disk DB file that ran migrations 1-14 under the old CHECK lists). 2026-08-29 — matches migration 13\'s own supersedes_balance_contract_id/superseded_by_balance_contract_id/superseded_movement_id removal (already dropped by 13\'s own rebuild by the time this one runs; omitted here too so this migration\'s own column list stays consistent with what actually exists).',
+      "Rebuild balance_contracts/balance_movements to widen the status/movement_type CHECK constraints to include EXPIRED and EXPIRE/AMEND_EXPIRY_DATE/REVERSAL/REOPEN (2026-08-25, F1 external BA review) — same 12-step rebuild procedure as migration 13, since SQLite cannot ALTER an existing CHECK constraint. Includes migration 14's two new columns in the rebuilt balance_contracts (a fresh DB never needs this — schema.ts already declares both with the widened CHECK lists via CREATE TABLE IF NOT EXISTS; this only matters for a pre-existing on-disk DB file that ran migrations 1-14 under the old CHECK lists). 2026-08-29 — matches migration 13's own supersedes_balance_contract_id/superseded_by_balance_contract_id/superseded_movement_id removal (already dropped by 13's own rebuild by the time this one runs; omitted here too so this migration's own column list stays consistent with what actually exists).",
     up: (db) => {
       db.exec('PRAGMA foreign_keys = OFF');
       try {
@@ -466,7 +467,7 @@ export const MIGRATIONS: Migration[] = [
   {
     id: 16,
     description:
-      'Add new_expiry_date to balance_movements (2026-08-25, F1 external BA review — AMEND_EXPIRY_DATE) — see schema.ts\'s own column comment. Runs AFTER migration 15\'s rebuild (must — 15\'s CREATE TABLE balance_movements_new has a hardcoded column list that predates this column; adding it before 15 would have it silently dropped by that rebuild). Simple ALTER TABLE ADD COLUMN, no CHECK constraint involved.',
+      "Add new_expiry_date to balance_movements (2026-08-25, F1 external BA review — AMEND_EXPIRY_DATE) — see schema.ts's own column comment. Runs AFTER migration 15's rebuild (must — 15's CREATE TABLE balance_movements_new has a hardcoded column list that predates this column; adding it before 15 would have it silently dropped by that rebuild). Simple ALTER TABLE ADD COLUMN, no CHECK constraint involved.",
     up: (db) => {
       const columns = (db.prepare('PRAGMA table_info(balance_movements)').all() as { name: string }[]).map((c) => c.name);
       if (!columns.includes('new_expiry_date')) db.exec('ALTER TABLE balance_movements ADD COLUMN new_expiry_date TEXT');
@@ -475,7 +476,7 @@ export const MIGRATIONS: Migration[] = [
   {
     id: 17,
     description:
-      'Add amendment_approved/amendment_effective/consent_status to balance_movements (2026-08-25, F1 proposal §13.1 item 2, BA-ratified — AMEND_EXPIRY_DATE/REOPEN upstream consent passthrough; this component accepts and shape-validates these, never judges them) — see schema.ts\'s own column comment. Simple ALTER TABLE ADD COLUMN, no CHECK constraint (consent_status is bounded at the zod layer, same posture as the pre-existing reason_code column).',
+      "Add amendment_approved/amendment_effective/consent_status to balance_movements (2026-08-25, F1 proposal §13.1 item 2, BA-ratified — AMEND_EXPIRY_DATE/REOPEN upstream consent passthrough; this component accepts and shape-validates these, never judges them) — see schema.ts's own column comment. Simple ALTER TABLE ADD COLUMN, no CHECK constraint (consent_status is bounded at the zod layer, same posture as the pre-existing reason_code column).",
     up: (db) => {
       const columns = (db.prepare('PRAGMA table_info(balance_movements)').all() as { name: string }[]).map((c) => c.name);
       if (!columns.includes('amendment_approved')) db.exec('ALTER TABLE balance_movements ADD COLUMN amendment_approved INTEGER');
@@ -486,7 +487,7 @@ export const MIGRATIONS: Migration[] = [
   {
     id: 18,
     description:
-      'Add delete_pending_audit table (2026-08-27, Fix Pending/Delete Pending Phase — BA/business-directed dedicated audit trail for every Delete Pending action across all A1-A11/B1-B7 functions) — see schema.ts\'s own doc comment on this table for the full rationale. CREATE TABLE IF NOT EXISTS is safe to run unconditionally (idempotent), same as every other fresh-table addition in this codebase to date.',
+      "Add delete_pending_audit table (2026-08-27, Fix Pending/Delete Pending Phase — BA/business-directed dedicated audit trail for every Delete Pending action across all A1-A11/B1-B7 functions) — see schema.ts's own doc comment on this table for the full rationale. CREATE TABLE IF NOT EXISTS is safe to run unconditionally (idempotent), same as every other fresh-table addition in this codebase to date.",
     up: (db) => {
       db.exec(`
         CREATE TABLE IF NOT EXISTS delete_pending_audit (
@@ -511,7 +512,7 @@ export const MIGRATIONS: Migration[] = [
   {
     id: 19,
     description:
-      'Add superseded_by_movement_id/edited_by/edited_at to balance_movements (2026-08-27, Fix Pending §2.2/§15/§19 — see schema.ts\'s own column comment). Simple ALTER TABLE ADD COLUMN, no CHECK/REFERENCES constraint (§6.4/§15.3(d) — deliberately kept out at this stage, same posture as fresh schema.ts).',
+      "Add superseded_by_movement_id/edited_by/edited_at to balance_movements (2026-08-27, Fix Pending §2.2/§15/§19 — see schema.ts's own column comment). Simple ALTER TABLE ADD COLUMN, no CHECK/REFERENCES constraint (§6.4/§15.3(d) — deliberately kept out at this stage, same posture as fresh schema.ts).",
     up: (db) => {
       const columns = (db.prepare('PRAGMA table_info(balance_movements)').all() as { name: string }[]).map((c) => c.name);
       if (!columns.includes('superseded_by_movement_id')) db.exec('ALTER TABLE balance_movements ADD COLUMN superseded_by_movement_id TEXT');
@@ -522,7 +523,7 @@ export const MIGRATIONS: Migration[] = [
   {
     id: 20,
     description:
-      'Widen idx_movements_idempotency to a partial unique index excluding SUPERSEDED (2026-08-27, Fix Pending §19 — see schema.ts\'s own index comment for the full rationale: Fix Pending\'s replacement record reuses its predecessor\'s eventSeq, which a plain unconditional UNIQUE index would reject). Pure index swap, no table rebuild needed (same technique as migration 12) — must run AFTER migration 19 so the column referenced by the partial predicate already exists on every pre-existing on-disk DB (harmless either way here since the predicate is on the pre-existing status column, not a new one, but kept in this order for readability).',
+      "Widen idx_movements_idempotency to a partial unique index excluding SUPERSEDED (2026-08-27, Fix Pending §19 — see schema.ts's own index comment for the full rationale: Fix Pending's replacement record reuses its predecessor's eventSeq, which a plain unconditional UNIQUE index would reject). Pure index swap, no table rebuild needed (same technique as migration 12) — must run AFTER migration 19 so the column referenced by the partial predicate already exists on every pre-existing on-disk DB (harmless either way here since the predicate is on the pre-existing status column, not a new one, but kept in this order for readability).",
     up: (db) => {
       db.exec('DROP INDEX IF EXISTS idx_movements_idempotency');
       db.exec("CREATE UNIQUE INDEX idx_movements_idempotency ON balance_movements(balance_contract_id, event_seq) WHERE status != 'SUPERSEDED'");
@@ -531,7 +532,7 @@ export const MIGRATIONS: Migration[] = [
   {
     id: 21,
     description:
-      'Add fix_pending_audit table (Fix Pending §19, redesigned 2026-08-29 — editPending() now corrects a movement\'s row IN PLACE rather than retiring it and inserting a replacement; this table is the only place the pre-edit content survives) — see schema.ts\'s own doc comment on this table for the full shape/rationale. CREATE TABLE IF NOT EXISTS is safe to run unconditionally, same as migration 18\'s delete_pending_audit addition.',
+      "Add fix_pending_audit table (Fix Pending §19, redesigned 2026-08-29 — editPending() now corrects a movement's row IN PLACE rather than retiring it and inserting a replacement; this table is the only place the pre-edit content survives) — see schema.ts's own doc comment on this table for the full shape/rationale. CREATE TABLE IF NOT EXISTS is safe to run unconditionally, same as migration 18's delete_pending_audit addition.",
     up: (db) => {
       db.exec(`
         CREATE TABLE IF NOT EXISTS fix_pending_audit (
@@ -556,7 +557,7 @@ export const MIGRATIONS: Migration[] = [
   {
     id: 22,
     description:
-      'Fix Pending §19 redesigned to correct a movement\'s row IN PLACE instead of retiring it and inserting a replacement (2026-08-29 — see fixPendingAuditStore.ts/balanceService.ts editPending() for the new mechanism, fix_pending_audit above for where the pre-edit content now lives). No pre-existing on-disk DB has ever run the pre-redesign two-row mechanism (confirmed with the user — no SIT/production deployment exists yet), so this migration does not backfill anything; it only excludes any such row from the rebuild as a defensive no-op (WHERE clause below), same posture as migrations 13/15\'s own equivalent exclusion. Rebuilds balance_movements via the same 12-step procedure as migrations 13/15/17 to narrow the status CHECK (the old retired-row marker is no longer a legal value — MOVEMENT_STATUS_VALUES already reflects this) and drop superseded_by_movement_id (migration 19\'s own addition, no longer needed). A separate, pre-existing, never-written reserved column predating Fix Pending, and balance_contracts\' own unrelated (already-removed-by-2026-08-29, confirmed-zero-call-site) contract-versioning mechanism, were dropped earlier in the chain instead, at migrations 13/15/17\'s own rebuilds — those migrations already unconditionally rebuild both tables on every install including a brand-new one (schema.ts\'s own fresh CREATE TABLE no longer declares any of these columns), so carrying them any further forward before dropping them would make a fresh install fail copying a column that was never there. idx_movements_idempotency reverts to a plain unconditional UNIQUE index — there is only ever one row per (contract, eventSeq) now.',
+      "Fix Pending §19 redesigned to correct a movement's row IN PLACE instead of retiring it and inserting a replacement (2026-08-29 — see fixPendingAuditStore.ts/balanceService.ts editPending() for the new mechanism, fix_pending_audit above for where the pre-edit content now lives). No pre-existing on-disk DB has ever run the pre-redesign two-row mechanism (confirmed with the user — no SIT/production deployment exists yet), so this migration does not backfill anything; it only excludes any such row from the rebuild as a defensive no-op (WHERE clause below), same posture as migrations 13/15's own equivalent exclusion. Rebuilds balance_movements via the same 12-step procedure as migrations 13/15/17 to narrow the status CHECK (the old retired-row marker is no longer a legal value — MOVEMENT_STATUS_VALUES already reflects this) and drop superseded_by_movement_id (migration 19's own addition, no longer needed). A separate, pre-existing, never-written reserved column predating Fix Pending, and balance_contracts' own unrelated (already-removed-by-2026-08-29, confirmed-zero-call-site) contract-versioning mechanism, were dropped earlier in the chain instead, at migrations 13/15/17's own rebuilds — those migrations already unconditionally rebuild both tables on every install including a brand-new one (schema.ts's own fresh CREATE TABLE no longer declares any of these columns), so carrying them any further forward before dropping them would make a fresh install fail copying a column that was never there. idx_movements_idempotency reverts to a plain unconditional UNIQUE index — there is only ever one row per (contract, eventSeq) now.",
     up: (db) => {
       db.exec('PRAGMA foreign_keys = OFF');
       try {
@@ -700,12 +701,16 @@ export const MIGRATIONS: Migration[] = [
     up: (db) => {
       const columns = (db.prepare('PRAGMA table_info(balance_movements)').all() as { name: string }[]).map((c) => c.name);
       if (!columns.includes('tolerance_change_pct')) db.exec('ALTER TABLE balance_movements ADD COLUMN tolerance_change_pct TEXT');
-      if (!columns.includes('tolerance_change_direction')) db.exec("ALTER TABLE balance_movements ADD COLUMN tolerance_change_direction TEXT CHECK (tolerance_change_direction IS NULL OR tolerance_change_direction IN ('INCREASE','DECREASE'))");
+      if (!columns.includes('tolerance_change_direction'))
+        db.exec(
+          "ALTER TABLE balance_movements ADD COLUMN tolerance_change_direction TEXT CHECK (tolerance_change_direction IS NULL OR tolerance_change_direction IN ('INCREASE','DECREASE'))",
+        );
     },
   },
   {
     id: 26,
-    description: 'Replace fixed Balance Account business-type and risk-class CHECKs with configuration-authoritative category/Tenor validation while preserving every maintained mapping row.',
+    description:
+      'Replace fixed Balance Account business-type and risk-class CHECKs with configuration-authoritative category/Tenor validation while preserving every maintained mapping row.',
     up: (db) => {
       db.exec('BEGIN IMMEDIATE');
       try {
@@ -736,6 +741,13 @@ export const MIGRATIONS: Migration[] = [
         db.exec('ROLLBACK');
         throw error;
       }
+    },
+  },
+  {
+    id: 27,
+    description: 'Add v11.15 append-only Excess allowance, FX snapshot, SG capacity and command-idempotency persistence.',
+    up: (db) => {
+      db.exec(EXCESS_SCHEMA_SQL);
     },
   },
 ];

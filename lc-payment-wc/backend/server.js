@@ -20,7 +20,10 @@ app.use('/demo', express.static(path.join(__dirname, '..', 'dist', 'wc')));
 // trace a response shape from, so this endpoint's shape is invented for the demo,
 // same category as the pre-existing fake rate table it now replaces.
 const CURRENCIES = require('./data/currencies.json');
-const RATES = require('./data/fx-rates.json');
+const FX_DATA = require('./data/fx-rates.json');
+const RATES = FX_DATA.rates ?? FX_DATA;
+const BOOKING_QUOTES = FX_DATA.bookingQuotes ?? {};
+const { buildVirtualBookingQuote } = require('./virtual-booking-rate');
 const DECIMALS = Object.fromEntries(CURRENCIES.map((c) => [c.code, c.decimals]));
 
 // Guard: every currency in currencies.json must have a TWD rate in fx-rates.json
@@ -86,6 +89,45 @@ app.get('/api/health', (_req, res) => {
 // ─── FX Rates ────────────────────────────────────────────────────────────────
 app.get('/api/fx/rates', (_req, res) => {
   res.json({ entries: [], summary: {}, rates: currentRates(), at: new Date().toISOString() });
+});
+
+// Non-production virtual Currency Exchange used by Balance regression only. Production adapters must
+// reject this source and must never derive BOOKING from BUY/SELL; see lc-balance-wc BD-01/BD-02.
+app.get('/api/fx/booking-rate', (req, res) => {
+  const { base, quote, amount, decisionTime, correlationId, policyVersion, maxStalenessSeconds } = req.query;
+  if (
+    typeof base !== 'string' ||
+    typeof quote !== 'string' ||
+    typeof amount !== 'string' ||
+    typeof decisionTime !== 'string' ||
+    typeof correlationId !== 'string' ||
+    typeof policyVersion !== 'string' ||
+    typeof maxStalenessSeconds !== 'string'
+  ) {
+    return res.status(400).json({
+      code: 'INVALID_FX_REQUEST',
+      message: 'base, quote, amount, decisionTime, correlationId, policyVersion and maxStalenessSeconds are required.',
+    });
+  }
+  const baseCurrency = base.trim().toUpperCase();
+  const quoteCurrency = quote.trim().toUpperCase();
+  const pair = `${baseCurrency}/${quoteCurrency}`;
+  const result = buildVirtualBookingQuote({
+    quote: BOOKING_QUOTES[pair],
+    baseCurrency,
+    quoteCurrency,
+    amount,
+    decisionTime,
+    correlationId,
+    policyVersion,
+    maxStalenessSeconds,
+  });
+  if (result.error === 'INVALID_FX_REQUEST') {
+    return res.status(400).json({ code: result.error, message: 'decisionTime must be an ISO date-time.' });
+  }
+  if (result.error) return res.status(503).json({ code: result.error, message: result.message, ...(result.reason ? { reason: result.reason } : {}) });
+  res.set('X-Virtual-FX-Adapter', 'true');
+  return res.json(result);
 });
 
 // ─── Currencies ("Get Currency API") ──────────────────────────────────────────
@@ -885,6 +927,7 @@ if (require.main === module) {
     console.log('Endpoints:');
     console.log('  GET  /api/health');
     console.log('  GET  /api/fx/rates');
+    console.log('  GET  /api/fx/booking-rate (non-production virtual BOOKING quote)');
     console.log('  GET  /api/currencies');
     console.log('  POST /api/import/issue/calc          — A1 (chargeSelections: margin/comm/swift)');
     console.log('  POST /api/import/settlement/calc     — A2 (marginHeld in billCcy, chargeSelections: net)');

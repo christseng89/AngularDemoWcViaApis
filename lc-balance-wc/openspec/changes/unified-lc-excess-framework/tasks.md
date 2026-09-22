@@ -1,23 +1,23 @@
 ## 0. Review Gate
 
-- [ ] 0.1 Obtain OpenSpec Change Review／Approval for `proposal.md`, `design.md`, all delta specs, `tasks.md` and `requirement-traceability.md` before implementation.
-- [ ] 0.2 Confirm BD-01 and BD-02 in review evidence; do not add `FX_RATE_PENDING` or use the virtual adapter in production.
+- [x] 0.1 Obtain OpenSpec Change Review／Approval for `proposal.md`, `design.md`, all delta specs, `tasks.md` and `requirement-traceability.md` before implementation.
+- [x] 0.2 Confirm BD-01 and BD-02 in review evidence; do not add `FX_RATE_PENDING` or use the virtual adapter in production.
 
 ## 1. Contracts, Configuration and Persistence — Tests First
 
-- [ ] 1.1 Add failing configuration tests and implement versioned `ExcessPolicyConfig` under `microservices/balance-component/src/config.ts` plus a reviewed config file under `microservices/balance-component/config/`; test missing, overlap, effective date, maximum, percentage and `FAIL_CLOSED` freshness policy.
-- [ ] 1.2 Add failing migration／constraint tests in `microservices/balance-component/test/unit/db/` before extending `microservices/balance-component/src/db/schema.ts` and `migrations.ts` with `excess_account`, append-only `excess_ledger_event`, `excess_allocation`, `fx_rate_snapshot`, `sg_capacity_event` and `command_idempotency`.
+- [x] 1.1 Add failing configuration tests and implement versioned `ExcessPolicyConfig` under `microservices/balance-component/src/config.ts` plus a reviewed config file under `microservices/balance-component/config/`; test missing, overlap, effective date, maximum, percentage and `FAIL_CLOSED` freshness policy.
+- [x] 1.2 Add failing migration／constraint tests in `microservices/balance-component/test/unit/db/` before extending `microservices/balance-component/src/db/schema.ts` and `migrations.ts` with `excess_account`, append-only `excess_ledger_event`, `excess_allocation`, `fx_rate_snapshot`, `sg_capacity_event` and `command_idempotency`.
 - [ ] 1.3 Add typed wire／domain models and exact enums in `microservices/balance-component/src/types.ts`; keep Excess decision, workflow, accounting, contract and FX command result states separate.
 - [ ] 1.4 Add store contract tests before implementing narrow stores in `microservices/balance-component/src/store/`; prove owner versioning, immutable events, aggregate derivation and migration preservation.
 
 ## 2. Pure Policies and Currency Exchange Port — Tests First
 
-- [ ] 2.1 Add `excessPolicy.test.ts` then implement pure exact-decimal Covered／Excess split and owner allowance policy under `microservices/balance-component/src/domain/`.
+- [x] 2.1 Add `excessPolicy.test.ts` then implement pure exact-decimal Covered／Excess split and owner allowance policy under `microservices/balance-component/src/domain/`.
 - [ ] 2.2 Add boundary tests for zero capacity, exact limit, one minor unit over, currency rounding and concurrent aggregate inputs; use `microservices/balance-component/src/money.ts`, never JavaScript number.
 - [ ] 2.3 Add function strategies for A8／A3／A3S／B3 covered-capacity inputs without duplicating allowance arithmetic.
 - [ ] 2.4 Add formal allocation／return attribution pure-policy tests, including partial, repeated and over-reversal rejection.
-- [ ] 2.5 Define `CurrencyExchangePort` and DTOs under `microservices/balance-component/src/integration/`; add contract tests for BOOKING purpose, Approved／Effective, freshness, correlation, source／version and USD par.
-- [ ] 2.6 In `../lc-payment-wc/backend/data/fx-rates.json` and `../lc-payment-wc/backend/server.js`, first add tests then extend the non-production virtual endpoint to emit exact-decimal `buyRate`, `sellRate`, optional `bookingRate`, deterministic metadata and `bookingRate=(buyRate+sellRate)/2` when omitted; preserve legacy fixtures by explicitly setting both sides where appropriate.
+- [x] 2.5 Define `CurrencyExchangePort` and DTOs under `microservices/balance-component/src/integration/`; add contract tests for BOOKING purpose, Approved／Effective, freshness, correlation, source／version and USD par.
+- [x] 2.6 In `../lc-payment-wc/backend/data/fx-rates.json` and `../lc-payment-wc/backend/server.js`, first add tests then extend the non-production virtual endpoint to emit exact-decimal `buyRate`, `sellRate`, optional `bookingRate`, deterministic metadata and `bookingRate=(buyRate+sellRate)/2` when omitted; preserve legacy fixtures by explicitly setting both sides where appropriate.
 - [ ] 2.7 Implement a Balance virtual adapter and a production adapter boundary; configuration MUST reject the virtual adapter in production, and production MUST reject missing provider Booking Rate without deriving or falling back from Buy／Sell or any alternate-purpose rate.
 - [ ] 2.8 Test timeout／retry／late／out-of-order handling and map unavailable／not Approved／not Effective to `FX_RATE_UNAVAILABLE`, stale to `FX_RATE_STALE`.
 
@@ -78,4 +78,5 @@
 - [ ] 8.2 Update A8／A3／A3S／B3, Maker／Checker, data model, decision tables, downstream eligibility and traceability pages under `docs/obsidian-balance-kb-v3.2/`.
 - [ ] 8.3 Verify every row in `requirement-traceability.md` has passing test evidence and resolve C-01～C-07 without lowering v11.15 requirements.
 - [ ] 8.4 Run OAS validation, lint, formatting, all coverage gates and `openspec validate --all --strict --no-interactive`.
+- [ ] 8.4a Run a fresh SonarQube server scan against the exact `OVERDRAWN` release-candidate commit and retain machine-readable measures／Quality Gate evidence. New Code MUST have Issues = 0, Security Hotspots Reviewed = 100%, Coverage >= 92%, Duplicated Lines <= 1%, Maintainability Issues = 0, Medium Severity Issues = 0 and Security Issues = 0. Overall Code MUST have Coverage >= 92%, Duplicated Lines <= 3%, High Severity Issues = 0, Maintainability Issues <= 20, Medium Severity Issues = 0, Security Hotspots Reviewed = 100% and Security Issues = 0. A pre-candidate or stale scan is not evidence.
 - [ ] 8.5 Obtain implementation Review／Approval; only after all tasks and scenarios pass, run `openspec archive unified-lc-excess-framework --yes`, re-run strict validation and verify current specs contain the approved behavior.

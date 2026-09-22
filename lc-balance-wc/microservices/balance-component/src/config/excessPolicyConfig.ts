@@ -9,6 +9,9 @@ export interface ExcessPolicyConfig {
   allowancePercentage: string;
   configuredMaximumUsd: string;
   fxMaxStalenessSeconds: number;
+  currencyPrecisions: Readonly<Record<string, number>>;
+  rateScale: number;
+  roundingMode: 'ROUND_HALF_UP';
   effectiveFrom: string;
   effectiveTo: string | null;
   fallbackPolicy: 'FAIL_CLOSED';
@@ -28,6 +31,13 @@ const policySchema = z.object({
   allowancePercentage: nonNegativeMoney,
   configuredMaximumUsd: nonNegativeMoney,
   fxMaxStalenessSeconds: z.number().int().positive(),
+  currencyPrecisions: z
+    .record(z.string().regex(/^[A-Z]{3}$/), z.number().int().min(0).max(3))
+    .refine((value) => value.USD === 2, 'currencyPrecisions must include USD with precision 2'),
+  rateScale: z.number().int().min(1).max(10),
+  roundingMode: z.literal('ROUND_HALF_UP', {
+    errorMap: () => ({ message: 'roundingMode must be ROUND_HALF_UP' }),
+  }),
   effectiveFrom: z.string().datetime({ offset: true }),
   effectiveTo: z.string().datetime({ offset: true }).nullable(),
   fallbackPolicy: z.literal('FAIL_CLOSED', {
@@ -44,6 +54,12 @@ export function loadExcessPolicyConfig(rawJson: string): readonly Readonly<Exces
   }
   const policies = z.array(policySchema).min(1).parse(decoded);
 
+  for (const requiredOwnerType of ['IMPORT_LC', 'EXPORT_CONFIRMATION'] as const) {
+    if (!policies.some((policy) => policy.ownerType === requiredOwnerType)) {
+      throw new Error(`Excess policy configuration must include ${requiredOwnerType}.`);
+    }
+  }
+
   for (const policy of policies) {
     if (policy.effectiveTo !== null && Date.parse(policy.effectiveTo) <= Date.parse(policy.effectiveFrom)) {
       throw new Error(`Excess policy ${policy.policyVersion}/${policy.ownerType} effectiveTo must be after effectiveFrom.`);
@@ -54,6 +70,11 @@ export function loadExcessPolicyConfig(rawJson: string): readonly Readonly<Exces
     const ordered = policies
       .filter((policy) => policy.ownerType === ownerType)
       .sort((left, right) => Date.parse(left.effectiveFrom) - Date.parse(right.effectiveFrom));
+    const versions = new Set<string>();
+    for (const policy of ordered) {
+      if (versions.has(policy.policyVersion)) throw new Error(`policyVersion must be unique within ${ownerType}: ${policy.policyVersion}.`);
+      versions.add(policy.policyVersion);
+    }
     for (let index = 1; index < ordered.length; index += 1) {
       const previous = ordered[index - 1]!;
       const current = ordered[index]!;
@@ -63,7 +84,14 @@ export function loadExcessPolicyConfig(rawJson: string): readonly Readonly<Exces
     }
   }
 
-  return Object.freeze(policies.map((policy) => Object.freeze({ ...policy })));
+  return Object.freeze(
+    policies.map((policy) =>
+      Object.freeze({
+        ...policy,
+        currencyPrecisions: Object.freeze({ ...policy.currencyPrecisions }),
+      }),
+    ),
+  );
 }
 
 export function resolveExcessPolicy(

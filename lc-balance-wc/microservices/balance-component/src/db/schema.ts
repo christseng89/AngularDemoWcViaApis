@@ -83,6 +83,138 @@ function sqlInList(values: readonly string[]): string {
   return values.map((v) => `'${v}'`).join(',');
 }
 
+/** v11.15 Excess/FX append-only persistence, shared by fresh schema creation and migration 27. */
+export const EXCESS_SCHEMA_SQL = `
+CREATE TABLE IF NOT EXISTS excess_accounts (
+  excess_account_id       TEXT PRIMARY KEY,
+  owner_type               TEXT NOT NULL CHECK (owner_type IN ('IMPORT_LC','EXPORT_CONFIRMATION')),
+  owner_id                 TEXT NOT NULL,
+  policy_version           TEXT NOT NULL,
+  version                  INTEGER NOT NULL CHECK (version > 0),
+  created_at               TEXT NOT NULL,
+  updated_at               TEXT NOT NULL,
+  UNIQUE (owner_type, owner_id)
+);
+
+CREATE TABLE IF NOT EXISTS excess_ledger_events (
+  excess_event_id          TEXT PRIMARY KEY,
+  excess_account_id        TEXT NOT NULL REFERENCES excess_accounts(excess_account_id),
+  movement_id              TEXT REFERENCES balance_movements(movement_id),
+  event_type               TEXT NOT NULL CHECK (event_type IN (
+    'PENDING_RESERVATION','APPROVED_UTILIZATION','RESERVATION_RELEASE',
+    'FORMAL_INCREASE_REGULARIZATION','RETURN_REVERSAL','CANCELLATION_REVERSAL'
+  )),
+  transaction_currency     TEXT NOT NULL,
+  transaction_amount       TEXT NOT NULL,
+  covered_amount           TEXT NOT NULL,
+  excess_amount            TEXT NOT NULL,
+  amount_usd               TEXT NOT NULL,
+  policy_version           TEXT NOT NULL,
+  source_excess_event_id   TEXT REFERENCES excess_ledger_events(excess_event_id),
+  created_by               TEXT NOT NULL,
+  created_at               TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_excess_events_account_time
+  ON excess_ledger_events(excess_account_id, created_at, excess_event_id);
+CREATE INDEX IF NOT EXISTS idx_excess_events_movement
+  ON excess_ledger_events(movement_id);
+
+CREATE TABLE IF NOT EXISTS excess_allocations (
+  excess_allocation_id     TEXT PRIMARY KEY,
+  adjustment_event_id      TEXT NOT NULL REFERENCES excess_ledger_events(excess_event_id),
+  approved_excess_event_id TEXT NOT NULL REFERENCES excess_ledger_events(excess_event_id),
+  transaction_amount       TEXT NOT NULL,
+  amount_usd               TEXT NOT NULL,
+  created_at               TEXT NOT NULL,
+  UNIQUE (adjustment_event_id, approved_excess_event_id)
+);
+
+CREATE TABLE IF NOT EXISTS fx_rate_snapshots (
+  fx_snapshot_id           TEXT PRIMARY KEY,
+  movement_id              TEXT REFERENCES balance_movements(movement_id),
+  decision_point           TEXT NOT NULL CHECK (decision_point IN ('MAKER_SUBMIT','CHECKER_RELEASE','FIX_PENDING')),
+  base_currency            TEXT NOT NULL,
+  quote_currency           TEXT NOT NULL CHECK (quote_currency = 'USD'),
+  rate_purpose             TEXT NOT NULL CHECK (rate_purpose = 'BOOKING'),
+  booking_rate             TEXT NOT NULL,
+  converted_amount_usd     TEXT NOT NULL,
+  rate_source              TEXT NOT NULL,
+  provider_rate_id         TEXT NOT NULL,
+  provider_rate_version    TEXT NOT NULL,
+  rate_timestamp           TEXT NOT NULL,
+  approval_status          TEXT NOT NULL CHECK (approval_status = 'APPROVED'),
+  effective_from           TEXT NOT NULL,
+  effective_to             TEXT,
+  freshness_status         TEXT NOT NULL CHECK (freshness_status = 'FRESH'),
+  rate_origin              TEXT NOT NULL DEFAULT 'PROVIDER_SUPPLIED' CHECK (rate_origin IN (
+    'PROVIDER_SUPPLIED','USD_PAR','VIRTUAL_EXPLICIT','VIRTUAL_DERIVED_MID'
+  )),
+  correlation_id           TEXT NOT NULL,
+  policy_version           TEXT NOT NULL,
+  created_at               TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_fx_snapshots_movement
+  ON fx_rate_snapshots(movement_id, decision_point);
+
+CREATE TABLE IF NOT EXISTS sg_capacity_events (
+  sg_capacity_event_id     TEXT PRIMARY KEY,
+  sg_balance_contract_id   TEXT NOT NULL REFERENCES balance_contracts(balance_contract_id),
+  source_movement_id       TEXT NOT NULL REFERENCES balance_movements(movement_id),
+  event_type               TEXT NOT NULL CHECK (event_type IN ('INITIALIZE','RESERVE','REDEEM','RESTORE','REVERSE')),
+  transaction_currency     TEXT NOT NULL,
+  capacity_amount          TEXT NOT NULL,
+  covered_amount           TEXT NOT NULL,
+  excess_amount            TEXT NOT NULL,
+  source_capacity_event_id TEXT REFERENCES sg_capacity_events(sg_capacity_event_id),
+  created_by               TEXT NOT NULL,
+  created_at               TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_sg_capacity_contract_time
+  ON sg_capacity_events(sg_balance_contract_id, created_at, sg_capacity_event_id);
+
+CREATE TABLE IF NOT EXISTS command_idempotency (
+  idempotency_record_id    TEXT PRIMARY KEY,
+  command_type             TEXT NOT NULL,
+  owner_id                 TEXT NOT NULL,
+  actor_context            TEXT NOT NULL,
+  idempotency_key          TEXT NOT NULL,
+  request_hash             TEXT NOT NULL,
+  response_status          INTEGER NOT NULL CHECK (response_status BETWEEN 100 AND 599),
+  response_body            TEXT NOT NULL,
+  created_at               TEXT NOT NULL,
+  UNIQUE (command_type, owner_id, actor_context, idempotency_key)
+);
+
+-- These tables are immutable facts. Corrections and reversals are new rows, never in-place mutation.
+CREATE TRIGGER IF NOT EXISTS immutable_excess_ledger_events_update
+BEFORE UPDATE ON excess_ledger_events BEGIN SELECT RAISE(ABORT, 'excess_ledger_events is append-only'); END;
+CREATE TRIGGER IF NOT EXISTS immutable_excess_ledger_events_delete
+BEFORE DELETE ON excess_ledger_events BEGIN SELECT RAISE(ABORT, 'excess_ledger_events is append-only'); END;
+
+CREATE TRIGGER IF NOT EXISTS immutable_excess_allocations_update
+BEFORE UPDATE ON excess_allocations BEGIN SELECT RAISE(ABORT, 'excess_allocations is append-only'); END;
+CREATE TRIGGER IF NOT EXISTS immutable_excess_allocations_delete
+BEFORE DELETE ON excess_allocations BEGIN SELECT RAISE(ABORT, 'excess_allocations is append-only'); END;
+
+CREATE TRIGGER IF NOT EXISTS immutable_fx_rate_snapshots_update
+BEFORE UPDATE ON fx_rate_snapshots BEGIN SELECT RAISE(ABORT, 'fx_rate_snapshots is append-only'); END;
+CREATE TRIGGER IF NOT EXISTS immutable_fx_rate_snapshots_delete
+BEFORE DELETE ON fx_rate_snapshots BEGIN SELECT RAISE(ABORT, 'fx_rate_snapshots is append-only'); END;
+
+CREATE TRIGGER IF NOT EXISTS immutable_sg_capacity_events_update
+BEFORE UPDATE ON sg_capacity_events BEGIN SELECT RAISE(ABORT, 'sg_capacity_events is append-only'); END;
+CREATE TRIGGER IF NOT EXISTS immutable_sg_capacity_events_delete
+BEFORE DELETE ON sg_capacity_events BEGIN SELECT RAISE(ABORT, 'sg_capacity_events is append-only'); END;
+
+CREATE TRIGGER IF NOT EXISTS immutable_command_idempotency_update
+BEFORE UPDATE ON command_idempotency BEGIN SELECT RAISE(ABORT, 'command_idempotency is append-only'); END;
+CREATE TRIGGER IF NOT EXISTS immutable_command_idempotency_delete
+BEFORE DELETE ON command_idempotency BEGIN SELECT RAISE(ABORT, 'command_idempotency is append-only'); END;
+`;
+
 export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS balance_contracts (
   balance_contract_id            TEXT PRIMARY KEY,
@@ -363,4 +495,6 @@ CREATE TABLE IF NOT EXISTS balance_account_mappings (
   updated_at              TEXT NOT NULL,
   UNIQUE (instrument_type, risk_class)
 );
+
+${EXCESS_SCHEMA_SQL}
 `;
