@@ -1,6 +1,5 @@
 import { formatMonetaryAmount, parseMonetaryAmount, ZERO } from '../money';
-
-export type ExcessDecision = 'NOT_REQUIRED' | 'WITHIN_ALLOWANCE' | 'LIMIT_EXCEEDED';
+import type { ExcessDecisionStatus } from '../types';
 
 export interface CoveredAndExcessInput {
   transactionAmount: string;
@@ -49,7 +48,7 @@ export interface EvaluateExcessAllowanceInput {
 }
 
 export interface EvaluateExcessAllowanceResult {
-  decision: ExcessDecision;
+  decision: ExcessDecisionStatus;
   availableAllowanceUsd: string;
   remainingAllowanceUsd: string;
 }

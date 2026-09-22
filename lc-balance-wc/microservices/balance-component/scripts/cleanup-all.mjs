@@ -5,6 +5,7 @@
  * on this machine.
  */
 import { DatabaseSync } from 'node:sqlite';
+import { deleteAllExcessFacts, restoreImmutableTriggers, suspendImmutableTriggers } from './cleanup-excess-support.mjs';
 
 const dryRun = process.argv.includes('--dry-run');
 const dbPath = process.env.DB_PATH ?? 'balance-component.sqlite';
@@ -33,8 +34,11 @@ if (dryRun) {
 
 db.exec('BEGIN');
 try {
+  const immutableTriggerSql = suspendImmutableTriggers(db);
+  deleteAllExcessFacts(db);
   db.exec('DELETE FROM balance_movements');
   db.exec('DELETE FROM balance_contracts');
+  restoreImmutableTriggers(db, immutableTriggerSql);
   db.exec('COMMIT');
 } catch (err) {
   db.exec('ROLLBACK');

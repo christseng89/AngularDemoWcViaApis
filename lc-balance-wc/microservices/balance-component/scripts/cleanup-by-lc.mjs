@@ -8,6 +8,7 @@
  * the sqlite3 CLI, which is not installed on this machine.
  */
 import { DatabaseSync } from 'node:sqlite';
+import { deleteExcessFactsForContracts, restoreImmutableTriggers, suspendImmutableTriggers } from './cleanup-excess-support.mjs';
 
 const [, , lcNumber, ...flags] = process.argv;
 const dryRun = flags.includes('--dry-run');
@@ -32,10 +33,9 @@ if (contracts.length === 0) {
 }
 
 const contractIds = contracts.map((c) => c.balance_contract_id);
+const logicalContractIds = [...new Set(contracts.map((c) => c.logical_contract_id))];
 const placeholders = contractIds.map(() => '?').join(',');
-const movementCount = db
-  .prepare(`SELECT COUNT(*) AS n FROM balance_movements WHERE balance_contract_id IN (${placeholders})`)
-  .get(...contractIds).n;
+const movementCount = db.prepare(`SELECT COUNT(*) AS n FROM balance_movements WHERE balance_contract_id IN (${placeholders})`).get(...contractIds).n;
 
 console.log(`lc_number=${lcNumber} (db=${dbPath})`);
 console.log(`  balance_contracts: ${contracts.length}`);
@@ -52,8 +52,11 @@ if (dryRun) {
 
 db.exec('BEGIN');
 try {
+  const immutableTriggerSql = suspendImmutableTriggers(db);
+  deleteExcessFactsForContracts(db, contractIds, logicalContractIds);
   db.prepare(`DELETE FROM balance_movements WHERE balance_contract_id IN (${placeholders})`).run(...contractIds);
   db.prepare('DELETE FROM balance_contracts WHERE lc_number = ?').run(lcNumber);
+  restoreImmutableTriggers(db, immutableTriggerSql);
   db.exec('COMMIT');
 } catch (err) {
   db.exec('ROLLBACK');

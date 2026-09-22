@@ -7,8 +7,8 @@
 
 - [x] 1.1 Add failing configuration tests and implement versioned `ExcessPolicyConfig` under `microservices/balance-component/src/config.ts` plus a reviewed config file under `microservices/balance-component/config/`; test missing, overlap, effective date, maximum, percentage and `FAIL_CLOSED` freshness policy.
 - [x] 1.2 Add failing migration／constraint tests in `microservices/balance-component/test/unit/db/` before extending `microservices/balance-component/src/db/schema.ts` and `migrations.ts` with `excess_account`, append-only `excess_ledger_event`, `excess_allocation`, `fx_rate_snapshot`, `sg_capacity_event` and `command_idempotency`.
-- [ ] 1.3 Add typed wire／domain models and exact enums in `microservices/balance-component/src/types.ts`; keep Excess decision, workflow, accounting, contract and FX command result states separate.
-- [ ] 1.4 Add store contract tests before implementing narrow stores in `microservices/balance-component/src/store/`; prove owner versioning, immutable events, aggregate derivation and migration preservation.
+- [x] 1.3 Add typed wire／domain models and exact enums in `microservices/balance-component/src/types.ts`; keep Excess decision, workflow, accounting, contract and FX command result states separate.
+- [x] 1.4 Add store contract tests before implementing narrow stores in `microservices/balance-component/src/store/`; prove owner versioning, immutable events, aggregate derivation and migration preservation.
 
 ## 2. Pure Policies and Currency Exchange Port — Tests First
 

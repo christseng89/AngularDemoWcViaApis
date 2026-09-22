@@ -68,6 +68,55 @@ export type ExposureNature = 'CONTINGENT' | 'ACTUAL' | 'MEMO';
 
 export type TenorType = 'SIGHT' | 'BUYERS_USANCE' | 'SELLERS_USANCE' | 'DP' | 'DA';
 
+/** v11.15 Excess concepts are deliberately separate from contract, movement and accounting state. */
+export type ExcessFunctionCode = 'A8' | 'A3' | 'A3S' | 'B3';
+export type ExcessOwnerType = 'IMPORT_LC' | 'EXPORT_CONFIRMATION';
+export type ExcessDecisionStatus = 'NOT_REQUIRED' | 'WITHIN_ALLOWANCE' | 'LIMIT_EXCEEDED';
+export type ExcessWorkflowStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'DELETED';
+export type FxCommandFailureCode = 'FX_RATE_UNAVAILABLE' | 'FX_RATE_STALE';
+export type ExcessLedgerEventType =
+  'PENDING_RESERVATION' | 'APPROVED_UTILIZATION' | 'RESERVATION_RELEASE' | 'FORMAL_INCREASE_REGULARIZATION' | 'RETURN_REVERSAL' | 'CANCELLATION_REVERSAL';
+
+export interface ExcessAccount {
+  excessAccountId: string;
+  ownerType: ExcessOwnerType;
+  ownerId: string;
+  policyVersion: string;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ExcessLedgerEvent {
+  excessEventId: string;
+  excessAccountId: string;
+  movementId: string | null;
+  eventType: ExcessLedgerEventType;
+  transactionCurrency: string;
+  transactionAmount: string;
+  coveredAmount: string;
+  excessAmount: string;
+  amountUsd: string;
+  policyVersion: string;
+  sourceExcessEventId: string | null;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface ExcessAllocation {
+  excessAllocationId: string;
+  adjustmentEventId: string;
+  approvedExcessEventId: string;
+  transactionAmount: string;
+  amountUsd: string;
+  createdAt: string;
+}
+
+export interface ExcessAllowanceAggregate {
+  pendingReservedUsd: string;
+  approvedUtilizedUsd: string;
+}
+
 export interface NaturalKey {
   lcNumber: string;
   ibNumber?: string | null;

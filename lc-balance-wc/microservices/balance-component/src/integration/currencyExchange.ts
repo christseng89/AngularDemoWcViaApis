@@ -80,7 +80,12 @@ export function evaluateCurrencyExchangeQuote(
   const rateAt = Date.parse(quote.rateTimestamp);
   const effectiveFrom = Date.parse(quote.effectiveFrom);
   const effectiveTo = quote.effectiveTo === null ? Number.POSITIVE_INFINITY : Date.parse(quote.effectiveTo);
-  if (![decisionAt, rateAt, effectiveFrom, effectiveTo].every((value) => Number.isFinite(value)) || rateAt > decisionAt) return unavailable();
+  if (
+    ![decisionAt, rateAt, effectiveFrom].every((value) => Number.isFinite(value)) ||
+    (quote.effectiveTo !== null && !Number.isFinite(effectiveTo)) ||
+    rateAt > decisionAt
+  )
+    return unavailable();
   if (decisionAt < effectiveFrom || decisionAt >= effectiveTo) return unavailable();
   if (decisionAt - rateAt > maxStalenessSeconds * 1000) return { ok: false, code: 'FX_RATE_STALE' };
 
@@ -125,7 +130,19 @@ export function createCurrencyExchangeAdapterConfig(env: NodeJS.ProcessEnv): {
   environment: CurrencyExchangeEnvironment;
   adapter: CurrencyExchangeAdapter;
 } {
-  const environment: CurrencyExchangeEnvironment = env.APP_ENV?.trim().toLowerCase() === 'production' ? 'PRODUCTION' : 'NON_PRODUCTION';
+  const appEnvironment = env.APP_ENV?.trim().toLowerCase();
+  const nodeEnvironment = env.NODE_ENV?.trim().toLowerCase();
+  const nonProductionValues = new Set(['development', 'test', 'local', 'non-production']);
+  if (appEnvironment !== undefined && appEnvironment !== 'production' && !nonProductionValues.has(appEnvironment)) {
+    throw new Error('APP_ENV must be production, development, test, local or non-production.');
+  }
+  if (appEnvironment === undefined && nodeEnvironment !== 'production') {
+    throw new Error('APP_ENV must explicitly identify a recognized environment.');
+  }
+  if (nodeEnvironment === 'production' && appEnvironment !== undefined && appEnvironment !== 'production') {
+    throw new Error('APP_ENV conflicts with NODE_ENV=production.');
+  }
+  const environment: CurrencyExchangeEnvironment = appEnvironment === 'production' || nodeEnvironment === 'production' ? 'PRODUCTION' : 'NON_PRODUCTION';
   const adapter = env.CURRENCY_EXCHANGE_ADAPTER?.trim().toUpperCase();
   if (adapter !== 'PROVIDER' && adapter !== 'VIRTUAL') throw new Error('CURRENCY_EXCHANGE_ADAPTER must be PROVIDER or VIRTUAL.');
   if (environment === 'PRODUCTION' && adapter === 'VIRTUAL') throw new Error('VIRTUAL Currency Exchange adapter is forbidden in production.');

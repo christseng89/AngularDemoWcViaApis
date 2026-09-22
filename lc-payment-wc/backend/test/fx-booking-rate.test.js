@@ -1,5 +1,6 @@
 const request = require('supertest');
 const app = require('../server');
+const { buildVirtualBookingQuote } = require('../virtual-booking-rate');
 
 describe('non-production virtual Currency Exchange BOOKING endpoint', () => {
   const validQuery = {
@@ -98,5 +99,45 @@ describe('non-production virtual Currency Exchange BOOKING endpoint', () => {
       .expect(503);
 
     expect(response.body).toMatchObject({ code: 'FX_RATE_UNAVAILABLE', reason: 'TIMEOUT' });
+  });
+
+  test.each([
+    ['invalid effectiveFrom', { effectiveFrom: 'not-a-date' }],
+    ['invalid effectiveTo', { effectiveTo: 'not-a-date' }],
+    ['invalid rateTimestamp', { rateTimestamp: 'not-a-date' }],
+    ['future rateTimestamp', { rateTimestamp: '2026-09-22T00:01:00.000Z' }],
+  ])('fails closed for %s fixture evidence', (_label, fixtureOverride) => {
+    const result = buildVirtualBookingQuote({
+      quote: {
+        buyRate: '1.08',
+        sellRate: '1.10',
+        approvalStatus: 'APPROVED',
+        rateTimestamp: '2026-09-21T23:59:00.000Z',
+        effectiveFrom: '2026-01-01T00:00:00.000Z',
+        effectiveTo: '2027-01-01T00:00:00.000Z',
+        rateSource: 'TEST',
+        providerRateId: 'rate-1',
+        providerRateVersion: '1',
+        rateScale: 6,
+        roundingMode: 'ROUND_HALF_UP',
+        ...fixtureOverride,
+      },
+      baseCurrency: 'EUR',
+      quoteCurrency: 'USD',
+      amount: '10',
+      decisionTime: '2026-09-22T00:00:00.000Z',
+      correlationId: 'corr-1',
+      policyVersion: 'policy-1',
+      maxStalenessSeconds: '300',
+    });
+    expect(result.error).toBe('FX_RATE_UNAVAILABLE');
+  });
+
+  test('maps malformed amount to INVALID_FX_REQUEST instead of HTTP 500', async () => {
+    const response = await request(app)
+      .get('/api/fx/booking-rate')
+      .query({ ...validQuery, amount: 'NaN', base: 'EUR', quote: 'USD', decisionTime: '2026-09-22T00:00:00.000Z' })
+      .expect(400);
+    expect(response.body.code).toBe('INVALID_FX_REQUEST');
   });
 });

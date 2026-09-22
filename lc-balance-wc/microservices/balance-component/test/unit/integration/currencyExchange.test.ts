@@ -39,6 +39,11 @@ describe('Currency Exchange BOOKING contract', () => {
     expect(evaluateCurrencyExchangeQuote(request, quote, 300, 'PRODUCTION')).toEqual({ ok: true, quote });
   });
 
+  test('accepts an open-ended effective interval', () => {
+    const openEnded = { ...quote, effectiveTo: null };
+    expect(evaluateCurrencyExchangeQuote(request, openEnded, 300, 'PRODUCTION')).toEqual({ ok: true, quote: openEnded });
+  });
+
   test('maps stale independently timestamped quote to FX_RATE_STALE', () => {
     expect(evaluateCurrencyExchangeQuote({ ...request, decisionTime: '2026-09-22T00:10:00.000Z' }, quote, 300, 'PRODUCTION')).toEqual({
       ok: false,
@@ -53,8 +58,23 @@ describe('Currency Exchange BOOKING contract', () => {
     ['wrong correlation', { ...quote, correlationId: 'late-response' }],
     ['wrong policy', { ...quote, policyVersion: 'old-policy' }],
     ['wrong conversion', { ...quote, convertedAmount: '10.91' }],
+    ['invalid effective end', { ...quote, effectiveTo: 'not-a-date' }],
+    ['future timestamp', { ...quote, rateTimestamp: '2026-09-22T00:01:00.000Z' }],
+    ['invalid booking rate', { ...quote, bookingRate: 'NaN' }],
+    ['invalid converted amount', { ...quote, convertedAmount: 'NaN' }],
   ])('maps %s to FX_RATE_UNAVAILABLE', (_label, invalidQuote) => {
     expect(evaluateCurrencyExchangeQuote(request, invalidQuote, 300, 'PRODUCTION')).toEqual({ ok: false, code: 'FX_RATE_UNAVAILABLE' });
+  });
+
+  test('rejects an invalid decision time', () => {
+    expect(evaluateCurrencyExchangeQuote({ ...request, decisionTime: 'not-a-date' }, quote, 300, 'PRODUCTION')).toEqual({
+      ok: false,
+      code: 'FX_RATE_UNAVAILABLE',
+    });
+  });
+
+  test.each([0, 1.5])('rejects invalid max staleness %s', (maxStaleness) => {
+    expect(evaluateCurrencyExchangeQuote(request, quote, maxStaleness, 'PRODUCTION')).toEqual({ ok: false, code: 'FX_RATE_UNAVAILABLE' });
   });
 
   test('production rejects virtual midpoint origin even when Buy and Sell metadata are present', () => {
@@ -80,11 +100,37 @@ describe('Currency Exchange BOOKING contract', () => {
     });
   });
 
+  test('USD par rejects a non-USD base, invalid time and invalid amount', () => {
+    expect(usdParDecision(request)).toEqual({ ok: false, code: 'FX_RATE_UNAVAILABLE' });
+    expect(usdParDecision({ ...request, baseCurrency: 'USD', decisionTime: 'invalid' })).toEqual({ ok: false, code: 'FX_RATE_UNAVAILABLE' });
+    expect(usdParDecision({ ...request, baseCurrency: 'USD', amount: 'NaN' })).toEqual({ ok: false, code: 'FX_RATE_UNAVAILABLE' });
+  });
+
   test('production configuration rejects the demo virtual adapter', () => {
     expect(() => createCurrencyExchangeAdapterConfig({ APP_ENV: 'production', CURRENCY_EXCHANGE_ADAPTER: 'VIRTUAL' })).toThrow(/VIRTUAL.*production/i);
     expect(createCurrencyExchangeAdapterConfig({ APP_ENV: 'production', CURRENCY_EXCHANGE_ADAPTER: 'PROVIDER' })).toEqual({
       environment: 'PRODUCTION',
       adapter: 'PROVIDER',
     });
+  });
+
+  test.each([
+    { label: 'missing environment', env: { CURRENCY_EXCHANGE_ADAPTER: 'VIRTUAL' } },
+    { label: 'misspelled environment', env: { APP_ENV: 'prodution', CURRENCY_EXCHANGE_ADAPTER: 'VIRTUAL' } },
+    { label: 'NODE_ENV production', env: { NODE_ENV: 'production', CURRENCY_EXCHANGE_ADAPTER: 'VIRTUAL' } },
+  ])('fails closed for virtual adapter with $label', ({ env }) => {
+    expect(() => createCurrencyExchangeAdapterConfig(env)).toThrow();
+  });
+
+  test('requires an explicit recognized non-production environment before allowing the virtual adapter', () => {
+    expect(createCurrencyExchangeAdapterConfig({ APP_ENV: 'test', CURRENCY_EXCHANGE_ADAPTER: 'VIRTUAL' })).toEqual({
+      environment: 'NON_PRODUCTION',
+      adapter: 'VIRTUAL',
+    });
+  });
+
+  test('rejects conflicting production signals and an unknown adapter', () => {
+    expect(() => createCurrencyExchangeAdapterConfig({ APP_ENV: 'test', NODE_ENV: 'production', CURRENCY_EXCHANGE_ADAPTER: 'PROVIDER' })).toThrow(/conflicts/);
+    expect(() => createCurrencyExchangeAdapterConfig({ APP_ENV: 'test', CURRENCY_EXCHANGE_ADAPTER: 'UNKNOWN' })).toThrow(/PROVIDER or VIRTUAL/);
   });
 });

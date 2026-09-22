@@ -80,6 +80,7 @@ describe('loadExcessPolicyConfig', () => {
     ['negative allowance', { ...valid[0], allowancePercentage: '-1' }],
     ['negative cap', { ...valid[0], configuredMaximumUsd: '-1' }],
     ['zero freshness', { ...valid[0], fxMaxStalenessSeconds: 0 }],
+    ['malformed allowance', { ...valid[0], allowancePercentage: 'not-money' }],
   ])('rejects %s', (_label, item) => {
     expect(() => loadExcessPolicyConfig(JSON.stringify([item, valid[1]]))).toThrow();
   });
