@@ -1,5 +1,30 @@
 ## ADDED Requirements
 
+### Requirement: Zero Allowance Uses Legacy Sufficiency
+
+若 resolved policy 的 `configuredMaximumUsd = 0` 或 `allowancePercentage = 0`，該 owner SHALL 被明確視為「不允許超押」。系統 SHALL 不啟用該 owner 的 Excess Framework，並 SHALL 對 A8、A3、A3S、B3 使用變更前既有 Tight Available／sufficiency 邏輯。兩個配置值均嚴格大於零時才可進入 Covered／Excess 與 allowance validation。
+
+#### Scenario: Zero Configured Maximum Within Existing Capacity
+
+- **GIVEN** `configuredMaximumUsd = 0`
+- **WHEN** A8／A3／A3S／B3 Amount 未超過既有 authoritative capacity
+- **THEN** 系統 SHALL 依原有 Maker／Checker 流程處理
+- **AND** SHALL NOT 建立 FX snapshot、Excess decision、reservation 或 ledger event
+
+#### Scenario: Zero Percentage Exceeds Existing Capacity
+
+- **GIVEN** `allowancePercentage = 0`
+- **WHEN** A8／A3／A3S／B3 Amount 超過既有 Tight Available／sufficiency boundary
+- **THEN** 系統 SHALL 維持既有 `409 INSUFFICIENT_AVAILABLE_BALANCE` code 與 message
+- **AND** SHALL 維持 zero-write
+- **AND** SHALL NOT 回傳 `EXCESS_LIMIT_EXCEEDED`
+
+#### Scenario: Either Zero Disables Excess
+
+- **WHEN** configured maximum 與 percentage 其中任一為零而另一值大於零
+- **THEN** 整個 owner SHALL 使用 legacy sufficiency route
+- **AND** 系統 MUST NOT 將其解釋為已啟用但可用 allowance 為零
+
 ### Requirement: Unified Covered and Excess Split
 
 系統 SHALL 對 A8、A3、A3S、B3 使用相同的精確十進位規則，把交易金額拆分為 `Covered Amount = min(Transaction Amount, non-negative authoritative covered capacity)` 與 `Excess Amount = Transaction Amount - Covered Amount`，且兩者總和 MUST 等於交易金額。
@@ -93,4 +118,3 @@ A3、A3S、B3 Return Documents 與 A8 cancel／delete／non-issuance SHALL 只�
 - **WHEN** requested return 超過原 movement 尚未反轉的 attributable amount
 - **THEN** 系統 SHALL 拒絕 Return Documents
 - **AND** owner aggregates SHALL 維持不變
-

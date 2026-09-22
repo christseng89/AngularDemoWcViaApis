@@ -5,68 +5,69 @@
 - Business authority：`信用證超押處理業務需求_v11.15_Final_Business_Input.docx`
 - Accepted analysis：`analysis/Credit-Letter-Excess-Requirement-Gap-Analysis-v11.15.md`
 - Analysis Review：PASS（2026-09-22）；84 項 Gap Matrix 與 C-01～C-07 已接受
-- Business Decisions：BD-01 Maker FX Fail-Closed；BD-02 Virtual Booking Rate midpoint
-- Implementation status：NOT STARTED
+- Business Decisions：BD-01 Maker FX Fail-Closed；BD-02 Virtual Booking Rate midpoint；BD-03 Zero Allowance Legacy Fallback
+- Implementation status：IN PROGRESS on `OVERDRAWN`; BD-03 implementation is gated on amended Change Approval
 
 ## Requirement-to-Delta Matrix
 
-| Gap IDs | v11.15 concern | Delta capability／requirement | Design contract | Planned task／evidence |
-|---|---|---|---|---|
-| EX-01, EX-02, EX-03, EX-04 | A8／A3／A3S／B3 unified Excess scope | `excess-allowance-control / Unified Covered and Excess Split`; modified import／export transaction specs | TC-02, Core Calculation | 2.1–2.4; unit + API cases |
-| EX-05, EX-06, EX-07 | Covered／Excess split and exact boundary | `excess-allowance-control / Unified Covered and Excess Split`; `balance-calculation / Currency Conversion Precision` | Core Calculation | 2.2, 5.1 |
-| EX-08, EX-09 | Pending reservation and approved conversion | `excess-allowance-control / Pending and Approved Excess Lifecycle` | Maker／Checker Data Flow | 3.1–3.3, 5.2 |
-| EX-10, EX-11 | Excess does not increase contract; immutable attribution | `balance-calculation / Excess Aggregates Are Separate`; `contract-movement-model / Immutable Excess and FX Evidence` | API and Data Model | 1.2–1.4, 5.3 |
-| ALW-01, ALW-02, ALW-03 | Allowance percentage／maximum／owner | `excess-allowance-control / Owner-level Excess Allowance`; `Effective-dated Excess Policy` | TC-01, TC-02 | 1.1, 2.1, 3.1 |
-| ALW-04, ALW-05 | USD equivalent and available allowance equation | `excess-allowance-control / Owner-level Excess Allowance`; `balance-calculation / Allowance Reservation Sufficiency` | Core Calculation | 2.2, 3.2 |
-| ALW-06, ALW-07, ALW-08 | Cumulative Approved Excess and no reuse | `Pending and Approved Excess Lifecycle`; `downstream-excess-eligibility / Downstream Completion Does Not Release` | TC-02, TC-04 | 3.2–3.4, 7.2 |
-| ALW-09, ALW-10 | Exact-limit success and over-limit rejection | `Owner-level Excess Allowance` scenarios | Core Calculation | 5.1, 7.1 |
-| SG-01, SG-02 | Eligible SG Capacity initialization／selection | modified `import-lc-transactions / A8`; modified `earmark-linked-transactions / Shipping Guarantee Capacity` | TC-08 | 4.1, 4.2 |
-| SG-03, SG-04, SG-05 | A8→A3S attribution transfer and anti-double-counting | modified `A3S`; modified `Avoid Double Counting` | TC-08, Core Calculation | 4.2–4.4, 7.3 |
-| SG-06, SG-07, SG-08 | Partial／full redemption, reversal, legal separation | modified `Shipping Guarantee Capacity`; `Import Return and A8 Cancellation` | TC-08 | 4.3–4.5 |
-| MC-01, MC-02, MC-03 | Maker submit validation／reservation／atomicity | `maker-checker-control / Maker Excess Submit Atomicity` | Maker Data Flow | 3.1–3.3, 5.2 |
-| MC-04, MC-05, MC-06 | Checker re-read／revalue／convert | modified `Service-authoritative Revalidation`; `currency-exchange-integration / Checker Release Revaluation` | Checker Data Flow | 3.4–3.6 |
-| MC-07, MC-08 | Release failure retains pending facts | `Checker Release Revaluation` rejection scenario | TC-07 | 3.5, 7.4 |
-| MC-09, MC-10 | Fix amount only for four functions | modified `maker-checker-control / Fix Pending Limits`; UI `Excess-specific Fix Pending` | Fix, Delete, Reject | 3.7, 6.3 |
-| MC-11, MC-12, MC-13 | Reject／Delete, audit, concurrency | `Pending and Approved Excess Lifecycle`; `Allowance Reservation Sufficiency` | Failure／Security | 3.3, 3.8, 5.4 |
-| FI-01, FI-02, FI-03 | Formal Increase regularization | `excess-allowance-control / Formal Increase Regularization` | TC-04 | 3.9, 5.5 |
-| FI-04, FI-05 | Immutable history and explicit allocation | `contract-movement-model / Immutable Excess and FX Evidence`; regularization rejection | TC-04 | 1.4, 3.9 |
-| FI-06, FI-07 | Return／cancellation and explicit adjustment only | `Traceable Return and Cancellation Adjustments`; `downstream / Return Documents Command Boundary` | TC-05 | 3.10, 4.5, 5.6 |
-| FX-01, FX-02, FX-03 | Booking purpose, Approved／Effective, exact quote | `currency-exchange-integration / Authoritative Booking Rate Contract` | TC-07 | 2.5–2.7 |
-| FX-04, FX-05 | Decision-point revaluation and snapshots | `Maker Submit FX Fail-Closed`; `Checker Release Revaluation`; immutable evidence | TC-07 | 3.2, 3.5, 5.3 |
-| FX-06, FX-07 | Freshness／unavailable typed outcomes | `Maker Submit FX Fail-Closed` | BD-01, TC-07 | 2.7, 7.4 |
-| FX-08, FX-09 | Retry／timeout／out-of-order | `FX Retry and Out-of-order Safety` | TC-07 | 2.8, 7.4 |
-| FX-10 | USD par | `USD Par and Non-production Stub Boundary` | TC-07 | 2.6, 7.4 |
-| FX-11 | Audit evidence | `Immutable Excess and FX Evidence`; API inquiry | TC-07 | 1.4, 5.3, 6.2 |
-| DS-01, DS-02, DS-03 | Downstream source eligibility／command revalidation | `downstream-excess-eligibility / Excess-aware Downstream Eligibility` | Service Boundaries | 4.6, 6.2 |
-| DS-04, DS-05, DS-06 | Completion preserves Approved Excess | `Downstream Completion Does Not Release Approved Excess` | TC-02, TC-08 | 4.6, 7.2 |
-| DM-01, DM-02 | Excess account／append-only ledger | `Owner-level Excess Allowance`; `Immutable Excess and FX Evidence` | TC-02, Data Model | 1.2–1.4 |
-| DM-03, DM-04 | FX snapshot／configuration version | `Authoritative Booking Rate Contract`; `Effective-dated Excess Policy` | TC-01, TC-07 | 1.1, 1.3, 2.5 |
-| DM-05 | SG capacity ledger separate from legal ledger | modified `Shipping Guarantee Capacity` | TC-08 | 1.2, 4.1–4.4 |
-| DM-06 | Status separation | modified `contract-movement-model / Status Separation` | TC-03 | 1.2, 5.3 |
-| REG-01, REG-02, REG-03, REG-04 | Four-function covered／excess boundaries | `business-case-runner / v11.15 Excess Regression Suite` | Core Calculation | 7.1 |
-| REG-05, REG-06 | Maker／Checker FX fail-closed and revaluation | `Virtual Booking Rate Regression`; FX delta specs | BD-01, TC-07 | 7.4, 8.1 |
-| REG-07 | A8→A3S no double count | `A8 to A3S Anti-double-counting Regression` | TC-08 | 7.3 |
-| REG-08 | Downstream does not release | `Existing Lifecycle Regression`; downstream delta | TC-02 | 7.2 |
-| REG-09 | Formal Increase | regularization scenarios | TC-04 | 7.5 |
-| REG-10 | Return／Cancellation | return／cancellation scenarios | TC-05 | 7.6 |
-| REG-11 | Concurrency／idempotency | `Allowance Reservation Sufficiency`; modified movement idempotency | TC-06 | 5.4, 7.7 |
-| REG-12 | Full regression | `business-case-runner / Existing Lifecycle Regression` | Migration／Rollback | 7.8–7.10 |
+| Gap IDs                        | v11.15 concern                                           | Delta capability／requirement                                                                                        | Design contract          | Planned task／evidence    |
+| ------------------------------ | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------ | ------------------------- |
+| EX-01, EX-02, EX-03, EX-04     | A8／A3／A3S／B3 unified Excess scope                     | `excess-allowance-control / Unified Covered and Excess Split`; modified import／export transaction specs             | TC-02, Core Calculation  | 2.1–2.4; unit + API cases |
+| EX-05, EX-06, EX-07            | Covered／Excess split and exact boundary                 | `excess-allowance-control / Unified Covered and Excess Split`; `balance-calculation / Currency Conversion Precision` | Core Calculation         | 2.2, 5.1                  |
+| EX-08, EX-09                   | Pending reservation and approved conversion              | `excess-allowance-control / Pending and Approved Excess Lifecycle`                                                   | Maker／Checker Data Flow | 3.1–3.3, 5.2              |
+| EX-10, EX-11                   | Excess does not increase contract; immutable attribution | `balance-calculation / Excess Aggregates Are Separate`; `contract-movement-model / Immutable Excess and FX Evidence` | API and Data Model       | 1.2–1.4, 5.3              |
+| ALW-01, ALW-02, ALW-03         | Allowance percentage／maximum／owner                     | `excess-allowance-control / Owner-level Excess Allowance`; `Effective-dated Excess Policy`                           | TC-01, TC-02             | 1.1, 2.1, 3.1             |
+| ALW-04, ALW-05                 | USD equivalent and available allowance equation          | `excess-allowance-control / Owner-level Excess Allowance`; `balance-calculation / Allowance Reservation Sufficiency` | Core Calculation         | 2.2, 3.2                  |
+| ALW-06, ALW-07, ALW-08         | Cumulative Approved Excess and no reuse                  | `Pending and Approved Excess Lifecycle`; `downstream-excess-eligibility / Downstream Completion Does Not Release`    | TC-02, TC-04             | 3.2–3.4, 7.2              |
+| ALW-09, ALW-10                 | Exact-limit success and over-limit rejection             | `Owner-level Excess Allowance` scenarios                                                                             | Core Calculation         | 5.1, 7.1                  |
+| SG-01, SG-02                   | Eligible SG Capacity initialization／selection           | modified `import-lc-transactions / A8`; modified `earmark-linked-transactions / Shipping Guarantee Capacity`         | TC-08                    | 4.1, 4.2                  |
+| SG-03, SG-04, SG-05            | A8→A3S attribution transfer and anti-double-counting     | modified `A3S`; modified `Avoid Double Counting`                                                                     | TC-08, Core Calculation  | 4.2–4.4, 7.3              |
+| SG-06, SG-07, SG-08            | Partial／full redemption, reversal, legal separation     | modified `Shipping Guarantee Capacity`; `Import Return and A8 Cancellation`                                          | TC-08                    | 4.3–4.5                   |
+| MC-01, MC-02, MC-03            | Maker submit validation／reservation／atomicity          | `maker-checker-control / Maker Excess Submit Atomicity`                                                              | Maker Data Flow          | 3.1–3.3, 5.2              |
+| MC-04, MC-05, MC-06            | Checker re-read／revalue／convert                        | modified `Service-authoritative Revalidation`; `currency-exchange-integration / Checker Release Revaluation`         | Checker Data Flow        | 3.4–3.6                   |
+| MC-07, MC-08                   | Release failure retains pending facts                    | `Checker Release Revaluation` rejection scenario                                                                     | TC-07                    | 3.5, 7.4                  |
+| MC-09, MC-10                   | Fix amount only for four functions                       | modified `maker-checker-control / Fix Pending Limits`; UI `Excess-specific Fix Pending`                              | Fix, Delete, Reject      | 3.7, 6.3                  |
+| MC-11, MC-12, MC-13            | Reject／Delete, audit, concurrency                       | `Pending and Approved Excess Lifecycle`; `Allowance Reservation Sufficiency`                                         | Failure／Security        | 3.3, 3.8, 5.4             |
+| FI-01, FI-02, FI-03            | Formal Increase regularization                           | `excess-allowance-control / Formal Increase Regularization`                                                          | TC-04                    | 3.9, 5.5                  |
+| FI-04, FI-05                   | Immutable history and explicit allocation                | `contract-movement-model / Immutable Excess and FX Evidence`; regularization rejection                               | TC-04                    | 1.4, 3.9                  |
+| FI-06, FI-07                   | Return／cancellation and explicit adjustment only        | `Traceable Return and Cancellation Adjustments`; `downstream / Return Documents Command Boundary`                    | TC-05                    | 3.10, 4.5, 5.6            |
+| FX-01, FX-02, FX-03            | Booking purpose, Approved／Effective, exact quote        | `currency-exchange-integration / Authoritative Booking Rate Contract`                                                | TC-07                    | 2.5–2.7                   |
+| FX-04, FX-05                   | Decision-point revaluation and snapshots                 | `Maker Submit FX Fail-Closed`; `Checker Release Revaluation`; immutable evidence                                     | TC-07                    | 3.2, 3.5, 5.3             |
+| FX-06, FX-07                   | Freshness／unavailable typed outcomes                    | `Maker Submit FX Fail-Closed`                                                                                        | BD-01, TC-07             | 2.7, 7.4                  |
+| FX-08, FX-09                   | Retry／timeout／out-of-order                             | `FX Retry and Out-of-order Safety`                                                                                   | TC-07                    | 2.8, 7.4                  |
+| FX-10                          | USD par                                                  | `USD Par and Non-production Stub Boundary`                                                                           | TC-07                    | 2.6, 7.4                  |
+| FX-11                          | Audit evidence                                           | `Immutable Excess and FX Evidence`; API inquiry                                                                      | TC-07                    | 1.4, 5.3, 6.2             |
+| DS-01, DS-02, DS-03            | Downstream source eligibility／command revalidation      | `downstream-excess-eligibility / Excess-aware Downstream Eligibility`                                                | Service Boundaries       | 4.6, 6.2                  |
+| DS-04, DS-05, DS-06            | Completion preserves Approved Excess                     | `Downstream Completion Does Not Release Approved Excess`                                                             | TC-02, TC-08             | 4.6, 7.2                  |
+| DM-01, DM-02                   | Excess account／append-only ledger                       | `Owner-level Excess Allowance`; `Immutable Excess and FX Evidence`                                                   | TC-02, Data Model        | 1.2–1.4                   |
+| DM-03, DM-04                   | FX snapshot／configuration version                       | `Authoritative Booking Rate Contract`; `Effective-dated Excess Policy`                                               | TC-01, TC-07             | 1.1, 1.3, 2.5             |
+| DM-05                          | SG capacity ledger separate from legal ledger            | modified `Shipping Guarantee Capacity`                                                                               | TC-08                    | 1.2, 4.1–4.4              |
+| DM-06                          | Status separation                                        | modified `contract-movement-model / Status Separation`                                                               | TC-03                    | 1.2, 5.3                  |
+| REG-01, REG-02, REG-03, REG-04 | Four-function covered／excess boundaries                 | `business-case-runner / v11.15 Excess Regression Suite`                                                              | Core Calculation         | 7.1                       |
+| REG-05, REG-06                 | Maker／Checker FX fail-closed and revaluation            | `Virtual Booking Rate Regression`; FX delta specs                                                                    | BD-01, TC-07             | 7.4, 8.1                  |
+| REG-07                         | A8→A3S no double count                                   | `A8 to A3S Anti-double-counting Regression`                                                                          | TC-08                    | 7.3                       |
+| REG-08                         | Downstream does not release                              | `Existing Lifecycle Regression`; downstream delta                                                                    | TC-02                    | 7.2                       |
+| REG-09                         | Formal Increase                                          | regularization scenarios                                                                                             | TC-04                    | 7.5                       |
+| REG-10                         | Return／Cancellation                                     | return／cancellation scenarios                                                                                       | TC-05                    | 7.6                       |
+| REG-11                         | Concurrency／idempotency                                 | `Allowance Reservation Sufficiency`; modified movement idempotency                                                   | TC-06                    | 5.4, 7.7                  |
+| REG-12                         | Full regression                                          | `business-case-runner / Existing Lifecycle Regression`                                                               | Migration／Rollback      | 7.8–7.10                  |
 
 ## Conflict Resolution Register
 
-| Conflict | Resolution in this Change | Evidence gate |
-|---|---|---|
-| C-01 A3 hard-reject | Modified A3 permits allowance-controlled Excess | A3 exact／over-limit regression |
-| C-02 A8 hard-reject | Modified A8 permits allowance-controlled Excess | A8 and cancellation regression |
-| C-03 B3 hard-reject | Modified B3 permits allowance-controlled Excess | B3／B4 persistence regression |
-| C-04 A3S legal redemption coupling | Separate Eligible SG Capacity from SG legal liability | A8→A3S anti-double-counting and A9 regression |
-| C-05 Generic Fix Pending | Amount exception limited to A8／A3／A3S／B3 | API／UI protected-field tests |
-| C-06 Approved Excess lifecycle | Append-only owner ledger survives downstream completion | A4／A6／B4／A9 regression |
-| C-07 Current OpenSpec truth | Delta specs replace conflicting current requirements only after implementation and archive | strict validation before and after archive |
+| Conflict                           | Resolution in this Change                                                                  | Evidence gate                                 |
+| ---------------------------------- | ------------------------------------------------------------------------------------------ | --------------------------------------------- |
+| C-01 A3 hard-reject                | Modified A3 permits allowance-controlled Excess                                            | A3 exact／over-limit regression               |
+| C-02 A8 hard-reject                | Modified A8 permits allowance-controlled Excess                                            | A8 and cancellation regression                |
+| C-03 B3 hard-reject                | Modified B3 permits allowance-controlled Excess                                            | B3／B4 persistence regression                 |
+| C-04 A3S legal redemption coupling | Separate Eligible SG Capacity from SG legal liability                                      | A8→A3S anti-double-counting and A9 regression |
+| C-05 Generic Fix Pending           | Amount exception limited to A8／A3／A3S／B3                                                | API／UI protected-field tests                 |
+| C-06 Approved Excess lifecycle     | Append-only owner ledger survives downstream completion                                    | A4／A6／B4／A9 regression                     |
+| C-07 Current OpenSpec truth        | Delta specs replace conflicting current requirements only after implementation and archive | strict validation before and after archive    |
 
 ## Decision Traceability
 
-| Decision | Proposal／Design | Delta Specs | Regression |
-|---|---|---|---|
-| BD-01 Maker FX Fail-Closed, no `FX_RATE_PENDING` | Proposal BD-01; Design TC-07 | `currency-exchange-integration`, `maker-checker-control`, `contract-movement-model` | REG-05／REG-06; task 7.4 |
-| BD-02 Virtual Booking Rate midpoint | Proposal BD-02; Design adapter assessment and production prohibition | `Virtual Booking Rate Derivation`; `Production Provider-supplied Booking Rate Only`; Runner production negative case | task 2.6, 2.7, 7.4, 8.1 |
+| Decision                                                      | Proposal／Design                                                     | Delta Specs                                                                                                            | Regression                     |
+| ------------------------------------------------------------- | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| BD-01 Maker FX Fail-Closed, no `FX_RATE_PENDING`              | Proposal BD-01; Design TC-07                                         | `currency-exchange-integration`, `maker-checker-control`, `contract-movement-model`                                    | REG-05／REG-06; task 7.4       |
+| BD-02 Virtual Booking Rate midpoint                           | Proposal BD-02; Design adapter assessment and production prohibition | `Virtual Booking Rate Derivation`; `Production Provider-supplied Booking Rate Only`; Runner production negative case   | task 2.6, 2.7, 7.4, 8.1        |
+| BD-03 Zero Allowance Legacy Fallback（任一零值 = 不允許超押） | Proposal BD-03; Design TC-09                                         | `Zero Allowance Uses Legacy Sufficiency`; `Zero Allowance Skips Currency Exchange`; `Zero Allowance Legacy Regression` | task 0.3, 2.9, 3.11, 5.7, 7.11 |

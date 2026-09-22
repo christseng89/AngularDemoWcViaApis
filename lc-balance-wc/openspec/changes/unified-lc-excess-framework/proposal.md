@@ -2,13 +2,13 @@
 
 v11.15 FROZEN Business Input 要求 A8、A3、A3S 與 B3 在合約可用額度不足時，將交易拆成 Covered Amount 與 Excess Amount，並以同一 allowance owner 的累計 Approved Excess 執行限額控制。現行 OpenSpec、程式與測試採 hard-reject，且沒有 Excess ledger、FX Booking Rate freshness、正式增額 regularization、downstream eligibility 或完整 audit snapshot，因此 84 項 Gap Matrix 的 current conformance 為 FAIL。
 
-2026-09-22 Requirement Gap Analysis Review 已 PASS，Reviewer 接受 84 項 Gap Matrix 與 C-01～C-07 作為本 Change 的輸入。其後 Business Decision 採用方案 1：非 USD 交易在 Maker Submit 時若無 Approved／Effective 且符合 Freshness Policy 的 Booking Rate，必須 fail closed；本期不引入 `FX_RATE_PENDING` transaction state。
+2026-09-22 Requirement Gap Analysis Review 已 PASS，Reviewer 接受 84 項 Gap Matrix 與 C-01～C-07 作為本 Change 的輸入。其後 Business Decision 採用方案 1：非 USD 交易在 Maker Submit 時若無 Approved／Effective 且符合 Freshness Policy 的 Booking Rate，必須 fail closed；本期不引入 `FX_RATE_PENDING` transaction state。其後確認 BD-03：若有效配置的超押允許金額或允許百分比任一為零，該 owner 不啟用 Excess Framework，A8／A3／A3S／B3 完整沿用變更前的 Tight Available hard-reject 邏輯。
 
 ## What Changes
 
 - 以統一 Excess Policy 支援 A8、A3、A3S、B3 的 Covered／Excess split、allowance validation、pending reservation 與 Approved Excess cumulative ledger。
 - 以 Import LC 與 Export Confirmation 為各自 allowance owner，防止 partial shipment、multiple presentation、downstream completion 或 A8→A3S 關聯流程重複使用已核准 excess。
-- **BREAKING**：取代 A8、A3、A3S、B3 超過 Tight Available 即 hard-reject 的規則；只有 allowance 超限、FX gate 失敗或其他 domain validation 失敗才拒絕。
+- **BREAKING**：當有效配置的 allowance percentage 與 configured maximum 均大於零時，取代 A8、A3、A3S、B3 超過 Tight Available 即 hard-reject 的規則；只有 allowance 超限、FX gate 失敗或其他 domain validation 失敗才拒絕。任一配置值為零時依 BD-03 保留原 hard-reject 邏輯。
 - 在 Maker Submit 與 Checker Release 分別重新估值；非 USD 必須使用 Currency Exchange 提供的 `BOOKING` rate 與 Approved／Effective／fresh metadata。
 - Maker FX unavailable/stale 時回傳 `FX_RATE_UNAVAILABLE`／`FX_RATE_STALE`，不建立 transaction 或 reservation；Checker FX unavailable/stale 時禁止 Release，但保留既有 pending transaction／reservation。
 - 將 Formal Increase regularization、Return Documents／A8 cancellation reversal 建模為不可變 adjustment events，不回寫原 Approved Excess decision。
@@ -58,6 +58,12 @@ Checker Release 必須以當時最新可用 rate 重新估值；若 unavailable�
 ### BD-02 — Virtual Booking Rate（已確認）
 
 開發與 Regression 使用類似 `lc-payment-wc` 的虛擬 Currency Exchange service。其 quote 必須提供 `BUY_RATE`、`SELL_RATE` 與 `BOOKING_RATE`；若 source fixture 沒有獨立 Booking Rate 欄位，service 以 exact decimal 計算 `BOOKING_RATE = (BUY_RATE + SELL_RATE) / 2`。此衍生規則只適用於 non-production virtual service／regression fixture。Production 必須取得 provider-supplied BOOKING rate 及 Approved／Effective／Freshness evidence，且不得由 Buy／Sell midpoint 或其他 rate 推導／fallback；缺失時依 BD-01 fail closed。
+
+### BD-03 — Zero Allowance Legacy Fallback（已確認）
+
+若 resolved `ExcessPolicyConfig` 的 `configuredMaximumUsd = 0` 或 `allowancePercentage = 0`，其規範性業務語意是該 allowance owner **不允許任何超押**，並非 allowance 已啟用但耗盡。A8／A3／A3S／B3 SHALL 使用變更前的既有 Tight Available／sufficiency 邏輯：未產生 Excess Amount 時照原流程處理；只要 Amount 超過既有可用額度而產生任何 Excess Amount，即維持既有 `409 INSUFFICIENT_AVAILABLE_BALANCE` error code、message 與 zero-write 行為。
+
+此路徑 SHALL NOT 呼叫 Currency Exchange、執行 Excess allowance validation、建立 FX snapshot、Pending Excess Reservation、Approved Excess 或其他 Excess ledger event，亦 SHALL NOT 回傳 `EXCESS_LIMIT_EXCEEDED`。這是明確的 legacy-routing configuration contract，不得把零值解釋為「啟用但 allowance 已耗盡」。
 
 ## Migration and Rollback
 

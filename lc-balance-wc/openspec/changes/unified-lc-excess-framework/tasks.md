@@ -2,6 +2,7 @@
 
 - [x] 0.1 Obtain OpenSpec Change Review／Approval for `proposal.md`, `design.md`, all delta specs, `tasks.md` and `requirement-traceability.md` before implementation.
 - [x] 0.2 Confirm BD-01 and BD-02 in review evidence; do not add `FX_RATE_PENDING` or use the virtual adapter in production.
+- [ ] 0.3 Obtain amended OpenSpec Change Approval for BD-03 Zero Allowance Legacy Fallback before implementing BD-03 behavior.
 
 ## 1. Contracts, Configuration and Persistence — Tests First
 
@@ -20,6 +21,7 @@
 - [x] 2.6 In `../lc-payment-wc/backend/data/fx-rates.json` and `../lc-payment-wc/backend/server.js`, first add tests then extend the non-production virtual endpoint to emit exact-decimal `buyRate`, `sellRate`, optional `bookingRate`, deterministic metadata and `bookingRate=(buyRate+sellRate)/2` when omitted; preserve legacy fixtures by explicitly setting both sides where appropriate.
 - [ ] 2.7 Implement a Balance virtual adapter and a production adapter boundary; configuration MUST reject the virtual adapter in production, and production MUST reject missing provider Booking Rate without deriving or falling back from Buy／Sell or any alternate-purpose rate.
 - [ ] 2.8 Test timeout／retry／late／out-of-order handling and map unavailable／not Approved／not Effective to `FX_RATE_UNAVAILABLE`, stale to `FX_RATE_STALE`.
+- [ ] 2.9 Add pure routing tests proving `configuredMaximumUsd = 0 OR allowancePercentage = 0` selects legacy sufficiency before Covered／Excess or FX, while both values greater than zero select the Excess Framework.
 
 ## 3. Maker／Checker and Allowance Ledger — Tests First
 
@@ -33,6 +35,7 @@
 - [ ] 3.8 Extend Reject／Delete tests and `deletePendingAudit.ts` so reservation release and audit are atomic and approved facts cannot be deleted.
 - [ ] 3.9 Add Formal Increase command／service tests and implement explicit allocation events without FIFO／LIFO inference.
 - [ ] 3.10 Add typed Import／Export Return Documents command tests and implement Maker／Checker／idempotency／audit boundaries; keep A8 cancellation on its existing lifecycle with attributable reversal.
+- [ ] 3.11 Add A8／A3／A3S／B3 service tests and implement BD-03 legacy routing with existing `INSUFFICIENT_AVAILABLE_BALANCE` code／message, zero FX interaction and zero Excess persistence.
 
 ## 4. SG Capacity and Downstream Eligibility — Tests First
 
@@ -51,6 +54,7 @@
 - [ ] 5.4 Add same-key/same-hash replay, same-key/different-hash conflict, compound atomicity and concurrent owner allowance tests.
 - [ ] 5.5 Add Formal Increase API／inquiry tests with explicit allocation IDs and immutable history.
 - [ ] 5.6 Add Return／Cancellation API／inquiry tests with partial／over／duplicate cases and accounting-status separation.
+- [ ] 5.7 Add API contract tests proving BD-03 preserves the existing `409 INSUFFICIENT_AVAILABLE_BALANCE` response and never maps the legacy path to `EXCESS_LIMIT_EXCEEDED`.
 
 ## 6. Angular Transaction Builder — Tests First
 
@@ -71,6 +75,7 @@
 - [ ] 7.8 Run all Balance microservice unit／integration tests and coverage gates; document commands and results.
 - [ ] 7.9 Run all Angular unit tests、coverage and browser acceptance; retain existing A1–A11／B1–B7 characterization evidence except intentionally replaced hard-reject assertions.
 - [ ] 7.10 Run Backend and Business Case Runner full suite against real Balance microservice plus virtual FX adapter.
+- [ ] 7.11 Add the BD-03 A8／A3／A3S／B3 matrix for zero configured maximum、zero percentage、either-zero combinations、within-capacity success、over-capacity legacy rejection、zero FX calls and zero Excess writes.
 
 ## 8. Documentation, Validation and Release Gate
 

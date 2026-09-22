@@ -1,5 +1,17 @@
 ## ADDED Requirements
 
+### Requirement: Zero Allowance Skips Currency Exchange
+
+當 BD-03 legacy route 生效時，A8／A3／A3S／B3 SHALL NOT 呼叫 production 或 virtual Currency Exchange，亦 SHALL NOT 建立 `USD_PAR` 或其他 FX snapshot；FX availability／freshness 不得影響該 legacy command 的結果。
+
+#### Scenario: Non-USD Legacy Route Has No Booking Lookup
+
+- **GIVEN** transaction currency 非 USD
+- **AND** `configuredMaximumUsd = 0` 或 `allowancePercentage = 0`
+- **WHEN** Maker Submit 或 Checker action 執行
+- **THEN** Currency Exchange request count SHALL 為零
+- **AND** 結果 SHALL 僅由既有 sufficiency 與 Maker／Checker 規則決定
+
 ### Requirement: Authoritative Booking Rate Contract
 
 非 USD A8、A3、A3S、B3 的 Excess USD Equivalent SHALL 使用 Currency Exchange 回傳的 `BOOKING` rate；response MUST 包含 currency pair、exact decimal rate、converted amount、rate ID／version、source、rate timestamp、Approved status、Effective interval、correlation ID 與 policy version。

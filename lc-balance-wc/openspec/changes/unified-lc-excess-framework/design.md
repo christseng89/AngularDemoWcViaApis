@@ -52,11 +52,26 @@ At Maker failure, the unit of work writes no movement, reservation or partial au
 
 On A8 approval, Eligible SG Capacity is initialized to the approved SG amount and stores Covered／Excess attribution. A3S may reserve then redeem capacity partially or fully; available selection is approved amount less prior capacity redemptions and open reservations. Redeeming capacity transfers attributable coverage to A3S and prevents parent capacity／excess double counting. It does not reduce SHGT legal balance or release contingent liability. Reversal of A3S restores capacity only to the extent of its original allocation and only while the underlying SG remains legally eligible; otherwise an auditable exception is required. A9 and existing SG legal lifecycle remain independent.
 
+### TC-09 — Zero Allowance Legacy Routing
+
+After resolving one effective policy, the application evaluates `configuredMaximumUsd` and `allowancePercentage` before Covered／Excess processing. If either exact-decimal value equals zero, the owner is explicitly configured as **Excess not allowed** and the application routes the entire A8／A3／A3S／B3 command through the pre-change sufficiency policy. The transaction remains a normal legacy movement when no Excess Amount arises; any positive Excess Amount returns the existing `409 INSUFFICIENT_AVAILABLE_BALANCE` code and existing message with zero writes.
+
+The zero-allowance route performs no Currency Exchange call and persists no FX or Excess fact. It does not produce `NOT_REQUIRED`, `WITHIN_ALLOWANCE`, `LIMIT_EXCEEDED` or `EXCESS_LIMIT_EXCEEDED`, because no Excess decision is started. Maker／Checker continue through their existing non-Excess lifecycle. Both values must be strictly greater than zero before the Excess Framework may run.
+
 ## Core Calculation and Invariants
 
 All money uses exact decimal values and currency-aware `ROUND_HALF_UP` only at the specified conversion boundary.
 
 ```text
+if configuredMaximumUsd == 0 OR allowancePercentage == 0:
+    route = LEGACY_SUFFICIENCY
+    if transactionAmountTxn > authoritativeCoveredCapacityTxn:
+        reject 409 INSUFFICIENT_AVAILABLE_BALANCE
+    else:
+        continue legacy Maker／Checker flow
+else:
+    route = EXCESS_FRAMEWORK
+
 coveredTxn = min(transactionAmountTxn, max(authoritativeCoveredCapacityTxn, 0))
 excessTxn  = transactionAmountTxn - coveredTxn
 proposedUsd = convert(excessTxn, fresh BOOKING rate)
@@ -71,8 +86,8 @@ For A3S, authoritative covered capacity includes the selected SG capacity alloca
 ## Maker Data Flow and Transaction Boundary
 
 1. Validate OAS, function eligibility, actor and idempotency.
-2. Read authoritative contract／linked ledgers and resolved config version.
-3. Calculate Covered／Excess; for non-USD Excess call Currency Exchange and enforce BD-01.
+2. Read authoritative contract／linked ledgers and resolved config version; apply BD-03 legacy routing before any FX or Excess work.
+3. For an enabled Excess policy, calculate Covered／Excess; for non-USD Excess call Currency Exchange and enforce BD-01.
 4. Lock／version-check the owner allowance account and validate against approved plus other pending reservations.
 5. In one DB transaction persist movement snapshot, FX snapshot, pending excess reservation, idempotency response and audit.
 6. On any failure roll back all writes. `FX_RATE_UNAVAILABLE`, `FX_RATE_STALE` and `EXCESS_LIMIT_EXCEEDED` never create a pending movement.

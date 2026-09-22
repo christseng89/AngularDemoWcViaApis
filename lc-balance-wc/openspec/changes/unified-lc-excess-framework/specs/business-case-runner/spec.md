@@ -1,5 +1,15 @@
 ## ADDED Requirements
 
+### Requirement: Zero Allowance Legacy Regression
+
+Runner SHALL 對 A8、A3、A3S、B3 分別覆蓋 `configuredMaximumUsd = 0`、`allowancePercentage = 0` 與任一為零的組合，並證明 within-capacity 維持原成功行為、over-capacity 維持原 `INSUFFICIENT_AVAILABLE_BALANCE` hard-reject，且 Currency Exchange／Excess persistence 均為 zero interaction／zero write。
+
+#### Scenario: Four-function Legacy Matrix
+
+- **WHEN** Runner 執行 A8／A3／A3S／B3 的 zero-cap 與 zero-percentage cases
+- **THEN** 每一功能 SHALL 驗證原 success／reject boundary、既有 error code／message 與 Maker／Checker lifecycle
+- **AND** SHALL 驗證沒有 FX lookup、reservation、Approved Excess 或 ledger event
+
 ### Requirement: v11.15 Excess Regression Suite
 
 Business Case Runner SHALL 對 A8、A3、A3S、B3 執行 Covered-only、partial Excess、full Excess、exact-limit、over-limit、Maker／Checker FX failure、revaluation、concurrency、Fix、Formal Increase、Return／Cancellation 與 downstream lifecycle cases。
