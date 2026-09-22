@@ -1,6 +1,33 @@
-import { computeCoveredAndExcess, computeEffectiveAllowanceLimitUsd, evaluateExcessAllowance } from '../../../src/domain/excessPolicy';
+import {
+  computeCoveredAndExcess,
+  computeEffectiveAllowanceLimitUsd,
+  evaluateExcessAllowance,
+  selectExcessProcessingRoute,
+} from '../../../src/domain/excessPolicy';
 
 describe('unified excess policy (v11.15)', () => {
+  describe('selectExcessProcessingRoute (BD-03)', () => {
+    test.each([
+      { configuredMaximumUsd: '0', allowancePercentage: '0' },
+      { configuredMaximumUsd: '0', allowancePercentage: '10' },
+      { configuredMaximumUsd: '150000', allowancePercentage: '0' },
+    ])('routes $configuredMaximumUsd / $allowancePercentage to legacy sufficiency', (policy) => {
+      expect(selectExcessProcessingRoute(policy)).toBe('LEGACY_SUFFICIENCY');
+    });
+
+    test('enables Excess only when both values are strictly positive', () => {
+      expect(selectExcessProcessingRoute({ configuredMaximumUsd: '0.01', allowancePercentage: '0.01' })).toBe('EXCESS_FRAMEWORK');
+    });
+
+    test.each([
+      { configuredMaximumUsd: '-0.01', allowancePercentage: '10' },
+      { configuredMaximumUsd: '100', allowancePercentage: '-0.01' },
+      { configuredMaximumUsd: 'invalid', allowancePercentage: '10' },
+    ])('rejects invalid policy values before routing: %#', (policy) => {
+      expect(() => selectExcessProcessingRoute(policy)).toThrow();
+    });
+  });
+
   describe('computeCoveredAndExcess', () => {
     test.each([
       { amount: '120', capacity: '100', covered: '100', excess: '20' },

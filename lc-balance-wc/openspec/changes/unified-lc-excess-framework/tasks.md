@@ -2,7 +2,7 @@
 
 - [x] 0.1 Obtain OpenSpec Change Review／Approval for `proposal.md`, `design.md`, all delta specs, `tasks.md` and `requirement-traceability.md` before implementation.
 - [x] 0.2 Confirm BD-01 and BD-02 in review evidence; do not add `FX_RATE_PENDING` or use the virtual adapter in production.
-- [ ] 0.3 Obtain amended OpenSpec Change Approval for BD-03 Zero Allowance Legacy Fallback before implementing BD-03 behavior.
+- [x] 0.3 Obtain amended OpenSpec Change Approval for BD-03 Zero Allowance Legacy Fallback before implementing BD-03 behavior.
 
 ## 1. Contracts, Configuration and Persistence — Tests First
 
@@ -21,7 +21,7 @@
 - [x] 2.6 In `../lc-payment-wc/backend/data/fx-rates.json` and `../lc-payment-wc/backend/server.js`, first add tests then extend the non-production virtual endpoint to emit exact-decimal `buyRate`, `sellRate`, optional `bookingRate`, deterministic metadata and `bookingRate=(buyRate+sellRate)/2` when omitted; preserve legacy fixtures by explicitly setting both sides where appropriate.
 - [ ] 2.7 Implement a Balance virtual adapter and a production adapter boundary; configuration MUST reject the virtual adapter in production, and production MUST reject missing provider Booking Rate without deriving or falling back from Buy／Sell or any alternate-purpose rate.
 - [ ] 2.8 Test timeout／retry／late／out-of-order handling and map unavailable／not Approved／not Effective to `FX_RATE_UNAVAILABLE`, stale to `FX_RATE_STALE`.
-- [ ] 2.9 Add pure routing tests proving `configuredMaximumUsd = 0 OR allowancePercentage = 0` selects legacy sufficiency before Covered／Excess or FX, while both values greater than zero select the Excess Framework.
+- [x] 2.9 Add pure routing tests proving `configuredMaximumUsd = 0 OR allowancePercentage = 0` selects legacy sufficiency before Covered／Excess or FX, while both values greater than zero select the Excess Framework.
 
 ## 3. Maker／Checker and Allowance Ledger — Tests First
 

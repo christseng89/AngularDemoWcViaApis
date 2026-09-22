@@ -11,6 +11,20 @@ export interface CoveredAndExcessResult {
   excessAmount: string;
 }
 
+export type ExcessProcessingRoute = 'LEGACY_SUFFICIENCY' | 'EXCESS_FRAMEWORK';
+
+export interface ExcessProcessingRouteInput {
+  configuredMaximumUsd: string;
+  allowancePercentage: string;
+}
+
+/** BD-03: either zero disables Excess; both values must be strictly positive to enable it. */
+export function selectExcessProcessingRoute(input: ExcessProcessingRouteInput): ExcessProcessingRoute {
+  const configuredMaximumUsd = parseNonNegative(input.configuredMaximumUsd, 'configuredMaximumUsd');
+  const allowancePercentage = parseNonNegative(input.allowancePercentage, 'allowancePercentage');
+  return configuredMaximumUsd.isZero() || allowancePercentage.isZero() ? 'LEGACY_SUFFICIENCY' : 'EXCESS_FRAMEWORK';
+}
+
 /** v11.15: Covered=min(amount,max(capacity,0)); Excess=amount-Covered. */
 export function computeCoveredAndExcess(input: CoveredAndExcessInput): CoveredAndExcessResult {
   const transactionAmount = parseMonetaryAmount(input.transactionAmount);
