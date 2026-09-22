@@ -55,4 +55,12 @@ describe("CompositeResolutionPageDefinitionSource", () => {
       "DUPLICATE_RESOLUTION_PAGE_DEFINITION",
     );
   });
+
+  it("treats an optional all operation as an empty source", () => {
+    const findOnly: ResolutionPageDefinitionSource = {
+      find: jest.fn(() => []),
+    };
+    const composite = new CompositeResolutionPageDefinitionSource([findOnly]);
+    expect(composite.all("SR2026")).toEqual([]);
+  });
 });

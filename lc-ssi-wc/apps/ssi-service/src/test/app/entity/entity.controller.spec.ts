@@ -16,9 +16,11 @@ const body: EntityCommand = {
 describe("EntityController", () => {
   const service = {
     list: jest.fn(() => ["listed"]),
+    listPage: jest.fn((request: unknown) => ({ request })),
     create: jest.fn(() => ({ id: "created" })),
     update: jest.fn(() => ({ id: "updated" })),
     revise: jest.fn(() => ({ id: "revised" })),
+    suppress: jest.fn(() => ({ id: "suppressed" })),
     transition: jest.fn(() => ({ id: "transitioned" })),
     revoke: jest.fn(() => ({ id: "revoked" })),
     audit: jest.fn(() => ["audited"]),
@@ -32,9 +34,13 @@ describe("EntityController", () => {
 
   it("delegates CRUD, revision, revocation and audit calls", () => {
     expect(controller.list()).toEqual(["listed"]);
+    expect(controller.list("ACTIVE", "2", "10", "Hong Kong")).toEqual({
+      request: expect.objectContaining({ page: 2, pageSize: 10 }),
+    });
     expect(controller.create(body)).toEqual({ id: "created" });
     expect(controller.update("E1", body)).toEqual({ id: "updated" });
     expect(controller.revise("E1", { maker: "maker-2" })).toEqual({ id: "revised" });
+    expect(controller.suppress("E1", { maker: "maker-2", reason: "closed" })).toEqual({ id: "suppressed" });
     expect(controller.revoke("E1", { actor: "checker", reason: "closed" })).toEqual({ id: "revoked" });
     expect(controller.audit()).toEqual(["audited"]);
     expect(service.update).toHaveBeenCalledWith("E1", body);
@@ -45,6 +51,7 @@ describe("EntityController", () => {
   it.each([
     ["submit", "SUBMIT"],
     ["approve", "APPROVE"],
+    ["reject", "REJECT"],
     ["activate", "ACTIVATE"],
   ])("normalizes the %s transition", (input, expected) => {
     expect(controller.transition("E1", input, { actor: "actor" })).toEqual({ id: "transitioned" });

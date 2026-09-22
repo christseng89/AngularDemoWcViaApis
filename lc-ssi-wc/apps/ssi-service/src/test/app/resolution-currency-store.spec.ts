@@ -138,4 +138,44 @@ describe("ResolutionCurrencyStore", () => {
     expect(store.inquiryPage("SR2026", { businessDomain: "PAYMENT", page: 1, pageSize: 2, sortBy: "currency", sortDirection: "desc" }).items.map(({ currency }) => currency))
       .toEqual(["USD", "GBP"]);
   });
+
+  it("rejects inherited or unknown inquiry sort properties", () => {
+    expect(() =>
+      store.inquiryPage("SR2026", {
+        page: 1,
+        pageSize: 10,
+        sortBy: "toString" as never,
+      }),
+    ).toThrow("RESOLUTION_CURRENCY_INVALID_SORT");
+  });
+
+  it("rejects invalid page bounds and filters inquiry status in SQLite", () => {
+    expect(() =>
+      store.inquiryPage("SR2026", { page: 0, pageSize: 10 }),
+    ).toThrow("RESOLUTION_CURRENCY_INVALID_PAGE");
+
+    db.exec("BEGIN IMMEDIATE");
+    store.apply(
+      "SR2026",
+      [
+        {
+          standardsRelease: "SR2026",
+          businessDomain: "PAYMENT",
+          currency: "USD",
+        },
+      ],
+      "FULL_RESYNC",
+      "2026-09-20T00:00:00.000Z",
+      "2026-09-15",
+    );
+    db.exec("COMMIT");
+
+    expect(
+      store.inquiryPage("SR2026", {
+        page: 1,
+        pageSize: 10,
+        status: "ACTIVE",
+      }),
+    ).toMatchObject({ totalItems: 1, items: [{ currency: "USD" }] });
+  });
 });

@@ -10,6 +10,13 @@ const featureStyles = [
 ].map((path) => ({ path, css: readFileSync(path, "utf8") }));
 
 describe("portal visual design system", () => {
+  it("defines each resolution-workbench sort heading selector once", () => {
+    const resolutionStyles = featureStyles.find(({ path }) =>
+      path.endsWith("resolution-workbench.css"),
+    )?.css;
+    expect(resolutionStyles?.match(/\.sort-heading\s*\{/g)).toHaveLength(1);
+  });
+
   it("defines shared semantic tokens for both themes", () => {
     const light = globalStyles.match(/:root\s*\{([\s\S]*?)\}/)?.[1] ?? "";
     const dark = globalStyles.match(/:root\[data-theme="dark"\]\s*\{([\s\S]*?)\}/)?.[1] ?? "";

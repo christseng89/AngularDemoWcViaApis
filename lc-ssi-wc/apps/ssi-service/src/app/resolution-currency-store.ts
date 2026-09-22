@@ -54,6 +54,10 @@ export interface ResolutionCurrencyInquiryPage {
 
 export class ResolutionCurrencyStore {
   constructor(private readonly db: DatabaseSync) {
+    ResolutionCurrencyStore.ensureSchema(db);
+  }
+
+  static ensureSchema(db: DatabaseSync): void {
     db.exec(`
       CREATE TABLE IF NOT EXISTS resolution_currency_coverage (
         standards_release TEXT NOT NULL,
@@ -109,7 +113,7 @@ export class ResolutionCurrencyStore {
     };
     const sortBy = request.sortBy ?? "businessDomain";
     const sortDirection = request.sortDirection ?? "asc";
-    if (!Object.prototype.hasOwnProperty.call(sortColumns, sortBy) || !["asc", "desc"].includes(sortDirection))
+    if (!Object.hasOwn(sortColumns, sortBy) || !["asc", "desc"].includes(sortDirection))
       throw new Error("RESOLUTION_CURRENCY_INVALID_SORT");
     const order = `${sortColumns[sortBy]} ${sortDirection.toUpperCase()},c.business_domain,c.currency_code`;
     const clauses = ["c.standards_release=?"];

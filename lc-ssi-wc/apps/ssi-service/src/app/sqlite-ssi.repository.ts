@@ -145,6 +145,7 @@ const FIN_CONTROLLED_CATALOGUE_SQL = `
 
 const JS_TRIM_CHARACTERS =
   "char(9,10,11,12,13,32,160,5760,8192,8193,8194,8195,8196,8197,8198,8199,8200,8201,8202,8232,8233,8239,8287,12288,65279)";
+const SQL_LIKE_ESCAPE_CHARACTER = String.fromCodePoint(92);
 
 const FIN_CONTROLLED_INDEX_CURRENCIES_SQL = `
   WITH latest AS MATERIALIZED (
@@ -268,7 +269,11 @@ export class SqliteSsiRepository implements OnModuleDestroy {
       CREATE TABLE IF NOT EXISTS inbox (event_id TEXT PRIMARY KEY, event_type TEXT NOT NULL, processed_at TEXT NOT NULL);`);
   }
   private currencyStore(): ResolutionCurrencyStore {
-    return (this.resolutionCurrencies ??= new ResolutionCurrencyStore(this.db));
+    const existing = this.resolutionCurrencies;
+    if (existing) return existing;
+    const store = new ResolutionCurrencyStore(this.db);
+    this.resolutionCurrencies = store;
+    return store;
   }
   resolutionCurrencyInquiry(standardsRelease: string) {
     return this.currencyStore().inquiry(standardsRelease);
@@ -401,10 +406,17 @@ export class SqliteSsiRepository implements OnModuleDestroy {
     }
     const search = request.search?.trim();
     if (search) {
-      clauses.push("payload LIKE ? ESCAPE '\\'");
-      parameters.push(
-        `%${search.replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_")}%`,
+      clauses.push(
+        `payload LIKE ? ESCAPE '${SQL_LIKE_ESCAPE_CHARACTER}'`,
       );
+      const escapedSearch = search
+        .replaceAll(
+          SQL_LIKE_ESCAPE_CHARACTER,
+          SQL_LIKE_ESCAPE_CHARACTER.repeat(2),
+        )
+        .replaceAll("%", `${SQL_LIKE_ESCAPE_CHARACTER}%`)
+        .replaceAll("_", `${SQL_LIKE_ESCAPE_CHARACTER}_`);
+      parameters.push(`%${escapedSearch}%`);
     }
     const where = clauses.length ? ` WHERE ${clauses.join(" AND ")}` : "";
     const sortExpressions: Readonly<Record<string, string>> = {
@@ -1131,8 +1143,7 @@ export class SqliteSsiRepository implements OnModuleDestroy {
         ? (JSON.parse(String(requestRow.payload)) as SsiRecord)
         : undefined;
       if (
-        !request ||
-        request.status !== "PENDING_APPROVAL" ||
+        request?.status !== "PENDING_APPROVAL" ||
         request.changeType === "SUPPRESSION" ||
         !actor ||
         request.maker === actor
@@ -1386,13 +1397,11 @@ export class SqliteSsiRepository implements OnModuleDestroy {
         ? (JSON.parse(String(sourceRow.payload)) as SsiRecord)
         : undefined;
       if (
-        !request ||
-        request.changeType !== "SUPPRESSION" ||
+        request?.changeType !== "SUPPRESSION" ||
         request.status !== "PENDING_APPROVAL" ||
         (request.suppressionReason?.trim().length ?? 0) < 5 ||
         request.maker === actor ||
-        !source ||
-        source.status !== "ACTIVE"
+        source?.status !== "ACTIVE"
       ) {
         this.db.exec("ROLLBACK");
         return undefined;

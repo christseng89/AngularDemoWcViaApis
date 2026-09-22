@@ -67,6 +67,18 @@ function listQuery(parameters: Record<string, string | undefined>): string {
   return encoded ? `?${encoded}` : "";
 }
 
+interface SsiListQuery {
+  [key: string]: string | undefined;
+  status?: string;
+  ownershipType?: string;
+  counterpartyId?: string;
+  page?: string;
+  pageSize?: string;
+  search?: string;
+  sortBy?: string;
+  sortDirection?: string;
+}
+
 @Controller("api")
 class BffController {
   @Get("settings/runtime") runtimeSettings(): Promise<unknown> {
@@ -107,30 +119,8 @@ class BffController {
       recent: ssis.slice(0, 8),
     };
   }
-  @Get("ssis") list(
-    @Query("status") status = "",
-    @Query("ownershipType") ownershipType = "",
-    @Query("counterpartyId") counterpartyId = "",
-    @Query("page") page = "",
-    @Query("pageSize") pageSize = "",
-    @Query("search") search = "",
-    @Query("sortBy") sortBy = "",
-    @Query("sortDirection") sortDirection = "",
-  ): Promise<unknown> {
-    const query = new URLSearchParams();
-    for (const [key, value] of Object.entries({
-      status,
-      ownershipType,
-      counterpartyId,
-      page,
-      pageSize,
-      search,
-      sortBy,
-      sortDirection,
-    })) {
-      if (value) query.set(key, value);
-    }
-    return forwardSsi(`ssis${query.size ? `?${query.toString()}` : ""}`);
+  @Get("ssis") list(@Query() query: SsiListQuery = {}): Promise<unknown> {
+    return forwardSsi(`ssis${listQuery(query)}`);
   }
   @Get("ssis/summary") ssiSummary(): Promise<unknown> {
     return forwardSsi("ssis/summary");

@@ -332,11 +332,9 @@ export class MessageTypeTagsType extends FieldType<FieldTypeConfig> {
     )?.messageTypeOperation;
     const resolved =
       typeof configured === "function" ? configured() : configured;
-    return resolved === "EDIT"
-      ? "EDIT"
-      : resolved === "INQUIRE"
-        ? "INQUIRE"
-        : "ADD";
+    if (resolved === "EDIT") return "EDIT";
+    if (resolved === "INQUIRE") return "INQUIRE";
+    return "ADD";
   }
 
   get operationButtonLabel(): string {
@@ -352,11 +350,9 @@ export class MessageTypeTagsType extends FieldType<FieldTypeConfig> {
   }
 
   private get operationLabel(): "Add" | "Edit" | "Inquire" {
-    return this.operation === "EDIT"
-      ? "Edit"
-      : this.operation === "INQUIRE"
-        ? "Inquire"
-        : "Add";
+    if (this.operation === "EDIT") return "Edit";
+    if (this.operation === "INQUIRE") return "Inquire";
+    return "Add";
   }
 
   get categories(): MessageTypeCategory[] {
@@ -550,13 +546,11 @@ export class MessageTypeTagsType extends FieldType<FieldTypeConfig> {
     group: "ALL" | "MT1" | "MT2" | "MT3" | "MT4" | "MT7" | "CBPR",
   ): void {
     const selected = new Set(this.selectedValues);
-    const matches = this.messageOptions.filter(({ value }) =>
-      group === "ALL"
-        ? true
-        : group === "CBPR"
-          ? value.startsWith("pacs.")
-          : value.startsWith(group),
-    );
+    const matches = this.messageOptions.filter(({ value }) => {
+      if (group === "ALL") return true;
+      if (group === "CBPR") return value.startsWith("pacs.");
+      return value.startsWith(group);
+    });
     for (const { value } of matches) selected.add(value);
     this.setSelected(selected);
   }

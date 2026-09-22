@@ -54,6 +54,30 @@ export function evaluateCoverage(summaries, threshold = 92) {
   return { ok: failures.length === 0, threshold, totals, failures };
 }
 
+export function formatCoverageEvidence(result) {
+  const totals = Object.fromEntries(
+    METRICS.map((metric) => {
+      const value = result.totals[metric];
+      return [metric, { ...value, percentage: percentage(value.covered, value.total) }];
+    }),
+  );
+  const failures = [...result.failures].sort((left, right) => {
+    if (left.scope === "WORKSPACE_TOTAL") return 1;
+    if (right.scope === "WORKSPACE_TOTAL") return -1;
+    return (
+      left.scope.localeCompare(right.scope) ||
+      METRICS.indexOf(left.metric) - METRICS.indexOf(right.metric)
+    );
+  });
+
+  return {
+    ok: result.ok,
+    threshold: result.threshold,
+    totals,
+    failures,
+  };
+}
+
 function findSummaries(directory) {
   if (!existsSync(directory)) return [];
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -73,14 +97,22 @@ export function readCoverageSummaries(directory) {
 }
 
 function run() {
-  const threshold = Number(process.argv[2] ?? 92);
+  const json = process.argv.includes("--json");
+  const thresholdArgument = process.argv.slice(2).find((argument) => argument !== "--json");
+  const threshold = Number(thresholdArgument ?? 92);
   if (!Number.isFinite(threshold) || threshold < 0 || threshold >= 100) {
-    throw new Error(`Invalid coverage threshold: ${process.argv[2] ?? ""}`);
+    throw new Error(`Invalid coverage threshold: ${thresholdArgument ?? ""}`);
   }
   const result = evaluateCoverage(
     readCoverageSummaries(resolve(process.cwd(), "coverage")),
     threshold,
   );
+
+  if (json) {
+    console.log(JSON.stringify(formatCoverageEvidence(result), null, 2));
+    if (!result.ok) process.exitCode = 1;
+    return;
+  }
 
   for (const metric of METRICS) {
     const value = result.totals[metric];

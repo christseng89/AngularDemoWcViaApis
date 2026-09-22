@@ -1913,6 +1913,7 @@ dd code {
   background: #d7e3df;
 }
 .compact-warning {
+  display: block;
   margin: 18px 0 0;
   font-size: 12px;
 }

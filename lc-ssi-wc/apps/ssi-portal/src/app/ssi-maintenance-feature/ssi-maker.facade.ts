@@ -265,7 +265,7 @@ export class SsiMakerFacade {
     await firstValueFrom(
       this.api.cancelRevision(
         id,
-        actor ?? String(this.model["maker"] ?? "maker.revision"),
+        actor ?? scalarText(this.model["maker"], "maker.revision"),
       ),
     );
     if (id === this.editingId()) this.clearRevision();

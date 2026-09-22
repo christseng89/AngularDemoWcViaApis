@@ -124,9 +124,9 @@ describe("thin controller delegation coverage", () => {
     const controller = new SsiController(service as never);
     const command = { maker: "maker" } as never;
 
-    expect(controller.list("ACTIVE")).toBe(result);
+    expect(controller.list({ status: "ACTIVE" })).toBe(result);
     expect(service.list).toHaveBeenCalledWith("ACTIVE");
-    expect(controller.list(undefined, undefined, undefined, "2", "500", "Citi", "counterpartyId", "DESC")).toBe(result);
+    expect(controller.list({ page: "2", pageSize: "500", search: "Citi", sortBy: "counterpartyId", sortDirection: "DESC" })).toBe(result);
     expect(service.listPage).toHaveBeenCalledWith({
       page: 2,
       pageSize: 100,
@@ -134,7 +134,7 @@ describe("thin controller delegation coverage", () => {
       sortBy: "counterpartyId",
       sortDirection: "DESC",
     });
-    expect(controller.list("ACTIVE", "COUNTERPARTY", "CP-1", "1", "20", "", "id", "ASC")).toBe(result);
+    expect(controller.list({ status: "ACTIVE", ownershipType: "COUNTERPARTY", counterpartyId: "CP-1", page: "1", pageSize: "20", search: "", sortBy: "id", sortDirection: "ASC" })).toBe(result);
     expect(service.listPage).toHaveBeenLastCalledWith({
       page: 1,
       pageSize: 20,
@@ -145,7 +145,7 @@ describe("thin controller delegation coverage", () => {
       sortBy: "id",
       sortDirection: "ASC",
     });
-    expect(controller.list(undefined, "OWN")).toBe(result);
+    expect(controller.list({ ownershipType: "OWN" })).toBe(result);
     expect(service.listPage).toHaveBeenLastCalledWith({
       page: 1,
       pageSize: 20,
@@ -157,7 +157,7 @@ describe("thin controller delegation coverage", () => {
       ["1", "bad"],
       ["1", "0"],
     ]) {
-      expect(() => controller.list(undefined, undefined, undefined, values[0], values[1]))
+      expect(() => controller.list({ page: values[0], pageSize: values[1] }))
         .toThrow(BadRequestException);
     }
 

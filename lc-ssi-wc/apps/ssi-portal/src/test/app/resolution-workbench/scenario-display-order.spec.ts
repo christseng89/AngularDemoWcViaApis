@@ -15,4 +15,18 @@ describe("scenario display order", () => {
       [...scenarios].sort(compareScenarioDisplayOrder).map(({ id }) => id),
     ).toEqual(["p-a", "p-z", "n-a", "n-z", "b-a", "b-z"]);
   });
+
+  it("falls back from description to label and then stable scenario identity", () => {
+    const scenarios = [
+      { label: "Same", polarity: "POSITIVE" as const, scenarioId: "scenario-b" },
+      { label: "Same", polarity: "POSITIVE" as const, scenarioId: "scenario-a" },
+      { label: "Same", polarity: "POSITIVE" as const, id: "id-only" },
+      { label: "Same", polarity: "POSITIVE" as const },
+    ];
+    expect(
+      [...scenarios]
+        .sort(compareScenarioDisplayOrder)
+        .map(({ scenarioId, id }) => scenarioId ?? id ?? "empty"),
+    ).toEqual(["empty", "id-only", "scenario-a", "scenario-b"]);
+  });
 });

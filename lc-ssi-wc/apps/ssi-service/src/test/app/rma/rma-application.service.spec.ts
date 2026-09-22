@@ -121,6 +121,27 @@ describe("RmaApplicationService lifecycle", () => {
     );
   });
 
+  it("rejects an invalid canonical pair", () => {
+    expect(() =>
+      new RmaApplicationService(repository().value).pairState(
+        "bad",
+        "CHASUS33",
+      ),
+    ).toThrow("Invalid canonical BIC pair");
+  });
+
+  it("delegates index pagination and exposes the governed Message Type policy", () => {
+    const repo = repository();
+    const page = { items: [], total: 0, page: 1, pageSize: 20 };
+    Object.assign(repo.value, { listIndexPage: jest.fn(() => page) });
+    const subject = new RmaApplicationService(repo.value);
+
+    expect(subject.listPage({ page: 1, pageSize: 20 })).toBe(page);
+    expect(subject.messageTypePolicy().supportedMessageTypes).toContain(
+      "MT202",
+    );
+  });
+
   it("compares an edited Message Type set without changing the original", () => {
     expect(
       compareRmaMessageTypes(
@@ -269,6 +290,37 @@ describe("RmaApplicationService lifecycle", () => {
     ).toThrow("Only original maker can update");
   });
 
+  it("recomputes changes for an amended draft and rejects suppression edits", () => {
+    const original = record({ id: "original", messageTypes: ["MT202"] });
+    const revision = record({
+      id: "revision",
+      status: "WIP",
+      amendmentOfId: original.id,
+    });
+    const repo = repository([original, revision]);
+    const updated = new RmaApplicationService(repo.value).update(revision.id, {
+      ...command(),
+      messageTypes: ["MT103"],
+      source: "SYNTHETIC_DEMO",
+    });
+    expect(updated).toMatchObject({
+      source: "SYNTHETIC_DEMO",
+      messageTypeChanges: {
+        unchanged: [],
+        added: ["MT103"],
+        suppressed: ["MT202"],
+      },
+    });
+
+    const suppression = record({ status: "DRAFT", changeType: "SUPPRESSION" });
+    expect(() =>
+      new RmaApplicationService(repository([suppression]).value).update(
+        suppression.id,
+        command(),
+      ),
+    ).toThrow("SUPPRESSION_DRAFT_CANNOT_BE_EDITED");
+  });
+
   it("creates a revision without carrying the checker", () => {
     const current = record({ checker: "checker" });
     const repo = repository([current]);
@@ -291,6 +343,37 @@ describe("RmaApplicationService lifecycle", () => {
         repository([record({ status: "REVOKED" })]).value,
       ).revise("RMA-1", "maker"),
     ).toThrow(ConflictException);
+  });
+
+  it("fails closed for unavailable revisions and supports repository fallback", () => {
+    const current = record();
+    const occupied = repository([current]);
+    occupied.value.hasOpenRevision = jest.fn(() => true);
+    expect(() =>
+      new RmaApplicationService(occupied.value).revise(current.id, "maker.2"),
+    ).toThrow("OPEN_REVISION_EXISTS");
+
+    const unavailable = repository([current]);
+    unavailable.value.saveRevisionWorkInProgress = jest.fn(() => false);
+    expect(() =>
+      new RmaApplicationService(unavailable.value).revise(
+        current.id,
+        "maker.2",
+      ),
+    ).toThrow("REVISION_NOT_AVAILABLE");
+
+    const fallback = repository([current]);
+    fallback.value.saveRevisionWorkInProgress = undefined;
+    const revised = new RmaApplicationService(fallback.value).revise(
+      current.id,
+      "maker.2",
+    );
+    expect(fallback.value.save).toHaveBeenCalledWith(
+      revised,
+      "WIP_RESERVED",
+      "maker.2",
+      "RMA",
+    );
   });
 
   it("creates a governed suppression draft and only suppresses after independent approval", () => {
@@ -335,6 +418,59 @@ describe("RmaApplicationService lifecycle", () => {
       expect.arrayContaining([
         expect.objectContaining({ id: active.id, status: "SUPERSEDED" }),
       ]),
+    );
+  });
+
+  it("validates suppression reservation and supports repository fallback", () => {
+    const active = record();
+    const subject = (records: RmaRecord[] = [active]) =>
+      new RmaApplicationService(repository(records).value);
+    expect(() => subject().suppress(active.id, "", "valid reason")).toThrow(
+      "MAKER_REQUIRED",
+    );
+    expect(() => subject().suppress(active.id, "maker.2", "bad")).toThrow(
+      "SUPPRESSION_REASON_REQUIRED",
+    );
+    expect(() =>
+      subject([record({ status: "DRAFT" })]).suppress(
+        active.id,
+        "maker.2",
+        "valid reason",
+      ),
+    ).toThrow("ONLY_ACTIVE_CAN_BE_SUPPRESSED");
+
+    const occupied = repository([active]);
+    occupied.value.hasOpenRevision = jest.fn(() => true);
+    expect(() =>
+      new RmaApplicationService(occupied.value).suppress(
+        active.id,
+        "maker.2",
+        "valid reason",
+      ),
+    ).toThrow("OPEN_REVISION_EXISTS");
+
+    const unavailable = repository([active]);
+    unavailable.value.saveRevisionWorkInProgress = jest.fn(() => false);
+    expect(() =>
+      new RmaApplicationService(unavailable.value).suppress(
+        active.id,
+        "maker.2",
+        "valid reason",
+      ),
+    ).toThrow("SUPPRESSION_NOT_AVAILABLE");
+
+    const fallback = repository([active]);
+    fallback.value.saveRevisionWorkInProgress = undefined;
+    const suppression = new RmaApplicationService(fallback.value).suppress(
+      active.id,
+      "maker.2",
+      "valid reason",
+    );
+    expect(fallback.value.save).toHaveBeenCalledWith(
+      suppression,
+      "SUPPRESSION_DRAFT_CREATED",
+      "maker.2",
+      "RMA",
     );
   });
 
@@ -399,6 +535,116 @@ describe("RmaApplicationService lifecycle", () => {
     ).toThrow(ConflictException);
   });
 
+  it("preserves rejection evidence and the existing Message Type change summary", () => {
+    const changes = {
+      unchanged: ["MT202"],
+      added: ["MT103"],
+      suppressed: [],
+    };
+    const pending = record({
+      status: "PENDING_APPROVAL",
+      messageTypes: ["MT202", "MT103"],
+      messageTypeChanges: changes,
+    });
+    const repo = repository([pending]);
+
+    const rejected = new RmaApplicationService(repo.value).transition(
+      pending.id,
+      "REJECT",
+      "checker.other",
+      "incorrect scope",
+    );
+
+    expect(rejected).toMatchObject({
+      status: "DRAFT",
+      checker: "checker.other",
+      rejectionReason: "incorrect scope",
+      messageTypeChanges: changes,
+    });
+    expect(repo.value.save).toHaveBeenCalledWith(
+      rejected,
+      "REJECT",
+      "checker.other",
+      "RMA",
+      rejected,
+    );
+  });
+
+  it("records ADD provenance when approving a new RMA request", () => {
+    const pending = record({
+      status: "PENDING_APPROVAL",
+      messageTypeChanges: undefined,
+    });
+    const repo = repository([pending]);
+
+    const approved = new RmaApplicationService(repo.value).transition(
+      pending.id,
+      "APPROVE",
+      "checker.other",
+    );
+
+    expect(approved.messageTypeChanges).toEqual({
+      unchanged: [],
+      added: pending.messageTypes,
+      suppressed: [],
+    });
+    expect(repo.value.save).toHaveBeenCalledWith(
+      approved,
+      "APPROVE",
+      "checker.other",
+      "RMA",
+      {
+        before: null,
+        after: approved,
+        changedFields: { messageTypes: approved.messageTypeChanges },
+        provenance: { requestType: "ADD", amendmentOfId: null },
+      },
+    );
+  });
+
+  it("fails closed when suppression approval loses its atomic source state", () => {
+    const pending = record({
+      status: "PENDING_APPROVAL",
+      changeType: "SUPPRESSION",
+      amendmentOfId: "missing-active",
+    });
+    const repo = repository([pending]);
+
+    expect(() =>
+      new RmaApplicationService(repo.value).transition(
+        pending.id,
+        "APPROVE",
+        "checker.other",
+      ),
+    ).toThrow("SUPPRESSION_STATE_CHANGED");
+    expect(repo.value.save).not.toHaveBeenCalled();
+  });
+
+  it("rejects incomplete suppression and rejection submissions", () => {
+    const suppression = record({
+      status: "DRAFT",
+      changeType: "SUPPRESSION",
+      suppressionReason: "bad",
+    });
+    expect(() =>
+      new RmaApplicationService(repository([suppression]).value).transition(
+        suppression.id,
+        "SUBMIT",
+        suppression.maker,
+      ),
+    ).toThrow("SUPPRESSION_REASON_REQUIRED");
+
+    const pending = record({ status: "PENDING_APPROVAL" });
+    expect(() =>
+      new RmaApplicationService(repository([pending]).value).transition(
+        pending.id,
+        "REJECT",
+        "checker.other",
+        "bad",
+      ),
+    ).toThrow("REJECTION_REASON_REQUIRED");
+  });
+
   it("revokes with a meaningful reason and rejects invalid requests", () => {
     const current = record({ status: "DRAFT" });
     const repo = repository([current]);
@@ -430,6 +676,18 @@ describe("RmaApplicationService lifecycle", () => {
         "valid reason",
       ),
     ).toThrow(NotFoundException);
+    expect(() =>
+      new RmaApplicationService(repository([record()]).value).revoke(
+        "RMA-1",
+        "operator",
+        "valid reason",
+      ),
+    ).toThrow("ACTIVE_REQUIRES_SUPPRESSION");
+    expect(() =>
+      new RmaApplicationService(
+        repository([record({ status: "APPROVED" })]).value,
+      ).revoke("RMA-1", "operator", "valid reason"),
+    ).toThrow("REVOCATION_REQUIRES_DRAFT");
   });
 
   it.each([
@@ -545,5 +803,42 @@ describe("RmaApplicationService.check", () => {
       decision: "NOT_FOUND",
       effectiveAt: today,
     });
+  });
+
+  it("passes governed fixture scope and operational-only selection to the repository", () => {
+    const scopedRepo = repository();
+    const scoped = new RmaApplicationService(scopedRepo.value);
+    scoped.check({
+      ...request,
+      fixtureFamily: "FAMILY",
+      usageGroup: "GROUP",
+      fixtureBindingId: "BINDING",
+    });
+    expect(scopedRepo.value.findAuthorised).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fixtureFamily: "FAMILY",
+        usageGroup: "GROUP",
+        fixtureBindingId: "BINDING",
+      }),
+    );
+
+    const operationalRepo = repository();
+    new RmaApplicationService(operationalRepo.value).check({
+      ...request,
+      operationalOnly: true,
+    });
+    expect(operationalRepo.value.findAuthorised).toHaveBeenCalledWith(
+      expect.objectContaining({ operationalOnly: true }),
+    );
+  });
+
+  it.each([
+    { fixtureFamily: "FAMILY" },
+    { fixtureBindingId: "BINDING" },
+    { usageGroup: "GROUP" },
+  ])("rejects conflicting operational selector %#", (selector) => {
+    expect(() =>
+      service([]).check({ ...request, operationalOnly: true, ...selector }),
+    ).toThrow("RMA_SCOPE_CONFLICT");
   });
 });

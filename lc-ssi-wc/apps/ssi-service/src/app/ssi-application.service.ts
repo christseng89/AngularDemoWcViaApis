@@ -44,6 +44,21 @@ export interface CreateSsiCommand {
   publisherParty?: string;
   route: Record<string, string>;
 }
+type SsiTransitionAction = "SUBMIT" | "APPROVE" | "REJECT" | "ACTIVATE";
+
+const EXPECTED_TRANSITION_STATUS = {
+  SUBMIT: "DRAFT",
+  APPROVE: "PENDING_APPROVAL",
+  REJECT: "PENDING_APPROVAL",
+  ACTIVATE: "APPROVED",
+} as const;
+
+const NEXT_TRANSITION_STATUS = {
+  SUBMIT: "PENDING_APPROVAL",
+  REJECT: "DRAFT",
+  ACTIVATE: "ACTIVE",
+} as const;
+
 const BIC_PATTERN = /^[A-Z0-9]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?$/;
 const CURRENCY_PATTERN = /^[A-Z]{3}$/;
 const PAYMENT_TRIGGER_LEGS = new Set([
@@ -315,7 +330,8 @@ export class SsiApplicationService {
     private readonly rma: RmaApplicationService,
     private readonly nostro: NostroApplicationService,
     private readonly paymentMessageIndex: PaymentMessageIndexService,
-    @Optional() private readonly currencyCoordinator?: ResolutionCurrencyCoverageCoordinator,
+    @Optional()
+    private readonly currencyCoordinator?: ResolutionCurrencyCoverageCoordinator,
   ) {}
   list(status?: string): Array<
     SsiRecord & {
@@ -542,17 +558,37 @@ export class SsiApplicationService {
 
   transition(
     id: string,
-    action: "SUBMIT" | "APPROVE" | "REJECT" | "ACTIVATE",
+    action: SsiTransitionAction,
     actor: string,
     reason = "",
   ): SsiRecord {
     const current = this.requireRecord(id);
-    const expected = {
-      SUBMIT: "DRAFT",
-      APPROVE: "PENDING_APPROVAL",
-      REJECT: "PENDING_APPROVAL",
-      ACTIVATE: "APPROVED",
-    }[action];
+    this.validateTransition(current, action, actor, reason);
+
+    if (action === "APPROVE" && current.changeType === "SUPPRESSION") {
+      return this.approveSuppression(current, actor);
+    }
+
+    const activates = action === "APPROVE" || action === "ACTIVATE";
+    this.validateActivationPreconditions(current, action, actor, activates);
+
+    if (action === "APPROVE") {
+      return this.approveWithApplicability(current.id, actor);
+    }
+
+    if (activates) this.supersedePreviousActive(current, actor);
+    const next = this.buildTransitionRecord(current, action, actor, reason);
+    this.repository.save(next, action, actor);
+    return next;
+  }
+
+  private validateTransition(
+    current: SsiRecord,
+    action: SsiTransitionAction,
+    actor: string,
+    reason: string,
+  ): void {
+    const expected = EXPECTED_TRANSITION_STATUS[action];
     if (current.status !== expected)
       throw new ConflictException(
         `Expected ${expected}, found ${current.status}`,
@@ -566,30 +602,38 @@ export class SsiApplicationService {
       throw new ConflictException("Maker cannot check their own SSI");
     if (action === "REJECT" && reason.trim().length < 5)
       throw new BadRequestException("REJECTION_REASON_REQUIRED");
-    const activates = action === "APPROVE" || action === "ACTIVATE";
     if (
       action === "SUBMIT" &&
       current.changeType === "SUPPRESSION" &&
       (current.suppressionReason?.trim().length ?? 0) < 5
     )
       throw new BadRequestException("SUPPRESSION_REASON_REQUIRED");
-    if (action === "APPROVE" && current.changeType === "SUPPRESSION") {
-      const suppressed = this.repository.approveSuppression(current.id, actor);
-      if (!suppressed) throw new ConflictException("SUPPRESSION_STATE_CHANGED");
-      return suppressed;
-    }
+  }
+
+  private approveSuppression(current: SsiRecord, actor: string): SsiRecord {
+    const suppressed = this.repository.approveSuppression(current.id, actor);
+    if (!suppressed) throw new ConflictException("SUPPRESSION_STATE_CHANGED");
+    return suppressed;
+  }
+
+  private validateActivationPreconditions(
+    current: SsiRecord,
+    action: SsiTransitionAction,
+    actor: string,
+    activates: boolean,
+  ): void {
     if (
       activates &&
       current.scope === "TRANSACTION_SPECIFIC" &&
       !current.route["transactionBindingReference"]?.trim()
     )
       throw new ConflictException("TRANSACTION_BINDING_REQUIRED");
-    const applicability =
-      action === "APPROVE"
-        ? this.applicabilityForApproval(current)
-        : activates
-          ? this.ensureRevisionApplicability(current, actor)
-          : [];
+    const applicability = this.resolveActivationApplicability(
+      current,
+      action,
+      actor,
+      activates,
+    );
     if (
       activates &&
       !applicability.some(
@@ -600,34 +644,47 @@ export class SsiApplicationService {
     )
       throw new ConflictException("ACTIVE_SSI_APPLICABILITY_REQUIRED");
     if (activates) this.validateRoute(current.route);
-    if (action === "APPROVE") {
-      let coverageUpdate: ResolutionCurrencyApplyResult | undefined;
-      const approved = this.currencyCoordinator
-        ? this.repository.approveWithApplicability(id, actor, () => {
-            coverageUpdate = this.currencyCoordinator!.discoverApproved(id);
-          })
-        : this.repository.approveWithApplicability(id, actor);
-      if (!approved) throw new ConflictException("APPROVAL_STATE_CHANGED");
-      if (coverageUpdate) this.currencyCoordinator?.invalidateAfterCommit(coverageUpdate);
-      return approved;
-    }
-    const status = {
-      SUBMIT: "PENDING_APPROVAL",
-      REJECT: "DRAFT",
-      ACTIVATE: "ACTIVE",
-    }[action];
-    if (activates) this.supersedePreviousActive(current, actor);
-    const next: SsiRecord = {
+  }
+
+  private resolveActivationApplicability(
+    current: SsiRecord,
+    action: SsiTransitionAction,
+    actor: string,
+    activates: boolean,
+  ): ReturnType<SqliteSsiRepository["listApplicability"]> {
+    if (action === "APPROVE") return this.applicabilityForApproval(current);
+    if (activates) return this.ensureRevisionApplicability(current, actor);
+    return [];
+  }
+
+  private approveWithApplicability(id: string, actor: string): SsiRecord {
+    let coverageUpdate: ResolutionCurrencyApplyResult | undefined;
+    const approved = this.currencyCoordinator
+      ? this.repository.approveWithApplicability(id, actor, () => {
+          coverageUpdate = this.currencyCoordinator!.discoverApproved(id);
+        })
+      : this.repository.approveWithApplicability(id, actor);
+    if (!approved) throw new ConflictException("APPROVAL_STATE_CHANGED");
+    if (coverageUpdate)
+      this.currencyCoordinator?.invalidateAfterCommit(coverageUpdate);
+    return approved;
+  }
+
+  private buildTransitionRecord(
+    current: SsiRecord,
+    action: Exclude<SsiTransitionAction, "APPROVE">,
+    actor: string,
+    reason: string,
+  ): SsiRecord {
+    return {
       ...current,
-      status,
+      status: NEXT_TRANSITION_STATUS[action],
       version: current.version + 1,
       updatedAt: new Date().toISOString(),
       ...(action === "REJECT"
         ? { checker: actor, rejectionReason: reason.trim() }
         : {}),
     };
-    this.repository.save(next, action, actor);
-    return next;
   }
 
   private ensureRevisionApplicability(
@@ -734,12 +791,13 @@ export class SsiApplicationService {
   resolve(request: RouteResolutionRequest): unknown {
     this.validateResolutionRequest(request);
     this.requireCoverProfile(request);
-    const bindings = typeof this.repository.findRelatedRouteBindings === "function"
-      ? this.repository.findRelatedRouteBindings(request)
-      : {
-          ssi: this.repository.list(),
-          applicability: this.repository.listApplicability(),
-        };
+    const bindings =
+      typeof this.repository.findRelatedRouteBindings === "function"
+        ? this.repository.findRelatedRouteBindings(request)
+        : {
+            ssi: this.repository.list(),
+            applicability: this.repository.listApplicability(),
+          };
     const preview = previewResolution(
       request,
       bindings.ssi,
@@ -1040,23 +1098,25 @@ export class SsiApplicationService {
       request.businessService === COV_BUSINESS_SERVICE &&
       (typeof this.repository.hasCoverProfile === "function"
         ? this.repository.hasCoverProfile(request)
-        : this.repository.list().some(
-          (candidate) =>
-            candidate.status === "ACTIVE" &&
-            candidate.route["currency"] === request.currency &&
-            candidate.route["bookingEntity"] === request.bookingEntity &&
-            (candidate.route["counterpartyBic"] || candidate.counterpartyId) ===
-              exactCounterparty &&
-            routeList(candidate.route, "messageTypes").includes(
-              request.messageType,
-            ) &&
-            routeList(candidate.route, "businessService").includes(
-              COV_BUSINESS_SERVICE,
-            ) &&
-            routeList(candidate.route, "sourceMessageTypes").includes(
-              sourceMessageType,
-            ),
-        ));
+        : this.repository
+            .list()
+            .some(
+              (candidate) =>
+                candidate.status === "ACTIVE" &&
+                candidate.route["currency"] === request.currency &&
+                candidate.route["bookingEntity"] === request.bookingEntity &&
+                (candidate.route["counterpartyBic"] ||
+                  candidate.counterpartyId) === exactCounterparty &&
+                routeList(candidate.route, "messageTypes").includes(
+                  request.messageType,
+                ) &&
+                routeList(candidate.route, "businessService").includes(
+                  COV_BUSINESS_SERVICE,
+                ) &&
+                routeList(candidate.route, "sourceMessageTypes").includes(
+                  sourceMessageType,
+                ),
+            ));
     if (!profileAvailable)
       throw new ServiceUnavailableException("PROFILE_INCOMPLETE");
   }

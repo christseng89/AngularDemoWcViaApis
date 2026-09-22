@@ -159,4 +159,35 @@ describe("BankServiceLookupComponent resolution identity", () => {
 
     expect(right).toBe(left);
   });
+
+  it("uses empty identity defaults when optional lookup context is absent", () => {
+    expect(lookupResolutionKey(metadata, "", {})).toBe(
+      JSON.stringify([
+        "SSI_COUNTERPARTY",
+        metadata.endpoint,
+        "",
+        "",
+        "",
+        "",
+        [],
+      ]),
+    );
+    expect(lookupDependenciesSatisfied(metadata, {})).toBe(true);
+  });
+
+  it("does not satisfy a governed dependency that is absent", () => {
+    expect(
+      lookupDependenciesSatisfied(
+        {
+          ...metadata,
+          dependency: {
+            dependsOnFieldIds: ["context.currency"],
+            invalidatesFieldIds: [],
+            selectionPolicy: "SELECTABLE",
+          },
+        },
+        {},
+      ),
+    ).toBe(false);
+  });
 });

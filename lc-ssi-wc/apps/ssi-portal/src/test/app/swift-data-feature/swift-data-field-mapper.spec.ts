@@ -41,6 +41,10 @@ describe("SwiftDataFieldMapper", () => {
     (fields[0].props?.["pickerAction"] as () => void)();
     expect(openBankPicker).toHaveBeenCalledWith(resource.fields[0]);
     expect((fields[2].props?.["messageTypeOperation"] as () => string)()).toBe("EDIT");
+    const validMessageTypes = fields[2].validators?.["messageTypes"]
+      ?.expression as (control: { value: string }) => boolean;
+    expect(validMessageTypes({ value: "MT300, pacs.009.001.08, *" })).toBe(true);
+    expect(validMessageTypes({ value: "MT30" })).toBe(false);
     const model = { direction: "OUTBOUND" };
     expect((fields[2].props?.["messageTypeSelectionForDirection"] as (model: object, direction: string) => unknown)(model, "INBOUND")).toEqual(["MT304"]);
     expect(selectMessageTypes).toHaveBeenCalledWith(model, "INBOUND");
@@ -60,5 +64,65 @@ describe("SwiftDataFieldMapper", () => {
       threshold: 12,
     });
     expect(mapper.toFormValue(["MT300", "MT304"], resource.fields[2])).toBe("MT300, MT304");
+    expect(mapper.toFormValue("USD", resource.fields[1])).toBe("USD");
+  });
+
+  it("applies conditional field state, static options, defaults, and add mode", () => {
+    const mapper = new SwiftDataFieldMapper();
+    const conditionalResource: UiResource = {
+      ...resource,
+      fields: [
+        {
+          key: "conditional.required",
+          label: "Required field",
+          type: "select",
+          options: ["A"],
+          defaultValue: "A",
+          "x-required-when": { path: "mode", equals: "CREATE" },
+        },
+        {
+          key: "conditional.disabled",
+          label: "Disabled field",
+          type: "input",
+          "x-disabled-when": { path: "mode", equals: "VIEW" },
+        },
+        resource.fields[2],
+      ],
+    };
+    const fields = mapper.fields(conditionalResource, [], policy, {
+      editingId: () => null,
+      selectMessageTypes: jest.fn(),
+      openBankPicker: jest.fn(),
+    });
+    const required = fields[0].expressions?.["props.required"] as (
+      field: { model?: unknown },
+    ) => boolean;
+    const disabled = fields[1].expressions?.["props.disabled"] as (
+      field: { model?: unknown },
+    ) => boolean;
+
+    expect(fields[0].defaultValue).toBe("A");
+    expect(fields[0].props?.options).toEqual([{ label: "A", value: "A" }]);
+    expect(required({ model: { mode: "CREATE" } })).toBe(true);
+    expect(required({ model: { mode: "EDIT" } })).toBe(false);
+    expect(required({})).toBe(false);
+    expect(disabled({ model: { mode: "VIEW" } })).toBe(true);
+    expect(disabled({ model: { mode: "EDIT" } })).toBe(false);
+    expect(disabled({})).toBe(false);
+    expect((fields[2].props?.["messageTypeOperation"] as () => string)()).toBe(
+      "ADD",
+    );
+    expect(mapper.getPath({ container: null }, "container.value")).toBeUndefined();
+    expect(mapper.getPath({}, "missing.value")).toBeUndefined();
+    expect(mapper.getPath({ container: 0 }, "container.value")).toBeUndefined();
+    const existingObject = { bank: {} as Record<string, unknown> };
+    mapper.setPath(existingObject, "bank.bic", "BANKUS33");
+    expect(existingObject.bank).toEqual({ bic: "BANKUS33" });
+    const existingArray: Record<string, unknown> = { bank: [] };
+    mapper.setPath(existingArray, "bank.bic", "BANKUS33");
+    expect(existingArray).toEqual({ bank: { bic: "BANKUS33" } });
+    const existingPrimitive: Record<string, unknown> = { bank: "invalid" };
+    mapper.setPath(existingPrimitive, "bank.bic", "BANKUS33");
+    expect(existingPrimitive).toEqual({ bank: { bic: "BANKUS33" } });
   });
 });

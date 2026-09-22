@@ -32,8 +32,43 @@ import { LoadingStateComponent } from "./loading-state.component";
 import type { AppView as View, ThemeMode } from "./app-view.models";
 import { ThemeService } from "./theme.service";
 import { AppShellComponent } from "./app-shell.component";
+import { dispatchRouterEvent } from "./app-router-event-dispatcher";
 
 type WorkbenchView = "swiftdata" | "dashboard" | "maker";
+type AppNotice = {
+  kind: "info" | "warning" | "error";
+  text: string;
+};
+type Subscribable<T> = {
+  subscribe(callback: (value: T) => void): { unsubscribe(): void };
+};
+type MaintenanceWipPort = {
+  canDeactivate(targetUrl?: string): Promise<boolean>;
+  hasActiveMakerRevision(): boolean;
+  onLateMakerWipRelease(): void;
+  clearReleasedMakerForm(): void;
+  closeOverlayOnEscape(): Promise<boolean>;
+};
+interface ActivatedRoutePort {
+  dataReloaded?: Subscribable<void>;
+  setCurrencyOptions?: (
+    options: readonly { code: string; decimals: number }[],
+  ) => void;
+  detailOpenChange?: Subscribable<boolean>;
+  ssiDetailRequested?: Subscribable<unknown>;
+  tabChanged?: Subscribable<void>;
+  canDeactivate?: () => Promise<boolean>;
+  refresh?: () => Promise<void>;
+  maintenanceWipPort?: MaintenanceWipPort;
+  decide?: (
+    row: SsiRow,
+    decision: "approve" | "reject",
+    reason: string,
+  ) => Promise<boolean>;
+  reviewRequested?: Subscribable<SsiRow>;
+  countChanged?: Subscribable<number>;
+  noticeRaised?: Subscribable<{ kind: "warning"; text: string }>;
+}
 
 const routePathForView = (view: View): string | null => {
   switch (view) {
@@ -121,13 +156,7 @@ export class AppComponent implements OnInit, OnDestroy {
   } | null = null;
   private activeRoutedCanDeactivate: (() => Promise<boolean>) | null = null;
   private activeRoutedRefresh: (() => Promise<void>) | null = null;
-  private activeMaintenanceWipPort: {
-    canDeactivate(targetUrl?: string): Promise<boolean>;
-    hasActiveMakerRevision(): boolean;
-    onLateMakerWipRelease(): void;
-    clearReleasedMakerForm(): void;
-    closeOverlayOnEscape(): Promise<boolean>;
-  } | null = null;
+  private activeMaintenanceWipPort: MaintenanceWipPort | null = null;
   readonly view = signal<View>(this.savedView());
   readonly routeLoading = signal(false);
   private lastWorkbenchView: WorkbenchView = this.savedWorkbenchView();
@@ -138,10 +167,7 @@ export class AppComponent implements OnInit, OnDestroy {
   private readonly routerEventsSubscription: Subscription;
   private settingsReloadSubscription: { unsubscribe(): void } | null = null;
   readonly theme = this.themeService.theme;
-  readonly notice = signal<{
-    kind: "info" | "warning" | "error";
-    text: string;
-  } | null>(null);
+  readonly notice = signal<AppNotice | null>(null);
   readonly noticeAlert = computed(() => {
     const notice = this.notice();
     return notice
@@ -215,7 +241,6 @@ export class AppComponent implements OnInit, OnDestroy {
     if (this.document.defaultView?.location?.pathname === "/" && savedRoute) {
       this.pendingRouteTarget = this.view();
       void this.router.navigateByUrl(savedRoute).catch(() => undefined);
-      return;
     }
   }
 
@@ -229,16 +254,6 @@ export class AppComponent implements OnInit, OnDestroy {
   async refresh(): Promise<void> {
     if (this.view() === "checker") {
       await this.activeCheckerRoute?.refresh();
-      return;
-    }
-    if (
-      this.view() === "resolver" ||
-      this.view() === "treasury" ||
-      this.view() === "tradefinance" ||
-      this.view() === "settings" ||
-      this.view() === "audit"
-    ) {
-      await this.activeRoutedRefresh?.();
       return;
     }
     await this.activeRoutedRefresh?.();
@@ -286,53 +301,29 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   onSettingsActivated(component: unknown): void {
+    this.resetActivatedRouteState();
+    const route = component as ActivatedRoutePort;
+    this.bindRouteCapabilities(route);
+    this.bindCheckerRoute(route);
+    this.bindDetailRoute(route);
+    this.bindRouteEvents(route);
+  }
+
+  private resetActivatedRouteState(): void {
     this.settingsReloadSubscription?.unsubscribe();
     for (const subscription of this.auditRouteSubscriptions)
       subscription.unsubscribe();
     this.auditRouteSubscriptions = [];
     this.routedAuditDetailOpen.set(false);
-    const route = component as {
-      dataReloaded?: {
-        subscribe(callback: () => void): { unsubscribe(): void };
-      };
-      setCurrencyOptions?: (
-        options: readonly { code: string; decimals: number }[],
-      ) => void;
-      detailOpenChange?: {
-        subscribe(callback: (open: boolean) => void): { unsubscribe(): void };
-      };
-      ssiDetailRequested?: {
-        subscribe(callback: (snapshot: unknown) => void): {
-          unsubscribe(): void;
-        };
-      };
-      tabChanged?: {
-        subscribe(callback: () => void): { unsubscribe(): void };
-      };
-      canDeactivate?: () => Promise<boolean>;
-      refresh?: () => Promise<void>;
-      maintenanceWipPort?: NonNullable<
-        AppComponent["activeMaintenanceWipPort"]
-      >;
-      decide?: (
-        row: SsiRow,
-        decision: "approve" | "reject",
-        reason: string,
-      ) => Promise<boolean>;
-      reviewRequested?: {
-        subscribe(callback: (row: SsiRow) => void): { unsubscribe(): void };
-      };
-      countChanged?: {
-        subscribe(callback: (count: number) => void): { unsubscribe(): void };
-      };
-      noticeRaised?: {
-        subscribe(
-          callback: (notice: { kind: "warning"; text: string }) => void,
-        ): {
-          unsubscribe(): void;
-        };
-      };
-    };
+  }
+
+  private bindRouteCapabilities(route: ActivatedRoutePort): void {
+    this.activeRoutedCanDeactivate = route.canDeactivate?.bind(route) ?? null;
+    this.activeRoutedRefresh = route.refresh?.bind(route) ?? null;
+    this.activeMaintenanceWipPort = route.maintenanceWipPort ?? null;
+  }
+
+  private bindCheckerRoute(route: ActivatedRoutePort): void {
     this.activeCheckerRoute =
       route.refresh && route.decide
         ? {
@@ -340,14 +331,10 @@ export class AppComponent implements OnInit, OnDestroy {
             decide: route.decide.bind(route),
           }
         : null;
-    this.activeRoutedCanDeactivate = route.canDeactivate?.bind(route) ?? null;
-    this.activeRoutedRefresh = route.refresh?.bind(route) ?? null;
-    this.activeMaintenanceWipPort = route.maintenanceWipPort ?? null;
+    this.detail.setDecisionPort(this.activeCheckerRoute?.decide ?? null);
     if (route.reviewRequested)
       this.auditRouteSubscriptions.push(
-        route.reviewRequested.subscribe(
-          (row) => void this.detail.open(row),
-        ),
+        route.reviewRequested.subscribe((row) => void this.detail.open(row)),
       );
     if (route.countChanged)
       this.auditRouteSubscriptions.push(
@@ -359,10 +346,12 @@ export class AppComponent implements OnInit, OnDestroy {
       this.auditRouteSubscriptions.push(
         route.noticeRaised.subscribe((notice) => this.notice.set(notice)),
       );
+  }
+
+  private bindDetailRoute(route: ActivatedRoutePort): void {
     this.detail.setCurrencyConsumer(
       route.setCurrencyOptions?.bind(route) ?? null,
     );
-    this.detail.setDecisionPort(this.activeCheckerRoute?.decide ?? null);
     if (route.detailOpenChange)
       this.auditRouteSubscriptions.push(
         route.detailOpenChange.subscribe((open) =>
@@ -379,6 +368,9 @@ export class AppComponent implements OnInit, OnDestroy {
       this.auditRouteSubscriptions.push(
         route.tabChanged.subscribe(() => this.detail.close()),
       );
+  }
+
+  private bindRouteEvents(route: ActivatedRoutePort): void {
     this.settingsReloadSubscription =
       route.dataReloaded?.subscribe(() => {
         void this.refreshAfterDevelopmentReload();
@@ -401,101 +393,166 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   private onRouterEvent(event: unknown): void {
-    if (event instanceof NavigationStart) {
-      this.latestNavigationId = event.id;
-      this.loadingRouteView = routeViewFromUrl(event.url);
-      this.routeLoading.set(true);
-      return;
-    }
-    if (event instanceof NavigationEnd) {
-      const released =
-        this.routeGuardBridge.consumeReleasedMakerWip(event.id) ||
-        this.releasedMakerWipDuringNavigation;
-      this.releasedMakerWipDuringNavigation = false;
-      this.routeGuardBridge.consumeDenied(event.id);
-      if (released) {
-        this.activeMaintenanceWipPort?.clearReleasedMakerForm();
-        this.lastWorkbenchView = "dashboard";
-        this.document.defaultView?.localStorage.setItem(
-          "ssi-last-workbench-view",
-          "dashboard",
-        );
-      }
-      const routed = routeViewFromUrl(event.urlAfterRedirects);
-      const target: View = routed
-        ? routed
-        : released
-          ? "dashboard"
-          : this.lastWorkbenchView;
-      const previousView = this.view();
-      if (routed && isWorkbenchView(previousView) && !released) {
-        this.lastWorkbenchView = previousView;
-        this.document.defaultView?.localStorage.setItem(
-          "ssi-last-workbench-view",
-          this.lastWorkbenchView,
-        );
-      }
-      this.pendingRouteTarget = null;
-      this.loadingRouteView = null;
-      this.commitRouteView(target);
-      this.routeLoading.set(false);
-      if (event.urlAfterRedirects === "/" && isWorkbenchView(target)) {
-        // Legacy history entries have no routed Maintenance UI after the
-        // extraction. Replace that entry with the equivalent lazy route.
-        this.pendingRouteTarget = target;
-        void this.router
-          .navigateByUrl(routePathForView(target)!, { replaceUrl: true })
-          .catch(() => {
-            this.pendingRouteTarget = null;
-            this.notice.set({
-              kind: "error",
-              text: "無法返回 SSI 工作區；請重新選擇工作區。",
-            });
-          });
-      }
-      return;
-    }
-    if (event instanceof NavigationSkipped) {
-      if (event.id === this.latestNavigationId) {
+    dispatchRouterEvent(event, {
+      start: (navigation) => this.handleNavigationStart(navigation),
+      end: (navigation) => this.handleNavigationEnd(navigation),
+      skipped: (navigation) => this.handleNavigationSkipped(navigation),
+      failure: (navigation) => this.handleNavigationFailure(navigation),
+    });
+  }
+
+  private handleNavigationStart(event: NavigationStart): void {
+    this.latestNavigationId = event.id;
+    this.loadingRouteView = routeViewFromUrl(event.url);
+    this.routeLoading.set(true);
+  }
+
+  private handleNavigationEnd(event: NavigationEnd): void {
+    const released = this.consumeReleasedNavigationState(event.id);
+    this.restoreReleasedWorkbenchState(released);
+    const routed = routeViewFromUrl(event.urlAfterRedirects);
+    const target = this.resolveNavigationTarget(routed, released);
+    this.rememberPreviousWorkbench(routed, released);
+    this.completeNavigation(target);
+    if (event.urlAfterRedirects !== "/" || !isWorkbenchView(target)) return;
+
+    this.redirectLegacyWorkbenchRoute(target);
+  }
+
+  private consumeReleasedNavigationState(navigationId: number): boolean {
+    const released =
+      this.routeGuardBridge.consumeReleasedMakerWip(navigationId) ||
+      this.releasedMakerWipDuringNavigation;
+    this.releasedMakerWipDuringNavigation = false;
+    this.routeGuardBridge.consumeDenied(navigationId);
+    return released;
+  }
+
+  private restoreReleasedWorkbenchState(released: boolean): void {
+    if (!released) return;
+    this.activeMaintenanceWipPort?.clearReleasedMakerForm();
+    this.lastWorkbenchView = "dashboard";
+    this.document.defaultView?.localStorage.setItem(
+      "ssi-last-workbench-view",
+      "dashboard",
+    );
+  }
+
+  private resolveNavigationTarget(
+    routed: View | null,
+    released: boolean,
+  ): View {
+    if (routed) return routed;
+    if (released) return "dashboard";
+    return this.lastWorkbenchView;
+  }
+
+  private rememberPreviousWorkbench(
+    routed: View | null,
+    released: boolean,
+  ): void {
+    const previousView = this.view();
+    if (!routed || !isWorkbenchView(previousView) || released) return;
+    this.lastWorkbenchView = previousView;
+    this.document.defaultView?.localStorage.setItem(
+      "ssi-last-workbench-view",
+      this.lastWorkbenchView,
+    );
+  }
+
+  private completeNavigation(target: View): void {
+    this.pendingRouteTarget = null;
+    this.loadingRouteView = null;
+    this.commitRouteView(target);
+    this.routeLoading.set(false);
+  }
+
+  private redirectLegacyWorkbenchRoute(target: WorkbenchView): void {
+    // Legacy history entries have no routed Maintenance UI after the
+    // extraction. Replace that entry with the equivalent lazy route.
+    this.pendingRouteTarget = target;
+    void this.router
+      .navigateByUrl(routePathForView(target)!, { replaceUrl: true })
+      .catch(() => {
         this.pendingRouteTarget = null;
-        this.loadingRouteView = null;
-        this.routeLoading.set(false);
-      }
-      return;
-    }
-    if (event instanceof NavigationCancel || event instanceof NavigationError) {
-      const guardPending = this.routeGuardBridge.isGuardPending(event.id);
-      this.routeGuardBridge.markNavigationTerminated(event.id);
-      const released = this.routeGuardBridge.consumeReleasedMakerWip(event.id);
-      const denied = this.routeGuardBridge.consumeDenied(event.id);
-      if (event.id !== this.latestNavigationId) {
-        this.releasedMakerWipDuringNavigation ||= released;
-        return;
-      }
-      this.pendingRouteTarget = null;
-      this.loadingRouteView = null;
-      this.routeLoading.set(false);
-      if (released || this.releasedMakerWipDuringNavigation) {
-        this.releasedMakerWipDuringNavigation = false;
-        this.activeMaintenanceWipPort?.clearReleasedMakerForm();
-        this.commitRouteView("dashboard");
-        this.restoreDashboardRouteAfterReleasedWip({
-          kind: "error",
-          text: "頁面切換失敗；修訂 WIP 已釋放，編輯內容已關閉，請重新進入。",
-        });
-      } else if (!denied && !guardPending) {
         this.notice.set({
           kind: "error",
-          text: "頁面切換失敗；目前畫面與未儲存內容保持不變，請重試。",
+          text: "無法返回 SSI 工作區；請重新選擇工作區。",
         });
-      }
+      });
+  }
+
+  private handleNavigationSkipped(event: NavigationSkipped): void {
+    if (event.id !== this.latestNavigationId) return;
+
+    this.pendingRouteTarget = null;
+    this.loadingRouteView = null;
+    this.routeLoading.set(false);
+  }
+
+  private handleNavigationFailure(
+    event: NavigationCancel | NavigationError,
+  ): void {
+    const state = this.consumeNavigationFailureState(event.id);
+    if (event.id !== this.latestNavigationId) {
+      this.rememberReleasedWip(state.released);
+      return;
     }
+    this.clearPendingNavigation();
+    if (state.released || this.releasedMakerWipDuringNavigation) {
+      this.recoverReleasedMakerWip();
+      return;
+    }
+    if (state.denied || state.guardPending) return;
+    this.showNavigationFailure();
+  }
+
+  private consumeNavigationFailureState(navigationId: number): {
+    guardPending: boolean;
+    released: boolean;
+    denied: boolean;
+  } {
+    const guardPending = this.routeGuardBridge.isGuardPending(navigationId);
+    this.routeGuardBridge.markNavigationTerminated(navigationId);
+    const released =
+      this.routeGuardBridge.consumeReleasedMakerWip(navigationId);
+    const denied = this.routeGuardBridge.consumeDenied(navigationId);
+    return { guardPending, released, denied };
+  }
+
+  private rememberReleasedWip(released: boolean): void {
+    this.releasedMakerWipDuringNavigation ||= released;
+  }
+
+  private clearPendingNavigation(): void {
+    this.pendingRouteTarget = null;
+    this.loadingRouteView = null;
+    this.routeLoading.set(false);
+  }
+
+  private recoverReleasedMakerWip(): void {
+    this.releasedMakerWipDuringNavigation = false;
+    this.activeMaintenanceWipPort?.clearReleasedMakerForm();
+    this.commitRouteView("dashboard");
+    this.restoreDashboardRouteAfterReleasedWip({
+      kind: "error",
+      text: "頁面切換失敗；修訂 WIP 已釋放，編輯內容已關閉，請重新進入。",
+    });
+  }
+
+  private showNavigationFailure(): void {
+    this.notice.set({
+      kind: "error",
+      text: "頁面切換失敗；目前畫面與未儲存內容保持不變，請重試。",
+    });
   }
 
   loadingSsiDashboard(): boolean {
-    return this.routeLoading() &&
+    return (
+      this.routeLoading() &&
       (this.loadingRouteView === "dashboard" ||
-        (this.loadingRouteView === null && this.view() === "dashboard"));
+        (this.loadingRouteView === null && this.view() === "dashboard"))
+    );
   }
 
   private commitRouteView(view: View): void {
@@ -521,11 +578,13 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   async canDeactivate(targetUrl?: string): Promise<boolean> {
-    if (this.activeRoutedCanDeactivate && !(await this.activeRoutedCanDeactivate()))
+    if (
+      this.activeRoutedCanDeactivate &&
+      !(await this.activeRoutedCanDeactivate())
+    )
       return false;
     return (
       (await this.activeMaintenanceWipPort?.canDeactivate(targetUrl)) ?? true
     );
   }
-
 }

@@ -55,4 +55,14 @@ describe("Resolution Currency reconciliation", () => {
       keep: [row("EUR"), row("USD")],
     });
   });
+
+  it("rejects duplicate existing currency coverage identities", () => {
+    expect(() =>
+      planResolutionCurrencyReconciliation(
+        [row("USD"), row("USD", "INACTIVE")],
+        [],
+        "FULL_RESYNC",
+      ),
+    ).toThrow("RESOLUTION_CURRENCY_DUPLICATE_EXISTING");
+  });
 });

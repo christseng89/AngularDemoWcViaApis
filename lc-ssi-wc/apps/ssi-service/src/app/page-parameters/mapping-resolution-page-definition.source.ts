@@ -773,14 +773,18 @@ export class MappingResolutionPageDefinitionSource implements ResolutionPageDefi
             ),
         ),
       );
-    const fixtureCandidates = this.definitionOptions ? [] : fullyConfigured
-      ? []
-      : configured && this.fixtureManifest && this.fixtures?.indexCatalogue
-        ? this.fixtures.indexCatalogue()
-        : (this.fixtures?.catalogue() ?? []);
-    const indexCurrencies = this.definitionOptions ? [] : fullyConfigured
-      ? this.fixtures!.indexCurrencyProjection()
-      : fixtureCandidates;
+    let fixtureCandidates: readonly FinControlledFixtureCandidate[] = [];
+    if (!this.definitionOptions && !fullyConfigured) {
+      fixtureCandidates =
+        configured && this.fixtureManifest && this.fixtures?.indexCatalogue
+          ? this.fixtures.indexCatalogue()
+          : (this.fixtures?.catalogue() ?? []);
+    }
+    let indexCurrencies: readonly FinControlledFixtureIndexCurrency[] =
+      fixtureCandidates;
+    if (!this.definitionOptions && fullyConfigured) {
+      indexCurrencies = this.fixtures!.indexCurrencyProjection();
+    }
     const generated = representatives
       .map((representative) =>
         definitionFor(
@@ -1327,9 +1331,12 @@ export class MappingResolutionPageDefinitionSource implements ResolutionPageDefi
       (definition.businessDomain === "TREASURY" || definition.businessDomain === "TRADE_FINANCE")
       ? this.definitionOptions.currencies(definition.businessDomain, definition.messageType).defaultCurrency
       : undefined;
-    const defaultValue = this.definitionOptions
-      ? configuredDefault
-      : currencyValues.includes("USD") ? "USD" : currencyValues[0];
+    let defaultValue = configuredDefault;
+    if (!this.definitionOptions) {
+      defaultValue = currencyValues.includes("USD")
+        ? "USD"
+        : currencyValues[0];
+    }
     return {
       ...withoutDefaultValue(field),
       control: "SELECT",

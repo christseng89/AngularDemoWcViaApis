@@ -60,6 +60,20 @@ describe("payment message scenarios", () => {
     expect(parameters[0]).toBe(PAYMENT_MESSAGE_SCENARIOS.at(-1));
   });
 
+  it("sorts scenario titles in descending order", () => {
+    expect(
+      sortPaymentMessageScenarios(PAYMENT_MESSAGE_SCENARIOS, "desc").map(
+        ({ title }) => title,
+      ),
+    ).toEqual(
+      [...PAYMENT_MESSAGE_SCENARIOS]
+        .map(({ title }) => title)
+        .sort((left, right) =>
+          right.localeCompare(left, undefined, { sensitivity: "base" }),
+        ),
+    );
+  });
+
   it("derives the payment transaction from scenario parameters", () => {
     expect(
       paymentMessageForScenario(PAYMENT_MESSAGE_SCENARIOS[0]!),

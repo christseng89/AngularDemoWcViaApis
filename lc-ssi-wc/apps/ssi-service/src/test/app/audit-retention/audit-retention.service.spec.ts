@@ -56,4 +56,39 @@ describe("AuditRetentionService", () => {
     expect(repository.runLifecycle).toHaveBeenCalledTimes(2);
     service.onModuleDestroy();
   });
+
+  it("reports a scheduled lifecycle failure and permits destroy before init", () => {
+    const lifecycleResult = {
+      archiveCutoffUtc: "2026-08-28T12:00:00.000Z",
+      archivePurgeCutoffUtc: "2025-09-11T12:00:00.000Z",
+      archivedByTable: {},
+      totalArchived: 0,
+      purgedFromArchive: 0,
+    };
+    const repository = {
+      runLifecycle: jest
+        .fn()
+        .mockReturnValueOnce(lifecycleResult)
+        .mockImplementationOnce(() => {
+          throw new Error("database unavailable");
+        }),
+    } as unknown as AuditRetentionRepository;
+    const policy = AuditRetentionPolicy.fromEnvironment({
+      AUDIT_ONLINE_QUERY_DAYS: "7",
+      AUDIT_ARCHIVE_AFTER_DAYS: "14",
+      AUDIT_ARCHIVE_RETENTION_DAYS: "365",
+      AUDIT_RETENTION_SCHEDULE_HOURS: "1",
+    });
+    const service = new AuditRetentionService(policy, repository);
+    new AuditRetentionService(policy, repository).onModuleDestroy();
+
+    service.onModuleInit();
+    jest.advanceTimersByTime(HOURS_IN_MILLISECONDS);
+    expect(service.health()).toMatchObject({
+      status: "DOWN",
+      lastErrorCode: "AUDIT_LIFECYCLE_FAILED",
+      lastRunAtUtc: "2026-09-11T12:00:00.000Z",
+    });
+    service.onModuleDestroy();
+  });
 });

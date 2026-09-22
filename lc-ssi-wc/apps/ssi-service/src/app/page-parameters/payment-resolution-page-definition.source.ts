@@ -108,7 +108,9 @@ const requiredConstraint = (fieldId: string) => ({
 const transactionFields = (
   options?: {
     readonly currencies: readonly string[];
-    readonly bookingEntities: readonly (string | { readonly value: string; readonly label: string })[];
+    readonly bookingEntities: readonly (
+      string | { readonly value: string; readonly label: string }
+    )[];
     readonly defaultCurrency?: string;
     readonly defaultBookingEntity?: string;
   },
@@ -150,7 +152,9 @@ const transactionFields = (
         }
       : {}),
     optionSource: {
-      source: controlledCurrency ? "RESOLUTION_CURRENCY_COVERAGE" : "GOVERNED_APPLICABILITY",
+      source: controlledCurrency
+        ? "RESOLUTION_CURRENCY_COVERAGE"
+        : "GOVERNED_APPLICABILITY",
       dependsOnFieldIds: [],
       invalidatesFieldIds: ["context.counterpartyBankServiceId"],
       selectionPolicy: "SELECTABLE",
@@ -173,11 +177,14 @@ const transactionFields = (
     ...(options?.bookingEntities.length
       ? {
           options: options.bookingEntities.map((entry) =>
-            typeof entry === "string" ? { value: entry, label: entry } : entry),
+            typeof entry === "string" ? { value: entry, label: entry } : entry,
+          ),
         }
       : {}),
     optionSource: {
-      source: controlledCurrency ? "CONTROLLED_ENTITY_REFERENCE" : "GOVERNED_APPLICABILITY",
+      source: controlledCurrency
+        ? "CONTROLLED_ENTITY_REFERENCE"
+        : "GOVERNED_APPLICABILITY",
       dependsOnFieldIds: [],
       invalidatesFieldIds: ["context.counterpartyBankServiceId"],
       selectionPolicy: "SELECTABLE",
@@ -439,126 +446,136 @@ const settlementFields = (messageType: string): PageParameterField[] => {
   return fields;
 };
 
-const validationContextFields = (messageType: string): PageParameterField[] =>
-  messageType === "MT205"
-    ? [{
-        fieldId: "context.previousMessageType",
-        path: "previousMessage.type",
-        label: "Actual previous FI message type",
-        control: "TEXT",
-        dataType: "STRING",
-        required: false,
-        displayOrder: 70,
-        section: "VALIDATION_CONTEXT",
-        visibility: "HIDDEN_EVIDENCE",
-        readOnly: true,
-        options: ["MT202", "MT203", "MT205"].map((type) => ({
-          value: type,
-          label: type,
-        })),
-        constraints: [],
-      }]
-    : messageType.endsWith("COV")
-    ? [
-        governedContextField("21", "NONE", "SWIFT 21 • Related Reference", 60),
-        governedContextField(
-          "119",
-          "NONE",
-          "SWIFT Header 119 • COV",
-          61,
-          "COV",
-        ),
-        governedContextField("121", "NONE", "SWIFT Header 121 • UETR", 62),
+const validationContextFields = (
+  messageType: string,
+): PageParameterField[] => {
+  if (messageType === "MT205") {
+    return [
         {
-          fieldId: "context.sequenceB50A",
-          path: "cover.sequenceB.tag50A",
-          label: "SWIFT B50A • Underlying Ordering Customer",
+          fieldId: "context.previousMessageType",
+          path: "previousMessage.type",
+          label: "Actual previous FI message type",
           control: "TEXT",
           dataType: "STRING",
-          required: true,
-          displayOrder: 64,
+          required: false,
+          displayOrder: 70,
           section: "VALIDATION_CONTEXT",
-          visibility: "USER_INPUT",
-          constraints: [requiredConstraint("sequenceB50A")],
+          visibility: "HIDDEN_EVIDENCE",
+          readOnly: true,
+          options: ["MT202", "MT203", "MT205"].map((type) => ({
+            value: type,
+            label: type,
+          })),
+          constraints: [],
         },
-        {
-          fieldId: "context.sequenceB59",
-          path: "cover.sequenceB.tag59",
-          label: "SWIFT B59 • Underlying Beneficiary Customer",
-          control: "TEXT",
-          dataType: "STRING",
-          required: true,
-          displayOrder: 65,
-          section: "VALIDATION_CONTEXT",
-          visibility: "USER_INPUT",
-          constraints: [requiredConstraint("sequenceB59")],
-        },
-        ...(messageType === "MT205COV"
-          ? [
-              userContextField(
-                "previousMessageType",
-                "previousMessage.type",
-                "Previous cover message type",
-                70,
-              ),
-              userContextField(
-                "previousMessage20",
-                "previousMessage.tag20",
-                "Previous SWIFT 20",
-                71,
-              ),
-              userContextField(
-                "previousMessage21",
-                "previousMessage.tag21",
-                "Previous SWIFT 21",
-                72,
-              ),
-              userContextField(
-                "previousMessage121",
-                "previousMessage.header121",
-                "Previous SWIFT Header 121",
-                73,
-              ),
-              userContextField(
-                "previousMessageA52",
-                "previousMessage.sequenceA.tag52",
-                "Previous SWIFT A52",
-                74,
-              ),
-              userContextField(
-                "previousMessageA58",
-                "previousMessage.sequenceA.tag58",
-                "Previous SWIFT A58",
-                75,
-              ),
-              userContextField(
-                "previousMessageSequenceB50A",
-                "previousMessage.sequenceB.tag50A",
-                "Previous SWIFT B50A",
-                76,
-              ),
-              userContextField(
-                "previousMessageSequenceB59",
-                "previousMessage.sequenceB.tag59",
-                "Previous SWIFT B59",
-                77,
-              ),
-              userContextField(
-                "previousMessageArtifactSha256",
-                "previousMessage.provenance.sha256",
-                "Previous message artifact SHA-256",
-                78,
-              ),
-              userContextField(
-                "previousMessageArtifactVersion",
-                "previousMessage.provenance.version",
-                "Previous message artifact version",
-                79,
-              ),
-            ]
-          : []),
-      ]
-    : [];
+    ];
+  }
+  if (!messageType.endsWith("COV")) return [];
+  return [
+          governedContextField(
+            "21",
+            "NONE",
+            "SWIFT 21 • Related Reference",
+            60,
+          ),
+          governedContextField(
+            "119",
+            "NONE",
+            "SWIFT Header 119 • COV",
+            61,
+            "COV",
+          ),
+          governedContextField("121", "NONE", "SWIFT Header 121 • UETR", 62),
+          {
+            fieldId: "context.sequenceB50A",
+            path: "cover.sequenceB.tag50A",
+            label: "SWIFT B50A • Underlying Ordering Customer",
+            control: "TEXT",
+            dataType: "STRING",
+            required: true,
+            displayOrder: 64,
+            section: "VALIDATION_CONTEXT",
+            visibility: "USER_INPUT",
+            constraints: [requiredConstraint("sequenceB50A")],
+          },
+          {
+            fieldId: "context.sequenceB59",
+            path: "cover.sequenceB.tag59",
+            label: "SWIFT B59 • Underlying Beneficiary Customer",
+            control: "TEXT",
+            dataType: "STRING",
+            required: true,
+            displayOrder: 65,
+            section: "VALIDATION_CONTEXT",
+            visibility: "USER_INPUT",
+            constraints: [requiredConstraint("sequenceB59")],
+          },
+          ...(messageType === "MT205COV"
+            ? [
+                userContextField(
+                  "previousMessageType",
+                  "previousMessage.type",
+                  "Previous cover message type",
+                  70,
+                ),
+                userContextField(
+                  "previousMessage20",
+                  "previousMessage.tag20",
+                  "Previous SWIFT 20",
+                  71,
+                ),
+                userContextField(
+                  "previousMessage21",
+                  "previousMessage.tag21",
+                  "Previous SWIFT 21",
+                  72,
+                ),
+                userContextField(
+                  "previousMessage121",
+                  "previousMessage.header121",
+                  "Previous SWIFT Header 121",
+                  73,
+                ),
+                userContextField(
+                  "previousMessageA52",
+                  "previousMessage.sequenceA.tag52",
+                  "Previous SWIFT A52",
+                  74,
+                ),
+                userContextField(
+                  "previousMessageA58",
+                  "previousMessage.sequenceA.tag58",
+                  "Previous SWIFT A58",
+                  75,
+                ),
+                userContextField(
+                  "previousMessageSequenceB50A",
+                  "previousMessage.sequenceB.tag50A",
+                  "Previous SWIFT B50A",
+                  76,
+                ),
+                userContextField(
+                  "previousMessageSequenceB59",
+                  "previousMessage.sequenceB.tag59",
+                  "Previous SWIFT B59",
+                  77,
+                ),
+                userContextField(
+                  "previousMessageArtifactSha256",
+                  "previousMessage.provenance.sha256",
+                  "Previous message artifact SHA-256",
+                  78,
+                ),
+                userContextField(
+                  "previousMessageArtifactVersion",
+                  "previousMessage.provenance.version",
+                  "Previous message artifact version",
+                  79,
+                ),
+              ]
+            : []),
+  ];
+};
 
 function userContextField(
   suffix: string,
@@ -580,75 +597,108 @@ function userContextField(
   };
 }
 
+const hiddenEvidencePolicy = (
+  fieldId: string,
+  values: Pick<
+    PageParameterScenarioFieldPolicy,
+    "applicability" | "inputOwnership" | "processingPolicy" | "required"
+  >,
+): PageParameterScenarioFieldPolicy => ({
+  fieldId,
+  ...values,
+  visibility: "HIDDEN_EVIDENCE",
+  readOnly: true,
+});
+
+const previousMessageTypePolicy = (
+  fieldId: string,
+  scenarioId: string,
+): PageParameterScenarioFieldPolicy | undefined => {
+  if (
+    fieldId !== "context.previousMessageType" ||
+    !scenarioId.startsWith("MT205-")
+  )
+    return undefined;
+  return scenarioId === "MT205-OP-STANDARD-DOMESTIC-ONWARD"
+    ? hiddenEvidencePolicy(fieldId, {
+        applicability: "APPLICABLE",
+        inputOwnership: "TRANSACTION_CONTEXT",
+        processingPolicy: "APPLY",
+        required: false,
+      })
+    : hiddenEvidencePolicy(fieldId, {
+        applicability: "NOT_APPLICABLE",
+        inputOwnership: "SSI_DERIVED",
+        processingPolicy: "IGNORE_AUDIT",
+        required: false,
+      });
+};
+
+const ownAccountPolicy = (
+  fieldId: string,
+  scenarioId: string,
+): PageParameterScenarioFieldPolicy | undefined => {
+  const ownAccountScenario =
+    scenarioId.endsWith("-OP-BOOK") || scenarioId.endsWith("-OP-CREDIT-57A");
+  const ownAccountField =
+    fieldId === "context.receiverBankServiceId" ||
+    fieldId.includes("ownDebitAccount") ||
+    fieldId.includes("ownCreditAccount");
+  if (
+    (ownAccountField && !ownAccountScenario) ||
+    (fieldId === "context.counterpartyBankServiceId" && ownAccountScenario)
+  )
+    return hiddenEvidencePolicy(fieldId, {
+      applicability: "NOT_APPLICABLE",
+      inputOwnership: "SSI_DERIVED",
+      processingPolicy: "IGNORE_AUDIT",
+      required: false,
+    });
+  const governedOwnAccountOutput =
+    ownAccountScenario &&
+    (fieldId.includes("ownDebitAccount") ||
+      fieldId.includes("ownCreditAccount"));
+  if (governedOwnAccountOutput)
+    return hiddenEvidencePolicy(fieldId, {
+      applicability: "APPLICABLE",
+      inputOwnership: "SSI_DERIVED",
+      processingPolicy: "APPLY",
+      required: false,
+    });
+  return undefined;
+};
+
+const inputOwnershipFor = (
+  transaction: boolean,
+  derivedContext: boolean,
+  fixedContext: boolean,
+  scenarioFixed: boolean,
+): PageParameterScenarioFieldPolicy["inputOwnership"] => {
+  if (transaction) return "TRANSACTION_USER";
+  if (fixedContext || (!derivedContext && scenarioFixed))
+    return "SCENARIO_FIXED";
+  return derivedContext ? "TRANSACTION_USER" : "SSI_DERIVED";
+};
+
 const fieldPolicy = (
   field: PageParameterField,
   scenarioInputValues: Readonly<Record<string, string | boolean>>,
   scenarioId: string,
 ): PageParameterScenarioFieldPolicy => {
-  if (field.fieldId === "context.previousMessageType" && scenarioId.startsWith("MT205-"))
-    return scenarioId === "MT205-OP-STANDARD-DOMESTIC-ONWARD"
-      ? {
-          fieldId: field.fieldId,
-          applicability: "APPLICABLE",
-          inputOwnership: "TRANSACTION_CONTEXT",
-          visibility: "HIDDEN_EVIDENCE",
-          processingPolicy: "APPLY",
-          required: false,
-          readOnly: true,
-        }
-      : {
-          fieldId: field.fieldId,
-          applicability: "NOT_APPLICABLE",
-          inputOwnership: "SSI_DERIVED",
-          visibility: "HIDDEN_EVIDENCE",
-          processingPolicy: "IGNORE_AUDIT",
-          required: false,
-          readOnly: true,
-        };
+  const previousMessagePolicy = previousMessageTypePolicy(
+    field.fieldId,
+    scenarioId,
+  );
+  if (previousMessagePolicy) return previousMessagePolicy;
   if (field.fieldId === "context.transactionReference")
-    return {
-      fieldId: field.fieldId,
+    return hiddenEvidencePolicy(field.fieldId, {
       applicability: "APPLICABLE",
       inputOwnership: "SCENARIO_FIXED",
-      visibility: "HIDDEN_EVIDENCE",
       processingPolicy: "APPLY",
       required: true,
-      readOnly: true,
-    };
-  const ownAccountScenario =
-    scenarioId.endsWith("-OP-BOOK") || scenarioId.endsWith("-OP-CREDIT-57A");
-  const ownAccountField =
-    field.fieldId === "context.receiverBankServiceId" ||
-    field.fieldId.includes("ownDebitAccount") ||
-    field.fieldId.includes("ownCreditAccount");
-  if (
-    (ownAccountField && !ownAccountScenario) ||
-    (field.fieldId === "context.counterpartyBankServiceId" &&
-      ownAccountScenario)
-  )
-    return {
-      fieldId: field.fieldId,
-      applicability: "NOT_APPLICABLE",
-      inputOwnership: "SSI_DERIVED",
-      visibility: "HIDDEN_EVIDENCE",
-      processingPolicy: "IGNORE_AUDIT",
-      required: false,
-      readOnly: true,
-    };
-  const governedOwnAccountOutput =
-    ownAccountScenario &&
-    (field.fieldId.includes("ownDebitAccount") ||
-      field.fieldId.includes("ownCreditAccount"));
-  if (governedOwnAccountOutput)
-    return {
-      fieldId: field.fieldId,
-      applicability: "APPLICABLE",
-      inputOwnership: "SSI_DERIVED",
-      visibility: "HIDDEN_EVIDENCE",
-      processingPolicy: "APPLY",
-      required: false,
-      readOnly: true,
-    };
+    });
+  const governedOwnAccountPolicy = ownAccountPolicy(field.fieldId, scenarioId);
+  if (governedOwnAccountPolicy) return governedOwnAccountPolicy;
   const transaction = field.section === "TRANSACTION";
   const derivedContext = field.section === "VALIDATION_CONTEXT";
   const fixedContext =
@@ -658,12 +708,12 @@ const fieldPolicy = (
   const scenarioFixed =
     field.sequenceId === "B" ||
     (field.section !== "SETTLEMENT_INSTRUCTIONS" && field.readOnly === true);
-  let inputOwnership: PageParameterScenarioFieldPolicy["inputOwnership"] =
-    "SSI_DERIVED";
-  if (transaction) inputOwnership = "TRANSACTION_USER";
-  else if (fixedContext || (!derivedContext && scenarioFixed))
-    inputOwnership = "SCENARIO_FIXED";
-  else if (derivedContext) inputOwnership = "TRANSACTION_USER";
+  const inputOwnership = inputOwnershipFor(
+    transaction,
+    derivedContext,
+    fixedContext,
+    scenarioFixed,
+  );
   const userInput = transaction || (derivedContext && !fixedContext);
   return {
     fieldId: field.fieldId,
@@ -891,8 +941,14 @@ export class PaymentResolutionPageDefinitionSource implements ResolutionPageDefi
     const fields = [
       ...transactionFields(
         this.definitionOptions
-          ? this.definitionOptions.payment(configured.messageType, defaultValueDate)
-          : this.governedOptions?.options(configured.messageType, defaultValueDate),
+          ? this.definitionOptions.payment(
+              configured.messageType,
+              defaultValueDate,
+            )
+          : this.governedOptions?.options(
+              configured.messageType,
+              defaultValueDate,
+            ),
         defaultValueDate,
         businessDatePolicy.metadata(),
         Boolean(this.definitionOptions),

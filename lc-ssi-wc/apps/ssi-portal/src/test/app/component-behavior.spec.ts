@@ -636,18 +636,25 @@ describe("portal component behavior", () => {
     component.ngOnDestroy();
   });
 
-  it("takes direct Dashboard URL as authoritative without shell business preloads", async () => {
-    routerEvents = new Subject<unknown>();
-    fakeDocument.defaultView.location.pathname = "/dashboard";
-    fakeHttp.get.mockClear();
-    const { AppComponent } = await import("../../app/app.component");
-    const component = new AppComponent();
-    expect(component.view()).toBe("dashboard");
-    component.ngOnInit();
-    expect(fakeHttp.get).not.toHaveBeenCalled();
-    component.ngOnDestroy();
-    fakeDocument.defaultView.location.pathname = "/";
-  });
+  it.each([
+    ["/dashboard", "dashboard"],
+    ["/audit", "audit"],
+    ["/checker", "checker"],
+  ] as const)(
+    "takes direct %s URL as authoritative without shell business preloads",
+    async (path, target) => {
+      routerEvents = new Subject<unknown>();
+      fakeDocument.defaultView.location.pathname = path;
+      fakeHttp.get.mockClear();
+      const { AppComponent } = await import("../../app/app.component");
+      const component = new AppComponent();
+      expect(component.view()).toBe(target);
+      component.ngOnInit();
+      expect(fakeHttp.get).not.toHaveBeenCalled();
+      component.ngOnDestroy();
+      fakeDocument.defaultView.location.pathname = "/";
+    },
+  );
 
   it("canonicalizes a saved Dashboard on the legacy root before feature loading", async () => {
     routerEvents = new Subject<unknown>();
@@ -763,19 +770,6 @@ describe("portal component behavior", () => {
     component.ngOnDestroy();
   });
 
-  it("takes direct Audit URL without parent business preloads", async () => {
-    routerEvents = new Subject<unknown>();
-    fakeDocument.defaultView.location.pathname = "/audit";
-    fakeHttp.get.mockClear();
-    const { AppComponent } = await import("../../app/app.component");
-    const component = new AppComponent();
-    expect(component.view()).toBe("audit");
-    component.ngOnInit();
-    expect(fakeHttp.get).not.toHaveBeenCalled();
-    component.ngOnDestroy();
-    fakeDocument.defaultView.location.pathname = "/";
-  });
-
   it("waits for the existing guard before committing Checker navigation", async () => {
     routerEvents = new Subject<unknown>();
     fakeRouter.navigateByUrl.mockClear();
@@ -794,19 +788,6 @@ describe("portal component behavior", () => {
     routerEvents.next(new NavigationCancelEvent(316));
     expect(component.view()).toBe("maker");
     component.ngOnDestroy();
-  });
-
-  it("takes direct Checker URL without parent queue preloads", async () => {
-    routerEvents = new Subject<unknown>();
-    fakeDocument.defaultView.location.pathname = "/checker";
-    fakeHttp.get.mockClear();
-    const { AppComponent } = await import("../../app/app.component");
-    const component = new AppComponent();
-    expect(component.view()).toBe("checker");
-    component.ngOnInit();
-    expect(fakeHttp.get).not.toHaveBeenCalled();
-    component.ngOnDestroy();
-    fakeDocument.defaultView.location.pathname = "/";
   });
 
   it("waits for the existing guard before committing a Resolution route and restores the legacy view on history back", async () => {
@@ -929,10 +910,9 @@ describe("portal component behavior", () => {
   it("couples delayed HTTP WIP cleanup to cancellation without stale editor", async () => {
     routerEvents = new Subject<unknown>();
     let navigationId = 204;
-    const { AppRouteGuardBridge } =
-      jest.requireActual<typeof import("./app-route-guard")>(
-        "../../app/app-route-guard",
-      );
+    const { AppRouteGuardBridge } = jest.requireActual<
+      typeof import("./app-route-guard")
+    >("../../app/app-route-guard");
     const bridge = new AppRouteGuardBridge(() => navigationId);
     fakeRouteGuardBridge.register.mockImplementation((host) =>
       bridge.register(host),
@@ -991,10 +971,9 @@ describe("portal component behavior", () => {
 
   it("keeps Maker WIP and form when deferred server cleanup rejects", async () => {
     routerEvents = new Subject<unknown>();
-    const { AppRouteGuardBridge } =
-      jest.requireActual<typeof import("./app-route-guard")>(
-        "../../app/app-route-guard",
-      );
+    const { AppRouteGuardBridge } = jest.requireActual<
+      typeof import("./app-route-guard")
+    >("../../app/app-route-guard");
     const bridge = new AppRouteGuardBridge(() => 211);
     fakeRouteGuardBridge.register.mockImplementation((host) =>
       bridge.register(host),
@@ -1106,9 +1085,9 @@ describe("portal component behavior", () => {
     component.onSettingsActivated({ setCurrencyOptions });
     setCurrencyOptions.mockClear();
 
-    component.maintenanceShellPort().acceptCurrencies([
-      { code: "USD", decimals: 2, standard: "ISO 4217" },
-    ]);
+    component
+      .maintenanceShellPort()
+      .acceptCurrencies([{ code: "USD", decimals: 2, standard: "ISO 4217" }]);
 
     expect(setCurrencyOptions).toHaveBeenCalledWith([
       { code: "USD", decimals: 2, standard: "ISO 4217" },
@@ -1409,10 +1388,17 @@ describe("portal component behavior", () => {
     component.contract.set({
       info: { title: "test", version: "1" },
       "x-standards-baseline": {},
-      "x-ui-resources": [{
-        id: "rma", label: "RMA", endpoint: "rma-authorisations",
-        description: "RMA", columns: [], fields: [], "x-lifecycle": [],
-      }],
+      "x-ui-resources": [
+        {
+          id: "rma",
+          label: "RMA",
+          endpoint: "rma-authorisations",
+          description: "RMA",
+          columns: [],
+          fields: [],
+          "x-lifecycle": [],
+        },
+      ],
     } as never);
     component.revision.reservationId.set("RMA-WIP-1");
     component.formVisible.set(true);
@@ -1435,8 +1421,24 @@ describe("portal component behavior", () => {
       info: { title: "test", version: "1" },
       "x-standards-baseline": {},
       "x-ui-resources": [
-        { id: "rma", label: "RMA", endpoint: "rma-authorisations", description: "RMA", columns: [], fields: [], "x-lifecycle": [] },
-        { id: "entity", label: "Entity", endpoint: "entities", description: "Entity", columns: [], fields: [], "x-lifecycle": [] },
+        {
+          id: "rma",
+          label: "RMA",
+          endpoint: "rma-authorisations",
+          description: "RMA",
+          columns: [],
+          fields: [],
+          "x-lifecycle": [],
+        },
+        {
+          id: "entity",
+          label: "Entity",
+          endpoint: "entities",
+          description: "Entity",
+          columns: [],
+          fields: [],
+          "x-lifecycle": [],
+        },
       ],
     } as never);
     component.revision.reservationId.set("RMA-WIP-1");
@@ -1449,14 +1451,18 @@ describe("portal component behavior", () => {
       expect(component.formVisible()).toBe(true);
       expect(component.revision.reservationId()).toBe("RMA-WIP-1");
       expect(fakeHttp.delete.mock.calls.length - deletes).toBe(1);
-      expect(fakeHttp.delete.mock.calls[deletes][0]).toContain("/rma-authorisations/RMA-WIP-1");
+      expect(fakeHttp.delete.mock.calls[deletes][0]).toContain(
+        "/rma-authorisations/RMA-WIP-1",
+      );
     } finally {
       rejectHttp = false;
     }
     await component.chooseResource("entity");
     expect(component.resourceId()).toBe("entity");
     expect(component.revision.reservationId()).toBeNull();
-    expect(fakeHttp.delete.mock.calls[deletes + 1][0]).toContain("/rma-authorisations/RMA-WIP-1");
+    expect(fakeHttp.delete.mock.calls[deletes + 1][0]).toContain(
+      "/rma-authorisations/RMA-WIP-1",
+    );
   });
 
   it("clears a stale global notice when navigation provides its own page-level status", async () => {
@@ -1504,7 +1510,9 @@ describe("portal component behavior", () => {
     const loadCurrencies = jest
       .spyOn(component.detail, "loadCurrencies")
       .mockImplementation(async () => {
-        component.detail.currencies.set([{ code: "SGD", decimals: 2, standard: "ISO 4217" }]);
+        component.detail.currencies.set([
+          { code: "SGD", decimals: 2, standard: "ISO 4217" },
+        ]);
       });
     const activeRow = {
       id: "SSI-ACTIVE",
@@ -2683,5 +2691,219 @@ describe("portal component behavior", () => {
     } finally {
       rejectHttp = false;
     }
+  });
+
+  it("exposes shell notifications, detail actions, and notice presentation", async () => {
+    routerEvents = new Subject<unknown>();
+    const { AppComponent } = await import("../../app/app.component");
+    const component = new AppComponent();
+    const shell = component.maintenanceShellPort();
+    const openDetail = jest.spyOn(component.detail, "open");
+    const row = {
+      id: "SSI-SHELL-1",
+      counterpartyId: "BANK-1",
+      scope: "STANDING",
+      status: "ACTIVE",
+      maker: "maker.demo",
+      route: { currency: "USD" },
+      version: 1,
+    };
+
+    expect(component.noticeAlert()).toBeNull();
+    for (const [kind, title] of [
+      ["info", "操作完成"],
+      ["warning", "請注意"],
+      ["error", "操作未完成"],
+    ] as const) {
+      shell.notify({ kind, text: kind });
+      expect(component.noticeAlert()).toEqual({
+        severity: kind,
+        title,
+        message: kind,
+      });
+    }
+
+    shell.openDetail(row);
+    expect(openDetail).toHaveBeenCalledWith(row);
+    shell.closeDetail();
+    expect(component.detail.target()).toBeNull();
+    expect(shell.checkerCount()).toBe(0);
+    expect(shell.acceptPendingApprovalCount(3)).toBeUndefined();
+    component.ngOnDestroy();
+  });
+
+  it("binds and tears down every routed feature output", async () => {
+    routerEvents = new Subject<unknown>();
+    const { AppComponent } = await import("../../app/app.component");
+    const component = new AppComponent();
+    const reviewRequested = new Subject<{
+      id: string;
+      counterpartyId: string;
+      scope: string;
+      status: string;
+      maker: string;
+      route: { currency: string };
+      version: number;
+    }>();
+    const countChanged = new Subject<number>();
+    const noticeRaised = new Subject<{ kind: "warning"; text: string }>();
+    const detailOpenChange = new Subject<boolean>();
+    const dataReloaded = new Subject<void>();
+    const refresh = jest.fn(async () => undefined);
+    const decide = jest.fn(async () => true);
+    const refreshReload = jest
+      .spyOn(component, "refreshAfterDevelopmentReload")
+      .mockResolvedValue();
+
+    component.onSettingsActivated({
+      reviewRequested,
+      countChanged,
+      noticeRaised,
+      detailOpenChange,
+      dataReloaded,
+      refresh,
+      decide,
+    });
+    const reviewRow = {
+      id: "SSI-REVIEW-1",
+      counterpartyId: "BANK-1",
+      scope: "STANDING",
+      status: "PENDING_APPROVAL",
+      maker: "maker.demo",
+      route: { currency: "USD" },
+      version: 1,
+    };
+    const openDetail = jest.spyOn(component.detail, "open");
+    reviewRequested.next(reviewRow);
+    countChanged.next(7);
+    noticeRaised.next({ kind: "warning", text: "review warning" });
+    detailOpenChange.next(true);
+    dataReloaded.next();
+
+    expect(component.checkerCount()).toBe(7);
+    expect(openDetail).toHaveBeenCalledWith(reviewRow);
+    expect(component.notice()?.text).toBe("review warning");
+    expect(component.routedAuditDetailOpen()).toBe(true);
+    expect(refreshReload).toHaveBeenCalledTimes(1);
+    component.view.set("checker");
+    await component.refresh();
+    expect(refresh).toHaveBeenCalledTimes(1);
+
+    component.onSettingsDeactivated();
+    countChanged.next(8);
+    noticeRaised.next({ kind: "warning", text: "stale warning" });
+    detailOpenChange.next(true);
+    dataReloaded.next();
+    expect(component.checkerCount()).toBe(7);
+    expect(component.notice()?.text).toBe("review warning");
+    expect(component.routedAuditDetailOpen()).toBe(false);
+    expect(refreshReload).toHaveBeenCalledTimes(1);
+    component.ngOnDestroy();
+  });
+
+  it("exposes router loading and ordinary navigation-failure state", async () => {
+    routerEvents = new Subject<unknown>();
+    const { AppComponent } = await import("../../app/app.component");
+    const component = new AppComponent();
+
+    expect(await component.navigate(component.view())).toBe(true);
+    expect(component.loadingSsiDashboard()).toBe(false);
+    routerEvents.next(new NavigationStartEvent(601, "/dashboard"));
+    expect(component.loadingSsiDashboard()).toBe(true);
+    routerEvents.next(new NavigationSkippedEvent(601));
+    expect(component.loadingSsiDashboard()).toBe(false);
+
+    routerEvents.next(new NavigationStartEvent(602, "/settings"));
+    expect(component.loadingSsiDashboard()).toBe(false);
+    routerEvents.next(new NavigationCancelEvent(602));
+    expect(component.notice()?.text).toContain("目前畫面與未儲存內容保持不變");
+    component.ngOnDestroy();
+  });
+
+  it("delegates route-guard and overlay behavior to an activated maintenance port", async () => {
+    routerEvents = new Subject<unknown>();
+    const { AppComponent } = await import("../../app/app.component");
+    const component = new AppComponent();
+    const maintenanceWipPort = {
+      canDeactivate: jest.fn(async () => true),
+      hasActiveMakerRevision: jest.fn(() => true),
+      onLateMakerWipRelease: jest.fn(),
+      clearReleasedMakerForm: jest.fn(),
+      closeOverlayOnEscape: jest.fn(async () => false),
+    };
+    const guardHost = fakeRouteGuardBridge.register.mock.calls.at(-1)?.[0] as {
+      hasActiveMakerRevision(): boolean;
+      onLateMakerWipRelease(navigationId: number): void;
+    };
+
+    expect(guardHost.hasActiveMakerRevision()).toBe(false);
+    component.onSettingsActivated({ maintenanceWipPort });
+    expect(guardHost.hasActiveMakerRevision()).toBe(true);
+    guardHost.onLateMakerWipRelease(603);
+    expect(fakeRouteGuardBridge.consumeReleasedMakerWip).toHaveBeenCalledWith(
+      603,
+    );
+    expect(maintenanceWipPort.onLateMakerWipRelease).toHaveBeenCalledTimes(1);
+
+    const row = {
+      id: "SSI-DETAIL-1",
+      counterpartyId: "BANK-1",
+      scope: "STANDING",
+      status: "ACTIVE",
+      maker: "maker.demo",
+      route: { currency: "USD" },
+      version: 1,
+    };
+    component.detail.target.set(row);
+    const closeDetail = jest.spyOn(component.detail, "close");
+    await component.closeOverlayOnEscape();
+    expect(maintenanceWipPort.closeOverlayOnEscape).toHaveBeenCalledTimes(1);
+    expect(closeDetail).toHaveBeenCalledTimes(1);
+    component.ngOnDestroy();
+  });
+
+  it("ignores stale router completion and preserves a late released-WIP signal", async () => {
+    routerEvents = new Subject<unknown>();
+    const { AppComponent } = await import("../../app/app.component");
+    const component = new AppComponent();
+
+    routerEvents.next(new NavigationStartEvent(501, "/settings"));
+    routerEvents.next(new NavigationSkippedEvent(500));
+    expect(component.routeLoading()).toBe(true);
+
+    fakeRouteGuardBridge.consumeReleasedMakerWip.mockImplementation(
+      (id: number) => id === 500,
+    );
+    try {
+      routerEvents.next(new NavigationCancelEvent(500));
+      expect(component.routeLoading()).toBe(true);
+      routerEvents.next(new NavigationEndEvent(501, "/settings", "/settings"));
+      expect(component.view()).toBe("settings");
+      routerEvents.next(new NavigationStartEvent(503, "/"));
+      routerEvents.next(new NavigationEndEvent(503, "/", "/"));
+      expect(component.view()).toBe("dashboard");
+      expect(component.routeLoading()).toBe(false);
+    } finally {
+      fakeRouteGuardBridge.consumeReleasedMakerWip.mockImplementation(
+        () => false,
+      );
+      component.ngOnDestroy();
+    }
+  });
+
+  it("reports a failed legacy root canonicalization without leaving navigation pending", async () => {
+    routerEvents = new Subject<unknown>();
+    fakeRouter.navigateByUrl.mockRejectedValueOnce(new Error("route failed"));
+    const { AppComponent } = await import("../../app/app.component");
+    const component = new AppComponent();
+    component.view.set("maker");
+
+    routerEvents.next(new NavigationStartEvent(502, "/"));
+    routerEvents.next(new NavigationEndEvent(502, "/", "/"));
+    await Promise.resolve();
+
+    expect(component.notice()?.text).toContain("無法返回 SSI 工作區");
+    expect(await component.navigate("settings")).toBe(true);
+    component.ngOnDestroy();
   });
 });

@@ -14,6 +14,39 @@ import {
   parseTaskFile,
 } from "./sonar-analysis-identity.mjs";
 
+const TRUSTED_EXECUTABLE_PATHS = Object.freeze({
+  win32: Object.freeze({
+    git: Object.freeze([
+      "C:\\Program Files\\Git\\cmd\\git.exe",
+      "C:\\Program Files\\Git\\bin\\git.exe",
+    ]),
+    docker: Object.freeze([
+      "C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe",
+    ]),
+  }),
+  linux: Object.freeze({
+    git: Object.freeze(["/usr/bin/git"]),
+    docker: Object.freeze(["/usr/bin/docker", "/usr/local/bin/docker"]),
+  }),
+  darwin: Object.freeze({
+    git: Object.freeze(["/usr/bin/git"]),
+    docker: Object.freeze(["/usr/local/bin/docker"]),
+  }),
+});
+
+export const resolveTrustedExecutable = (
+  executable,
+  { platform = process.platform, exists = fs.existsSync } = {},
+) => {
+  const candidates = TRUSTED_EXECUTABLE_PATHS[platform]?.[executable] ?? [];
+  const resolved = candidates.find((candidate) => exists(candidate));
+  if (!resolved)
+    throw new Error(
+      `Unable to resolve ${executable} from a trusted absolute path on ${platform}`,
+    );
+  return resolved;
+};
+
 const sleep = (milliseconds) =>
   new Promise((resolve) => setTimeout(resolve, milliseconds));
 
@@ -133,6 +166,7 @@ export const buildScannerArguments = ({
   identity,
   envFile,
   typeScriptConfigFile,
+  scannerImage = "sonarsource/sonar-scanner-cli:latest",
 }) => [
   "run",
   "--rm",
@@ -144,7 +178,7 @@ export const buildScannerArguments = ({
   `${workspace}:/usr/src:ro`,
   "-w",
   "/usr/src",
-  "sonarsource/sonar-scanner-cli:latest",
+  scannerImage,
   `-Dsonar.projectKey=${project}`,
   `-Dsonar.projectVersion=${identity.projectVersion}`,
   "-Dsonar.working.directory=/tmp/ssi-wc-scannerwork",
@@ -231,7 +265,7 @@ export const runAnalyzerPreflight = (workspace = process.cwd()) => {
       "No indexed TypeScript files were found for Sonar analysis",
     );
   const environment = createScannerEnvironment({
-    host: "http://preflight.invalid",
+    host: "https://preflight.invalid",
     token: "",
     workspace,
     typeScriptFiles: analyzerManifest.files.map(
@@ -328,13 +362,14 @@ const requireSonarConfiguration = () => {
 
 const createAnalysisIdentity = (workspace, sourceManifest) => {
   try {
-    const commitSha = execFileSync("git", ["rev-parse", "HEAD"], {
+    const gitExecutable = resolveTrustedExecutable("git");
+    const commitSha = execFileSync(gitExecutable, ["rev-parse", "HEAD"], {
       cwd: workspace,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
     }).trim();
     const changes = execFileSync(
-      "git",
+      gitExecutable,
       [
         "status",
         "--porcelain",
@@ -394,13 +429,14 @@ const runDockerScanner = ({
       expectedFiles: typeScriptFiles,
     });
     const scannerProcess = spawnSync(
-      "docker",
+      resolveTrustedExecutable("docker"),
       buildScannerArguments({
         workspace,
         project,
         identity,
         envFile: environment.file,
         typeScriptConfigFile: environment.typeScriptConfigFile,
+        scannerImage: process.env.SONAR_SCANNER_IMAGE,
       }),
       {
         cwd: workspace,

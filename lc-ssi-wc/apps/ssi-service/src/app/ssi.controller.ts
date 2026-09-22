@@ -14,19 +14,31 @@ import {
   type CreateSsiCommand,
 } from "./ssi-application.service";
 
+interface SsiListQuery {
+  status?: string;
+  ownershipType?: "OWN" | "COUNTERPARTY";
+  counterpartyId?: string;
+  page?: string;
+  pageSize?: string;
+  search?: string;
+  sortBy?: string;
+  sortDirection?: "ASC" | "DESC";
+}
+
 @Controller("ssis")
 export class SsiController {
   constructor(private readonly service: SsiApplicationService) {}
-  @Get() list(
-    @Query("status") status?: string,
-    @Query("ownershipType") ownershipType?: "OWN" | "COUNTERPARTY",
-    @Query("counterpartyId") counterpartyId?: string,
-    @Query("page") page?: string,
-    @Query("pageSize") pageSize?: string,
-    @Query("search") search?: string,
-    @Query("sortBy") sortBy?: string,
-    @Query("sortDirection") sortDirection?: "ASC" | "DESC",
-  ): unknown {
+  @Get() list(@Query() query: SsiListQuery = {}): unknown {
+    const {
+      status,
+      ownershipType,
+      counterpartyId,
+      page,
+      pageSize,
+      search,
+      sortBy,
+      sortDirection,
+    } = query;
     if (
       page === undefined &&
       pageSize === undefined &&

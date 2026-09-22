@@ -1,15 +1,18 @@
 import { NostroController } from "../../app/nostro/nostro.controller";
 import { RmaController } from "../../app/rma/rma.controller";
 import { SsiController } from "../../app/ssi.controller";
+import { BadRequestException } from "@nestjs/common";
 import type { NostroApplicationService } from "../../app/nostro/nostro-application.service";
 import type { RmaApplicationService } from "../../app/rma/rma-application.service";
 import type { SsiApplicationService } from "../../app/ssi-application.service";
 
 const governedService = () => ({
   list: jest.fn(() => ["listed"]),
+  listPage: jest.fn((request: unknown) => ({ request })),
   create: jest.fn((body: unknown) => ({ body })),
   update: jest.fn((id: string, body: unknown) => ({ id, body })),
   revise: jest.fn((id: string, maker: string) => ({ id, maker })),
+  suppress: jest.fn((id: string, maker: string, reason: string) => ({ id, maker, reason })),
   cancelRevision: jest.fn((id: string, actor: string) => ({ id, actor })),
   transition: jest.fn((id: string, action: string, actor: string) => ({
     id,
@@ -36,6 +39,9 @@ describe("governed HTTP controller contracts", () => {
     const command = { accountReference: "ACCOUNT-1" } as never;
 
     expect(controller.list()).toEqual(["listed"]);
+    expect(controller.list("ACTIVE", "2", "10", "usd")).toEqual({
+      request: expect.objectContaining({ page: 2, pageSize: 10, search: "usd" }),
+    });
     expect(
       controller.resolve({
         accountServicerBic: "CITIUS33",
@@ -52,9 +58,17 @@ describe("governed HTTP controller contracts", () => {
       id: "n-1",
       maker: "maker",
     });
+    expect(controller.suppress("n-1", { maker: "maker", reason: "closed" })).toEqual({
+      id: "n-1",
+      maker: "maker",
+      reason: "closed",
+    });
     expect(
       controller.transition("n-1", "APPROVE", { actor: "checker" }),
     ).toEqual({ id: "n-1", action: "APPROVE", actor: "checker" });
+    expect(() =>
+      controller.transition("n-1", "delete", { actor: "checker" }),
+    ).toThrow(BadRequestException);
     expect(
       controller.revoke("n-1", { actor: "checker", reason: "test" }),
     ).toEqual({ id: "n-1", actor: "checker", reason: "test" });
@@ -65,6 +79,8 @@ describe("governed HTTP controller contracts", () => {
     const service = {
       ...governedService(),
       check: jest.fn((body: unknown) => ({ body })),
+      supportedMessageTypes: jest.fn(() => ["MT300"]),
+      messageTypePolicy: jest.fn(() => ({ version: "SR2026" })),
       pairState: jest.fn((ownBic: string, counterpartyBic: string) => ({
         ownBic,
         counterpartyBic,
@@ -76,6 +92,11 @@ describe("governed HTTP controller contracts", () => {
     const command = { ownBic: "DEMOHKHH" } as never;
 
     expect(controller.list()).toEqual(["listed"]);
+    expect(controller.list("ACTIVE", "1", "20", "DEMO")).toEqual({
+      request: expect.objectContaining({ page: 1, pageSize: 20, search: "DEMO" }),
+    });
+    expect(controller.messageTypes()).toEqual(["MT300"]);
+    expect(controller.messageTypePolicy()).toEqual({ version: "SR2026" });
     expect(controller.pairState("DEMOHKHH", "CITIUS33")).toEqual({
       ownBic: "DEMOHKHH",
       counterpartyBic: "CITIUS33",
@@ -97,6 +118,11 @@ describe("governed HTTP controller contracts", () => {
     expect(controller.revise("r-1", { maker: "maker" })).toEqual({
       id: "r-1",
       maker: "maker",
+    });
+    expect(controller.suppress("r-1", { maker: "maker", reason: "closed" })).toEqual({
+      id: "r-1",
+      maker: "maker",
+      reason: "closed",
     });
     expect(
       controller.transition("r-1", "ACTIVATE", { actor: "checker" }),

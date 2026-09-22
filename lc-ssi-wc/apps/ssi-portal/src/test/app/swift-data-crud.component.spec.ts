@@ -2,6 +2,18 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 describe("SWIFT Data canonical SSI entrypoint", () => {
+  it("uses native output semantics for loading and saved-draft status", () => {
+    const template = readFileSync(
+      join(
+        join(process.cwd(), "apps/ssi-portal/src/app"),
+        "swift-data-crud.component.html",
+      ),
+      "utf8",
+    );
+    expect(template).not.toContain('role="status"');
+    expect(template.match(/<output\b/g)).toHaveLength(2);
+  });
+
   it("keeps SSI out of the SWIFT Data resource navigation", () => {
     const ids = ["rma", "ssi", "entity", "nostro"];
     expect(ids.filter((id) => id !== "ssi")).toEqual(["rma", "entity", "nostro"]);

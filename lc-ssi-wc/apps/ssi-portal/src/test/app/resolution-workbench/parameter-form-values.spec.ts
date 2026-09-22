@@ -26,6 +26,10 @@ describe("parameter form value allow-list", () => {
     ).toEqual({ "context.currency": "USD" });
   });
 
+  it("omits an authorized field when the user supplied no value", () => {
+    expect(userInputValues(model as never, {})).toEqual({});
+  });
+
   it("retains the selected route and eligibility snapshot as one atomic binding", () => {
     const selectedRouteIdentity = {
       routeId: "ROUTE-1",
@@ -49,5 +53,21 @@ describe("parameter form value allow-list", () => {
         { eligibilitySnapshot } as never,
       ),
     ).toEqual({ selectedRouteIdentity, eligibilitySnapshot });
+  });
+
+  it("requires both route identity and its matching eligibility snapshot", () => {
+    expect(() => selectedLookupBinding({} as never, {} as never)).toThrow(
+      "PAGE_PARAMETER_ROUTE_BINDING_REQUIRED",
+    );
+    expect(() =>
+      selectedLookupBinding(
+        {
+          selectedRouteIdentity: { contextSha256: "a".repeat(64) },
+        } as never,
+        {
+          eligibilitySnapshot: { contextSha256: "b".repeat(64) },
+        } as never,
+      ),
+    ).toThrow("PAGE_PARAMETER_ROUTE_CONTEXT_MISMATCH");
   });
 });

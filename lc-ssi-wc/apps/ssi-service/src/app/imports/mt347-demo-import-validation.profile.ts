@@ -24,7 +24,7 @@ export class Mt347DemoImportValidationProfile {
     this.assertNoPaymentSemantics(route);
     this.assertReferenceIdentity(route);
     if (payload["usageScope"] === "QA_POSITIVE") return true;
-    const reasonCode = String(route["oracleReasonCode"] ?? "").trim();
+    const reasonCode = this.text(route["oracleReasonCode"]).trim();
     if (!reasonCode) throw new Error("MT347_DEMO_REASON_CODE_REQUIRED");
     throw new Error(reasonCode);
   }
@@ -52,7 +52,7 @@ export class Mt347DemoImportValidationProfile {
       route["settlementModel"] !== "FIN_REFERENCE_ONLY" ||
       route["paymentExecutable"] !== "false" ||
       route["oracleBusinessStatus"] !== "BA_CONFIRMED" ||
-      !String(route["oracleContextKey"] ?? "").trim()
+      !this.text(route["oracleContextKey"]).trim()
     ) {
       throw new Error("MT347_DEMO_PROFILE_CONTRACT_MISMATCH");
     }
@@ -61,7 +61,7 @@ export class Mt347DemoImportValidationProfile {
   private assertNoPaymentSemantics(route: JsonObject): void {
     if (
       PROHIBITED_PAYMENT_FIELDS.some((field) =>
-        String(route[field] ?? "").trim(),
+        this.hasValue(route[field]),
       )
     ) {
       throw new Error("MT347_DEMO_PAYMENT_SEMANTICS_PROHIBITED");
@@ -70,9 +70,9 @@ export class Mt347DemoImportValidationProfile {
 
   private assertReferenceIdentity(route: JsonObject): void {
     if (
-      !CURRENCY_PATTERN.test(String(route["currency"] ?? "")) ||
-      !BIC_PATTERN.test(String(route["counterpartyBic"] ?? "")) ||
-      !String(route["bookingEntity"] ?? "").trim()
+      !CURRENCY_PATTERN.test(this.text(route["currency"])) ||
+      !BIC_PATTERN.test(this.text(route["counterpartyBic"])) ||
+      !this.text(route["bookingEntity"]).trim()
     ) {
       throw new Error("MT347_DEMO_REFERENCE_IDENTITY_REQUIRED");
     }
@@ -83,4 +83,15 @@ export class Mt347DemoImportValidationProfile {
       ? (value as JsonObject)
       : {};
   }
+
+  private text(value: unknown): string {
+    return typeof value === "string" ? value : "";
+  }
+
+  private hasValue(value: unknown): boolean {
+    return typeof value === "string"
+      ? Boolean(value.trim())
+      : value !== null && value !== undefined;
+  }
+
 }

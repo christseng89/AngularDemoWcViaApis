@@ -7,7 +7,10 @@ import {
   EntityApplicationService,
   type EntityCommand,
 } from "../../../app/entity/entity-application.service";
-import type { EntityRecord, EntityRepository } from "../../../app/entity/entity.repository";
+import type {
+  EntityRecord,
+  EntityRepository,
+} from "../../../app/entity/entity.repository";
 
 const command = (overrides: Partial<EntityCommand> = {}): EntityCommand => ({
   branchCode: "HK01",
@@ -31,11 +34,20 @@ const record = (overrides: Partial<EntityRecord> = {}): EntityRecord => ({
   ...overrides,
 });
 
-function harness(initial: EntityRecord[] = []) {
+function harness(
+  initial: EntityRecord[] = [],
+  options: {
+    approveSuppressionResult?: EntityRecord | null;
+    hasOpenRevision?: boolean;
+    legacyReservation?: boolean;
+    reservationResult?: boolean;
+  } = {},
+) {
   const records = [...initial];
   const auditEvents = [{ action: "SEEDED" }];
   const repository = {
     list: jest.fn(() => records),
+    listPage: jest.fn(() => ({ items: records, total: records.length })),
     find: jest.fn((id: string) => records.find((item) => item.id === id)),
     save: jest.fn((item: EntityRecord) => {
       const index = records.findIndex((current) => current.id === item.id);
@@ -43,6 +55,11 @@ function harness(initial: EntityRecord[] = []) {
       else records.push(item);
       return item;
     }),
+    approveSuppression: jest.fn(() => options.approveSuppressionResult ?? null),
+    hasOpenRevision: jest.fn(() => options.hasOpenRevision ?? false),
+    saveRevisionWorkInProgress: options.legacyReservation
+      ? undefined
+      : jest.fn(() => options.reservationResult ?? true),
     audit: jest.fn(() => auditEvents),
   };
   return {
@@ -56,9 +73,24 @@ function harness(initial: EntityRecord[] = []) {
 describe("EntityApplicationService", () => {
   it("lists records and audit events", () => {
     const existing = record();
-    const service = harness([existing]).service;
+    const { service, repository } = harness([existing]);
     expect(service.list()).toEqual([existing]);
+    expect(service.list("ACTIVE")).toEqual([existing]);
+    expect(repository.list).toHaveBeenLastCalledWith("ACTIVE");
+    expect(service.listPage({ page: 2, pageSize: 25 })).toEqual({
+      items: [existing],
+      total: 1,
+    });
     expect(service.audit()).toEqual([{ action: "SEEDED" }]);
+  });
+
+  it("exposes command validation without persistence", () => {
+    const { service, repository } = harness();
+    expect(service.validateCommand(command())).toBeUndefined();
+    expect(() =>
+      service.validateCommand(command({ countryCode: "HKG" })),
+    ).toThrow(new BadRequestException("ENTITY_FIELDS_INVALID"));
+    expect(repository.save).not.toHaveBeenCalled();
   });
 
   it("creates and persists a draft", () => {
@@ -95,6 +127,19 @@ describe("EntityApplicationService", () => {
         command({ maker: "bob" }),
       ),
     ).toThrow(ConflictException);
+    expect(() =>
+      harness([
+        record({ status: "DRAFT", changeType: "SUPPRESSION" }),
+      ]).service.update("ENTITY-1", command()),
+    ).toThrow("SUPPRESSION_DRAFT_CANNOT_BE_EDITED");
+
+    const wip = record({
+      status: "WIP",
+      revisionWipExpiresAt: "2026-06-01T00:00:00.000Z",
+    });
+    const updatedWip = harness([wip]).service.update(wip.id, command());
+    expect(updatedWip).toMatchObject({ status: "DRAFT" });
+    expect(updatedWip).not.toHaveProperty("revisionWipExpiresAt");
   });
 
   it("creates a checker-free linked revision", () => {
@@ -108,6 +153,48 @@ describe("EntityApplicationService", () => {
     });
     expect(revised.id).not.toBe(current.id);
     expect(revised.checker).toBeUndefined();
+  });
+
+  it("preserves atomic revision reservation and legacy fallback semantics", () => {
+    const current = record();
+    const atomic = harness([current]);
+    const reserved = atomic.service.revise(current.id, "new-maker");
+    expect(atomic.repository.saveRevisionWorkInProgress).toHaveBeenCalledWith(
+      reserved,
+      "new-maker",
+      "ENTITY",
+    );
+    expect(atomic.repository.save).not.toHaveBeenCalled();
+
+    expect(() =>
+      harness([current], { reservationResult: false }).service.revise(
+        current.id,
+        "new-maker",
+      ),
+    ).toThrow("REVISION_NOT_AVAILABLE");
+
+    const legacy = harness([current], { legacyReservation: true });
+    const legacyRevision = legacy.service.revise(current.id, "new-maker");
+    expect(legacy.repository.save).toHaveBeenCalledWith(
+      legacyRevision,
+      "WIP_RESERVED",
+      "new-maker",
+      "ENTITY",
+    );
+  });
+
+  it("rejects invalid or concurrently reserved revisions", () => {
+    const draft = record({ status: "DRAFT" });
+    expect(() =>
+      harness([draft]).service.revise(draft.id, "new-maker"),
+    ).toThrow("INVALID_REVISION_STATUS");
+    const active = record();
+    expect(() =>
+      harness([active], { hasOpenRevision: true }).service.revise(
+        active.id,
+        "new-maker",
+      ),
+    ).toThrow("OPEN_REVISION_EXISTS");
   });
 
   it.each(["REVOKED", "SUPERSEDED"] as const)(
@@ -178,6 +265,210 @@ describe("EntityApplicationService", () => {
     );
   });
 
+  it("characterizes rejection metadata and repository call semantics", () => {
+    const pending = record({ status: "PENDING_APPROVAL", maker: "maker" });
+    expect(() =>
+      harness([pending]).service.transition(
+        pending.id,
+        "REJECT",
+        "checker",
+        "bad",
+      ),
+    ).toThrow(new BadRequestException("REJECTION_REASON_REQUIRED"));
+
+    const { service, repository } = harness([pending]);
+    const rejected = service.transition(
+      pending.id,
+      "REJECT",
+      "checker",
+      "  invalid branch ownership  ",
+    );
+    expect(rejected).toMatchObject({
+      status: "DRAFT",
+      checker: "checker",
+      rejectionReason: "invalid branch ownership",
+      version: 3,
+    });
+    expect(repository.save).toHaveBeenCalledWith(
+      rejected,
+      "REJECT",
+      "checker",
+      "ENTITY",
+    );
+  });
+
+  it("characterizes suppression submission and atomic approval", () => {
+    const suppressionDraft = record({
+      status: "DRAFT",
+      changeType: "SUPPRESSION",
+      suppressionReason: "  branch relationship retired  ",
+    });
+    expect(
+      harness([suppressionDraft]).service.transition(
+        suppressionDraft.id,
+        "SUBMIT",
+        suppressionDraft.maker,
+      ),
+    ).toMatchObject({ status: "PENDING_APPROVAL" });
+
+    for (const suppressionReason of [undefined, "bad"]) {
+      const invalid = record({
+        status: "DRAFT",
+        changeType: "SUPPRESSION",
+        suppressionReason,
+      });
+      expect(() =>
+        harness([invalid]).service.transition(
+          invalid.id,
+          "SUBMIT",
+          invalid.maker,
+        ),
+      ).toThrow(new BadRequestException("SUPPRESSION_REASON_REQUIRED"));
+    }
+
+    const pending = record({
+      status: "PENDING_APPROVAL",
+      changeType: "SUPPRESSION",
+      suppressionReason: "branch relationship retired",
+    });
+    const suppressed = { ...pending, status: "SUPPRESSED" } as EntityRecord;
+    const approved = harness([pending], {
+      approveSuppressionResult: suppressed,
+    });
+    expect(approved.service.transition(pending.id, "APPROVE", "checker")).toBe(
+      suppressed,
+    );
+    expect(approved.repository.approveSuppression).toHaveBeenCalledWith(
+      pending.id,
+      "checker",
+      "ENTITY",
+    );
+    expect(approved.repository.save).not.toHaveBeenCalled();
+
+    expect(() =>
+      harness([pending]).service.transition(pending.id, "APPROVE", "checker"),
+    ).toThrow(new ConflictException("SUPPRESSION_STATE_CHANGED"));
+  });
+
+  it("characterizes approval superseding only the same active branch", () => {
+    const pending = record({ id: "PENDING", status: "PENDING_APPROVAL" });
+    const previous = record({ id: "PREVIOUS", version: 9 });
+    const otherBranch = record({ id: "OTHER", branchCode: "US01" });
+    const inactiveSameBranch = record({ id: "DRAFT", status: "DRAFT" });
+    const { service, repository } = harness([
+      pending,
+      previous,
+      otherBranch,
+      inactiveSameBranch,
+    ]);
+
+    expect(service.transition(pending.id, "APPROVE", "checker")).toMatchObject({
+      status: "ACTIVE",
+      checker: "checker",
+    });
+    expect(repository.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: previous.id,
+        status: "SUPERSEDED",
+        version: 10,
+      }),
+      "SUPERSEDED",
+      "checker",
+      "ENTITY",
+    );
+    expect(repository.save).not.toHaveBeenCalledWith(
+      expect.objectContaining({ id: otherBranch.id, status: "SUPERSEDED" }),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+    );
+    expect(repository.save).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: inactiveSameBranch.id,
+        status: "SUPERSEDED",
+      }),
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+    );
+  });
+
+  it("creates suppression drafts with atomic and legacy reservation semantics", () => {
+    const active = record({ checker: "checker" });
+    const atomic = harness([active]);
+    const suppression = atomic.service.suppress(
+      active.id,
+      "new-maker",
+      "  branch relationship retired  ",
+    );
+    expect(suppression).toMatchObject({
+      maker: "new-maker",
+      status: "DRAFT",
+      changeType: "SUPPRESSION",
+      suppressionReason: "branch relationship retired",
+      amendmentOfId: active.id,
+      version: 3,
+    });
+    expect(suppression.checker).toBeUndefined();
+    expect(atomic.repository.saveRevisionWorkInProgress).toHaveBeenCalledWith(
+      suppression,
+      "new-maker",
+      "ENTITY",
+      "SUPPRESSION_DRAFT_CREATED",
+    );
+
+    expect(() =>
+      harness([active], { reservationResult: false }).service.suppress(
+        active.id,
+        "new-maker",
+        "branch relationship retired",
+      ),
+    ).toThrow("SUPPRESSION_NOT_AVAILABLE");
+
+    const legacy = harness([active], { legacyReservation: true });
+    const legacySuppression = legacy.service.suppress(
+      active.id,
+      "new-maker",
+      "branch relationship retired",
+    );
+    expect(legacy.repository.save).toHaveBeenCalledWith(
+      legacySuppression,
+      "SUPPRESSION_DRAFT_CREATED",
+      "new-maker",
+      "ENTITY",
+    );
+  });
+
+  it("validates suppression maker, reason, state and concurrency", () => {
+    const active = record();
+    expect(() =>
+      harness([active]).service.suppress(active.id, "", "valid reason"),
+    ).toThrow("MAKER_REQUIRED");
+    for (const reason of ["bad", undefined]) {
+      expect(() =>
+        harness([active]).service.suppress(
+          active.id,
+          "new-maker",
+          reason as unknown as string,
+        ),
+      ).toThrow("SUPPRESSION_REASON_REQUIRED");
+    }
+    expect(() =>
+      harness([record({ status: "DRAFT" })]).service.suppress(
+        active.id,
+        "new-maker",
+        "valid reason",
+      ),
+    ).toThrow("ONLY_ACTIVE_CAN_BE_SUPPRESSED");
+    expect(() =>
+      harness([active], { hasOpenRevision: true }).service.suppress(
+        active.id,
+        "new-maker",
+        "valid reason",
+      ),
+    ).toThrow("OPEN_REVISION_EXISTS");
+  });
+
   it("revokes with a trimmed reason and validates revoke metadata", () => {
     const current = record({ status: "DRAFT" });
     expect(
@@ -197,6 +488,16 @@ describe("EntityApplicationService", () => {
     expect(() =>
       harness([current]).service.revoke(current.id, "checker", "bad"),
     ).toThrow(BadRequestException);
+    expect(() =>
+      harness([record()]).service.revoke("ENTITY-1", "checker", "valid reason"),
+    ).toThrow("ACTIVE_REQUIRES_SUPPRESSION");
+    expect(() =>
+      harness([record({ status: "PENDING_APPROVAL" })]).service.revoke(
+        "ENTITY-1",
+        "checker",
+        "valid reason",
+      ),
+    ).toThrow("REVOCATION_REQUIRES_DRAFT");
   });
 
   it("throws when a requested entity is missing", () => {

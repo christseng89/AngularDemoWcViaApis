@@ -134,38 +134,45 @@ export class PaymentGovernedApplicabilityService {
         at: query.valueDate,
         operationalOnly: true,
       }) as unknown as Record<string, unknown>;
-      const accountServicerBic = nostro["accountServicerBic"];
-      return nostro["decision"] === "RESOLVED" &&
-        typeof nostro["nostroId"] === "string" &&
-        typeof nostro["nostroVersion"] === "number" &&
-        typeof nostro["priority"] === "number" &&
-        rma["authorised"] === true &&
-        typeof rma["rmaId"] === "string" &&
-        typeof rma["rmaVersion"] === "number" &&
-        (!query.servicerRelationship ||
-          servicerRelationshipMatches(
+      const accountServicerBic =
+        typeof nostro["accountServicerBic"] === "string"
+          ? nostro["accountServicerBic"]
+          : "";
+      const nostroId = nostro["nostroId"];
+      const nostroVersion = nostro["nostroVersion"];
+      const priority = nostro["priority"];
+      const rmaId = rma["rmaId"];
+      const rmaVersion = rma["rmaVersion"];
+      if (
+        nostro["decision"] !== "RESOLVED" ||
+        typeof nostroId !== "string" ||
+        typeof nostroVersion !== "number" ||
+        typeof priority !== "number" ||
+        rma["authorised"] !== true ||
+        typeof rmaId !== "string" ||
+        typeof rmaVersion !== "number" ||
+        (query.servicerRelationship !== undefined &&
+          !servicerRelationshipMatches(
             query.servicerRelationship,
             route["counterpartyBic"] ?? "",
-            typeof accountServicerBic === "string" ? accountServicerBic : "",
+            accountServicerBic,
           ))
-        ? [
-            {
-              ssi,
-              applicability,
-              nostro: {
-                id: nostro["nostroId"],
-                version: nostro["nostroVersion"],
-                priority: nostro["priority"],
-                accountServicerBic:
-                  typeof accountServicerBic === "string"
-                    ? accountServicerBic
-                    : "",
-              },
-              rma: { id: rma["rmaId"], version: rma["rmaVersion"] },
-              snapshot,
-            },
-          ]
-        : [];
+      )
+        return [];
+      return [
+        {
+          ssi,
+          applicability,
+          nostro: {
+            id: nostroId,
+            version: nostroVersion,
+            priority,
+            accountServicerBic,
+          },
+          rma: { id: rmaId, version: rmaVersion },
+          snapshot,
+        },
+      ];
     });
     const after = this.snapshots.current();
     return after.sha256 === snapshot.sha256 ? candidates : [];

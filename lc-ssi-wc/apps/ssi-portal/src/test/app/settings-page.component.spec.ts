@@ -67,15 +67,16 @@ jest.mock("../../app/runtime-settings.service", () => ({
 }));
 
 describe("SettingsPageComponent", () => {
-  it("does not request or render a DB logical snapshot on ordinary Settings load", () => {
-    const source = readFileSync("apps/ssi-portal/src/app/settings-page.component.ts", "utf8");
-    expect(source).not.toContain("currentSnapshot");
-  });
   beforeEach(() => {
     reloadError = false;
     runtimeError = false;
     emitted.length = 0;
     jest.clearAllMocks();
+  });
+
+  it("does not request or render a DB logical snapshot on ordinary Settings load", () => {
+    const source = readFileSync("apps/ssi-portal/src/app/settings-page.component.ts", "utf8");
+    expect(source).not.toContain("currentSnapshot");
   });
 
   it("loads server-authoritative runtime settings", async () => {

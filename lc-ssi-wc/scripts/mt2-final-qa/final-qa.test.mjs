@@ -36,10 +36,33 @@ import {
   assertTypeScriptProgramCoverage,
   parseScannerTask,
   redactToken,
+  resolveTrustedExecutable,
   resolveScannerTask,
   run as runSonarAnalysis,
   waitForCeAnalysis,
 } from "./sonar-current-analysis.mjs";
+
+test("Sonar scanner resolves process executables from fixed absolute paths", () => {
+  const windowsGit = resolveTrustedExecutable("git", {
+    platform: "win32",
+    exists: (candidate) => candidate === "C:\\Program Files\\Git\\cmd\\git.exe",
+  });
+  const linuxDocker = resolveTrustedExecutable("docker", {
+    platform: "linux",
+    exists: (candidate) => candidate === "/usr/bin/docker",
+  });
+
+  assert.equal(windowsGit, "C:\\Program Files\\Git\\cmd\\git.exe");
+  assert.equal(linuxDocker, "/usr/bin/docker");
+  assert.throws(
+    () =>
+      resolveTrustedExecutable("docker", {
+        platform: "win32",
+        exists: () => false,
+      }),
+    /trusted absolute path/,
+  );
+});
 
 class StubGate extends QualityGate {
   constructor(id, result) {
@@ -503,26 +526,28 @@ test("Sonar scanner keeps credentials out of argv and removes its env file", () 
   });
   try {
     const argumentsList = buildScannerArguments({
-      workspace: "C:/workspace",
+      workspace: process.cwd(),
       project: "ssi-wc-prototype",
       identity: { kind: "worktree", projectVersion: "worktree-digest" },
       envFile: scannerEnvironment.file,
-      scannerConfigDirectory: scannerEnvironment.directory,
+      typeScriptConfigFile: scannerEnvironment.typeScriptConfigFile,
+      scannerImage: "lc-ssi-sonar-scanner:arm64",
     });
     assert.equal(argumentsList.join(" ").includes(secret), false);
     assert.equal(argumentsList.includes("--env-file"), true);
-    assert.equal(argumentsList.includes("C:/workspace:/usr/src:ro"), true);
+    assert.equal(argumentsList.includes("lc-ssi-sonar-scanner:arm64"), true);
+    assert.equal(argumentsList.includes(`${process.cwd()}:/usr/src:ro`), true);
     assert.equal(
       argumentsList.includes(
         "-Dsonar.working.directory=/tmp/ssi-wc-scannerwork",
       ),
       true,
     );
-    assert.equal(
-      argumentsList.includes(
-        "-Dsonar.typescript.tsconfigPaths=/sonar-config/tsconfig.sonar.json",
+    assert.match(
+      argumentsList.find((argument) =>
+        argument.startsWith("-Dsonar.typescript.tsconfigPaths="),
       ),
-      true,
+      /^-Dsonar\.typescript\.tsconfigPaths=\/usr\/src\/tmp\/sonar\/scanner-env-[^/]+\/tsconfig\.sonar\.json$/,
     );
     assert.equal(
       argumentsList.includes("-Dsonar.qualitygate.wait=false"),

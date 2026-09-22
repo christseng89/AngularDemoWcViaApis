@@ -6,6 +6,13 @@ import {
 } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import { EntityRepository, type EntityRecord } from "./entity.repository";
+import {
+  approveGovernedSuppression,
+  buildGovernedRevocation,
+  buildGovernedTransitionRecord,
+  type GovernedTransitionAction,
+  validateGovernedTransition,
+} from "../shared/governed-transition";
 import { revisionWipExpiresAt } from "../shared/sqlite-governed.repository";
 export type EntityCommand = Pick<
   EntityRecord,
@@ -18,6 +25,7 @@ export type EntityCommand = Pick<
   | "validTo"
   | "maker"
 >;
+
 @Injectable()
 export class EntityApplicationService {
   constructor(private readonly repository: EntityRepository) {}
@@ -139,104 +147,62 @@ export class EntityApplicationService {
   }
   transition(
     id: string,
-    action: "SUBMIT" | "APPROVE" | "REJECT" | "ACTIVATE",
+    action: GovernedTransitionAction,
     actor: string,
     reason = "",
   ) {
     const current = this.require(id);
-    const expected = {
-      SUBMIT: "DRAFT",
-      APPROVE: "PENDING_APPROVAL",
-      REJECT: "PENDING_APPROVAL",
-      ACTIVATE: "APPROVED",
-    }[action];
-    if (current.status !== expected) {
-      throw new ConflictException(`Expected ${expected}`);
-    }
-    if (action === "SUBMIT" && actor !== current.maker) {
-      throw new ConflictException("Only maker can submit");
-    }
-    if (["APPROVE", "REJECT"].includes(action) && actor === current.maker) {
-      throw new ConflictException("Maker cannot approve");
-    }
-    if (
-      action === "SUBMIT" &&
-      current.changeType === "SUPPRESSION" &&
-      (current.suppressionReason?.trim().length ?? 0) < 5
-    )
-      throw new BadRequestException("SUPPRESSION_REASON_REQUIRED");
-    if (action === "REJECT" && reason.trim().length < 5)
-      throw new BadRequestException("REJECTION_REASON_REQUIRED");
-    if (action === "APPROVE" && current.changeType === "SUPPRESSION") {
-      const suppressed = this.repository.approveSuppression?.(
-        current.id,
-        actor,
-        "ENTITY",
-      );
-      if (!suppressed) throw new ConflictException("SUPPRESSION_STATE_CHANGED");
-      return suppressed;
-    }
-    if (action === "APPROVE" || action === "ACTIVATE") {
-      for (const previous of this.repository
-        .list()
-        .filter(
-          (item) =>
-            item.id !== id &&
-            item.status === "ACTIVE" &&
-            item.branchCode === current.branchCode,
-        )) {
-        this.repository.save(
-          {
-            ...previous,
-            status: "SUPERSEDED",
-            version: previous.version + 1,
-            updatedAt: new Date().toISOString(),
-          },
-          "SUPERSEDED",
-          actor,
-          "ENTITY",
-        );
-      }
-    }
-    const next = {
-      ...current,
-      status: {
-        SUBMIT: "PENDING_APPROVAL",
-        APPROVE: "ACTIVE",
-        REJECT: "DRAFT",
-        ACTIVATE: "ACTIVE",
-      }[action],
-      version: current.version + 1,
-      updatedAt: new Date().toISOString(),
-      ...(action === "APPROVE" ? { checker: actor } : {}),
-      ...(action === "REJECT"
-        ? { checker: actor, rejectionReason: reason.trim() }
-        : {}),
-    };
+    validateGovernedTransition(current, action, actor, reason);
+    const suppressed = approveGovernedSuppression(
+      current,
+      action,
+      actor,
+      "ENTITY",
+      this.repository.approveSuppression?.bind(this.repository),
+    );
+    if (suppressed) return suppressed;
+    this.supersedePreviousActive(id, current, action, actor);
+    const next = buildGovernedTransitionRecord(current, action, actor, reason);
     this.repository.save(next, action, actor, "ENTITY");
     return next;
   }
   revoke(id: string, actor: string, reason: string) {
     const current = this.require(id);
-    if (!actor || reason?.trim().length < 5) {
-      throw new BadRequestException("ACTOR_AND_REASON_REQUIRED");
-    }
-    if (current.status === "ACTIVE")
-      throw new ConflictException("ACTIVE_REQUIRES_SUPPRESSION");
-    if (!["DRAFT", "WIP"].includes(current.status))
-      throw new ConflictException("REVOCATION_REQUIRES_DRAFT");
-    const next = {
-      ...current,
-      status: "REVOKED",
-      revokeReason: reason.trim(),
-      version: current.version + 1,
-      updatedAt: new Date().toISOString(),
-    };
+    const next = buildGovernedRevocation(current, actor, reason);
     this.repository.save(next, "REVOKED", actor, "ENTITY");
     return next;
   }
   audit() {
     return this.repository.audit();
+  }
+  private supersedePreviousActive(
+    id: string,
+    current: EntityRecord,
+    action: GovernedTransitionAction,
+    actor: string,
+  ): void {
+    if (action !== "APPROVE" && action !== "ACTIVATE") return;
+    const previousActive = this.repository
+      .list()
+      .filter(
+        (item) =>
+          item.id !== id &&
+          item.status === "ACTIVE" &&
+          item.branchCode === current.branchCode,
+      );
+    for (const previous of previousActive) {
+      this.repository.save(
+        {
+          ...previous,
+          status: "SUPERSEDED",
+          version: previous.version + 1,
+          updatedAt: new Date().toISOString(),
+        },
+        "SUPERSEDED",
+        actor,
+        "ENTITY",
+      );
+    }
   }
   private require(id: string) {
     const value = this.repository.find(id);

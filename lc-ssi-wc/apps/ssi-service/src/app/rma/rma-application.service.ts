@@ -16,6 +16,12 @@ import {
   RmaSupportedMessageTypeCatalogue,
   loadRmaSupportedMessageTypes,
 } from "./rma-supported-message-types";
+import {
+  approveGovernedSuppression,
+  buildGovernedTransitionRecord,
+  type GovernedTransitionAction,
+  validateGovernedTransition,
+} from "../shared/governed-transition";
 
 export interface RmaCommand {
   ownBic: string;
@@ -251,89 +257,39 @@ export class RmaApplicationService {
   }
   transition(
     id: string,
-    action: "SUBMIT" | "APPROVE" | "REJECT" | "ACTIVATE",
+    action: GovernedTransitionAction,
     actor: string,
     reason = "",
   ): RmaRecord {
     const current = this.require(id);
-    const expected = {
-      SUBMIT: "DRAFT",
-      APPROVE: "PENDING_APPROVAL",
-      REJECT: "PENDING_APPROVAL",
-      ACTIVATE: "APPROVED",
-    }[action];
-    if (current.status !== expected) {
-      throw new ConflictException(`Expected ${expected}`);
-    }
-    if (action === "SUBMIT" && actor !== current.maker) {
-      throw new ConflictException("Only maker can submit");
-    }
-    if (["APPROVE", "REJECT"].includes(action) && actor === current.maker) {
-      throw new ConflictException("Maker cannot approve");
-    }
-    if (
-      action === "SUBMIT" &&
-      current.changeType === "SUPPRESSION" &&
-      (current.suppressionReason?.trim().length ?? 0) < 5
-    )
-      throw new BadRequestException("SUPPRESSION_REASON_REQUIRED");
-    if (action === "REJECT" && reason.trim().length < 5)
-      throw new BadRequestException("REJECTION_REASON_REQUIRED");
-    if (action === "APPROVE" && current.changeType === "SUPPRESSION") {
-      const suppressed = this.repository.approveSuppression?.(
-        current.id,
-        actor,
-        "RMA",
-      );
-      if (!suppressed) throw new ConflictException("SUPPRESSION_STATE_CHANGED");
-      return suppressed;
-    }
-    const status = {
-      SUBMIT: "PENDING_APPROVAL",
-      APPROVE: "ACTIVE",
-      REJECT: "DRAFT",
-      ACTIVATE: "ACTIVE",
-    }[action];
-    const original = current.amendmentOfId
-      ? this.repository.find(current.amendmentOfId)
-      : undefined;
-    const messageTypeChanges = original
-      ? compareRmaMessageTypes(original.messageTypes, current.messageTypes)
-      : (current.messageTypeChanges ??
-        compareRmaMessageTypes([], current.messageTypes));
+    validateGovernedTransition(current, action, actor, reason);
+    const suppressed = approveGovernedSuppression(
+      current,
+      action,
+      actor,
+      "RMA",
+      this.repository.approveSuppression?.bind(this.repository),
+    );
+    if (suppressed) return suppressed;
+
+    const original = this.originalRecord(current);
+    const messageTypeChanges = this.transitionMessageTypeChanges(
+      current,
+      original,
+    );
     if (action === "APPROVE" || action === "ACTIVATE") {
       this.supersede(current, actor);
     }
-    const next: RmaRecord = {
-      ...current,
-      status,
-      version: current.version + 1,
-      updatedAt: new Date().toISOString(),
+    const next = {
+      ...buildGovernedTransitionRecord(current, action, actor, reason),
       messageTypeChanges,
     };
-    if (action === "APPROVE") {
-      next.checker = actor;
-    }
-    if (action === "REJECT") {
-      next.checker = actor;
-      next.rejectionReason = reason.trim();
-    }
     this.repository.save(
       next,
       action,
       actor,
       "RMA",
-      action === "APPROVE"
-        ? {
-            before: original ?? null,
-            after: next,
-            changedFields: { messageTypes: messageTypeChanges },
-            provenance: {
-              requestType: original ? "EDIT" : "ADD",
-              amendmentOfId: current.amendmentOfId ?? null,
-            },
-          }
-        : next,
+      this.transitionEvidence(action, current, original, next),
     );
     return next;
   }
@@ -482,6 +438,37 @@ export class RmaApplicationService {
         normalizeBic(command.counterpartyBic) &&
       record.direction === command.direction
     );
+  }
+  private originalRecord(current: RmaRecord): RmaRecord | undefined {
+    return current.amendmentOfId
+      ? this.repository.find(current.amendmentOfId)
+      : undefined;
+  }
+  private transitionMessageTypeChanges(
+    current: RmaRecord,
+    original: RmaRecord | undefined,
+  ): RmaMessageTypeChanges {
+    return original
+      ? compareRmaMessageTypes(original.messageTypes, current.messageTypes)
+      : (current.messageTypeChanges ??
+          compareRmaMessageTypes([], current.messageTypes));
+  }
+  private transitionEvidence(
+    action: GovernedTransitionAction,
+    current: RmaRecord,
+    original: RmaRecord | undefined,
+    next: RmaRecord,
+  ): RmaRecord | Record<string, unknown> {
+    if (action !== "APPROVE") return next;
+    return {
+      before: original ?? null,
+      after: next,
+      changedFields: { messageTypes: next.messageTypeChanges },
+      provenance: {
+        requestType: original ? "EDIT" : "ADD",
+        amendmentOfId: current.amendmentOfId ?? null,
+      },
+    };
   }
   private supersede(current: RmaRecord, actor: string): void {
     for (const previous of this.repository

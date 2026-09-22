@@ -118,6 +118,146 @@ describe("MappingResolutionPageDefinitionSource", () => {
     );
   });
 
+  it("preserves governed MT4/MT7 fallback identities when optional mapping metadata is absent", () => {
+    const base = catalogue.mappings[0]!;
+    const variantCatalogue: LoadedCatalogue = {
+      ...catalogue,
+      mappings: [
+        {
+          ...base,
+          messageType: "MT499",
+          businessFunction: "TRADE_FALLBACK",
+          sequence: undefined,
+          settlementLeg: undefined,
+          officialRole: undefined,
+          path: "MESSAGE.53A",
+          tag: "53",
+          option: "A",
+          canonicalRole: "SENDERS_CORRESPONDENT",
+          nvrRefs: undefined,
+        },
+        {
+          ...base,
+          messageType: "MT499",
+          businessFunction: "TRADE_FALLBACK",
+          sequence: undefined,
+          settlementLeg: undefined,
+          officialRole: undefined,
+          path: "MESSAGE.79Z",
+          tag: "79",
+          option: "Z",
+        },
+        {
+          ...base,
+          messageType: "MT799",
+          businessFunction: "TRADE_PROFILE_ID",
+          pageProfileId: "PROFILE-MT799-CUSTOM",
+          officialRole: undefined,
+        },
+      ],
+    };
+    const source = new MappingResolutionPageDefinitionSource({
+      get: () => variantCatalogue,
+    } as MappingCatalogueService);
+
+    const definitions = source.all();
+    expect(definitions).toHaveLength(2);
+    expect(definitions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          messageType: "MT499",
+          businessDomain: "TRADE_FINANCE",
+          sequences: [
+            expect.objectContaining({
+              sequenceId: "MESSAGE",
+            }),
+          ],
+        }),
+        expect.objectContaining({
+          messageType: "MT799",
+          businessDomain: "TRADE_FINANCE",
+          profile: expect.objectContaining({
+            profileId: "PROFILE-MT799-CUSTOM",
+          }),
+        }),
+      ]),
+    );
+    expect(definitions[0]!.sequences[0]).not.toHaveProperty("settlementLeg");
+    expect(source.coverageProfiles()).toEqual([
+      {
+        businessDomain: "TRADE_FINANCE",
+        messageType: "MT499",
+        businessFunction: "TRADE_FALLBACK",
+      },
+      {
+        businessDomain: "TRADE_FINANCE",
+        messageType: "MT799",
+        businessFunction: "TRADE_PROFILE_ID",
+      },
+    ]);
+
+    const fixtures = ["FIX-MT499-A", "FIX-MT499-B"].map((bindingId) => ({
+      bindingId,
+      messageType: "MT499",
+      businessFunction: "TRADE_FALLBACK",
+      sequence: "MESSAGE",
+      settlementLeg: "MESSAGE",
+    }));
+    const fixtureSource = new MappingResolutionPageDefinitionSource(
+      { get: () => variantCatalogue } as MappingCatalogueService,
+      { catalogue: () => fixtures } as never,
+    );
+    const fixtureDefinition = fixtureSource
+      .all()
+      .find(({ messageType }) => messageType === "MT499")!;
+    expect(fixtureDefinition.scenarios).toHaveLength(2);
+    expect(fixtureDefinition.scenarios.map(({ scenarioId }) => scenarioId)).toEqual([
+      "MT499-TRADE-FALLBACK-MESSAGE-MESSAGE",
+      "MT499-TRADE-FALLBACK-MESSAGE-MESSAGE-FIX-MT499-B",
+    ]);
+    expect(fixtureDefinition.scenarios[0]!.label).toBe(
+      "TRADE_FALLBACK — FIX-MT499-A",
+    );
+  });
+
+  it("fails closed when a boundary profile uses an ungoverned message family", () => {
+    const source = new MappingResolutionPageDefinitionSource(
+      {
+        get: () => ({ ...catalogue, mappings: [] }),
+      } as MappingCatalogueService,
+      { indexCurrencyProjection: () => [] } as never,
+      {
+        get: () => ({
+          catalogueVersion: "SCN-v1",
+          standardsRelease: "SR2026",
+          messageFamily: "MT347",
+          sourceArtifactId: "parameters/scenarios.json",
+          sourceArtifactSha256: SHA,
+          definitions: [
+            {
+              profileId: "P-MT599-BOUNDARY",
+              messageType: "MT599",
+              sequence: "MESSAGE",
+              settlementLeg: "MESSAGE",
+            },
+          ],
+          scenarios: [
+            {
+              scenarioId: "SCN-MT599-BOUNDARY",
+              profileId: "P-MT599-BOUNDARY",
+              fixtureBindingId: "FIX-MT599",
+            },
+          ],
+          inputs: [],
+          crossTagConstraints: [],
+        }),
+      } as never,
+      {} as ResolutionPageFixtureManifestService,
+    );
+
+    expect(() => source.all()).toThrow("PAGE_DISPLAY_FAMILY_NOT_GOVERNED");
+  });
+
   it("selects only by the API-provided typed query identity", () => {
     const source = new MappingResolutionPageDefinitionSource(catalogues);
     const definition = source.all()[0]!;
@@ -138,6 +278,15 @@ describe("MappingResolutionPageDefinitionSource", () => {
         messageFamily: "MT347",
         messageType: "MT300",
         direction: "OUTGOING",
+      }),
+    ).toEqual([]);
+    expect(
+      source.find({
+        standardsRelease: "SR2026",
+        messageFamily: "MT347",
+        messageType: "MT399",
+        direction: "OUTGOING",
+        businessService: "unsupported.service",
       }),
     ).toEqual([]);
   });
@@ -536,6 +685,33 @@ describe("MappingResolutionPageDefinitionSource", () => {
     expect(definition.fields.find(({ fieldId }) => fieldId === "context.currency")?.optionSource?.source)
       .toBe("RESOLUTION_CURRENCY_COVERAGE");
     expect(oldProjection).not.toHaveBeenCalled();
+
+    const singleCurrencySource = new MappingResolutionPageDefinitionSource(
+      new MappingCatalogueService(),
+      { indexCurrencyProjection: oldProjection } as never,
+      new ResolutionPageScenarioCatalogueService(policy),
+      new ResolutionPageFixtureManifestService(),
+      undefined,
+      undefined,
+      {
+        currencies: () => ({
+          currencies: ["JPY"],
+          defaultCurrency: "JPY",
+        }),
+      } as never,
+    );
+    const singleCurrency = singleCurrencySource
+      .all("SR2026")
+      .find(({ businessDomain }) => businessDomain === "TREASURY")!
+      .fields.find(({ fieldId }) => fieldId === "context.currency")!;
+    expect(singleCurrency).toMatchObject({
+      defaultValue: "JPY",
+      optionSource: {
+        selectionPolicy: "SINGLE_VALUE_RESTRICTED",
+        restrictionMessage:
+          "This governed resolution currently supports one currency.",
+      },
+    });
   });
 
   it("loads the governed 362-case catalogue without embedding scenarios in mapping rows", () => {

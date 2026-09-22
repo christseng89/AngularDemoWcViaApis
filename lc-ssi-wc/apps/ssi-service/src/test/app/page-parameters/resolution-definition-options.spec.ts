@@ -27,4 +27,26 @@ describe("ResolutionDefinitionOptionsService", () => {
       bookingEntities: [{ value: "HK01", label: "HK01 — Hong Kong Branch" }],
     });
   });
+
+  it("returns domain currencies with a valid configured default", () => {
+    policy.defaultFor.mockReturnValueOnce({ currency: "EUR" });
+    const source = new ResolutionDefinitionOptionsService(coverage as never, entities as never, policy as never);
+    expect(source.currencies("TREASURY", "MT300")).toEqual({
+      currencies: ["EUR", "USD"],
+      defaultCurrency: "EUR",
+    });
+  });
+
+  it("omits an absent or unsupported domain currency default", () => {
+    policy.defaultFor
+      .mockReturnValueOnce({ currency: "JPY" })
+      .mockReturnValueOnce({ currency: "" });
+    const source = new ResolutionDefinitionOptionsService(coverage as never, entities as never, policy as never);
+    expect(source.currencies("TRADE_FINANCE", "MT700")).toEqual({
+      currencies: ["EUR", "USD"],
+    });
+    expect(source.currencies("PAYMENT", "MT202")).toEqual({
+      currencies: ["EUR", "USD"],
+    });
+  });
 });

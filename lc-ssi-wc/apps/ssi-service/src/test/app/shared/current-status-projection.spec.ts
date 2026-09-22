@@ -1,5 +1,6 @@
 import {
   currentStatusFromOpenRevision,
+  currentStatusProjection,
   type OpenRevisionProjection,
 } from "../../../app/shared/current-status-projection";
 
@@ -42,5 +43,30 @@ describe("currentStatusFromOpenRevision", () => {
       changeType: "SUPPRESSION",
     };
     expect(currentStatusFromOpenRevision(child)).toBe("IN_PROGRESS");
+  });
+
+  it("projects optional open-revision identity only when present", () => {
+    expect(currentStatusProjection(undefined)).toEqual({
+      currentStatus: "EMPTY",
+      hasOpenRevision: false,
+    });
+    expect(currentStatusProjection({ status: "DRAFT" })).toEqual({
+      currentStatus: "DRAFTED",
+      hasOpenRevision: true,
+      openRevisionStatus: "DRAFT",
+    });
+    expect(
+      currentStatusProjection({
+        id: "RMA-REVISION-1",
+        status: "PENDING_APPROVAL",
+        changeType: "SUPPRESSION",
+      }),
+    ).toEqual({
+      currentStatus: "SUPPRESSED",
+      hasOpenRevision: true,
+      openRevisionId: "RMA-REVISION-1",
+      openRevisionStatus: "PENDING_APPROVAL",
+      openRevisionChangeType: "SUPPRESSION",
+    });
   });
 });

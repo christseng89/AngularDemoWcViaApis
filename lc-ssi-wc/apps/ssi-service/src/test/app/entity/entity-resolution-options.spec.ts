@@ -26,4 +26,30 @@ describe("controlled Booking Entity resolution options", () => {
     expect(repository.activeBookingEntities("2026-09-15"))
       .toEqual([{ value: "HK01", label: "HK01 — HK01 Branch" }]);
   });
+
+  it.each([
+    [["HK01", "HK01"]],
+    [["   ", "US01"]],
+  ])("fails closed for ambiguous active branch codes", (branchCodes) => {
+    for (const [index, branchCode] of branchCodes.entries()) {
+      repository.save({
+        id: `E-${index}`,
+        branchCode,
+        branchName: "Branch",
+        legalEntityCode: `LE-${index}`,
+        legalEntityName: "Legal Entity",
+        countryCode: "HK",
+        validFrom: "2026-01-01",
+        validTo: "2027-01-01",
+        maker: "maker",
+        status: "ACTIVE",
+        version: 1,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      }, "CREATED", "maker", "ENTITY");
+    }
+    expect(() => repository.activeBookingEntities("2026-09-15")).toThrow(
+      "RESOLUTION_BOOKING_ENTITY_AMBIGUOUS",
+    );
+  });
 });

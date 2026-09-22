@@ -3,6 +3,54 @@ import type { BicTarget } from "../app-view.models";
 import { ssiAccountReferenceCopy } from "../ssi-account-reference-copy";
 import { BIC_PATTERN, COUNTERPARTY_ID_PATTERN } from "../fin-5x-catalog";
 
+type CounterpartyType = "ANY_BANK" | "BANK" | "CUSTOMER";
+
+const COUNTERPARTY_BEHAVIOR = {
+  BANK: {
+    pattern: COUNTERPARTY_ID_PATTERN,
+    maxLength: 35,
+    validationMessage:
+      "請輸入 3–35 字元的內部 Counterparty ID，或從 Bank Service 選擇",
+    description: "內部穩定識別碼；SWIFT BIC 另存於受控 route 資料。",
+    showPicker: true,
+    readonly: false,
+    pickerLabel: "從 Bank Service 選擇",
+  },
+  CUSTOMER: {
+    pattern: /^[A-Z0-9][A-Z0-9._-]{2,34}$/i,
+    maxLength: 35,
+    validationMessage:
+      "請輸入 3–35 字元的 Customer ID，或從 Customer Service 選擇",
+    description: "內部穩定識別碼；SWIFT BIC 另存於受控 route 資料。",
+    showPicker: true,
+    readonly: false,
+    pickerLabel: "從 Customer Service 選擇",
+  },
+  ANY_BANK: {
+    pattern: /^ANY$/,
+    maxLength: 3,
+    validationMessage: "通用 fallback 固定使用 ANY；實際受款銀行由交易資料提供",
+    description:
+      "通用 fallback 適用任何已核准銀行；實際交易對手由交易資料提供。",
+    showPicker: false,
+    readonly: true,
+    pickerLabel: "從 Bank Service 選擇",
+  },
+} as const;
+
+function counterpartyBehavior(field: FormlyFieldConfig) {
+  const counterpartyType = (
+    field.model as { route?: { counterpartyType?: CounterpartyType } }
+  )?.route?.counterpartyType;
+  if (counterpartyType === "CUSTOMER") {
+    return COUNTERPARTY_BEHAVIOR.CUSTOMER;
+  }
+  if (counterpartyType === "ANY_BANK") {
+    return COUNTERPARTY_BEHAVIOR.ANY_BANK;
+  }
+  return COUNTERPARTY_BEHAVIOR.BANK;
+}
+
 export function buildSsiMakerFields(
   currencies: readonly { code: string; decimals: number }[],
   openPicker: (target: BicTarget, title: string) => void,
@@ -71,85 +119,18 @@ export function buildSsiMakerFields(
         placeholder: "Bank: CP-CITIUS33；通用 fallback: ANY",
         description:
           "內部穩定識別碼；Bank Service 選擇會同步保存對應的 SWIFT BIC。",
-        pickerAction: () =>
-          void openPicker("counterpartyId", "選擇交易對手識別碼"),
+        pickerAction: () => openPicker("counterpartyId", "選擇交易對手識別碼"),
       },
       expressions: {
-        "props.pattern": (field) =>
-          (
-            field.model as {
-              route?: { counterpartyType?: "BANK" | "CUSTOMER" };
-            }
-          )?.route?.counterpartyType === "CUSTOMER"
-            ? /^[A-Z0-9][A-Z0-9._-]{2,34}$/i
-            : (
-                  field.model as {
-                    route?: { counterpartyType?: string };
-                  }
-                )?.route?.counterpartyType === "ANY_BANK"
-              ? /^ANY$/
-              : COUNTERPARTY_ID_PATTERN,
-        "props.minLength": (field) =>
-          (
-            field.model as {
-              route?: { counterpartyType?: "BANK" | "CUSTOMER" };
-            }
-          )?.route?.counterpartyType === "CUSTOMER"
-            ? 3
-            : (
-                  field.model as {
-                    route?: { counterpartyType?: string };
-                  }
-                )?.route?.counterpartyType === "ANY_BANK"
-              ? 3
-              : 3,
-        "props.maxLength": (field) =>
-          (
-            field.model as {
-              route?: { counterpartyType?: "BANK" | "CUSTOMER" };
-            }
-          )?.route?.counterpartyType === "CUSTOMER"
-            ? 35
-            : (
-                  field.model as {
-                    route?: { counterpartyType?: string };
-                  }
-                )?.route?.counterpartyType === "ANY_BANK"
-              ? 3
-              : 35,
+        "props.pattern": (field) => counterpartyBehavior(field).pattern,
+        "props.minLength": () => 3,
+        "props.maxLength": (field) => counterpartyBehavior(field).maxLength,
         "props.validationMessage": (field) =>
-          (
-            field.model as {
-              route?: { counterpartyType?: "BANK" | "CUSTOMER" };
-            }
-          )?.route?.counterpartyType === "CUSTOMER"
-            ? "請輸入 3–35 字元的 Customer ID，或從 Customer Service 選擇"
-            : (
-                  field.model as {
-                    route?: { counterpartyType?: string };
-                  }
-                )?.route?.counterpartyType === "ANY_BANK"
-              ? "通用 fallback 固定使用 ANY；實際受款銀行由交易資料提供"
-              : "請輸入 3–35 字元的內部 Counterparty ID，或從 Bank Service 選擇",
-        "props.description": (field) =>
-          (field.model as { route?: { counterpartyType?: string } })?.route
-            ?.counterpartyType === "ANY_BANK"
-            ? "通用 fallback 適用任何已核准銀行；實際交易對手由交易資料提供。"
-            : "內部穩定識別碼；SWIFT BIC 另存於受控 route 資料。",
-        "props.showPicker": (field) =>
-          (field.model as { route?: { counterpartyType?: string } })?.route
-            ?.counterpartyType !== "ANY_BANK",
-        "props.readonly": (field) =>
-          (field.model as { route?: { counterpartyType?: string } })?.route
-            ?.counterpartyType === "ANY_BANK",
-        "props.pickerLabel": (field) =>
-          (
-            field.model as {
-              route?: { counterpartyType?: "BANK" | "CUSTOMER" };
-            }
-          )?.route?.counterpartyType === "CUSTOMER"
-            ? "從 Customer Service 選擇"
-            : "從 Bank Service 選擇",
+          counterpartyBehavior(field).validationMessage,
+        "props.description": (field) => counterpartyBehavior(field).description,
+        "props.showPicker": (field) => counterpartyBehavior(field).showPicker,
+        "props.readonly": (field) => counterpartyBehavior(field).readonly,
+        "props.pickerLabel": (field) => counterpartyBehavior(field).pickerLabel,
       },
     },
     {
@@ -201,7 +182,7 @@ export function buildSsiMakerFields(
       props: {
         label: "Beneficiary BIC（ISO 9362）",
         pickerAction: () =>
-          void openPicker("beneficiaryBic", "選擇 Beneficiary BIC"),
+          openPicker("beneficiaryBic", "選擇 Beneficiary BIC"),
         pattern: BIC_PATTERN,
         maxLength: 11,
         minLength: 8,
@@ -228,7 +209,7 @@ export function buildSsiMakerFields(
         description:
           "SSI 的 Account With Institution BIC；Bank Service 只提供銀行身分與 BIC，不提供帳號。",
         pickerAction: () =>
-          void openPicker("accountWithBic", "選擇 Account With Institution"),
+          openPicker("accountWithBic", "選擇 Account With Institution"),
         ...bicValidation,
       },
     },
@@ -239,7 +220,7 @@ export function buildSsiMakerFields(
         label: "Intermediary Institution（ISO 9362）",
         description: "選填；沒有 intermediary 時保持空白。",
         pickerAction: () =>
-          void openPicker("intermediaryBic", "選擇 Intermediary Institution"),
+          openPicker("intermediaryBic", "選擇 Intermediary Institution"),
         pattern: BIC_PATTERN,
         maxLength: 11,
       },

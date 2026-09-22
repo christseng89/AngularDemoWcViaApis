@@ -1,7 +1,10 @@
 import { cpSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { RmaSupportedMessageTypeCatalogue } from "../../lib/rma-supported-message-type-catalogue";
+import {
+  RmaMessageScopePolicy,
+  RmaSupportedMessageTypeCatalogue,
+} from "../../lib/rma-supported-message-type-catalogue";
 
 const PARAMETER_FILES = [
   "rma-message-scope.sr2026.json",
@@ -50,6 +53,22 @@ describe("RMA supported message-type catalogue", () => {
     );
     expect(policy.supportedMessageTypes).not.toContain("MT700");
     expect(policy.supportedMessageTypes).not.toContain("pacs.008.001.12");
+  });
+
+  it("sorts supported message types with the governed locale-aware comparator", () => {
+    const values = ["Zulu", "alpha", "beta"];
+    const expected = [...values].sort((left, right) =>
+      left.localeCompare(right),
+    );
+    const sorted = new RmaMessageScopePolicy({
+      supportedMessageTypes: values,
+      categories: [],
+      items: [],
+      legacyConversions: [],
+      developmentReferenceGapSkips: [],
+    }).supportedMessageTypes;
+
+    expect(sorted).toEqual(expected);
   });
 
   it("exposes one governed presentation catalogue for the directional selector", () => {

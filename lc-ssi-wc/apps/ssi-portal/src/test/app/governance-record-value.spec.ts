@@ -24,5 +24,8 @@ describe("governed index presentation values", () => {
     ).toBe("HK01 / BANK-1");
     expect(governanceRecordValue(record, "messageTypes")).toBe("MT300, MT304");
     expect(governanceRecordValue(record, "missing.path")).toBe("—");
+    expect(governanceRecordValue(record, "missing|alsoMissing")).toBe("—");
+    expect(governanceRecordValue({ route: null }, "route.ownerParty")).toBe("—");
+    expect(governanceRecordValue({ route: [] }, "route.ownerParty")).toBe("—");
   });
 });

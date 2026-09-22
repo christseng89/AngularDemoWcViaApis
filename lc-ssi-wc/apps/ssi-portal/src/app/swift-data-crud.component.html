@@ -48,10 +48,10 @@
   />
 }
 @if (busy()) {
-  <div class="index-loading" role="status" aria-live="polite">
+  <output class="index-loading" aria-live="polite">
     <span class="index-spinner" aria-hidden="true"></span>
     <span>Loading {{ resource()?.label ?? "SWIFT Data Service" }}…</span>
-  </div>
+  </output>
 }
 @if (!checkerMode()) {
   <section class="catalog-tabs" aria-label="SWIFT data resource">
@@ -410,10 +410,10 @@
       </form>
     }
     @if (!formVisible() && savedDraftId()) {
-      <p class="data-disclaimer compact-warning" role="status">
+      <output class="data-disclaimer compact-warning">
         草稿 {{ savedDraftId() }} 已儲存。請在下方 DRAFT 清單按「提交」；
         儲存草稿本身不會送審。
-      </p>
+      </output>
     }
     @if (importResult()) {
       <details class="import-result" open>

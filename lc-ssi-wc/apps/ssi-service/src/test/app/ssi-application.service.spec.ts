@@ -142,8 +142,11 @@ describe("SsiApplicationService route standing-data validation", () => {
 
   it.each([
     [{ currency: "US" }, "INVALID_ISO_4217_CURRENCY"],
+    [{ currency: undefined }, "INVALID_ISO_4217_CURRENCY"],
     [{ routePreference: "UNKNOWN" }, "INVALID_ROUTE_CLASS_OR_PRIORITY"],
+    [{ routePreference: undefined }, "INVALID_ROUTE_CLASS_OR_PRIORITY"],
     [{ priority: "high" }, "INVALID_ROUTE_CLASS_OR_PRIORITY"],
+    [{ priority: undefined }, "INVALID_ROUTE_CLASS_OR_PRIORITY"],
     [{ validFrom: "" }, "INVALID_SSI_EFFECTIVE_DATES"],
     [
       { validFrom: "2028-01-01", validTo: "2027-01-01" },
@@ -186,6 +189,12 @@ describe("SsiApplicationService route standing-data validation", () => {
     expect(() =>
       validateRoute({ ...completeRoute, beneficiarySource: "TRANSACTION" }),
     ).not.toThrow();
+  });
+
+  it("defaults an unspecified counterparty type to governed bank validation", () => {
+    expect(() => validateRoute(validRoute)).toThrow(
+      "BANK_COUNTERPARTY_BIC_REQUIRED",
+    );
   });
 
   it("does not allow transaction-sourced Beneficiary BIC to be stored in SSI", () => {
@@ -262,6 +271,17 @@ describe("SsiApplicationService governed lifecycle", () => {
             }
           : undefined;
       }),
+      approveSuppression: jest.fn((id: string, actor: string) => {
+        const current = records.find((item) => item.id === id);
+        return current
+          ? {
+              ...current,
+              status: "SUPPRESSED",
+              checker: actor,
+              version: current.version + 1,
+            }
+          : undefined;
+      }),
       save: jest.fn(),
       audit: jest.fn(() => [{ action: "CREATED" }]),
     };
@@ -280,15 +300,27 @@ describe("SsiApplicationService governed lifecycle", () => {
   it("discovers new currency inside the normal approval transaction", () => {
     const pending = { ...record, status: "PENDING_APPROVAL" };
     const coordinator = {
-      discoverApproved: jest.fn(() => ({ inserted: 1, activated: 0, inactivated: 0 })),
+      discoverApproved: jest.fn(() => ({
+        inserted: 1,
+        activated: 0,
+        inactivated: 0,
+      })),
       invalidateAfterCommit: jest.fn(),
     };
-    const { service, repository } = harness([pending], [applicability], coordinator);
-    repository.approveWithApplicability.mockImplementation((id, actor, onApproved?: () => void) => {
-      onApproved?.();
-      return { ...pending, status: "ACTIVE", checker: actor, version: 2 };
+    const { service, repository } = harness(
+      [pending],
+      [applicability],
+      coordinator,
+    );
+    repository.approveWithApplicability.mockImplementation(
+      (id, actor, onApproved?: () => void) => {
+        onApproved?.();
+        return { ...pending, status: "ACTIVE", checker: actor, version: 2 };
+      },
+    );
+    expect(service.transition(pending.id, "APPROVE", "checker")).toMatchObject({
+      status: "ACTIVE",
     });
-    expect(service.transition(pending.id, "APPROVE", "checker")).toMatchObject({ status: "ACTIVE" });
     expect(coordinator.discoverApproved).toHaveBeenCalledWith(pending.id);
     expect(coordinator.invalidateAfterCommit).toHaveBeenCalledWith(
       expect.objectContaining({ inserted: 1 }),
@@ -310,11 +342,44 @@ describe("SsiApplicationService governed lifecycle", () => {
     expect(repository.listApplicability).toHaveBeenCalledWith("SSI-1");
   });
 
+  it("delegates paged lists and lifecycle summaries without changing repository semantics", () => {
+    const { service: current, repository } = harness();
+    const page = { items: [record], page: 1, pageSize: 20, totalItems: 1 };
+    const summary = { ACTIVE: 1 };
+    const coverage = [{ counterpartyId: "CP-1", count: 1 }];
+    Object.assign(repository, {
+      listPage: jest.fn(() => page),
+      summary: jest.fn(() => summary),
+      counterpartyCoverage: jest.fn(() => coverage),
+    });
+
+    expect(current.listPage({ page: 1, pageSize: 20 } as never)).toMatchObject({
+      ...page,
+      items: [
+        expect.objectContaining({
+          id: record.id,
+          ownershipType: "COUNTERPARTY",
+          applicability: [applicability],
+        }),
+      ],
+    });
+    expect(current.summary()).toBe(summary);
+    expect(current.counterpartyCoverage("ACTIVE")).toBe(coverage);
+    expect(repository.counterpartyCoverage).toHaveBeenCalledWith("ACTIVE");
+  });
+
   it.each([
     [{ actor: "", records: [applicability] }, "SSI_APPLICABILITY_REQUIRED"],
     [{ actor: "ops", records: [] }, "SSI_APPLICABILITY_REQUIRED"],
     [
       { actor: "ops", records: [{ ...applicability, consumer: "" }] },
+      "SSI_APPLICABILITY_FIELDS_REQUIRED",
+    ],
+    [
+      {
+        actor: "ops",
+        records: [(({ consumer: _consumer, ...row }) => row)(applicability)],
+      },
       "SSI_APPLICABILITY_FIELDS_REQUIRED",
     ],
     [
@@ -368,6 +433,32 @@ describe("SsiApplicationService governed lifecycle", () => {
       publisherParty: "PAYMENT-OPS",
     });
     expect(repository.save).toHaveBeenCalledWith(created, "CREATED", "maker");
+  });
+
+  it("derives governed ownership defaults for own and counterparty SSI", () => {
+    const routeWithoutBookingEntity: Record<string, string> = { ...route };
+    delete routeWithoutBookingEntity.bookingEntity;
+    const own = harness([]).service.create({
+      ...command,
+      counterpartyId: "ANY",
+      route: {
+        ...routeWithoutBookingEntity,
+        counterpartyType: "ANY_BANK",
+        counterpartyBic: "ANY",
+      },
+    });
+    expect(own).toMatchObject({
+      ownershipType: "OWN",
+      ownerParty: "HK01",
+      publisherParty: "HK01",
+    });
+
+    const counterparty = harness([]).service.create(command);
+    expect(counterparty).toMatchObject({
+      ownershipType: "COUNTERPARTY",
+      ownerParty: "CHASUS33",
+      publisherParty: "CHASUS33",
+    });
   });
 
   it.each([
@@ -452,6 +543,69 @@ describe("SsiApplicationService governed lifecycle", () => {
     );
   });
 
+  it("keeps an empty applicability set empty when reserving a revision", () => {
+    const active = { ...record, status: "ACTIVE" };
+    const { service, repository } = harness([active], []);
+    expect(service.revise(active.id, "maker2")).toMatchObject({
+      status: "WIP",
+    });
+    expect(repository.replaceApplicability).not.toHaveBeenCalled();
+  });
+
+  it("copies governed fixture bindings into a revision reservation", () => {
+    const active = { ...record, status: "ACTIVE" };
+    const boundApplicability = {
+      ...applicability,
+      fixtureBindingIds: ["FIXTURE-1"],
+    };
+    const { service, repository } = harness([active], [boundApplicability]);
+    const revision = service.revise(active.id, "maker2");
+    expect(repository.replaceApplicability).toHaveBeenCalledWith(
+      revision.id,
+      [expect.objectContaining({ fixtureBindingIds: ["FIXTURE-1"] })],
+      "maker2",
+    );
+  });
+
+  it("fails closed for an open or concurrently unavailable revision", () => {
+    const active = { ...record, status: "ACTIVE" };
+    const open = harness([active]);
+    Object.assign(open.repository, {
+      hasOpenRevision: jest.fn(() => true),
+    });
+    expect(() => open.service.revise(active.id, "maker2")).toThrow(
+      "OPEN_REVISION_EXISTS",
+    );
+
+    const unavailable = harness([active]);
+    Object.assign(unavailable.repository, {
+      hasOpenRevision: jest.fn(() => false),
+      saveRevisionWorkInProgress: jest.fn(() => false),
+    });
+    expect(() => unavailable.service.revise(active.id, "maker2")).toThrow(
+      "REVISION_NOT_AVAILABLE",
+    );
+    expect(unavailable.repository.save).not.toHaveBeenCalled();
+  });
+
+  it("uses the repository's atomic WIP reservation when it is available", () => {
+    const active = { ...record, status: "ACTIVE" };
+    const { service, repository } = harness([active]);
+    const saveRevisionWorkInProgress = jest.fn(() => true);
+    Object.assign(repository, {
+      hasOpenRevision: jest.fn(() => false),
+      saveRevisionWorkInProgress,
+    });
+
+    const revision = service.revise(active.id, "maker2");
+    expect(saveRevisionWorkInProgress).toHaveBeenCalledWith(revision, "maker2");
+    expect(repository.save).not.toHaveBeenCalledWith(
+      revision,
+      "WIP_RESERVED",
+      "maker2",
+    );
+  });
+
   it("lets only the WIP maker cancel a revision reservation", () => {
     const wip = {
       ...record,
@@ -485,6 +639,80 @@ describe("SsiApplicationService governed lifecycle", () => {
     expect(repository.save).toHaveBeenCalledWith(
       cancelled,
       "WIP_CANCELLED",
+      "maker2",
+    );
+  });
+
+  it("enforces suppression validation and atomic reservation", () => {
+    const active = { ...record, status: "ACTIVE" };
+    expect(() =>
+      harness([active]).service.suppress(active.id, "", "retired"),
+    ).toThrow("MAKER_REQUIRED");
+    expect(() =>
+      harness([active]).service.suppress(active.id, "maker2", "bad"),
+    ).toThrow("SUPPRESSION_REASON_REQUIRED");
+    expect(() =>
+      harness([active]).service.suppress(
+        active.id,
+        "maker2",
+        undefined as never,
+      ),
+    ).toThrow("SUPPRESSION_REASON_REQUIRED");
+    expect(() =>
+      harness().service.suppress(record.id, "maker2", "retired route"),
+    ).toThrow("ONLY_ACTIVE_CAN_BE_SUPPRESSED");
+
+    const open = harness([active]);
+    Object.assign(open.repository, { hasOpenRevision: jest.fn(() => true) });
+    expect(() =>
+      open.service.suppress(active.id, "maker2", "retired route"),
+    ).toThrow("OPEN_REVISION_EXISTS");
+
+    const unavailable = harness([active]);
+    Object.assign(unavailable.repository, {
+      hasOpenRevision: jest.fn(() => false),
+      saveRevisionWorkInProgress: jest.fn(() => false),
+    });
+    expect(() =>
+      unavailable.service.suppress(active.id, "maker2", "retired route"),
+    ).toThrow("SUPPRESSION_NOT_AVAILABLE");
+
+    const reserved = harness([active]);
+    const saveRevisionWorkInProgress = jest.fn(() => true);
+    Object.assign(reserved.repository, {
+      hasOpenRevision: jest.fn(() => false),
+      saveRevisionWorkInProgress,
+    });
+    const suppression = reserved.service.suppress(
+      active.id,
+      "maker2",
+      "  retired route  ",
+    );
+    expect(suppression).toMatchObject({
+      status: "DRAFT",
+      changeType: "SUPPRESSION",
+      suppressionReason: "retired route",
+      amendmentOfId: active.id,
+    });
+    expect(saveRevisionWorkInProgress).toHaveBeenCalledWith(
+      suppression,
+      "maker2",
+      "SUPPRESSION_DRAFT_CREATED",
+    );
+    expect(reserved.repository.replaceApplicability).toHaveBeenCalledWith(
+      suppression.id,
+      [expect.objectContaining({ consumer: applicability.consumer })],
+      "maker2",
+    );
+  });
+
+  it("keeps the suppression reservation fallback for legacy repositories", () => {
+    const active = { ...record, status: "ACTIVE" };
+    const { service, repository } = harness([active]);
+    const suppression = service.suppress(active.id, "maker2", "retired route");
+    expect(repository.save).toHaveBeenCalledWith(
+      suppression,
+      "SUPPRESSION_DRAFT_CREATED",
       "maker2",
     );
   });
@@ -553,6 +781,111 @@ describe("SsiApplicationService governed lifecycle", () => {
     );
   });
 
+  it("preserves suppression submission and atomic approval behavior", () => {
+    const suppressionDraft = {
+      ...record,
+      changeType: "SUPPRESSION" as const,
+      suppressionReason: "  duplicate settlement route  ",
+    };
+    const submitted = harness([suppressionDraft]).service.transition(
+      suppressionDraft.id,
+      "SUBMIT",
+      suppressionDraft.maker,
+    );
+    expect(submitted).toMatchObject({ status: "PENDING_APPROVAL" });
+
+    const pending = { ...suppressionDraft, status: "PENDING_APPROVAL" };
+    const { service, repository } = harness([pending]);
+    expect(service.transition(pending.id, "APPROVE", "checker")).toMatchObject({
+      status: "SUPPRESSED",
+      checker: "checker",
+    });
+    expect(repository.approveSuppression).toHaveBeenCalledWith(
+      pending.id,
+      "checker",
+    );
+    expect(repository.approveWithApplicability).not.toHaveBeenCalled();
+    expect(repository.save).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when suppression approval state changes", () => {
+    const pending = {
+      ...record,
+      status: "PENDING_APPROVAL",
+      changeType: "SUPPRESSION" as const,
+      suppressionReason: "duplicate settlement route",
+    };
+    const { service, repository } = harness([pending]);
+    repository.approveSuppression.mockReturnValue(undefined);
+
+    expect(() => service.transition(pending.id, "APPROVE", "checker")).toThrow(
+      "SUPPRESSION_STATE_CHANGED",
+    );
+    expect(repository.approveWithApplicability).not.toHaveBeenCalled();
+    expect(repository.save).not.toHaveBeenCalled();
+  });
+
+  it("requires a governed suppression reason before submission", () => {
+    const suppressionDraft = {
+      ...record,
+      changeType: "SUPPRESSION" as const,
+      suppressionReason: "bad",
+    };
+    expect(() =>
+      harness([suppressionDraft]).service.transition(
+        suppressionDraft.id,
+        "SUBMIT",
+        suppressionDraft.maker,
+      ),
+    ).toThrow("SUPPRESSION_REASON_REQUIRED");
+
+    expect(() =>
+      harness([
+        { ...suppressionDraft, suppressionReason: undefined },
+      ]).service.transition(
+        suppressionDraft.id,
+        "SUBMIT",
+        suppressionDraft.maker,
+      ),
+    ).toThrow("SUPPRESSION_REASON_REQUIRED");
+  });
+
+  it("fails closed when ordinary approval state changes", () => {
+    const pending = { ...record, status: "PENDING_APPROVAL" };
+    const { service, repository } = harness([pending]);
+    repository.approveWithApplicability.mockReturnValue(undefined);
+
+    expect(() => service.transition(pending.id, "APPROVE", "checker")).toThrow(
+      "APPROVAL_STATE_CHANGED",
+    );
+    expect(repository.save).not.toHaveBeenCalled();
+  });
+
+  it("does not invalidate currency coverage when approval discovers no delta", () => {
+    const pending = { ...record, status: "PENDING_APPROVAL" };
+    const coordinator = {
+      discoverApproved: jest.fn(() => undefined),
+      invalidateAfterCommit: jest.fn(),
+    };
+    const { service, repository } = harness(
+      [pending],
+      [applicability],
+      coordinator,
+    );
+    repository.approveWithApplicability.mockImplementation(
+      (id, actor, onApproved?: () => void) => {
+        onApproved?.();
+        return { ...pending, id, status: "ACTIVE", checker: actor, version: 2 };
+      },
+    );
+
+    expect(service.transition(pending.id, "APPROVE", "checker")).toMatchObject({
+      status: "ACTIVE",
+    });
+    expect(coordinator.discoverApproved).toHaveBeenCalledWith(pending.id);
+    expect(coordinator.invalidateAfterCommit).not.toHaveBeenCalled();
+  });
+
   it("enforces revocation authority, reason and idempotency", () => {
     expect(() => harness().service.revoke("SSI-1", "", "retired")).toThrow(
       "ACTOR_REQUIRED",
@@ -583,6 +916,14 @@ describe("SsiApplicationService governed lifecycle", () => {
       version: 2,
     });
     expect(repository.save).toHaveBeenCalledWith(revoked, "REVOKED", "ops");
+
+    expect(() =>
+      harness([{ ...record, status: "WIP" }]).service.revoke(
+        "SSI-1",
+        "maker",
+        "Maker cannot revoke own WIP",
+      ),
+    ).toThrow("Maker cannot revoke an approved SSI");
   });
 
   it("enforces maker/checker and state transitions", () => {
@@ -697,6 +1038,31 @@ describe("SsiApplicationService governed lifecycle", () => {
     );
   });
 
+  it("inherits applicability when activating a legacy approved revision", () => {
+    const previous = { ...record, id: "SSI-OLD", status: "ACTIVE" };
+    const revision = {
+      ...record,
+      id: "SSI-REVISION",
+      status: "APPROVED",
+      amendmentOfId: previous.id,
+    };
+    const { service, repository } = harness([previous, revision]);
+    repository.listApplicability.mockImplementation((id?: string) =>
+      id === revision.id ? [] : [applicability],
+    );
+
+    expect(
+      service.transition(revision.id, "ACTIVATE", "checker"),
+    ).toMatchObject({
+      status: "ACTIVE",
+    });
+    expect(repository.replaceApplicability).toHaveBeenCalledWith(
+      revision.id,
+      [expect.objectContaining({ consumer: applicability.consumer })],
+      "checker",
+    );
+  });
+
   it("reports missing records and exposes the audit trail", () => {
     expect(() => harness([]).service.update("missing", command)).toThrow(
       "SSI not found",
@@ -710,6 +1076,9 @@ describe("SsiApplicationService resolution failure boundaries", () => {
     rmaAuthorised?: boolean;
     nostroDecision?: string;
     includeAlternative?: boolean;
+    includeRoute?: boolean;
+    routeOverrides?: Record<string, string | undefined>;
+    nostroRecords?: readonly Record<string, unknown>[];
   }) => {
     const route = {
       counterpartyType: "BANK",
@@ -732,6 +1101,7 @@ describe("SsiApplicationService resolution failure boundaries", () => {
       messageTypes: "pacs.009.001.08",
       validFrom: "2026-01-01",
       validTo: "2027-12-31",
+      ...options?.routeOverrides,
     };
     const record = {
       id: "SSI-PAY-1",
@@ -764,33 +1134,52 @@ describe("SsiApplicationService resolution failure boundaries", () => {
       ssiId: alternative.id,
     };
     const repository = {
-      list: () => [
-        record,
-        ...(options?.includeAlternative ? [alternative] : []),
-      ],
-      listApplicability: () => [
-        applicability,
-        ...(options?.includeAlternative ? [alternativeApplicability] : []),
-      ],
-    } as unknown as SqliteSsiRepository;
-    const rma = {
-      check: () => ({ authorised: options?.rmaAuthorised ?? true }),
-    } as unknown as RmaApplicationService;
-    const nostro = {
-      resolve: () => ({
-        decision: options?.nostroDecision ?? "RESOLVED",
-        nostroId: "NOSTRO-1",
-        accountServicerBic: "HSBCHKHH",
-        maskedAccountRef: "MASKED-HKD-1",
-      }),
-    } as unknown as NostroApplicationService;
+      list: jest.fn(() =>
+        options?.includeRoute === false
+          ? []
+          : [record, ...(options?.includeAlternative ? [alternative] : [])],
+      ),
+      listApplicability: jest.fn(() =>
+        options?.includeRoute === false
+          ? []
+          : [
+              applicability,
+              ...(options?.includeAlternative
+                ? [alternativeApplicability]
+                : []),
+            ],
+      ),
+    };
+    const rmaCheck = jest.fn(() => ({
+      authorised: options?.rmaAuthorised ?? true,
+    }));
+    const rma = { check: rmaCheck } as unknown as RmaApplicationService;
+    const nostroResolve = jest.fn(() => ({
+      decision: options?.nostroDecision ?? "RESOLVED",
+      nostroId: "NOSTRO-1",
+      accountReference: "OWN-HKD-1",
+      accountServicerBic: "HSBCHKHH",
+      maskedAccountRef: "MASKED-HKD-1",
+    }));
+    const nostroImplementation = {
+      resolve: nostroResolve,
+      ...(options?.nostroRecords
+        ? { list: jest.fn(() => options.nostroRecords) }
+        : {}),
+    };
+    const nostro = nostroImplementation as unknown as NostroApplicationService;
     return {
       service: new SsiApplicationService(
-        repository,
+        repository as unknown as SqliteSsiRepository,
         rma,
         nostro,
         new PaymentMessageIndexService(),
       ),
+      repository,
+      rmaCheck,
+      nostroResolve,
+      record,
+      applicability,
       request: {
         consumer: "CENTRAL_PAYMENT",
         product: "CENTRAL_PAYMENT",
@@ -814,12 +1203,14 @@ describe("SsiApplicationService resolution failure boundaries", () => {
 
   it.each([
     [{ transactionReference: "" }, "RESOLUTION_FIELDS_REQUIRED"],
+    [{ transactionReference: undefined }, "RESOLUTION_FIELDS_REQUIRED"],
     [{ paymentLeg: "INFORMATION_ONLY" }, "PAYMENT_TRIGGER_REQUIRED"],
     [
       { direction: "INBOUND" },
       "EXECUTABLE_SETTLEMENT_REQUIRES_OUTGOING_PAYMENT",
     ],
     [{ currency: "US" }, "INVALID_ISO_4217_CURRENCY"],
+    [{ currency: undefined }, "INVALID_ISO_4217_CURRENCY"],
     [{ sourceMessageType: "MT103" }, "MESSAGE_TYPE_NOT_SUPPORTED"],
   ])(
     "rejects an invalid executable-resolution request %#",
@@ -856,6 +1247,12 @@ describe("SsiApplicationService resolution failure boundaries", () => {
     expect(
       current.clearingOptions({
         ...validRequest,
+        amount: undefined as never,
+      }),
+    ).toEqual({ items: [], decision: "INCOMPLETE_CRITERIA" });
+    expect(
+      current.clearingOptions({
+        ...validRequest,
         paymentLeg: "INFORMATION_ONLY",
       }),
     ).toEqual({ items: [], decision: "PAYMENT_TRIGGER_REQUIRED" });
@@ -874,6 +1271,63 @@ describe("SsiApplicationService resolution failure boundaries", () => {
       nostroDecision: "NOT_FOUND",
     });
     expect(() => current.resolve(validRequest)).toThrow("PROFILE_INCOMPLETE");
+  });
+
+  it("uses scoped route bindings when the repository provides them", () => {
+    const {
+      service: current,
+      request: validRequest,
+      repository,
+      record,
+      applicability,
+    } = paymentHarness();
+    const findRelatedRouteBindings = jest.fn(() => ({
+      ssi: [record],
+      applicability: [applicability],
+    }));
+    Object.assign(repository, { findRelatedRouteBindings });
+
+    expect(current.resolve(validRequest)).toMatchObject({
+      recommendedRoute: expect.objectContaining({ ssiId: record.id }),
+    });
+    expect(findRelatedRouteBindings).toHaveBeenCalledWith(validRequest);
+  });
+
+  it("uses the repository cover-profile check when that capability exists", () => {
+    const {
+      service: current,
+      request: validRequest,
+      repository,
+    } = paymentHarness();
+    const hasCoverProfile = jest.fn(() => true);
+    Object.assign(repository, { hasCoverProfile });
+    const covRequest = {
+      ...validRequest,
+      sourceMessageType: "MT202COV",
+      businessService: "swift.cbprplus.cov.04",
+    };
+    const internals = current as unknown as {
+      requireCoverProfile(request: never): void;
+    };
+
+    expect(() =>
+      internals.requireCoverProfile(covRequest as never),
+    ).not.toThrow();
+    expect(hasCoverProfile).toHaveBeenCalledWith(covRequest);
+  });
+
+  it("returns a non-executable preview when no route is eligible", () => {
+    const { service: current, request: validRequest } = paymentHarness({
+      includeRoute: false,
+    });
+    expect(current.resolve(validRequest)).toMatchObject({
+      paymentExecutable: false,
+      preSettlement: true,
+      alternatives: [],
+    });
+    expect(current.resolve(validRequest)).not.toHaveProperty(
+      "canonicalSettlementPreview",
+    );
   });
 
   it("rejects stale, unauthenticated and ineligible confirmation attempts", () => {
@@ -939,6 +1393,144 @@ describe("SsiApplicationService resolution failure boundaries", () => {
     ).toThrow("OVERRIDE_REASON_REQUIRED");
   });
 
+  it("confirms the recommended route with preserved RMA, Nostro and snapshot inputs", () => {
+    const {
+      service: current,
+      request: validRequest,
+      rmaCheck,
+      nostroResolve,
+    } = paymentHarness();
+    const preview = current.resolve(validRequest) as {
+      attemptId: string;
+      recommendedRoute: { ssiId: string };
+    };
+
+    const confirmed = current.confirm({
+      attemptId: preview.attemptId,
+      selectedSsiId: preview.recommendedRoute.ssiId,
+      actor: "ops",
+    }) as Record<string, unknown>;
+    expect(confirmed).toMatchObject({
+      decision: "CONFIRMED",
+      paymentExecutable: true,
+      actor: "ops",
+      overrideReason: null,
+      actualReceiverBic: "HSBCHKHH",
+      resolutionToken: expect.any(String),
+      snapshotHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+    });
+    expect(rmaCheck).toHaveBeenCalledWith({
+      ownBic: "DEMOHKHH",
+      counterpartyBic: "HSBCHKHH",
+      service: "FINPLUS",
+      direction: "OUTBOUND",
+      messageType: validRequest.messageType,
+      at: validRequest.valueDate,
+    });
+    expect(nostroResolve).toHaveBeenLastCalledWith({
+      ownLegalEntityId: validRequest.bookingEntity,
+      accountReference: "OWN-HKD-1",
+      accountServicerBic: "HSBCHKHH",
+      currency: validRequest.currency,
+      purpose: "SETTLEMENT",
+      at: validRequest.valueDate,
+    });
+  });
+
+  it("confirms an eligible override only with its governed reason", () => {
+    const { service: current, request: validRequest } = paymentHarness({
+      includeAlternative: true,
+    });
+    const preview = current.resolve(validRequest) as {
+      attemptId: string;
+      alternatives: Array<{ ssiId: string }>;
+    };
+    expect(
+      current.confirm({
+        attemptId: preview.attemptId,
+        selectedSsiId: preview.alternatives[0]!.ssiId,
+        actor: "ops",
+        overrideReason: "  approved alternate settlement route  ",
+      }),
+    ).toMatchObject({
+      decision: "CONFIRMED",
+      overrideReason: "approved alternate settlement route",
+    });
+  });
+
+  it("counts only distinct eligible direct-account relationships", () => {
+    const baseNostro = {
+      status: "ACTIVE",
+      accountServicerBic: "HSBCHKHH",
+      currency: "HKD",
+      purpose: "SETTLEMENT",
+      validFrom: "2026-01-01",
+      validTo: "2027-12-31",
+      ownLegalEntityId: "HK01",
+    };
+    const { service: current, request: validRequest } = paymentHarness({
+      routeOverrides: { routeType: "DIRECT", beneficiaryBic: "HSBCHKHH" },
+      nostroRecords: [
+        { ...baseNostro, accountReference: "ACC-DEFAULT" },
+        {
+          ...baseNostro,
+          accountReference: "ACC-EMPTY",
+          allowedBookingEntities: [],
+        },
+        {
+          ...baseNostro,
+          accountReference: "ACC-ANY",
+          allowedBookingEntities: ["ANY"],
+        },
+        {
+          ...baseNostro,
+          accountReference: "ACC-EXACT",
+          allowedBookingEntities: ["HK01"],
+        },
+        {
+          ...baseNostro,
+          accountReference: "ACC-BLOCKED",
+          allowedBookingEntities: ["SG01"],
+        },
+      ],
+    });
+    const preview = current.resolve(validRequest) as {
+      attemptId: string;
+      recommendedRoute: { ssiId: string };
+    };
+    const confirmed = current.confirm({
+      attemptId: preview.attemptId,
+      selectedSsiId: preview.recommendedRoute.ssiId,
+      actor: "ops",
+    }) as { canonicalSettlement: Record<string, unknown> };
+
+    expect(confirmed.canonicalSettlement).toMatchObject({
+      directAccountRelationshipCount: 4,
+      creditorAgentBic: "",
+      deliveryAgentBic: "",
+    });
+  });
+
+  it("reports zero direct relationships when a canonical route has no receiver", () => {
+    const { service: current, request: validRequest } = paymentHarness();
+    const internals = current as unknown as {
+      buildCanonicalSettlement(
+        request: never,
+        selected: never,
+        nostroEvidence?: never,
+      ): Record<string, unknown>;
+    };
+    expect(
+      internals.buildCanonicalSettlement(
+        validRequest as never,
+        { ssiId: "SSI-NO-RECEIVER", route: { currency: "HKD" } } as never,
+      ),
+    ).toMatchObject({
+      instructedAgentBic: "",
+      directAccountRelationshipCount: 0,
+    });
+  });
+
   it("detects a currency change between preview request and candidate snapshot", () => {
     const { service: current, request: validRequest } = paymentHarness();
     const internals = current as unknown as {
@@ -950,6 +1542,108 @@ describe("SsiApplicationService resolution failure boundaries", () => {
         { ssiId: "SSI-PAY-1", route: { currency: "USD" } } as never,
       ),
     ).toThrow("RESOLUTION_SNAPSHOT_CURRENCY_MISMATCH");
+  });
+
+  it("passes empty optional route account fields to Nostro resolution", () => {
+    const {
+      service: current,
+      request: validRequest,
+      nostroResolve,
+    } = paymentHarness();
+    const internals = current as unknown as {
+      resolveCandidateNostro(request: never, candidate: never): unknown;
+    };
+    expect(
+      internals.resolveCandidateNostro(
+        validRequest as never,
+        {
+          ssiId: "SSI-PAY-EMPTY",
+          route: { currency: "HKD" },
+        } as never,
+      ),
+    ).toMatchObject({ ssiId: "SSI-PAY-EMPTY", decision: "RESOLVED" });
+    expect(nostroResolve).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        accountReference: "",
+        accountServicerBic: "",
+      }),
+    );
+  });
+
+  it("preserves request messaging-service precedence", () => {
+    const {
+      service: current,
+      request: validRequest,
+      rmaCheck,
+    } = paymentHarness();
+    const requestWithService = {
+      ...validRequest,
+      messagingService: "FINPLUS",
+    };
+    const preview = current.resolve(requestWithService) as {
+      attemptId: string;
+      recommendedRoute: { ssiId: string };
+    };
+    expect(
+      current.confirm({
+        attemptId: preview.attemptId,
+        selectedSsiId: preview.recommendedRoute.ssiId,
+        actor: "ops",
+      }),
+    ).toMatchObject({ actualReceiverBic: "HSBCHKHH" });
+    expect(rmaCheck).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        counterpartyBic: "HSBCHKHH",
+        service: "FINPLUS",
+      }),
+    );
+  });
+
+  it("builds customer canonical settlement with transaction provenance", () => {
+    const { service: current, request: validRequest } = paymentHarness();
+    const internals = current as unknown as {
+      buildCanonicalSettlement(
+        request: never,
+        selected: never,
+        nostroEvidence?: never,
+      ): Record<string, unknown>;
+    };
+    const customerRequest = {
+      ...validRequest,
+      counterpartyType: "CUSTOMER",
+      sourceMessageType: "MT103",
+      beneficiaryCustomer: {
+        customerId: "CUSTOMER-1",
+        name: "Customer One",
+        accountReference: "CUSTOMER-ACCOUNT-1",
+      },
+    };
+    const settlement = internals.buildCanonicalSettlement(
+      customerRequest as never,
+      {
+        ssiId: "SSI-CUSTOMER-1",
+        route: {
+          currency: "HKD",
+          accountWithBic: "HSBCHKHH",
+          routeType: "CLEARING_AGENT",
+        },
+      } as never,
+    );
+    expect(settlement).toMatchObject({
+      finMessageType: "MT103",
+      instructedAgentBic: "HSBCHKHH",
+      beneficiaryCustomer: customerRequest.beneficiaryCustomer,
+      fieldProvenance: {
+        "57A": {
+          source: "CUSTOMER_SSI",
+          evidenceId: "SSI-CUSTOMER-1",
+        },
+        "59": {
+          source: "TRANSACTION_INPUT",
+          evidenceId: "CUSTOMER-1",
+        },
+      },
+    });
   });
 
   it.each([

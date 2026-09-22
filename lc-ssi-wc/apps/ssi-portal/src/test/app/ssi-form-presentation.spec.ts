@@ -64,6 +64,9 @@ describe("SSI form presentation", () => {
       readonly: true,
       showPicker: false,
     });
+    expect(field.expressions?.["props.disabled"]?.(field)).toBe(true);
+    expect(field.expressions?.["props.readonly"]?.(field)).toBe(true);
+    expect(field.expressions?.["props.showPicker"]?.(field)).toBe(false);
     expect(messageTypeField.props?.["messageTypeOperation"]).toBe("INQUIRE");
   });
 

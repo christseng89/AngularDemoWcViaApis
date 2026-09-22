@@ -42,4 +42,11 @@ describe("RuntimeSettingsService", () => {
     });
     expect(http.post).toHaveBeenCalledWith("/api/settings/resolution-currencies/resync", {});
   });
+
+  it("loads the governed currency inquiry contract from the current origin", async () => {
+    const { RuntimeSettingsService } = await import("../../app/runtime-settings.service");
+    const service = new RuntimeSettingsService();
+    await firstValueFrom(service.currencyContract());
+    expect(http.get).toHaveBeenCalledWith("/openapi/swift-data-service.v1.json");
+  });
 });

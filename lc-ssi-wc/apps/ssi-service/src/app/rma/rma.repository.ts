@@ -13,6 +13,8 @@ import {
 } from "../shared/current-status-projection";
 import { maintenanceIndexStatuses } from "../shared/maintenance-index-status";
 
+const SQL_LIKE_ESCAPE_CHARACTER = String.fromCodePoint(92);
+
 export type RmaDirection = "INBOUND" | "OUTBOUND";
 export interface RmaMessageTypeChanges {
   unchanged: string[];
@@ -57,6 +59,16 @@ export interface RmaPairState {
   counterpartyBic: string;
   directions: Record<RmaDirection, RmaRecord | null>;
 }
+
+const serviceForMessageTypes = (
+  messageTypes: readonly string[],
+): RmaRecord["service"] => {
+  const hasFin = messageTypes.some((value) => value.startsWith("MT"));
+  const hasFinPlus = messageTypes.some((value) => value.startsWith("pacs."));
+  if (hasFin && hasFinPlus) return "FIN / FINPLUS";
+  if (hasFin) return "FIN";
+  return "FINPLUS";
+};
 
 @Injectable()
 export class RmaRepository extends SqliteGovernedRepository<RmaRecord> {
@@ -135,15 +147,10 @@ export class RmaRepository extends SqliteGovernedRepository<RmaRecord> {
       const messageTypes = [
         ...new Set(matches.flatMap((record) => record.messageTypes)),
       ];
-      const hasFin = messageTypes.some((value) => value.startsWith("MT"));
-      const hasFinPlus = messageTypes.some((value) =>
-        value.startsWith("pacs."),
-      );
       return {
         ...representative,
         messageTypes,
-        service:
-          hasFin && hasFinPlus ? "FIN / FINPLUS" : hasFin ? "FIN" : "FINPLUS",
+        service: serviceForMessageTypes(messageTypes),
       };
     };
     return {
@@ -172,10 +179,17 @@ export class RmaRepository extends SqliteGovernedRepository<RmaRecord> {
     parameters.push(...statuses);
     const search = request.search?.trim();
     if (search) {
-      clauses.push("payload LIKE ? ESCAPE '\\'");
-      parameters.push(
-        `%${search.replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_")}%`,
+      clauses.push(
+        `payload LIKE ? ESCAPE '${SQL_LIKE_ESCAPE_CHARACTER}'`,
       );
+      const escapedSearch = search
+        .replaceAll(
+          SQL_LIKE_ESCAPE_CHARACTER,
+          SQL_LIKE_ESCAPE_CHARACTER.repeat(2),
+        )
+        .replaceAll("%", `${SQL_LIKE_ESCAPE_CHARACTER}%`)
+        .replaceAll("_", `${SQL_LIKE_ESCAPE_CHARACTER}_`);
+      parameters.push(`%${escapedSearch}%`);
     }
     const where = clauses.length ? ` WHERE ${clauses.join(" AND ")}` : "";
     const key = `upper(trim(json_extract(payload,'$.ownBic'))) || '|' ||

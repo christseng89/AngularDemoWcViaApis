@@ -7,7 +7,10 @@ import {
   NostroApplicationService,
   type NostroCommand,
 } from "../../../app/nostro/nostro-application.service";
-import type { NostroRecord, NostroRepository } from "../../../app/nostro/nostro.repository";
+import type {
+  NostroRecord,
+  NostroRepository,
+} from "../../../app/nostro/nostro.repository";
 
 const command = (overrides: Partial<NostroCommand> = {}): NostroCommand => ({
   ownLegalEntityId: "HK01",
@@ -35,11 +38,20 @@ const record = (overrides: Partial<NostroRecord> = {}): NostroRecord => ({
   ...overrides,
 });
 
-function harness(initial: NostroRecord[] = []) {
+function harness(
+  initial: NostroRecord[] = [],
+  options: {
+    approveSuppressionResult?: NostroRecord | null;
+    hasOpenRevision?: boolean;
+    legacyReservation?: boolean;
+    reservationResult?: boolean;
+  } = {},
+) {
   const records = [...initial];
   const auditEvents: unknown[] = [{ action: "SEEDED" }];
   const repository = {
     list: jest.fn(() => records),
+    listPage: jest.fn(() => ({ items: records, total: records.length })),
     findEligible: jest.fn(
       (query: {
         ownLegalEntityId?: string;
@@ -83,6 +95,11 @@ function harness(initial: NostroRecord[] = []) {
       else records.push(item);
       return item;
     }),
+    approveSuppression: jest.fn(() => options.approveSuppressionResult ?? null),
+    hasOpenRevision: jest.fn(() => options.hasOpenRevision ?? false),
+    saveRevisionWorkInProgress: options.legacyReservation
+      ? undefined
+      : jest.fn(() => options.reservationResult ?? true),
     audit: jest.fn(() => auditEvents),
   };
   return {
@@ -96,8 +113,14 @@ function harness(initial: NostroRecord[] = []) {
 describe("NostroApplicationService", () => {
   it("lists records, exposes audit events and validates a command", () => {
     const existing = record();
-    const { service } = harness([existing]);
+    const { service, repository } = harness([existing]);
     expect(service.list()).toEqual([existing]);
+    expect(service.list("ACTIVE")).toEqual([existing]);
+    expect(repository.list).toHaveBeenLastCalledWith("ACTIVE");
+    expect(service.listPage({ page: 1, pageSize: 25 })).toEqual({
+      items: [existing],
+      total: 1,
+    });
     expect(service.audit()).toEqual([{ action: "SEEDED" }]);
     expect(() => service.validateCommand(command())).not.toThrow();
   });
@@ -136,6 +159,26 @@ describe("NostroApplicationService", () => {
       version: 3,
       source: "LICENSED_IMPORT",
     });
+
+    const wip = record({
+      status: "WIP",
+      revisionWipExpiresAt: "2026-06-01T00:00:00.000Z",
+    });
+    const updatedWip = harness([wip]).service.update(
+      wip.id,
+      command({ source: "LICENSED_IMPORT" }),
+    );
+    expect(updatedWip).toMatchObject({
+      status: "DRAFT",
+      source: "LICENSED_IMPORT",
+    });
+    expect(updatedWip).not.toHaveProperty("revisionWipExpiresAt");
+
+    expect(() =>
+      harness([
+        record({ status: "DRAFT", changeType: "SUPPRESSION" }),
+      ]).service.update("NOSTRO-1", command()),
+    ).toThrow("SUPPRESSION_DRAFT_CANNOT_BE_EDITED");
   });
 
   it.each([
@@ -162,6 +205,46 @@ describe("NostroApplicationService", () => {
     });
     expect(revised.id).not.toBe(current.id);
     expect(revised.checker).toBeUndefined();
+  });
+
+  it("preserves atomic revision reservation and legacy fallback semantics", () => {
+    const current = record();
+    const atomic = harness([current]);
+    const reserved = atomic.service.revise(current.id, "new-maker");
+    expect(atomic.repository.saveRevisionWorkInProgress).toHaveBeenCalledWith(
+      reserved,
+      "new-maker",
+      "NOSTRO",
+    );
+    expect(() =>
+      harness([current], { reservationResult: false }).service.revise(
+        current.id,
+        "new-maker",
+      ),
+    ).toThrow("REVISION_NOT_AVAILABLE");
+
+    const legacy = harness([current], { legacyReservation: true });
+    const legacyRevision = legacy.service.revise(current.id, "new-maker");
+    expect(legacy.repository.save).toHaveBeenCalledWith(
+      legacyRevision,
+      "WIP_RESERVED",
+      "new-maker",
+      "NOSTRO",
+    );
+  });
+
+  it("rejects invalid or concurrently reserved revisions", () => {
+    const draft = record({ status: "DRAFT" });
+    expect(() =>
+      harness([draft]).service.revise(draft.id, "new-maker"),
+    ).toThrow("INVALID_REVISION_STATUS");
+    const active = record();
+    expect(() =>
+      harness([active], { hasOpenRevision: true }).service.revise(
+        active.id,
+        "new-maker",
+      ),
+    ).toThrow("OPEN_REVISION_EXISTS");
   });
 
   it.each(["REVOKED", "SUPERSEDED"] as const)(
@@ -238,6 +321,164 @@ describe("NostroApplicationService", () => {
     );
   });
 
+  it("characterizes rejection metadata and persistence semantics", () => {
+    const pending = record({ status: "PENDING_APPROVAL" });
+    expect(() =>
+      harness([pending]).service.transition(
+        pending.id,
+        "REJECT",
+        "checker",
+        "bad",
+      ),
+    ).toThrow(new BadRequestException("REJECTION_REASON_REQUIRED"));
+
+    const { service, repository } = harness([pending]);
+    const rejected = service.transition(
+      pending.id,
+      "REJECT",
+      "checker",
+      "  invalid account ownership  ",
+    );
+    expect(rejected).toMatchObject({
+      status: "DRAFT",
+      checker: "checker",
+      rejectionReason: "invalid account ownership",
+      version: 3,
+    });
+    expect(repository.save).toHaveBeenCalledWith(
+      rejected,
+      "REJECT",
+      "checker",
+      "NOSTRO",
+    );
+  });
+
+  it("characterizes suppression submission and atomic approval", () => {
+    const suppressionDraft = record({
+      status: "DRAFT",
+      changeType: "SUPPRESSION",
+      suppressionReason: "account relationship retired",
+    });
+    expect(
+      harness([suppressionDraft]).service.transition(
+        suppressionDraft.id,
+        "SUBMIT",
+        suppressionDraft.maker,
+      ),
+    ).toMatchObject({ status: "PENDING_APPROVAL" });
+
+    for (const suppressionReason of [undefined, "bad"]) {
+      const invalid = record({
+        status: "DRAFT",
+        changeType: "SUPPRESSION",
+        suppressionReason,
+      });
+      expect(() =>
+        harness([invalid]).service.transition(
+          invalid.id,
+          "SUBMIT",
+          invalid.maker,
+        ),
+      ).toThrow(new BadRequestException("SUPPRESSION_REASON_REQUIRED"));
+    }
+
+    const pending = record({
+      status: "PENDING_APPROVAL",
+      changeType: "SUPPRESSION",
+      suppressionReason: "account relationship retired",
+    });
+    const suppressed = { ...pending, status: "SUPPRESSED" } as NostroRecord;
+    const approved = harness([pending], {
+      approveSuppressionResult: suppressed,
+    });
+    expect(approved.service.transition(pending.id, "APPROVE", "checker")).toBe(
+      suppressed,
+    );
+    expect(approved.repository.approveSuppression).toHaveBeenCalledWith(
+      pending.id,
+      "checker",
+      "NOSTRO",
+    );
+    expect(approved.repository.save).not.toHaveBeenCalled();
+    expect(() =>
+      harness([pending]).service.transition(pending.id, "APPROVE", "checker"),
+    ).toThrow(new ConflictException("SUPPRESSION_STATE_CHANGED"));
+  });
+
+  it("creates suppression drafts with atomic and legacy reservation semantics", () => {
+    const active = record({ checker: "checker" });
+    const atomic = harness([active]);
+    const suppression = atomic.service.suppress(
+      active.id,
+      "new-maker",
+      "  account relationship retired  ",
+    );
+    expect(suppression).toMatchObject({
+      status: "DRAFT",
+      changeType: "SUPPRESSION",
+      suppressionReason: "account relationship retired",
+      amendmentOfId: active.id,
+      maker: "new-maker",
+    });
+    expect(suppression.checker).toBeUndefined();
+    expect(atomic.repository.saveRevisionWorkInProgress).toHaveBeenCalledWith(
+      suppression,
+      "new-maker",
+      "NOSTRO",
+      "SUPPRESSION_DRAFT_CREATED",
+    );
+    expect(() =>
+      harness([active], { reservationResult: false }).service.suppress(
+        active.id,
+        "new-maker",
+        "account relationship retired",
+      ),
+    ).toThrow("SUPPRESSION_NOT_AVAILABLE");
+
+    const legacy = harness([active], { legacyReservation: true });
+    const legacySuppression = legacy.service.suppress(
+      active.id,
+      "new-maker",
+      "account relationship retired",
+    );
+    expect(legacy.repository.save).toHaveBeenCalledWith(
+      legacySuppression,
+      "SUPPRESSION_DRAFT_CREATED",
+      "new-maker",
+      "NOSTRO",
+    );
+  });
+
+  it("validates suppression maker, reason, state and concurrency", () => {
+    const active = record();
+    expect(() =>
+      harness([active]).service.suppress(active.id, "", "valid reason"),
+    ).toThrow("MAKER_REQUIRED");
+    for (const reason of ["bad", undefined]) {
+      expect(() =>
+        harness([active]).service.suppress(
+          active.id,
+          "new-maker",
+          reason as unknown as string,
+        ),
+      ).toThrow("SUPPRESSION_REASON_REQUIRED");
+    }
+    expect(() =>
+      harness([record({ status: "DRAFT" })]).service.suppress(
+        active.id,
+        "new-maker",
+        "valid reason",
+      ),
+    ).toThrow("ONLY_ACTIVE_CAN_BE_SUPPRESSED");
+    expect(() =>
+      harness([active], { hasOpenRevision: true }).service.suppress(
+        active.id,
+        "new-maker",
+        "valid reason",
+      ),
+    ).toThrow("OPEN_REVISION_EXISTS");
+  });
+
   it("revokes with a trimmed reason", () => {
     const current = record({ status: "DRAFT" });
     expect(
@@ -261,6 +502,19 @@ describe("NostroApplicationService", () => {
     expect(() =>
       harness([current]).service.revoke(current.id, actor, reason),
     ).toThrow(BadRequestException);
+  });
+
+  it("rejects revoke outside a maker-owned draft or WIP", () => {
+    expect(() =>
+      harness([record()]).service.revoke("NOSTRO-1", "checker", "valid reason"),
+    ).toThrow("ACTIVE_REQUIRES_SUPPRESSION");
+    expect(() =>
+      harness([record({ status: "PENDING_APPROVAL" })]).service.revoke(
+        "NOSTRO-1",
+        "checker",
+        "valid reason",
+      ),
+    ).toThrow("REVOCATION_REQUIRES_DRAFT");
   });
 
   it("resolves the lowest-priority eligible exact account match", () => {
@@ -416,6 +670,52 @@ describe("NostroApplicationService", () => {
       decision: "REJECTED",
       reasonCode: "OWN_ACCOUNT_VERSION_MISMATCH",
     });
+  });
+
+  it.each([
+    [[], "OWN_ACCOUNT_NOT_FOUND"],
+    [[record({ status: "DRAFT" })], "OWN_ACCOUNT_NOT_ACTIVE"],
+    [
+      [record({ validFrom: "2027-01-01", validTo: "2027-12-31" })],
+      "OWN_ACCOUNT_NOT_EFFECTIVE",
+    ],
+    [[record()], "OWN_ACCOUNT_BOOKING_ENTITY_MISMATCH"],
+    [
+      [record({ allowedBookingEntities: ["US01"] })],
+      "OWN_ACCOUNT_BOOKING_ENTITY_MISMATCH",
+    ],
+  ])("fails closed for pinned eligibility case %#", (records, reasonCode) => {
+    expect(
+      harness(records as NostroRecord[]).service.resolvePinned({
+        nostroId: "NOSTRO-1",
+        version: 2,
+        bookingEntity: "GB01",
+        at: "2026-06-30",
+      }),
+    ).toEqual({ decision: "REJECTED", reasonCode });
+  });
+
+  it("rejects invalid pinned dates and accepts ANY booking controls", () => {
+    expect(
+      harness([record()]).service.resolvePinned({
+        nostroId: "NOSTRO-1",
+        version: 2,
+        bookingEntity: "HK01",
+        at: "not-a-date",
+      }),
+    ).toEqual({
+      decision: "REJECTED",
+      reasonCode: "OWN_ACCOUNT_NOT_EFFECTIVE",
+    });
+    const any = record({ allowedBookingEntities: ["ANY"] });
+    expect(
+      harness([any]).service.resolvePinned({
+        nostroId: any.id,
+        version: any.version,
+        bookingEntity: any.ownLegalEntityId,
+        at: "2026-06-30",
+      }),
+    ).toEqual({ decision: "RESOLVED", record: any });
   });
 
   it.each([

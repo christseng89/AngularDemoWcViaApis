@@ -682,7 +682,7 @@ describe("SSI BFF forwarding contract", () => {
     ["resolutionCurrencyInquiry", [], "http://ssi.test/api/settings/resolution-currencies"],
     [
       "list",
-      ["ACTIVE", "COUNTERPARTY", "cp/a", "2", "25", "Citi & Co", "currency", "desc"],
+      [{ status: "ACTIVE", ownershipType: "COUNTERPARTY", counterpartyId: "cp/a", page: "2", pageSize: "25", search: "Citi & Co", sortBy: "currency", sortDirection: "desc" }],
       "http://ssi.test/api/ssis?status=ACTIVE&ownershipType=COUNTERPARTY&counterpartyId=cp%2Fa&page=2&pageSize=25&search=Citi+%26+Co&sortBy=currency&sortDirection=desc",
     ],
     ["counterpartyCoverage", [], "http://ssi.test/api/ssis/counterparty-coverage?status=ACTIVE"],

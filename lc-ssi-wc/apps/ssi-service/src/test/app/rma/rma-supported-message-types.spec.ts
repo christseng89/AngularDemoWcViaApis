@@ -1,4 +1,5 @@
 import {
+  RmaMessageScopePolicy,
   RmaSupportedMessageTypeCatalogue,
   loadRmaSupportedMessageTypes,
 } from "../../../app/rma/rma-supported-message-types";
@@ -26,9 +27,9 @@ describe("RMA supported Message Types", () => {
   });
 
   it("loads the governed plain .12 to .08 repair conversions from parameters", () => {
-    const conversions =
-      RmaSupportedMessageTypeCatalogue.fromWorkspace().loadPolicy()
-        .legacyConversions;
+    const policy = RmaSupportedMessageTypeCatalogue.fromWorkspace().loadPolicy();
+    const conversions = policy.legacyConversions;
+    expect(policy).toBeInstanceOf(RmaMessageScopePolicy);
     expect(conversions).toEqual(
       expect.arrayContaining([
         expect.objectContaining({

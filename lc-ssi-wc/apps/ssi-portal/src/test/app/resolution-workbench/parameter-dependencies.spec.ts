@@ -79,4 +79,45 @@ describe("parameter dependency invalidation", () => {
       "context.deliveryBankServiceId",
     ]);
   });
+
+  it("handles unknown, empty and cyclic dependency sources without duplicates", () => {
+    const fields = [
+      {
+        fieldId: "a",
+        lookup: {
+          provider: "BANK_SERVICE" as const,
+          action: "BANK_SERVICE" as const,
+          endpoint: "/lookup",
+          valueField: "id",
+          displayField: "name",
+          validationField: "id",
+          dependency: {
+            dependsOnFieldIds: ["b"],
+            invalidatesFieldIds: ["b"],
+            selectionPolicy: "SELECTABLE" as const,
+          },
+        },
+      },
+      {
+        fieldId: "b",
+        lookup: {
+          provider: "BANK_SERVICE" as const,
+          action: "BANK_SERVICE" as const,
+          endpoint: "/lookup",
+          valueField: "id",
+          displayField: "name",
+          validationField: "id",
+          dependency: {
+            dependsOnFieldIds: ["a"],
+            invalidatesFieldIds: ["a"],
+            selectionPolicy: "SELECTABLE" as const,
+          },
+        },
+      },
+    ];
+
+    expect(dependentInvalidatedFieldIds(fields, "unknown")).toEqual([]);
+    expect(dependentInvalidatedFieldIds(fields, "")).toEqual([]);
+    expect(dependentInvalidatedFieldIds(fields, "a")).toEqual(["b"]);
+  });
 });

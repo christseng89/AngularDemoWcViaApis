@@ -48,6 +48,27 @@ describe("Resolution currency repository transaction boundary", () => {
     expect((db.prepare("PRAGMA busy_timeout").get() as { timeout: number }).timeout).toBeGreaterThanOrEqual(5000);
   });
 
+  it("pages resolution-currency inquiry through the repository boundary", () => {
+    repository.bootstrapResolutionCurrencyCoverage(
+      () => [paymentUsd],
+      "2026-09-15",
+    );
+    expect(
+      repository.resolutionCurrencyInquiryPage("SR2026", {
+        businessDomain: "PAYMENT",
+        page: 1,
+        pageSize: 10,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        page: 1,
+        pageSize: 10,
+        totalItems: 1,
+        items: [expect.objectContaining({ currency: "USD" })],
+      }),
+    );
+  });
+
   it("fails closed if coverage exists without matching initialization control", () => {
     repository.bootstrapResolutionCurrencyCoverage(() => [paymentUsd], "2026-09-15");
     const db = (repository as unknown as { db: DatabaseSync }).db;

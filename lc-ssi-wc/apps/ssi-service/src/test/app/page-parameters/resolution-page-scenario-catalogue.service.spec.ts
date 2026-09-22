@@ -51,6 +51,9 @@ const config = {
 };
 
 describe("ResolutionPageScenarioCatalogueService", () => {
+  const path = join(tmpdir(), `resolution-page-scenarios-${process.pid}.json`);
+  beforeAll(() => writeFileSync(path, JSON.stringify(config)));
+
   it("names the 11 Trade Finance MESSAGE scenarios without the redundant prefix", () => {
     const scenarios = new ResolutionPageScenarioCatalogueService(
       new PageParameterEnvironmentPolicy("QA"),
@@ -70,9 +73,6 @@ describe("ResolutionPageScenarioCatalogueService", () => {
     expect(tradeFinance).toHaveLength(88);
     expect(tradeFinance.filter(({ label }) => label.startsWith("MESSAGE - Message / "))).toEqual([]);
   });
-  const path = join(tmpdir(), `resolution-page-scenarios-${process.pid}.json`);
-  beforeAll(() => writeFileSync(path, JSON.stringify(config)));
-
   it("exposes controlled negative scenarios only in governed test environments", () => {
     const qa = new ResolutionPageScenarioCatalogueService(
       new PageParameterEnvironmentPolicy("QA"),

@@ -113,17 +113,20 @@ export class SwiftDataEditorSession {
       await firstValueFrom(this.api.act(resource.endpoint, row.id, action, actor));
       ports.notify({
         kind: "info",
-        text: action === "submit"
-          ? `${resource.label} 已提交審批。`
-          : action === "approve"
-            ? `${resource.label} 已由獨立 Checker 核准並啟用。`
-            : `${resource.label} 已啟用。`,
+        text: this.actionSuccessText(resource, action),
       });
       await ports.refresh();
       if (action === "approve") void ports.cancelWork();
     } catch {
       ports.notify({ kind: "error", text: `${action} 被生命週期／四眼控制拒絕。` });
     }
+  }
+
+  private actionSuccessText(resource: UiResource, action: "submit" | "approve"): string {
+    if (action === "submit") return `${resource.label} 已提交審批。`;
+    if (action === "approve")
+      return `${resource.label} 已由獨立 Checker 核准並啟用。`;
+    return `${resource.label} 已啟用。`;
   }
 
   async revise(

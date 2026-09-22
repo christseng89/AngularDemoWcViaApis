@@ -4,9 +4,9 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { hashCanonical } from "./canonical-json";
-import { ResolutionCurrencyStore } from "./resolution-currency-store";
 import { ResolutionCurrencyCoveragePolicy } from "./resolution-currency-policy";
 import { ResolutionCurrencyCoverageDiscoveryService } from "./resolution-currency-discovery";
+import { ResolutionCurrencyStore } from "./resolution-currency-store";
 import { SqliteSsiRepository } from "./sqlite-ssi.repository";
 import { MappingCatalogueService } from "./mapping-catalogue.service";
 import { MappingResolutionPageDefinitionSource } from "./page-parameters/mapping-resolution-page-definition.source";
@@ -276,7 +276,7 @@ export class DevelopmentDataReloadService implements OnModuleInit {
   }
 
   private rebuildResolutionCurrencyCoverage(database: DatabaseSync): void {
-    new ResolutionCurrencyStore(database);
+    ResolutionCurrencyStore.ensureSchema(database);
     database.exec("DELETE FROM resolution_currency_coverage; DELETE FROM resolution_currency_sync_control;");
     const repository = new SqliteSsiRepository(database);
     const policy = new ResolutionCurrencyCoveragePolicy();

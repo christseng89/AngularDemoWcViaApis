@@ -28,10 +28,50 @@ services:
       SONAR_JDBC_PASSWORD: ${SONAR_DB_PASSWORD:?SONAR_DB_PASSWORD must be set}
     ports:
       - "9000:9000"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl --fail --silent http://localhost:9000/api/system/status | grep --quiet '\"status\":\"UP\"'",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
     volumes:
       - sonarqube_data:/opt/sonarqube/data
       - sonarqube_extensions:/opt/sonarqube/extensions
       - sonarqube_logs:/opt/sonarqube/logs
+
+  sonar-scanner:
+    profiles: [scan]
+    platform: linux/arm64
+    build:
+      context: ../..
+      dockerfile: qa/docker/sonar-scanner.Dockerfile
+    image: lc-ssi-sonar-scanner:arm64
+    depends_on:
+      sonarqube:
+        condition: service_healthy
+    environment:
+      SONAR_HOST_URL: http://sonarqube:9000
+      SONAR_TOKEN: ${SONAR_TOKEN:?SONAR_TOKEN must be set}
+    volumes:
+      - ../..:/usr/src:ro
+    working_dir: /usr/src
+    read_only: true
+    tmpfs:
+      - /tmp:rw,exec,nosuid,size=2g
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    command:
+      - -Dsonar.projectKey=lc-ssi-wc
+      - -Dsonar.projectVersion=${SONAR_PROJECT_VERSION:?SONAR_PROJECT_VERSION must be set}
+      - -Dsonar.working.directory=/tmp/ssi-wc-scannerwork
+      - -Dsonar.javascript.node.maxspace=4096
+      - -Dsonar.scm.disabled=true
+      - -Dsonar.qualitygate.wait=false
 
 volumes:
   postgres_data:

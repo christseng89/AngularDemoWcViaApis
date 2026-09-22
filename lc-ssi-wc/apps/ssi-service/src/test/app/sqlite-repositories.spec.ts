@@ -28,6 +28,23 @@ interface TestRecord {
   value: string;
 }
 
+const ssiRecord = (overrides: Partial<SsiRecord> = {}): SsiRecord => ({
+  id: "SSI-CHARACTERIZATION",
+  counterpartyId: "CP-BARCGB22",
+  scope: "REUSABLE",
+  maker: "maker.test",
+  status: "ACTIVE",
+  version: 1,
+  route: {
+    counterpartyBic: "BARCGB22",
+    currency: "GBP",
+    bookingEntity: "HK01",
+  },
+  createdAt: "2026-09-21T00:00:00.000Z",
+  updatedAt: "2026-09-21T00:00:00.000Z",
+  ...overrides,
+});
+
 class TestGovernedRepository extends SqliteGovernedRepository<TestRecord> {
   constructor() {
     super("test_record", "test_record_audit");
@@ -41,6 +58,13 @@ describe("SQLite governed repositories", () => {
   beforeEach(() => {
     temporaryDirectory = mkdtempSync(join(tmpdir(), "ssi-repository-test-"));
     process.env["SSI_DATABASE_PATH"] = join(temporaryDirectory, "test.sqlite");
+  });
+
+  afterEach(() => {
+    if (originalDatabasePath === undefined)
+      delete process.env["SSI_DATABASE_PATH"];
+    else process.env["SSI_DATABASE_PATH"] = originalDatabasePath;
+    rmSync(temporaryDirectory, { recursive: true, force: true });
   });
 
   it("defaults WIP TTL to 30 minutes and honors an explicit governed override", () => {
@@ -66,8 +90,9 @@ describe("SQLite governed repositories", () => {
     try {
       for (const value of ["invalid", "0", "-5"]) {
         process.env["REVISION_WIP_TTL_MINUTES"] = value;
-        const expires = Date.parse(revisionWipExpiresAt());
-        const cutoff = Date.parse(revisionWipCutoffAt());
+        const now = new Date();
+        const expires = Date.parse(revisionWipExpiresAt(now));
+        const cutoff = Date.parse(revisionWipCutoffAt(now));
         expect(expires - cutoff).toBe(60 * 60_000);
       }
     } finally {
@@ -75,13 +100,6 @@ describe("SQLite governed repositories", () => {
         delete process.env["REVISION_WIP_TTL_MINUTES"];
       else process.env["REVISION_WIP_TTL_MINUTES"] = originalTtl;
     }
-  });
-
-  afterEach(() => {
-    if (originalDatabasePath === undefined)
-      delete process.env["SSI_DATABASE_PATH"];
-    else process.env["SSI_DATABASE_PATH"] = originalDatabasePath;
-    rmSync(temporaryDirectory, { recursive: true, force: true });
   });
 
   it("persists, finds, lists and audits a generic governed record", () => {
@@ -1061,7 +1079,10 @@ describe("SQLite governed repositories", () => {
       createdAt: "2026-01-01T00:00:00.000Z",
       updatedAt: "2026-01-01T00:00:00.000Z",
     });
-    const operational = makeRecord("NOSTRO-OP", "MT2-UI-PARITY-V1", 10);
+    const operational = {
+      ...makeRecord("NOSTRO-OP", "MT2-UI-PARITY-V1", 10),
+      accountReference: "ACC-OP",
+    };
     const qaOnly = makeRecord("NOSTRO-QA", "MT2-NEGATIVE-QA", 1);
     const wrongBinding = makeRecord(
       "NOSTRO-WRONG-BINDING",
@@ -1090,6 +1111,15 @@ describe("SQLite governed repositories", () => {
     expect(repository.explainFindEligible(query).join(" ")).toContain(
       "idx_nostro_eligibility_scope_v2",
     );
+    expect(
+      repository.findEligible({
+        accountServicerBic: "CITIUS33",
+        currency: "USD",
+        purpose: "SETTLEMENT",
+        at: "2026-09-15",
+        accountReference: "ACC-OP",
+      }),
+    ).toEqual([operational]);
     repository.onModuleDestroy();
   });
 
@@ -1271,6 +1301,315 @@ describe("SQLite governed repositories", () => {
           messageTypes: ["MT202", "pacs.009.001.08"],
         },
       ],
+    });
+    repository.onModuleDestroy();
+  });
+
+  it("treats RMA index search metacharacters as literal text", () => {
+    const repository = new RmaRepository();
+    const record: RmaRecord = {
+      id: "RMA-100%_\\",
+      ownBic: "DEMOHKHH",
+      counterpartyBic: "CITIUS33",
+      service: "FIN",
+      direction: "OUTBOUND",
+      messageTypes: ["MT202"],
+      validFrom: "2026-01-01",
+      validTo: "2027-12-31",
+      maker: "maker.test",
+      source: "SYNTHETIC_DEMO",
+      status: "ACTIVE",
+      version: 1,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    };
+    repository.save(record, "CREATED", record.maker, "RMA");
+
+    expect(repository.listIndexPage({ search: "100%_\\" }).items).toEqual([
+      expect.objectContaining({ id: record.id }),
+    ]);
+    expect(repository.listIndexPage({ search: "100X" }).items).toEqual([]);
+    repository.onModuleDestroy();
+  });
+
+  it("characterizes SSI WIP reservation and open-revision concurrency", () => {
+    const repository = new SqliteSsiRepository();
+    const source = ssiRecord({ id: "SSI-WIP-SOURCE" });
+    const reservation = ssiRecord({
+      id: "SSI-WIP-RESERVATION",
+      amendmentOfId: source.id,
+      changeType: "REVISION",
+      status: "WIP",
+      maker: "maker.revision",
+      revisionWipExpiresAt: "2099-01-01T00:00:00.000Z",
+    });
+    repository.save(source, "CREATED", source.maker);
+
+    expect(repository.hasOpenRevision(source.id)).toBe(false);
+    expect(
+      repository.saveRevisionWorkInProgress(
+        ssiRecord({ id: "SSI-WIP-NO-SOURCE", status: "WIP" }),
+        "maker.revision",
+      ),
+    ).toBe(false);
+    expect(
+      repository.saveRevisionWorkInProgress(
+        { ...reservation, id: "SSI-WIP-MISSING", amendmentOfId: "UNKNOWN" },
+        "maker.revision",
+      ),
+    ).toBe(false);
+    expect(
+      repository.saveRevisionWorkInProgress(reservation, reservation.maker),
+    ).toBe(true);
+    expect(repository.hasOpenRevision(source.id)).toBe(true);
+    expect(
+      repository.saveRevisionWorkInProgress(
+        { ...reservation, id: "SSI-WIP-COMPETITOR", maker: "maker.other" },
+        "maker.other",
+      ),
+    ).toBe(false);
+    expect(repository.find(reservation.id)).toEqual(reservation);
+    repository.onModuleDestroy();
+  });
+
+  it("characterizes SSI suppression validation and atomic approval", () => {
+    const repository = new SqliteSsiRepository();
+    const source = ssiRecord({ id: "SSI-SUPPRESSION-SOURCE" });
+    repository.save(source, "CREATED", source.maker);
+    expect(repository.approveSuppression("UNKNOWN", "checker.test")).toBeUndefined();
+
+    const invalid = [
+      ssiRecord({
+        id: "SSI-NOT-SUPPRESSION",
+        amendmentOfId: source.id,
+        changeType: "REVISION",
+        status: "PENDING_APPROVAL",
+        suppressionReason: "relationship retired",
+      }),
+      ssiRecord({
+        id: "SSI-NOT-PENDING",
+        amendmentOfId: source.id,
+        changeType: "SUPPRESSION",
+        status: "DRAFT",
+        suppressionReason: "relationship retired",
+      }),
+      ssiRecord({
+        id: "SSI-SHORT-REASON",
+        amendmentOfId: source.id,
+        changeType: "SUPPRESSION",
+        status: "PENDING_APPROVAL",
+        suppressionReason: "no",
+      }),
+      ssiRecord({
+        id: "SSI-NO-REASON",
+        amendmentOfId: source.id,
+        changeType: "SUPPRESSION",
+        status: "PENDING_APPROVAL",
+        suppressionReason: undefined,
+      }),
+      ssiRecord({
+        id: "SSI-SAME-MAKER",
+        amendmentOfId: source.id,
+        changeType: "SUPPRESSION",
+        status: "PENDING_APPROVAL",
+        suppressionReason: "relationship retired",
+        maker: "checker.test",
+      }),
+      ssiRecord({
+        id: "SSI-MISSING-SOURCE",
+        amendmentOfId: "UNKNOWN",
+        changeType: "SUPPRESSION",
+        status: "PENDING_APPROVAL",
+        suppressionReason: "relationship retired",
+      }),
+    ];
+    for (const request of invalid) {
+      repository.save(request, "SUBMIT", request.maker);
+      expect(
+        repository.approveSuppression(request.id, "checker.test"),
+      ).toBeUndefined();
+    }
+
+    const inactive = ssiRecord({ id: "SSI-INACTIVE", status: "REVOKED" });
+    const inactiveRequest = ssiRecord({
+      id: "SSI-INACTIVE-REQUEST",
+      amendmentOfId: inactive.id,
+      changeType: "SUPPRESSION",
+      status: "PENDING_APPROVAL",
+      suppressionReason: "relationship retired",
+    });
+    repository.save(inactive, "REVOKED", inactive.maker);
+    repository.save(inactiveRequest, "SUBMIT", inactiveRequest.maker);
+    expect(
+      repository.approveSuppression(inactiveRequest.id, "checker.test"),
+    ).toBeUndefined();
+
+    const request = ssiRecord({
+      id: "SSI-SUPPRESSION-REQUEST",
+      amendmentOfId: source.id,
+      changeType: "SUPPRESSION",
+      status: "PENDING_APPROVAL",
+      suppressionReason: "relationship retired",
+      maker: "maker.revision",
+    });
+    repository.save(request, "SUBMIT", request.maker);
+    expect(repository.approveSuppression(request.id, "checker.test")).toEqual(
+      expect.objectContaining({
+        id: request.id,
+        status: "SUPPRESSED",
+        checker: "checker.test",
+        version: 2,
+      }),
+    );
+    expect(repository.find(source.id)).toEqual(
+      expect.objectContaining({ status: "SUPERSEDED", version: 2 }),
+    );
+    repository.onModuleDestroy();
+  });
+
+  it("characterizes SSI paging defaults, filtering, ordering, and coverage status selection", () => {
+    const repository = new SqliteSsiRepository();
+    expect(repository.summary()).toEqual({
+      currentOwn: 0,
+      pendingApproval: 0,
+      active: 0,
+      archived: 0,
+    });
+    repository.save(
+      ssiRecord({ id: "SSI-COVERAGE-A", route: { counterpartyBic: "BARCGB22", currency: "GBP", accountId: "100%_\\" } }),
+      "CREATED",
+      "maker.test",
+    );
+    repository.save(
+      ssiRecord({ id: "SSI-COVERAGE-B", status: "SUPPRESSED", route: { counterpartyBic: "BARCGB22", currency: "EUR" } }),
+      "SUPPRESSED",
+      "maker.test",
+    );
+
+    expect(repository.listPage({ status: "ACTIVE" })).toEqual(
+      expect.objectContaining({ page: 1, pageSize: 20, totalItems: 1 }),
+    );
+    expect(
+      repository.listPage({
+        status: "ACTIVE",
+        counterpartyId: " BARCGB22 ",
+        search: "100%_\\",
+        sortBy: "UNKNOWN",
+        sortDirection: "DESC",
+        page: 0,
+        pageSize: 200,
+      }).items.map(({ id }) => id),
+    ).toEqual(["SSI-COVERAGE-A"]);
+    expect(repository.counterpartyCoverage()).toHaveLength(1);
+    expect(repository.counterpartyCoverage("ALL")).toEqual([
+      expect.objectContaining({
+        counterpartyId: "BARCGB22",
+        ssiCount: 2,
+        currencyCount: 2,
+        statuses: ["ACTIVE", "SUPPRESSED"],
+      }),
+    ]);
+
+    const sharedDb = (repository as unknown as { db: DatabaseSync }).db;
+    const externallyOwned = new SqliteSsiRepository(sharedDb);
+    externallyOwned.onModuleDestroy();
+    expect(repository.list()).toHaveLength(2);
+    repository.onModuleDestroy();
+  });
+
+  it("rejects SSI approval when no active or draft applicability exists", () => {
+    const repository = new SqliteSsiRepository();
+    expect(
+      repository.approveWithApplicability("UNKNOWN", "checker.test"),
+    ).toBeUndefined();
+    const pending = ssiRecord({
+      id: "SSI-NO-APPLICABILITY",
+      status: "PENDING_APPROVAL",
+    });
+    repository.save(pending, "SUBMIT", pending.maker);
+    expect(
+      repository.approveWithApplicability(pending.id, "checker.test"),
+    ).toBeUndefined();
+    repository.onModuleDestroy();
+  });
+
+  it.each([
+    ["FIN", ["MT202"]],
+    ["FINPLUS", ["pacs.009.001.08"]],
+    ["FIN / FINPLUS", ["MT202", "pacs.009.001.08"]],
+  ] as const)(
+    "preserves the %s service when an active RMA pair has one message family",
+    (service, messageTypes) => {
+      const repository = new RmaRepository();
+      repository.save(
+        {
+          id: `RMA-${service}`,
+          ownBic: "DEMOHKHH",
+          counterpartyBic: "CITIUS33",
+          service,
+          direction: "OUTBOUND",
+          messageTypes: [...messageTypes],
+          validFrom: "2026-01-01",
+          validTo: "2027-12-31",
+          maker: "maker.test",
+          source: "SYNTHETIC_DEMO",
+          status: "ACTIVE",
+          version: 1,
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        },
+        "CREATED",
+        "maker.test",
+        "RMA",
+      );
+
+      expect(
+        repository.findActivePair("DEMOHKHHXXX", "CITIUS33XXX").directions
+          .OUTBOUND,
+      ).toMatchObject({ service, messageTypes });
+      repository.onModuleDestroy();
+    },
+  );
+
+  it("falls back to a wildcard RMA authorisation when no exact message type exists", () => {
+    const repository = new RmaRepository();
+    const wildcard: RmaRecord = {
+      id: "RMA-WILDCARD-FALLBACK",
+      ownBic: "DEMOHKHH",
+      counterpartyBic: "CITIUS33",
+      service: "FINPLUS",
+      direction: "OUTBOUND",
+      messageTypes: ["*"],
+      validFrom: "2026-01-01",
+      validTo: "2027-12-31",
+      maker: "maker.test",
+      source: "SYNTHETIC_DEMO",
+      status: "ACTIVE",
+      version: 1,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    };
+    repository.save(wildcard, "CREATED", "maker.test", "RMA");
+
+    expect(
+      repository.findAuthorised({
+        ownBic: "DEMOHKHHXXX",
+        counterpartyBic: "CITIUS33XXX",
+        service: "FINPLUS",
+        direction: "OUTBOUND",
+        messageType: "pacs.009.001.08",
+      }),
+    ).toEqual([wildcard]);
+    repository.onModuleDestroy();
+  });
+
+  it("returns an empty first RMA index page when no records match", () => {
+    const repository = new RmaRepository();
+    expect(repository.listIndexPage({})).toMatchObject({
+      items: [],
+      page: 1,
+      totalItems: 0,
+      totalPages: 1,
     });
     repository.onModuleDestroy();
   });

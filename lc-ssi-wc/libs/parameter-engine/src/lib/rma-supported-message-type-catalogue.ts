@@ -94,7 +94,9 @@ export class RmaMessageScopePolicy {
     developmentReferenceGapSkips: readonly DevelopmentReferenceGapSkip[];
   }) {
     this.supportedMessageTypes = Object.freeze(
-      [...new Set(input.supportedMessageTypes)].sort(),
+      [...new Set(input.supportedMessageTypes)].sort((left, right) =>
+        left.localeCompare(right),
+      ),
     );
     this.categories = Object.freeze(
       input.categories
@@ -239,7 +241,7 @@ export class RmaSupportedMessageTypeCatalogue {
         const messageType = value?.trim() ?? "";
         if (
           /^MT2\d{2}(?:COV)?$/.test(messageType) ||
-          /^pacs\.009\./.test(messageType)
+          messageType.startsWith("pacs.009.")
         ) {
           supported.add(messageType);
         }

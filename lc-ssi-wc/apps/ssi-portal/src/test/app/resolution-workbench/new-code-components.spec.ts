@@ -15,6 +15,7 @@ const testSignal = <T>(initial: T): TestSignal<T> => {
 
 const mockEffects: Array<() => void> = [];
 const mockInjected: unknown[] = [];
+const mockViewChildren: unknown[] = [];
 const mockOutput = () => ({ emit: jest.fn() });
 
 jest.mock("@angular/core", () => ({
@@ -44,7 +45,7 @@ jest.mock("@angular/core", () => ({
   }),
   output: mockOutput,
   signal: testSignal,
-  viewChild: () => testSignal<unknown>(undefined),
+  viewChild: () => testSignal<unknown>(mockViewChildren.shift()),
 }));
 
 class MockHttpParams {
@@ -220,13 +221,23 @@ describe("Portal new-code component behavior", () => {
   });
 
   it("covers Bank Service picker events and both focus-wrap directions", async () => {
+    const focus = jest.fn();
+    mockViewChildren.push(undefined, { nativeElement: { focus } });
     const { BankServicePickerDialogComponent } =
       await import("../../../app/bank-service-picker-dialog.component");
     const component = new BankServicePickerDialogComponent();
+    expect(focus).toHaveBeenCalled();
     component.search("  deutsch  ");
     component.cancel();
     expect(component.searchRequested.emit).toHaveBeenCalledWith("deutsch");
     expect(component.cancelled.emit).toHaveBeenCalled();
+
+    component.retainFocus(new KeyboardEvent("keydown"));
+    const emptyRoot = document.createElement("div");
+    (component as never as { dialog: TestSignal<unknown> }).dialog.set({
+      nativeElement: emptyRoot,
+    });
+    component.retainFocus(new KeyboardEvent("keydown"));
 
     const root = document.createElement("div");
     const first = document.createElement("button");
@@ -249,6 +260,14 @@ describe("Portal new-code component behavior", () => {
     component.retainFocus(forward);
     expect(forward.preventDefault).toHaveBeenCalled();
     expect(document.activeElement).toBe(first);
+
+    const middle = document.createElement("button");
+    root.insertBefore(middle, last);
+    middle.focus();
+    const unchanged = new KeyboardEvent("keydown");
+    jest.spyOn(unchanged, "preventDefault");
+    component.retainFocus(unchanged);
+    expect(unchanged.preventDefault).not.toHaveBeenCalled();
   });
 
   it("covers lookup labels, guarded opening, paging, selection and focus restoration", async () => {
@@ -424,6 +443,7 @@ describe("Portal new-code component behavior", () => {
       confirmedResolutionCreated: false,
       repairQueueCreated: false,
       fields: [],
+      outputs: [],
       evidence: {
         correlationId: "C",
         owner: "SSI_FIELD_RESOLUTION_API" as const,
@@ -440,6 +460,7 @@ describe("Portal new-code component behavior", () => {
     } as never);
     expect(component.scenarioLabel()).toBe("Direct route");
     expect(component.outcomeTitle()).toBe("SSI resolved");
+    expect(component.resolutionDomain()).toBe("");
     for (const [outcome, title] of [
       ["NOT_REQUIRED", "SSI not required"],
       ["NO_ELIGIBLE_SSI", "No eligible SSI found"],
@@ -453,12 +474,35 @@ describe("Portal new-code component behavior", () => {
     expect(component.scenarioLabel()).toBe("Selected scenario");
   });
 
+  it("projects result table rows, route and empty message", async () => {
+    const { ResolutionResultTableComponent } =
+      await import("../../../app/resolution-workbench/resolution-result-table.component");
+    const component = new ResolutionResultTableComponent();
+    component.result.set({
+      outcome: "NOT_REQUIRED",
+      fields: [],
+      outputs: [],
+    } as never);
+    expect(component.rows()).toEqual([]);
+    expect(component.route()).toBeUndefined();
+    expect(component.emptyMessage()).toContain("not required");
+  });
+
   it("covers result dialog close and focus containment", async () => {
+    const focus = jest.fn();
+    mockViewChildren.push(undefined, { nativeElement: { focus } });
     const { ResolutionResultDialogComponent } =
       await import("../../../app/resolution-workbench/resolution-result-dialog.component");
     const component = new ResolutionResultDialogComponent();
+    expect(focus).toHaveBeenCalled();
     component.close();
     expect(component.closed.emit).toHaveBeenCalled();
+    component.retainFocus(new KeyboardEvent("keydown"));
+
+    const emptyRoot = document.createElement("div");
+    (component as never as { dialog: TestSignal<unknown> }).dialog.set({
+      nativeElement: emptyRoot,
+    });
     component.retainFocus(new KeyboardEvent("keydown"));
 
     const root = document.createElement("div");
@@ -475,6 +519,13 @@ describe("Portal new-code component behavior", () => {
     expect(document.activeElement).toBe(last);
     component.retainFocus(new KeyboardEvent("keydown"));
     expect(document.activeElement).toBe(first);
+    const middle = document.createElement("button");
+    root.insertBefore(middle, last);
+    middle.focus();
+    const unchanged = new KeyboardEvent("keydown");
+    jest.spyOn(unchanged, "preventDefault");
+    component.retainFocus(unchanged);
+    expect(unchanged.preventDefault).not.toHaveBeenCalled();
   });
 
   it("covers workbench loading, submission, retry, cancel and focus restore", async () => {

@@ -50,27 +50,22 @@ export class SwiftDataFieldMapper {
       };
     const requiredWhen = field["x-required-when"];
     const disabledWhen = field["x-disabled-when"];
-    if (requiredWhen || disabledWhen)
-      config.expressions = {
-        ...(requiredWhen
-          ? {
-              "props.required": (formlyField: FormlyFieldConfig) =>
-                this.getPath(
-                  (formlyField.model as Record<string, unknown>) ?? {},
-                  requiredWhen.path,
-                ) === requiredWhen.equals,
-            }
-          : {}),
-        ...(disabledWhen
-          ? {
-              "props.disabled": (formlyField: FormlyFieldConfig) =>
-                this.getPath(
-                  (formlyField.model as Record<string, unknown>) ?? {},
-                  disabledWhen.path,
-                ) === disabledWhen.equals,
-            }
-          : {}),
-      };
+    if (requiredWhen || disabledWhen) {
+      const expressions: NonNullable<FormlyFieldConfig["expressions"]> = {};
+      if (requiredWhen)
+        expressions["props.required"] = (formlyField: FormlyFieldConfig) =>
+          this.getPath(
+            (formlyField.model as Record<string, unknown>) ?? {},
+            requiredWhen.path,
+          ) === requiredWhen.equals;
+      if (disabledWhen)
+        expressions["props.disabled"] = (formlyField: FormlyFieldConfig) =>
+          this.getPath(
+            (formlyField.model as Record<string, unknown>) ?? {},
+            disabledWhen.path,
+          ) === disabledWhen.equals;
+      config.expressions = expressions;
+    }
     return config;
   }
 
@@ -83,18 +78,7 @@ export class SwiftDataFieldMapper {
     const props: NonNullable<FormlyFieldConfig["props"]> = {
       label: field.label,
       required: Boolean(field.required),
-      options:
-        field.optionsSource === "reference/currencies"
-          ? currencies.map(({ code, decimals }) => ({
-              label: `${code} · ${decimals} decimals`,
-              value: code,
-            }))
-          : field.optionsSource === "rma-authorisations/message-types"
-            ? messageTypePolicy.supportedMessageTypes.map((value) => ({
-                label: value,
-                value,
-              }))
-            : (field.options ?? []).map((value) => ({ label: value, value })),
+      options: this.fieldOptions(field, currencies, messageTypePolicy),
     };
     const optionalProps: Array<
       [keyof NonNullable<FormlyFieldConfig["props"]>, unknown]
@@ -129,6 +113,24 @@ export class SwiftDataFieldMapper {
         field.description ?? "由 Bank Service 選擇並回填受控 SWIFT BIC。";
     }
     return props;
+  }
+
+  private fieldOptions(
+    field: UiField,
+    currencies: readonly CurrencyReference[],
+    messageTypePolicy: RmaMessageTypePolicy,
+  ) {
+    if (field.optionsSource === "reference/currencies")
+      return currencies.map(({ code, decimals }) => ({
+        label: `${code} · ${decimals} decimals`,
+        value: code,
+      }));
+    if (field.optionsSource === "rma-authorisations/message-types")
+      return messageTypePolicy.supportedMessageTypes.map((value) => ({
+        label: value,
+        value,
+      }));
+    return (field.options ?? []).map((value) => ({ label: value, value }));
   }
 
   private readonly validMessageTypes = (control: AbstractControl): boolean =>

@@ -136,12 +136,7 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
     if (!notice) return null;
     return {
       severity: notice.kind,
-      title:
-        notice.kind === "error"
-          ? "操作未完成"
-          : notice.kind === "warning"
-            ? "請注意"
-            : "操作完成",
+      title: this.noticeTitle(notice.kind),
       message: notice.text,
     } as const;
   });
@@ -166,6 +161,12 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
   readonly checkerRejectReason = this.editor.checkerRejectReason;
   get model(): Record<string, unknown> { return this.editor.model; }
   set model(value: Record<string, unknown>) { this.editor.model = value; }
+
+  private noticeTitle(kind: "info" | "warning" | "error"): string {
+    if (kind === "error") return "操作未完成";
+    if (kind === "warning") return "請注意";
+    return "操作完成";
+  }
 
   constructor() {
     this.index.sortValue = (row, path) => this.sortValue(row, path);
@@ -458,11 +459,9 @@ export class SwiftDataCrudComponent implements OnInit, OnChanges {
     const messages = value.filter(
       (item): item is string => typeof item === "string" && item.length > 0,
     );
-    return messages.length > 2
-      ? [...messages.slice(0, 2), "..."]
-      : messages.length
-        ? messages
-        : ["—"];
+    if (messages.length > 2) return [...messages.slice(0, 2), "..."];
+    if (messages.length > 0) return messages;
+    return ["—"];
   }
   columnPath(column: UiColumn): string {
     return column.path ?? column.paths?.[0] ?? "id";

@@ -74,11 +74,9 @@ export class MaintenanceIndexActionPolicy {
   columnsFor(
     tab: MaintenanceIndexTab,
   ): readonly MaintenanceIndexActionColumn[] {
-    return tab === "ACTIVE"
-      ? ACTIVE_COLUMNS
-      : tab === "DRAFT"
-        ? DRAFT_COLUMNS
-        : [];
+    if (tab === "ACTIVE") return ACTIVE_COLUMNS;
+    if (tab === "DRAFT") return DRAFT_COLUMNS;
+    return [];
   }
   isPresented(
     action: MaintenanceIndexActionId,

@@ -52,6 +52,19 @@ const applicability = (
 });
 
 describe("PaymentGovernedApplicabilityService", () => {
+  it("returns no atomic candidates when governed collaborators are unavailable", () => {
+    const service = new PaymentGovernedApplicabilityService({
+      findPaymentCandidateBindings: jest.fn(() => []),
+    } as never);
+
+    expect(
+      service.atomicCandidates({
+        messageType: "MT202",
+        valueDate: "2026-09-15",
+      }),
+    ).toEqual([]);
+  });
+
   it("keeps MT205 SSI, Applicability, Nostro, RMA and rank independent of prior FI message", () => {
     const ssi = route({ priority: "10" });
     const app = applicability();
@@ -171,6 +184,21 @@ describe("PaymentGovernedApplicabilityService", () => {
     );
   });
 
+  it("omits absent optional filters from the optimized payment query", () => {
+    const findPaymentCandidates = jest.fn(() => []);
+    const service = new PaymentGovernedApplicabilityService({
+      findPaymentCandidates,
+    } as never);
+
+    service.candidates({ messageType: "MT202", valueDate: "2026-09-15" });
+
+    expect(findPaymentCandidates).toHaveBeenCalledWith({
+      sourceMessageType: "MT202",
+      messageType: "pacs.009.001.08",
+      valueDate: "2026-09-15",
+    });
+  });
+
   it("builds one atomic persisted SSI/applicability/Nostro/RMA candidate in one stable snapshot", () => {
     const ssi = route();
     const app = applicability();
@@ -221,6 +249,123 @@ describe("PaymentGovernedApplicabilityService", () => {
       },
     ]);
     expect(snapshots.current).toHaveBeenCalledTimes(2);
+  });
+
+  it("uses governed route fallbacks and rejects a candidate when the snapshot changes", () => {
+    const previous = process.env["OWN_BIC"];
+    delete process.env["OWN_BIC"];
+    try {
+      const ssi = route();
+      delete ssi.route["senderBic"];
+      delete ssi.route["accountId"];
+      delete ssi.route["accountWithBic"];
+      delete ssi.route["actualReceiverBic"];
+      delete ssi.route["messagingService"];
+      const resolve = jest.fn(() => ({
+        decision: "RESOLVED",
+        nostroId: "N-1",
+        nostroVersion: 1,
+        priority: 1,
+        accountServicerBic: "",
+      }));
+      const check = jest.fn(() => ({
+        authorised: true,
+        rmaId: "R-1",
+        rmaVersion: 1,
+      }));
+      const current = jest
+        .fn()
+        .mockReturnValueOnce({ sha256: "before", method: "logical" })
+        .mockReturnValueOnce({ sha256: "after", method: "logical" });
+      const service = new PaymentGovernedApplicabilityService(
+        {
+          findPaymentCandidateBindings: jest.fn(() => [
+            { ssi, applicability: applicability() },
+          ]),
+        } as never,
+        undefined,
+        undefined,
+        { resolve } as never,
+        { check } as never,
+        { current } as never,
+      );
+
+      expect(
+        service.atomicCandidates({
+          messageType: "MT202",
+          valueDate: "2026-09-15",
+        }),
+      ).toEqual([]);
+      expect(resolve).toHaveBeenCalledWith(
+        expect.objectContaining({
+          accountReference: "",
+          accountServicerBic: "",
+          currency: "",
+        }),
+      );
+      expect(check).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ownBic: "",
+          counterpartyBic: "",
+          service: "swift.cbprplus.04",
+          messageType: "pacs.009.001.08",
+        }),
+      );
+    } finally {
+      if (previous === undefined) delete process.env["OWN_BIC"];
+      else process.env["OWN_BIC"] = previous;
+    }
+  });
+
+  it("keeps the governed pacs.009 RMA scope for an explicitly FIN route", () => {
+    const previous = process.env["OWN_BIC"];
+    delete process.env["OWN_BIC"];
+    try {
+      const ssi = route({ messagingService: "FIN", senderBic: "DEMOHKHHXXX" });
+      const check = jest.fn(() => ({
+        authorised: true,
+        rmaId: "R-1",
+        rmaVersion: 1,
+      }));
+      const service = new PaymentGovernedApplicabilityService(
+        {
+          findPaymentCandidateBindings: jest.fn(() => [
+            { ssi, applicability: applicability() },
+          ]),
+        } as never,
+        undefined,
+        undefined,
+        {
+          resolve: jest.fn(() => ({
+            decision: "RESOLVED",
+            nostroId: "N-1",
+            nostroVersion: 1,
+            priority: 1,
+            accountServicerBic: "DEUTDEFF",
+          })),
+        } as never,
+        { check } as never,
+        {
+          current: jest.fn(() => ({ sha256: "stable", method: "logical" })),
+        } as never,
+      );
+
+      expect(
+        service.atomicCandidates({
+          messageType: "MT202",
+          valueDate: "2026-09-15",
+        }),
+      ).toHaveLength(1);
+      expect(check).toHaveBeenCalledWith(
+        expect.objectContaining({
+          service: "FIN",
+          messageType: "pacs.009.001.08",
+        }),
+      );
+    } finally {
+      if (previous === undefined) delete process.env["OWN_BIC"];
+      else process.env["OWN_BIC"] = previous;
+    }
   });
 
   it("does not expose a SAME-servicer route to a DIFFERENT-servicer scenario", () => {
@@ -365,6 +510,42 @@ describe("PaymentGovernedApplicabilityService", () => {
       .toEqual([core.id]);
     expect(service.candidates({ messageType: "MT202COV", valueDate: "2026-09-15" }).map(({ id }) => id))
       .toEqual([cov.id]);
+  });
+
+  it("honours ANY applicability while applying currency and booking filters", () => {
+    const eligible = route();
+    const wrongCurrency = {
+      ...route({ currency: "USD" }),
+      id: "SSI-USD",
+    };
+    const wrongBooking = {
+      ...route({ bookingEntity: "CA01" }),
+      id: "SSI-CA",
+    };
+    const missingTokens = route();
+    missingTokens.id = "SSI-NO-TOKENS";
+    delete missingTokens.route["sourceMessageTypes"];
+    const records = [eligible, wrongCurrency, wrongBooking, missingTokens];
+    const service = new PaymentGovernedApplicabilityService({
+      list: () => records,
+      listApplicability: () =>
+        records.map(({ id }, index) =>
+          applicability({
+            id: `${id}:APPL:1`,
+            ssiId: id,
+            consumer: index === 0 ? "ANY" : "CENTRAL_PAYMENT",
+          }),
+        ),
+    } as never);
+
+    expect(
+      service.candidates({
+        messageType: "MT202",
+        valueDate: "2026-09-15",
+        currency: "EUR",
+        bookingEntity: "HK01",
+      }),
+    ).toEqual([eligible]);
   });
 
   it("excludes rows with inactive or expired applicability", () => {

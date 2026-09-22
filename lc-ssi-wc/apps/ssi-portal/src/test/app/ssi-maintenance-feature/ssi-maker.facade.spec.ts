@@ -43,6 +43,13 @@ const revision: SsiRow = {
 };
 
 describe("SsiMakerFacade", () => {
+  it("reports the initial revision state without manufacturing an identity", () => {
+    const facade = new SsiMakerFacade({} as SsiMaintenanceApiService);
+
+    expect(facade.revisionSourceIdentity()).toBeNull();
+    expect(facade.makerEditing()).toBe(false);
+  });
+
   it("owns Bank picker paging, selection and model binding", async () => {
     const bank = {
       bankServiceId: "BANK-SVC-1",
@@ -79,6 +86,34 @@ describe("SsiMakerFacade", () => {
       route: { counterpartyBic: "BARCGB22" },
     });
     expect(facade.bicPickerTarget()).toBeNull();
+  });
+
+  it("ignores missing picker context and writes a selected route BIC", () => {
+    const facade = new SsiMakerFacade({} as SsiMaintenanceApiService);
+    const selected = { setValue: jest.fn() };
+    (facade.form.get as jest.Mock).mockReturnValue(selected);
+    const bank = {
+      bankServiceId: "BANK-SVC-1",
+      bic: "BARCGB22",
+      name: "Barclays",
+      country: "GB",
+      addressRef: "ADDR-1",
+      standard: "BIC",
+    };
+
+    facade.selectBank(bank);
+    expect(selected.setValue).not.toHaveBeenCalled();
+
+    facade.bicPickerTarget.set("beneficiaryBic");
+    facade.selectBank(bank);
+    expect(selected.setValue).toHaveBeenCalledWith("BARCGB22");
+  });
+
+  it("ignores an unknown bank item and presents an unselected route target", () => {
+    const facade = new SsiMakerFacade({} as SsiMaintenanceApiService);
+    facade.selectBankPickerItem({ bankServiceId: "MISSING" } as never);
+
+    expect(facade.selectedBic("beneficiaryBic")).toBe("尚未選擇");
   });
 
   it("routes Customer picker requests to the same HTTP-only API and closes on failure", async () => {
@@ -160,6 +195,34 @@ describe("SsiMakerFacade", () => {
     expect(cancelRevision).toHaveBeenCalledWith("SSI-WIP", "maker.revision");
     expect(facade.editingId()).toBeNull();
     expect(facade.revisionSource()).toBeNull();
+  });
+
+  it("uses the governed fallback actor when the Maker model value is not scalar", async () => {
+    const cancelRevision = jest.fn(() => of({}));
+    const facade = new SsiMakerFacade({
+      cancelRevision,
+    } as unknown as SsiMaintenanceApiService);
+    facade.beginRevision(active, revision, { maker: {} });
+
+    await facade.cancelRevision();
+
+    expect(cancelRevision).toHaveBeenCalledWith("SSI-WIP", "maker.revision");
+  });
+
+  it("does not clear the current editor when cancelling another WIP", async () => {
+    const cancelRevision = jest.fn(() => of({}));
+    const facade = new SsiMakerFacade({
+      cancelRevision,
+    } as unknown as SsiMaintenanceApiService);
+    facade.beginRevision(active, revision, { maker: "maker.revision" });
+
+    await facade.cancelRevision("SSI-OTHER-WIP", "maker.other");
+
+    expect(cancelRevision).toHaveBeenCalledWith(
+      "SSI-OTHER-WIP",
+      "maker.other",
+    );
+    expect(facade.editingId()).toBe("SSI-WIP");
   });
 
   it("preserves create versus update request selection", async () => {

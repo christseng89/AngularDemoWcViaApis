@@ -115,6 +115,55 @@ describe("request-scoped SSI SQL", () => {
     repository.onModuleDestroy();
   });
 
+  it("rejects every incomplete data-quality request shape before querying bindings", () => {
+    const repository = new SqliteSsiRepository();
+    const invalidRequests: RouteResolutionRequest[] = [
+      { ...request, counterpartyBic: undefined, counterpartyId: undefined },
+      { ...request, consumer: "TREASURY" },
+      { ...request, product: "TRADE_FINANCE" },
+      { ...request, businessFunction: "BANK_REIMBURSEMENT" },
+      { ...request, paymentLeg: "COVER_SETTLEMENT" },
+      { ...request, direction: "INBOUND" },
+    ];
+    for (const invalidRequest of invalidRequests) {
+      expect(repository.findRequestDataQualityBindings(invalidRequest)).toEqual(
+        [],
+      );
+    }
+    expect(
+      repository.findRequestDataQualityBindings({
+        ...request,
+        counterpartyBic: undefined,
+        counterpartyId: request.counterpartyBic,
+      }),
+    ).toEqual([]);
+    repository.onModuleDestroy();
+  });
+
+  it("excludes future, expired, and malformed applicability dates", () => {
+    const repository = new SqliteSsiRepository();
+    const cases = [
+      { id: "FUTURE", validFrom: "2027-01-01", validTo: "2027-12-31" },
+      { id: "EXPIRED", validFrom: "2025-01-01", validTo: "2025-12-31" },
+      { id: "BAD-FROM", validFrom: "not-a-date", validTo: "2027-12-31" },
+      { id: "BAD-TO", validFrom: "2025-01-01", validTo: "not-a-date" },
+    ];
+    for (const item of cases) {
+      const record = ssi(item.id, {});
+      repository.save(record, "CREATED", record.maker);
+      repository.replaceApplicability(
+        record.id,
+        [{ ...applicability, validFrom: item.validFrom, validTo: item.validTo }],
+        record.maker,
+      );
+    }
+    expect(repository.findRelatedRouteBindings(request)).toEqual({
+      ssi: [],
+      applicability: [],
+    });
+    repository.onModuleDestroy();
+  });
+
   it("expires abandoned WIP before the scoped resolution read, as the former list did", () => {
     const repository = new SqliteSsiRepository();
     const expired: SsiRecord = {
@@ -147,6 +196,25 @@ describe("request-scoped SSI SQL", () => {
     expect(repository.hasCoverProfile({ ...context, sourceMessageType: "MT202" })).toBe(false);
     expect(repository.hasCoverProfile({ ...context, counterpartyBic: "CHASUS33" })).toBe(false);
     expect(repository.hasCoverProfile({ ...context, bookingEntity: "SG01" })).toBe(false);
+    expect(repository.hasCoverProfile({
+      ...context,
+      counterpartyBic: undefined,
+      counterpartyId: context.counterpartyBic,
+    })).toBe(true);
+    expect(repository.hasCoverProfile({
+      ...context,
+      counterpartyBic: undefined,
+      counterpartyId: undefined,
+    })).toBe(false);
+    repository.save({
+      ...cover,
+      id: "COVER-WITHOUT-SOURCE-MESSAGE",
+      route: { ...cover.route, sourceMessageTypes: "" },
+    }, "CREATED", "maker.test");
+    expect(repository.hasCoverProfile({
+      ...context,
+      sourceMessageType: undefined,
+    })).toBe(false);
     repository.save({ ...cover, route: { ...cover.route, counterpartyBic: "" } }, "UPDATED", "maker.test");
     expect(repository.hasCoverProfile(context)).toBe(true);
     repository.save({ ...cover, route: { ...cover.route, businessService: "swift.cbprplus.cov. 04" } }, "UPDATED", "maker.test");

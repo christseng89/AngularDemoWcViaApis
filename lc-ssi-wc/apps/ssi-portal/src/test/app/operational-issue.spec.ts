@@ -19,6 +19,12 @@ describe("operational issue presentation", () => {
     expect(issue.impact).toContain("銀行目錄不受影響");
   });
 
+  it("explains Audit service failure independently", () => {
+    const issue = presentOperationalIssue("AUDIT_SERVICE_UNAVAILABLE");
+    expect(issue.code).toBe("AUDIT_SERVICE_UNAVAILABLE");
+    expect(issue.impact).toContain("不會變更 SSI");
+  });
+
   it("preserves an unknown code for support diagnosis", () => {
     expect(presentOperationalIssue("UNEXPECTED_UPSTREAM").code).toBe(
       "UNEXPECTED_UPSTREAM",
@@ -40,6 +46,22 @@ describe("operational issue presentation", () => {
     );
     expect(issue.code).toContain("OWN_ACCOUNT_DEBIT_CREDIT_COLLISION");
     expect(issue.reason).toContain("相同帳號");
+  });
+
+  it.each([
+    ["OWN_ACCOUNT_CURRENCY_MISMATCH", "幣別不一致"],
+    ["OWN_ACCOUNT_RECEIVER_MISMATCH", "同一個所選 Receiver"],
+  ])("explains %s", (reasonCode, expected) => {
+    const issue = presentResolutionIssue(
+      `OPTION_CONSTRAINT_VIOLATION · ${reasonCode}`,
+    );
+    expect(issue.reason).toContain(expected);
+  });
+
+  it("preserves a free-form failure when no governed code is present", () => {
+    const issue = presentResolutionIssue("upstream timed out");
+    expect(issue.code).toBe("RESOLUTION_FAILED");
+    expect(issue.reason).toBe("upstream timed out");
   });
 
   it("presents incorrect SSI as configuration governance, not resolution", () => {
