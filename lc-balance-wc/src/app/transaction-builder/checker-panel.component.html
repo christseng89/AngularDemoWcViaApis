@@ -40,8 +40,8 @@
        "type the field yourself" error. Picking a row resolves the contract directly and loads its own
        Checker queue (checker-panel.component.ts's own onSelectSecondaryCandidate()). -->
     <div class="mt-2" *ngIf="checkerSecondaryCandidates.length">
-      <label class="tb-field__label">More than one {{ checkerSecondaryLabel }} under this LC — pick one</label>
-      <app-index-picker [items]="checkerSecondaryCandidates" (pick)="onSelectSecondaryCandidate($event)">
+      <span id="checker-secondary-picker-label" class="tb-field__label">More than one {{ checkerSecondaryLabel }} under this LC — pick one</span>
+      <app-index-picker aria-labelledby="checker-secondary-picker-label" [items]="checkerSecondaryCandidates" (pick)="onSelectSecondaryCandidate($event)">
         <ng-template let-c>
           <span class="tb-row-primary">{{ checkerSecondaryField === 'sgNumber' ? c.naturalKey.sgNumber : c.naturalKey.ibNumber }}</span>
           <span class="tb-row-badge">{{ c.status }}</span>

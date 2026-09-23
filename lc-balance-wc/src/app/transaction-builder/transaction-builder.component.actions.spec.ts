@@ -1,4 +1,4 @@
-import { Observable, forkJoin, of, throwError } from 'rxjs';
+import { Observable, Subject, forkJoin, of, throwError } from 'rxjs';
 import { TransactionBuilderComponent } from './transaction-builder.component';
 import { BalanceComponentApiService, BalanceContract, BalanceSnapshot } from './balance-component-api.service';
 import { IMPORT_FUNCTIONS, EXPORT_FUNCTIONS } from './balance-component.model';
@@ -85,6 +85,21 @@ function makeApi() {
   const api: any = {
     createMovement: jest.fn(() => of({ body: { movementId: 'mv-new', status: 'PENDING' } })),
     release: jest.fn(() => of({ movementId: 'mv-released', status: 'RELEASED' })),
+    releaseExportAssets: jest.fn(() =>
+      of({
+        movement: makeMovement({ movementId: 'mv-b4-released', status: 'RELEASED' }),
+        authorization: {
+          authorizationSnapshotId: 'auth-1',
+          claimStatus: 'SUBMITTED',
+          authorizationValidationResult: 'CONFIRMED',
+          excessDebtor: 'ISSUING_BANK',
+        },
+        assets: [
+          { postingId: 'p1', balanceType: 'Due from Issuing Bank', amountOwner: '10000', ownerCurrency: 'USD', debtor: 'ISSUING_BANK' },
+          { postingId: 'p2', balanceType: 'EXPORT_EXCESS_ASSET', amountOwner: '200', ownerCurrency: 'USD', debtor: 'ISSUING_BANK' },
+        ],
+      }),
+    ),
     reject: jest.fn(() => of({ movementId: 'mv-rejected', status: 'REJECTED' })),
     cancel: jest.fn(() => of({ movementId: 'mv-cancelled', status: 'CANCELLED' })),
     acknowledge: jest.fn(() => of({ movementId: 'mv-acknowledged', status: 'PENDING' })),
@@ -97,6 +112,7 @@ function makeApi() {
     getContract: jest.fn(() => of(makeContract())),
     listMovements: jest.fn(() => of([] as any[])),
     findByBusinessEventId: jest.fn(() => of([] as any[])),
+    getExcessReleaseContext: jest.fn(() => of({ sourceMovementId: null, thisExcessAmountOwner: '0', ownerCurrency: 'USD', requiresApplicantWaiver: false })),
     releaseCompoundMovements: jest.fn((movementIds: string[], actor: string) => forkJoin(movementIds.map((id) => api.release(id, actor)))),
     executeCompoundActions: jest.fn((actions: { kind: 'release' | 'acknowledge'; movementId: string }[], actor: string) =>
       forkJoin(actions.map((action) => (action.kind === 'release' ? api.release(action.movementId, actor) : api.acknowledge(action.movementId, actor)))),
@@ -134,7 +150,10 @@ function makerContextOf(comp: TransactionBuilderComponent): MakerCheckerContext 
 }
 
 function resetAfterRelease(comp: TransactionBuilderComponent, fn: TransactionFunction, movementId: string): void {
-  (comp as unknown as { resetAfterSuccessfulCheckerRelease: (selected: TransactionFunction, id: string) => void }).resetAfterSuccessfulCheckerRelease(fn, movementId);
+  (comp as unknown as { resetAfterSuccessfulCheckerRelease: (selected: TransactionFunction, id: string) => void }).resetAfterSuccessfulCheckerRelease(
+    fn,
+    movementId,
+  );
 }
 
 describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
@@ -268,7 +287,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(syncFromSpy).toHaveBeenCalledWith('LC-RELEASED', 'IPLC_LC', expect.any(Function));
     });
 
-    it("Common Requirement: no lookup refresh is attempted when the Maker never synced (nothing to refresh)", () => {
+    it('Common Requirement: no lookup refresh is attempted when the Maker never synced (nothing to refresh)', () => {
       const { comp, api } = setup();
       comp.selectFunction(A2);
       setMakerContext(comp, { createdBy: 'maker1', submitResult: makeMovement({ movementId: 'mv-amend', status: 'PENDING' }) });
@@ -336,7 +355,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(comp.actionBusy).toBe(false);
     });
 
-    it('A6 settlesDocumentArrival: releases the source Document Arrival FIRST, then the Acceptance', () => {
+    it('A6 sends one atomic final Release command for the Acceptance and its referenced arrival', () => {
       const { comp, api } = setup();
       comp.selectFunction(A6);
       setMakerContext(comp, {
@@ -344,14 +363,12 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
         selectedPayMovement: makeMovement({ movementId: 'mv-doc-arrival', sourceTransactionRef: 'IB01' }),
         submitResult: makeMovement({ movementId: 'mv-acceptance', status: 'PENDING' }),
       });
-      api.release
-        .mockReturnValueOnce(of({ movementId: 'mv-doc-arrival', status: 'RELEASED' }) as any)
-        .mockReturnValueOnce(of({ movementId: 'mv-acceptance', status: 'RELEASED' }) as any);
+      api.release.mockReturnValueOnce(of({ movementId: 'mv-acceptance', status: 'RELEASED' }) as any);
 
       comp.release();
 
-      expect(api.release).toHaveBeenNthCalledWith(1, 'mv-doc-arrival', 'checker1');
-      expect(api.release).toHaveBeenNthCalledWith(2, 'mv-acceptance', 'checker1');
+      expect(api.release).toHaveBeenCalledTimes(1);
+      expect(api.release).toHaveBeenCalledWith('mv-acceptance', 'checker1');
       // A genuine 'released' outcome returns to the same function with a fresh screen.
       expect(comp.selectedFunction).toBe(A6);
       expect((comp as any).makerContext.submitResult).toBeNull();
@@ -359,7 +376,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(comp.releaseSuccessHint).toContain('mv-acceptance');
     });
 
-    it('A6: a failed source release NEVER attempts to release the Acceptance', () => {
+    it('A6: an atomic final Release failure is surfaced without a second client-side mutation', () => {
       const { comp, api } = setup();
       comp.selectFunction(A6);
       setMakerContext(comp, {
@@ -370,31 +387,29 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
       comp.release();
 
-      expect(api.release).toHaveBeenCalledTimes(2);
+      expect(api.release).toHaveBeenCalledTimes(1);
       expect(comp.makerOutcomeSignal).toMatchObject({
         kind: 'failed',
-        message: 'Compound event failed to release atomically: ILLEGAL_STATE_TRANSITION',
+        message: 'ILLEGAL_STATE_TRANSITION',
       });
       expect(comp.actionBusy).toBe(false);
     });
 
-    it('A6: source release succeeds but the Acceptance release fails', () => {
+    it('A6 uses the same ABSENT Checker approval path as B4', () => {
       const { comp, api } = setup();
       comp.selectFunction(A6);
       setMakerContext(comp, {
         selectedPayMovement: makeMovement({ movementId: 'mv-doc-arrival', sourceTransactionRef: 'IB01' }),
         submitResult: makeMovement({ movementId: 'mv-acceptance', status: 'PENDING' }),
       });
-      api.release
-        .mockReturnValueOnce(of({ movementId: 'mv-doc-arrival', status: 'RELEASED' }) as any)
-        .mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
+      comp.applicantWaiverExcessAmountOwner = '100';
+      comp.applicantWaiverOwnerCurrency = 'USD';
+      comp.applicantWaiverConfirmed = true;
+      api.release.mockReturnValueOnce(of({ movementId: 'mv-acceptance', status: 'RELEASED' }) as any);
 
       comp.release();
 
-      expect(comp.makerOutcomeSignal).toMatchObject({
-        kind: 'failed',
-        message: 'Compound event failed to release atomically: ILLEGAL_STATE_TRANSITION',
-      });
+      expect(api.release).toHaveBeenCalledWith('mv-acceptance', 'checker1');
       expect(comp.actionBusy).toBe(false);
     });
 
@@ -403,19 +418,22 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
     // session never has selectedPayMovement (only ever populated by the SAME Maker session's own picker)
     // — resolveSettlesDocumentArrivalIds() falls back to selectedCheckerMovement.referencedTransactionId
     // for the source id instead.
-    it('A6 settlesDocumentArrival, genuinely independent Checker session (submitResult and selectedPayMovement both null): still releases source then Acceptance via referencedTransactionId, not a silent no-op', () => {
+    it('A6 independent Checker session sends the selected Acceptance as one authoritative final Release', () => {
       const { comp, api } = setup();
       comp.selectFunction(A6);
       setMakerContext(comp, { createdBy: 'maker1' });
-      comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-acceptance', movementType: 'CREATE', status: 'PENDING', referencedTransactionId: 'mv-doc-arrival' });
-      api.release
-        .mockReturnValueOnce(of({ movementId: 'mv-doc-arrival', status: 'RELEASED' }) as any)
-        .mockReturnValueOnce(of({ movementId: 'mv-acceptance', status: 'RELEASED' }) as any);
+      comp.selectedCheckerMovement = makeMovement({
+        movementId: 'mv-acceptance',
+        movementType: 'CREATE',
+        status: 'PENDING',
+        referencedTransactionId: 'mv-doc-arrival',
+      });
+      api.release.mockReturnValueOnce(of({ movementId: 'mv-acceptance', status: 'RELEASED' }) as any);
 
       comp.release();
 
-      expect(api.release).toHaveBeenNthCalledWith(1, 'mv-doc-arrival', 'checker1');
-      expect(api.release).toHaveBeenNthCalledWith(2, 'mv-acceptance', 'checker1');
+      expect(api.release).toHaveBeenCalledTimes(1);
+      expect(api.release).toHaveBeenCalledWith('mv-acceptance', 'checker1');
       expect(comp.makerOutcomeSignal?.kind).not.toBe('failed');
     });
 
@@ -486,159 +504,49 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(comp.releaseSuccessHint).toContain('mv-settle');
     });
 
-    // B4's source (B3's Present Docs earmark) is independently Checker-Released before B4 picks it, so
-    // B4's compound release never re-releases it.
-    it('B4 Sight full compound release: Confirmation HONOUR -> Due from Issuing Bank asset (does NOT re-release the already-RELEASED B3 source)', () => {
+    it('B4 uses one authoritative release and clears the completed Inquiry when returning to Index', () => {
       const { comp, api } = setup();
       comp.selectFunction(B4);
-      setMakerContext(comp, {
-        selectedPayMovement: makeMovement({ movementId: 'mv-b3', movementType: 'CREATE', sourceTransactionRef: 'EB01' }),
-        dueFromIssuingBankMovementId: 'mv-receivable',
-        submitResult: makeMovement({ movementId: 'mv-honour', status: 'PENDING' }),
-      });
-      api.release
-        .mockReturnValueOnce(of({ movementId: 'mv-honour', status: 'RELEASED' }) as any)
-        .mockReturnValueOnce(of({ movementId: 'mv-receivable', status: 'RELEASED' }) as any);
+      setMakerContext(comp, { submitResult: makeMovement({ movementId: 'mv-honour', status: 'PENDING' }) });
+      comp.exportAuthorizationExcessAmountOwner = '200';
+      comp.exportAuthorizationOwnerCurrency = 'USD';
+      comp.exportClaimStatus = 'SUBMITTED';
+      comp.exportAuthorizationReference = 'AUTH-1';
+      comp.exportAuthorizedAmountOwner = '200';
+      comp.exportAuthorizedCurrency = 'USD';
+      comp.exportAuthorizationScopeConfirmed = true;
+      comp.exportAuthorizationApplicabilityConfirmed = true;
+      comp.exportAuthorizationAuthenticityConfirmed = true;
 
       comp.release();
 
-      expect(api.release).toHaveBeenNthCalledWith(1, 'mv-honour', 'checker1');
-      expect(api.release).toHaveBeenNthCalledWith(2, 'mv-receivable', 'checker1');
-      expect(api.release).toHaveBeenCalledTimes(2);
-      // See the A6 test above for why submitResult is null, not the leg response.
-      expect(comp.selectedFunction).toBe(B4);
-      expect((comp as any).makerContext.submitResult).toBeNull();
-      expect(comp.actionBusy).toBe(false);
-      expect(comp.releaseSuccessHint).toContain('mv-honour');
+      expect(api.releaseExportAssets).toHaveBeenCalledWith('mv-honour', 'checker1', {
+        claimStatus: 'SUBMITTED',
+        authorizationReference: 'AUTH-1',
+        authorizedAmountOwner: '200',
+        authorizedCurrency: 'USD',
+        authorizationValidationResult: 'CONFIRMED',
+      });
+      expect(api.release).not.toHaveBeenCalled();
+      expect(comp.lastB4ExportAssetDecision).toBeNull();
     });
 
-    it('B4 Sight: the final Due from Issuing Bank release failing surfaces its own compound error', () => {
+    it('B4 absent authorization is explicit and an API failure does not fabricate an Inquiry receipt', () => {
       const { comp, api } = setup();
       comp.selectFunction(B4);
-      setMakerContext(comp, {
-        selectedPayMovement: makeMovement({ movementId: 'mv-b3' }),
-        dueFromIssuingBankMovementId: 'mv-receivable',
-        submitResult: makeMovement({ movementId: 'mv-honour', status: 'PENDING' }),
-      });
-      api.release
-        .mockReturnValueOnce(of({ movementId: 'mv-honour', status: 'RELEASED' }) as any)
-        .mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
+      setMakerContext(comp, { submitResult: makeMovement({ movementId: 'mv-honour', status: 'PENDING' }) });
+      comp.exportAuthorizationExcessAmountOwner = '200';
+      comp.exportAuthorizationOwnerCurrency = 'USD';
+      api.releaseExportAssets.mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION'));
 
       comp.release();
 
+      expect(api.releaseExportAssets).toHaveBeenCalledWith('mv-honour', 'checker1', { claimStatus: 'ABSENT', authorizationValidationResult: 'NOT_CONFIRMED' });
       expect(comp.makerOutcomeSignal).toMatchObject({
         kind: 'failed',
-        message: 'Compound event failed to release atomically: ILLEGAL_STATE_TRANSITION',
+        message: 'ILLEGAL_STATE_TRANSITION',
       });
-    });
-
-    it('B4 Usance full compound release: ACCEPT -> Acceptance liability -> Receivable asset (does NOT re-release the already-RELEASED B3 source)', () => {
-      const { comp, api } = setup();
-      comp.selectFunction(B4);
-      setMakerContext(comp, {
-        selectedPayMovement: makeMovement({ movementId: 'mv-b3', movementType: 'ACCEPT' }),
-        acceptanceMovementId: 'mv-acceptance',
-        acceptanceReimbReceivableMovementId: 'mv-receivable',
-        submitResult: makeMovement({ movementId: 'mv-accept', status: 'PENDING' }),
-      });
-      api.release
-        .mockReturnValueOnce(of({ movementId: 'mv-accept', status: 'RELEASED' }) as any)
-        .mockReturnValueOnce(of({ movementId: 'mv-acceptance', status: 'RELEASED' }) as any)
-        .mockReturnValueOnce(of({ movementId: 'mv-receivable', status: 'RELEASED' }) as any);
-
-      comp.release();
-
-      expect(api.release).toHaveBeenNthCalledWith(1, 'mv-accept', 'checker1');
-      expect(api.release).toHaveBeenNthCalledWith(2, 'mv-acceptance', 'checker1');
-      expect(api.release).toHaveBeenNthCalledWith(3, 'mv-receivable', 'checker1');
-      expect(api.release).toHaveBeenCalledTimes(3);
-      // See the A6 test above for why submitResult is null, not the leg response.
-      expect(comp.selectedFunction).toBe(B4);
-      expect((comp as any).makerContext.submitResult).toBeNull();
-      expect(comp.releaseSuccessHint).toContain('mv-accept');
-    });
-
-    it('B4 Usance: the Acceptance liability release failing stops before the Receivable leg', () => {
-      const { comp, api } = setup();
-      comp.selectFunction(B4);
-      setMakerContext(comp, {
-        selectedPayMovement: makeMovement({ movementId: 'mv-b3' }),
-        acceptanceMovementId: 'mv-acceptance',
-        acceptanceReimbReceivableMovementId: 'mv-receivable',
-        submitResult: makeMovement({ movementId: 'mv-accept', status: 'PENDING' }),
-      });
-      api.release
-        .mockReturnValueOnce(of({ movementId: 'mv-accept', status: 'RELEASED' }) as any)
-        .mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
-
-      comp.release();
-
-      expect(api.release).toHaveBeenCalledTimes(3);
-      expect(comp.makerOutcomeSignal).toMatchObject({
-        kind: 'failed',
-        message: 'Compound event failed to release atomically: ILLEGAL_STATE_TRANSITION',
-      });
-    });
-
-    it('B4 Usance: the Receivable release failing is its own final compound error', () => {
-      const { comp, api } = setup();
-      comp.selectFunction(B4);
-      setMakerContext(comp, {
-        selectedPayMovement: makeMovement({ movementId: 'mv-b3' }),
-        acceptanceMovementId: 'mv-acceptance',
-        acceptanceReimbReceivableMovementId: 'mv-receivable',
-        submitResult: makeMovement({ movementId: 'mv-accept', status: 'PENDING' }),
-      });
-      api.release
-        .mockReturnValueOnce(of({ movementId: 'mv-accept', status: 'RELEASED' }) as any)
-        .mockReturnValueOnce(of({ movementId: 'mv-acceptance', status: 'RELEASED' }) as any)
-        .mockReturnValueOnce(apiErr('ILLEGAL_STATE_TRANSITION') as any);
-
-      comp.release();
-
-      expect(comp.makerOutcomeSignal).toMatchObject({
-        kind: 'failed',
-        message: 'Compound event failed to release atomically: ILLEGAL_STATE_TRANSITION',
-      });
-    });
-
-    // Bug fixed (business-reported 2026-08-21, "B4 Submit 後跳出交易 再進入B4 SEARCH U04或U06 找出交易後
-    // 點選RELEASE => 無法處理" — B4 Submit, leave the screen, re-enter B4, search independently, click
-    // Release => nothing happens): a genuinely SEPARATE Checker session never has submitResult or any of
-    // the makerContext.*MovementId fields (those only ever exist in the SAME session that Submitted) —
-    // only selectedCheckerMovement (real server data from the Checker's own independent search) and the
-    // businessEventId/referencedTransactionId correlation it carries. Before the fix, release()'s own
-    // top-of-method guard required submitResult and silently no-opped here, before ever calling the API.
-    it('B4 Usance, genuinely independent Checker session (submitResult and every makerContext leg id null): still resolves and releases all 3 legs via businessEventId, not a silent no-op', () => {
-      const { comp, api } = setup();
-      comp.selectFunction(B4);
-      setMakerContext(comp, { createdBy: 'maker1' }); // submitResult/selectedPayMovement/acceptance*MovementId all null — fresh session
-      comp.selectedCheckerMovement = makeMovement({
-        movementId: 'mv-accept',
-        movementType: 'ACCEPT',
-        status: 'PENDING',
-        businessEventId: 'be-1',
-        referencedTransactionId: 'mv-b3',
-      });
-      api.findByBusinessEventId.mockReturnValueOnce(
-        of([
-          makeMovement({ movementId: 'mv-accept', movementType: 'ACCEPT', status: 'PENDING' }),
-          makeMovement({ movementId: 'mv-acceptance', movementType: 'CREATE', status: 'PENDING' }),
-          makeMovement({ movementId: 'mv-receivable', movementType: 'CREATE', status: 'PENDING' }),
-        ]) as any,
-      );
-      api.release
-        .mockReturnValueOnce(of({ movementId: 'mv-accept', status: 'RELEASED' }) as any)
-        .mockReturnValueOnce(of({ movementId: 'mv-acceptance', status: 'RELEASED' }) as any)
-        .mockReturnValueOnce(of({ movementId: 'mv-receivable', status: 'RELEASED' }) as any);
-
-      comp.release();
-
-      expect(api.findByBusinessEventId).toHaveBeenCalledWith('be-1');
-      expect(api.release).toHaveBeenNthCalledWith(1, 'mv-accept', 'checker1');
-      expect(api.release).toHaveBeenNthCalledWith(2, 'mv-acceptance', 'checker1');
-      expect(api.release).toHaveBeenNthCalledWith(3, 'mv-receivable', 'checker1');
-      expect(comp.makerOutcomeSignal).not.toEqual({ kind: 'failed', message: expect.stringContaining('no') });
+      expect(comp.lastB4ExportAssetDecision).toBeNull();
     });
 
     it('true no-op case survives: neither selectedCheckerMovement nor submitResult set', () => {
@@ -695,7 +603,13 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       const { comp, api } = setup();
       comp.selectFunction(B4);
       setMakerContext(comp, { createdBy: 'maker1' });
-      comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-accept', movementType: 'ACCEPT', status: 'PENDING', businessEventId: 'be-1', referencedTransactionId: 'mv-b3' });
+      comp.selectedCheckerMovement = makeMovement({
+        movementId: 'mv-accept',
+        movementType: 'ACCEPT',
+        status: 'PENDING',
+        businessEventId: 'be-1',
+        referencedTransactionId: 'mv-b3',
+      });
       api.reject.mockReturnValueOnce(of({ movementId: 'mv-accept', status: 'REJECTED' }) as any);
 
       comp.reject();
@@ -781,7 +695,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
     // Phase 4 (2026-08-28, "使用同樣方式處理A3 A35 A4 & B2") — an A3S compound Fix Pending edit's own
     // resolved SG leg reaches the Maker panel via `secondary`.
-    it('compound (A3S) PENDING path: resolves the SG leg via findByBusinessEventId and includes it in the forwarded outcome\'s own secondary', () => {
+    it("compound (A3S) PENDING path: resolves the SG leg via findByBusinessEventId and includes it in the forwarded outcome's own secondary", () => {
       const { comp, api } = setup();
       setMakerContext(comp, { createdBy: 'maker1', submitResult: makeMovement({ movementId: 'mv-utilize', status: 'PENDING' }) });
       const editedUtilize = makeMovement({ movementId: 'mv-utilize-edited', status: 'PENDING', amount: '8000', businessEventId: 'be-a3s' });
@@ -821,9 +735,12 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
   });
 
   describe('onMakerQueueFixPending() (2026-08-28, "Maker Queue Need to provide Fix Pending button as well")', () => {
-    it('no-ops when the row\'s own Function cannot be resolved at all', () => {
+    it("no-ops when the row's own Function cannot be resolved at all", () => {
       const { comp } = setup();
-      const row = { movement: makeMovement({ movementType: 'SOME_UNKNOWN_TYPE', businessEventId: null }), contract: makeContract({ instrumentType: 'IPLC_LC' }) };
+      const row = {
+        movement: makeMovement({ movementType: 'SOME_UNKNOWN_TYPE', businessEventId: null }),
+        contract: makeContract({ instrumentType: 'IPLC_LC' }),
+      };
 
       comp.onMakerQueueFixPending(row as any);
 
@@ -831,7 +748,7 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(comp.externalFixPendingRequest).toBeNull();
     });
 
-    it('switches to Transaction Processing, selects the row\'s own resolved Function (A1), and feeds a fresh copy of the movement into externalFixPendingRequest', () => {
+    it("switches to Transaction Processing, selects the row's own resolved Function (A1), and feeds a fresh copy of the movement into externalFixPendingRequest", () => {
       const { comp } = setup();
       comp.activeMode = 'MAKER_QUEUE';
       const movement = makeMovement({ movementId: 'mv-9', movementType: 'ISSUE', businessEventId: null });
@@ -983,9 +900,12 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
   });
 
   describe('onMakerQueueDeletePendingReview() / onDeletePendingReviewConfirmed() / onDeletePendingReviewCancelled() (2026-08-28, "Maker Queue Delete Pending 也要顯示交易畫面 確認刪除與否")', () => {
-    it('onMakerQueueDeletePendingReview() no-ops when the row\'s own Function cannot be resolved at all', () => {
+    it("onMakerQueueDeletePendingReview() no-ops when the row's own Function cannot be resolved at all", () => {
       const { comp } = setup();
-      const row = { movement: makeMovement({ movementType: 'SOME_UNKNOWN_TYPE', businessEventId: null }), contract: makeContract({ instrumentType: 'IPLC_LC' }) };
+      const row = {
+        movement: makeMovement({ movementType: 'SOME_UNKNOWN_TYPE', businessEventId: null }),
+        contract: makeContract({ instrumentType: 'IPLC_LC' }),
+      };
 
       comp.onMakerQueueDeletePendingReview(row as any);
 
@@ -1021,7 +941,11 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
     it('onDeletePendingReviewConfirmed() calls MakerQueueService.deletePending() with the ORIGINAL row (cascade-aware), is already busy by the time the call settles, then clears the pending row and returns to Maker Queue', () => {
       const { comp, api } = setup();
-      const row = { movement: makeMovement({ movementId: 'mv-del-2', businessEventId: null }), contract: makeContract({ instrumentType: 'IPLC_LC' }), siblingMovementIds: ['mv-del-2', 'mv-sibling'] };
+      const row = {
+        movement: makeMovement({ movementId: 'mv-del-2', businessEventId: null }),
+        contract: makeContract({ instrumentType: 'IPLC_LC' }),
+        siblingMovementIds: ['mv-del-2', 'mv-sibling'],
+      };
       comp.pendingMakerQueueDeleteRow = row as any;
       comp.activeMode = 'PROCESSING';
       let wasBusyDuringCall = false;
@@ -1059,8 +983,14 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
     // earlier click would silently re-fire alongside a genuinely new one).
     it('a Fix Pending review followed by a Delete Pending review for a DIFFERENT row never leaves externalFixPendingRequest stale — only one of the two external-request signals is ever non-null at a time', () => {
       const { comp } = setup();
-      const fixRow = { movement: makeMovement({ movementId: 'mv-fix-1', movementType: 'ISSUE', businessEventId: null }), contract: makeContract({ instrumentType: 'IPLC_LC' }) };
-      const deleteRow = { movement: makeMovement({ movementId: 'mv-del-9', movementType: 'ISSUE', businessEventId: null }), contract: makeContract({ instrumentType: 'IPLC_LC' }) };
+      const fixRow = {
+        movement: makeMovement({ movementId: 'mv-fix-1', movementType: 'ISSUE', businessEventId: null }),
+        contract: makeContract({ instrumentType: 'IPLC_LC' }),
+      };
+      const deleteRow = {
+        movement: makeMovement({ movementId: 'mv-del-9', movementType: 'ISSUE', businessEventId: null }),
+        contract: makeContract({ instrumentType: 'IPLC_LC' }),
+      };
 
       comp.onMakerQueueFixPending(fixRow as any);
       expect(comp.externalFixPendingRequest).not.toBeNull();
@@ -1079,8 +1009,14 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
     it('the reverse order (Delete Pending review, then Fix Pending for a different row) is equally safe', () => {
       const { comp } = setup();
-      const deleteRow = { movement: makeMovement({ movementId: 'mv-del-10', movementType: 'ISSUE', businessEventId: null }), contract: makeContract({ instrumentType: 'IPLC_LC' }) };
-      const fixRow = { movement: makeMovement({ movementId: 'mv-fix-2', movementType: 'ISSUE', businessEventId: null }), contract: makeContract({ instrumentType: 'IPLC_LC' }) };
+      const deleteRow = {
+        movement: makeMovement({ movementId: 'mv-del-10', movementType: 'ISSUE', businessEventId: null }),
+        contract: makeContract({ instrumentType: 'IPLC_LC' }),
+      };
+      const fixRow = {
+        movement: makeMovement({ movementId: 'mv-fix-2', movementType: 'ISSUE', businessEventId: null }),
+        contract: makeContract({ instrumentType: 'IPLC_LC' }),
+      };
 
       comp.onMakerQueueDeletePendingReview(deleteRow as any);
       expect(comp.externalDeletePendingReviewRequest).not.toBeNull();
@@ -1160,7 +1096,10 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
   describe('onFixPendingCancelled()', () => {
     it('navigates back to Maker Queue and clears externalFixPendingRequest when Fix Pending was Maker-Queue-originated', () => {
       const { comp } = setup();
-      const row = { movement: makeMovement({ movementId: 'mv-fix-cancel-1', movementType: 'ISSUE', businessEventId: null }), contract: makeContract({ instrumentType: 'IPLC_LC' }) };
+      const row = {
+        movement: makeMovement({ movementId: 'mv-fix-cancel-1', movementType: 'ISSUE', businessEventId: null }),
+        contract: makeContract({ instrumentType: 'IPLC_LC' }),
+      };
       comp.onMakerQueueFixPending(row as any);
       expect(comp.externalFixPendingRequest).not.toBeNull();
       comp.activeMode = 'PROCESSING';
@@ -1313,29 +1252,26 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(comp.checkerResetNonce).toBe(before + 1);
     });
 
-    it.each([...IMPORT_FUNCTIONS, ...EXPORT_FUNCTIONS])(
-      'post-Release reset clears every stale Maker action signal for $code',
-      (fn) => {
-        const { comp } = setup();
-        comp.selectFunction(fn);
-        setMakerContext(comp, { submitResult: makeMovement({ movementId: `mv-${fn.code}` }) });
-        comp.selectedCheckerMovement = makeMovement({ movementId: `mv-${fn.code}` });
-        comp.externalFixPendingRequest = makeMovement({ movementId: `mv-${fn.code}` });
-        comp.externalDeletePendingReviewRequest = makeMovement({ movementId: `mv-${fn.code}` });
-        comp.makerOutcomeSignal = { kind: 'failed', message: 'stale' };
-        comp.checkerSyncSignal = { lcNumber: 'LC-OLD', secondaryRef: null };
+    it.each([...IMPORT_FUNCTIONS, ...EXPORT_FUNCTIONS])('post-Release reset clears every stale Maker action signal for $code', (fn) => {
+      const { comp } = setup();
+      comp.selectFunction(fn);
+      setMakerContext(comp, { submitResult: makeMovement({ movementId: `mv-${fn.code}` }) });
+      comp.selectedCheckerMovement = makeMovement({ movementId: `mv-${fn.code}` });
+      comp.externalFixPendingRequest = makeMovement({ movementId: `mv-${fn.code}` });
+      comp.externalDeletePendingReviewRequest = makeMovement({ movementId: `mv-${fn.code}` });
+      comp.makerOutcomeSignal = { kind: 'failed', message: 'stale' };
+      comp.checkerSyncSignal = { lcNumber: 'LC-OLD', secondaryRef: null };
 
-        resetAfterRelease(comp, fn, `mv-${fn.code}`);
+      resetAfterRelease(comp, fn, `mv-${fn.code}`);
 
-        expect(comp.selectedFunction).toBe(fn);
-        expect(makerContextOf(comp).submitResult).toBeNull();
-        expect(comp.selectedCheckerMovement).toBeNull();
-        expect(comp.externalFixPendingRequest).toBeNull();
-        expect(comp.externalDeletePendingReviewRequest).toBeNull();
-        expect(comp.makerOutcomeSignal).toBeNull();
-        expect(comp.checkerSyncSignal).toBeNull();
-      },
-    );
+      expect(comp.selectedFunction).toBe(fn);
+      expect(makerContextOf(comp).submitResult).toBeNull();
+      expect(comp.selectedCheckerMovement).toBeNull();
+      expect(comp.externalFixPendingRequest).toBeNull();
+      expect(comp.externalDeletePendingReviewRequest).toBeNull();
+      expect(comp.makerOutcomeSignal).toBeNull();
+      expect(comp.checkerSyncSignal).toBeNull();
+    });
 
     // A4's UTILIZE uses the same plain fallback path as A2; gated on makerSubmittedAt (a real A4 Submit
     // always sets it).
@@ -1349,6 +1285,123 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
       expect(api.release).toHaveBeenCalledWith('mv-a4', 'checker9');
       expect(comp.checkerBusy).toBe(false);
+    });
+
+    it('A4 uses the same ABSENT Checker approval path as B4', () => {
+      const { comp, api } = setup();
+      api.getExcessReleaseContext.mockReturnValueOnce(
+        of({ sourceMovementId: 'mv-a4-waiver', thisExcessAmountOwner: '100', ownerCurrency: 'USD', requiresApplicantWaiver: true }),
+      );
+      api.release.mockReturnValueOnce(of({ movementId: 'mv-a4-waiver', status: 'RELEASED' }) as any);
+      comp.selectFunction(A4);
+      comp.checkerId = 'checker9';
+      comp.onCheckerMovementPicked(makeMovement({ movementId: 'mv-a4-waiver', makerSubmittedAt: '2026-09-23T00:00:00.000Z' }));
+      comp.applicantWaiverConfirmed = true;
+      comp.checkerAct('release');
+
+      expect(api.release).toHaveBeenCalledWith('mv-a4-waiver', 'checker9');
+    });
+
+    it('A4 shows Applicant Waiver only for the selected event whose This Exceed Amount is positive', () => {
+      const { comp, api } = setup();
+      comp.selectFunction(A4);
+
+      api.getExcessReleaseContext.mockReturnValueOnce(
+        of({ sourceMovementId: null, thisExcessAmountOwner: '0', ownerCurrency: 'USD', requiresApplicantWaiver: false }),
+      );
+      comp.onCheckerMovementPicked(makeMovement({ movementId: 'b01', sourceTransactionRef: 'B01' }));
+      expect(comp.showApplicantWaiverConfirmation).toBe(false);
+
+      api.getExcessReleaseContext.mockReturnValueOnce(
+        of({ sourceMovementId: 'b02', thisExcessAmountOwner: '100', ownerCurrency: 'USD', requiresApplicantWaiver: true }),
+      );
+      comp.onCheckerMovementPicked(makeMovement({ movementId: 'b02', sourceTransactionRef: 'B02' }));
+      expect(comp.showApplicantWaiverConfirmation).toBe(true);
+      expect(comp.applicantWaiverExcessAmountOwner).toBe('100');
+      expect(comp.applicantWaiverOwnerCurrency).toBe('USD');
+    });
+
+    it('A6 resolves its referenced source event: covered-only hides waiver and positive Excess shows 100', () => {
+      const { comp, api } = setup();
+      comp.selectFunction(A6);
+
+      api.getExcessReleaseContext.mockReturnValueOnce(
+        of({ sourceMovementId: null, thisExcessAmountOwner: '0', ownerCurrency: 'USD', requiresApplicantWaiver: false }),
+      );
+      comp.onCheckerMovementPicked(makeMovement({ movementId: 'acceptance-b01', referencedTransactionId: 'b01' }));
+      expect(comp.showApplicantWaiverConfirmation).toBe(false);
+
+      api.getExcessReleaseContext.mockReturnValueOnce(
+        of({ sourceMovementId: 'b02', thisExcessAmountOwner: '100', ownerCurrency: 'USD', requiresApplicantWaiver: true }),
+      );
+      comp.onCheckerMovementPicked(makeMovement({ movementId: 'acceptance-b02', referencedTransactionId: 'b02' }));
+      expect(comp.showApplicantWaiverConfirmation).toBe(true);
+      expect(comp.applicantWaiverExcessAmountOwner).toBe('100');
+    });
+
+    it('B4 shows Export Authorization only for the selected B3 event whose This Exceed Amount is positive', () => {
+      const { comp, api } = setup();
+      comp.selectFunction(B4);
+
+      api.getExcessReleaseContext.mockReturnValueOnce(
+        of({ sourceMovementId: null, thisExcessAmountOwner: '0', ownerCurrency: 'USD', requiresApplicantWaiver: false, requiresExportAuthorization: false }),
+      );
+      comp.onCheckerMovementPicked(makeMovement({ movementId: 'honour-b01', referencedTransactionId: 'b01' }));
+      expect(comp.showB4ExportAuthorization).toBe(false);
+
+      api.getExcessReleaseContext.mockReturnValueOnce(
+        of({ sourceMovementId: 'b02', thisExcessAmountOwner: '100', ownerCurrency: 'USD', requiresApplicantWaiver: false, requiresExportAuthorization: true }),
+      );
+      comp.onCheckerMovementPicked(makeMovement({ movementId: 'honour-b02', referencedTransactionId: 'b02' }));
+      expect(comp.showB4ExportAuthorization).toBe(true);
+      expect(comp.exportAuthorizationExcessAmountOwner).toBe('100');
+      expect(comp.exportAuthorizationOwnerCurrency).toBe('USD');
+    });
+
+    it('uses the same ABSENT Checker Approve gate for A4/A6/B4', () => {
+      const { comp } = setup();
+
+      comp.selectFunction(A4);
+      comp.applicantWaiverExcessAmountOwner = '20';
+      expect(comp.checkerExcessApprovalRequired).toBe(true);
+      comp.onCheckerExcessApprovedChange(true);
+      expect(comp.applicantWaiverConfirmed).toBe(true);
+      expect(comp.checkerExcessApprovalRequired).toBe(false);
+
+      comp.selectFunction(A6);
+      comp.applicantWaiverExcessAmountOwner = '20';
+      expect(comp.checkerExcessApprovalRequired).toBe(true);
+      comp.onCheckerExcessApprovedChange(true);
+      expect(comp.applicantWaiverConfirmed).toBe(true);
+      expect(comp.checkerExcessApprovalRequired).toBe(false);
+
+      comp.selectFunction(B4);
+      comp.exportAuthorizationExcessAmountOwner = '20';
+      expect(comp.exportClaimStatus).toBe('ABSENT');
+      expect(comp.checkerExcessApprovalRequired).toBe(true);
+      comp.onCheckerExcessApprovedChange(true);
+      expect(comp.exportExcessCheckerApproved).toBe(true);
+      expect(comp.exportClaimStatus).toBe('ABSENT');
+      expect(comp.checkerExcessApprovalRequired).toBe(false);
+    });
+
+    it('ignores a late context error from an earlier request when the same movement is reselected', () => {
+      const { comp, api } = setup();
+      const first = new Subject<any>();
+      const second = new Subject<any>();
+      api.getExcessReleaseContext.mockReturnValueOnce(first).mockReturnValueOnce(second);
+      comp.selectFunction(A4);
+      const movement = makeMovement({ movementId: 'same-b02', sourceTransactionRef: 'B02' });
+
+      comp.onCheckerMovementPicked(movement);
+      comp.onCheckerMovementPicked(movement);
+      second.next({ sourceMovementId: 'same-b02', thisExcessAmountOwner: '100', ownerCurrency: 'USD', requiresApplicantWaiver: true });
+      second.complete();
+      first.error(new Error('late stale error'));
+
+      expect(comp.applicantWaiverContextError).toBeNull();
+      expect(comp.applicantWaiverExcessAmountOwner).toBe('100');
+      expect(comp.showApplicantWaiverConfirmation).toBe(true);
     });
 
     // Without this gate a Checker could release A4's own item before any Maker used Submit A4.
@@ -1411,7 +1464,11 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
     ])('plain Checker release preserves HTTP %i for the shared feedback policy', (status, title, supportCode) => {
       const { comp, api } = setup();
       api.release.mockReturnValueOnce(
-        throwError(() => ({ status, message: status === 0 ? 'Http failure response: 0 Unknown Error' : `HTTP ${status}`, error: { code: 'RELEASE_FAILED' } })) as any,
+        throwError(() => ({
+          status,
+          message: status === 0 ? 'Http failure response: 0 Unknown Error' : `HTTP ${status}`,
+          error: { code: 'RELEASE_FAILED' },
+        })) as any,
       );
       comp.selectFunction(A4);
       comp.selectedCheckerMovement = makeMovement({
@@ -1425,6 +1482,27 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       expect(comp.checkerFeedback).toMatchObject({ title, retryable: false });
       if (supportCode) expect(comp.checkerFeedback?.supportCode).toBe(supportCode);
       else expect(comp.checkerFeedback?.supportCode).toBeUndefined();
+    });
+
+    it('Checker Excess rejection states that the pending transaction and reservation are retained', () => {
+      const { comp, api } = setup();
+      api.release.mockReturnValueOnce(throwError(() => ({ status: 409, error: { code: 'EXCESS_LIMIT_EXCEEDED', message: 'Allowance changed.' } })) as any);
+      comp.selectFunction(A4);
+      comp.selectedCheckerMovement = makeMovement({
+        movementId: 'mv-a4-excess-failure',
+        movementType: 'UTILIZE',
+        makerSubmittedAt: '2026-09-03T00:00:00.000Z',
+      });
+
+      comp.checkerAct('release');
+
+      expect(comp.checkerFeedback).toMatchObject({
+        title: 'Excess limit exceeded',
+        message: expect.stringContaining('pending transaction and Excess reservation were retained.'),
+        supportCode: 'EXCESS_LIMIT_EXCEEDED',
+        retryable: false,
+      });
+      expect(JSON.stringify(comp.checkerFeedback)).not.toContain('FX_RATE_PENDING');
     });
   });
 
@@ -1552,10 +1630,12 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
     // User instruction 2026-08-21 ("Lookup 除了 REFERENCE 還要有 SECONDARY REF") — lookUp.secondaryReferenceFor()
     // delegates to the same secondaryReferenceForEvent() free function as
     // InquireEventsService.secondaryReferenceFor() — no separate Secondary Ref. mapping.
-    it("lookUp.secondaryReferenceFor() delegates to the shared secondaryReferenceForEvent() rule", () => {
+    it('lookUp.secondaryReferenceFor() delegates to the shared secondaryReferenceForEvent() rule', () => {
       const { comp } = setup();
       const sgRow = makeEventRow({ contract: makeContract({ instrumentType: 'SHGT', naturalKey: { lcNumber: 'LC001', ibNumber: null, sgNumber: 'G01' } }) });
-      const examRow = makeEventRow({ contract: makeContract({ instrumentType: 'EPLC_EXAMINATION', naturalKey: { lcNumber: 'LC001', ibNumber: 'E01', sgNumber: null } }) });
+      const examRow = makeEventRow({
+        contract: makeContract({ instrumentType: 'EPLC_EXAMINATION', naturalKey: { lcNumber: 'LC001', ibNumber: 'E01', sgNumber: null } }),
+      });
       // makeEventRow()'s own default movement is IPLC_LC/UTILIZE with sourceTransactionRef 'IB001' — the
       // A6/B4 Accounting Event Ownership Rule (2026-08-28) reclassifies this as Secondary Ref., not
       // Reference (lookUp.primaryReferenceFor() is its own delegating counterpart, same pairing).
@@ -2049,17 +2129,29 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
     it('A4 (releasesExistingMovementInPlace, own Maker Submit already done): derives phase "finalize" so the dialog shows PENDING, not EARMARKING', () => {
       const { comp } = setup();
       comp.selectedFunction = A4;
-      comp.selectedCheckerMovement = makeMovement({ movementType: 'UTILIZE', status: 'PENDING', makerSubmittedAt: '2026-08-29T00:00:00.000Z', referencedTransactionId: null, businessEventId: null });
+      comp.selectedCheckerMovement = makeMovement({
+        movementType: 'UTILIZE',
+        status: 'PENDING',
+        makerSubmittedAt: '2026-08-29T00:00:00.000Z',
+        referencedTransactionId: null,
+        businessEventId: null,
+      });
 
       comp.openCheckerAccountEntryDialog();
 
       expect(comp.accountEntryDialogPhase).toBe('finalize');
     });
 
-    it('A4 whose own Maker Submit has NOT happened yet stays phase null (still genuinely A3\'s own EARMARKING territory)', () => {
+    it("A4 whose own Maker Submit has NOT happened yet stays phase null (still genuinely A3's own EARMARKING territory)", () => {
       const { comp } = setup();
       comp.selectedFunction = A4;
-      comp.selectedCheckerMovement = makeMovement({ movementType: 'UTILIZE', status: 'PENDING', makerSubmittedAt: null, referencedTransactionId: null, businessEventId: null });
+      comp.selectedCheckerMovement = makeMovement({
+        movementType: 'UTILIZE',
+        status: 'PENDING',
+        makerSubmittedAt: null,
+        referencedTransactionId: null,
+        businessEventId: null,
+      });
 
       comp.openCheckerAccountEntryDialog();
 
@@ -2070,7 +2162,13 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       const { comp } = setup();
       const A3 = IMPORT_FUNCTIONS.find((f) => f.code === 'A3')!;
       comp.selectedFunction = A3;
-      comp.selectedCheckerMovement = makeMovement({ movementType: 'UTILIZE', status: 'PENDING', makerSubmittedAt: '2026-08-29T00:00:00.000Z', referencedTransactionId: null, businessEventId: null });
+      comp.selectedCheckerMovement = makeMovement({
+        movementType: 'UTILIZE',
+        status: 'PENDING',
+        makerSubmittedAt: '2026-08-29T00:00:00.000Z',
+        referencedTransactionId: null,
+        businessEventId: null,
+      });
 
       comp.openCheckerAccountEntryDialog();
 
@@ -2086,9 +2184,17 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
         balanceContractId: 'bc-acceptance',
         referencedTransactionId: 'mv-utilize',
       });
-      api.getContract.mockReturnValueOnce(of(makeContract({ instrumentType: 'IPLC_ACCEPTANCE', naturalKey: { lcNumber: 'U01', ibNumber: 'B01', sgNumber: null } })) as any);
-      api.resolveContract.mockReturnValueOnce(of(makeContract({ instrumentType: 'IPLC_LC', balanceContractId: 'bc-lc', naturalKey: { lcNumber: 'U01', ibNumber: null, sgNumber: null } })) as any);
-      const utilizeMovement = makeMovement({ movementId: 'mv-utilize', movementType: 'UTILIZE', contingentAccountEntry: { drAccount: 'Dr', crAccount: 'Cr', currency: 'USD', amount: '1000' } });
+      api.getContract.mockReturnValueOnce(
+        of(makeContract({ instrumentType: 'IPLC_ACCEPTANCE', naturalKey: { lcNumber: 'U01', ibNumber: 'B01', sgNumber: null } })) as any,
+      );
+      api.resolveContract.mockReturnValueOnce(
+        of(makeContract({ instrumentType: 'IPLC_LC', balanceContractId: 'bc-lc', naturalKey: { lcNumber: 'U01', ibNumber: null, sgNumber: null } })) as any,
+      );
+      const utilizeMovement = makeMovement({
+        movementId: 'mv-utilize',
+        movementType: 'UTILIZE',
+        contingentAccountEntry: { drAccount: 'Dr', crAccount: 'Cr', currency: 'USD', amount: '1000' },
+      });
       api.listMovements.mockReturnValueOnce(of([makeMovement({ movementId: 'mv-other' }), utilizeMovement]) as any);
 
       comp.openCheckerAccountEntryDialog();
@@ -2115,7 +2221,11 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       comp.selectedFunction = B4;
       comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-accept', movementType: 'ACCEPT', businessEventId: 'be-1' });
       const receivable = makeMovement({ movementId: 'mv-receivable', movementType: 'CREATE', contingentAccountEntry: null }); // ON_BALANCE_ASSET leg, no contingent pair
-      const acceptanceCreate = makeMovement({ movementId: 'mv-acceptance-create', movementType: 'CREATE', contingentAccountEntry: { drAccount: 'Dr', crAccount: 'Cr', currency: 'USD', amount: '1000' } });
+      const acceptanceCreate = makeMovement({
+        movementId: 'mv-acceptance-create',
+        movementType: 'CREATE',
+        contingentAccountEntry: { drAccount: 'Dr', crAccount: 'Cr', currency: 'USD', amount: '1000' },
+      });
       api.findByBusinessEventId.mockReturnValueOnce(of([comp.selectedCheckerMovement, receivable, acceptanceCreate]) as any);
 
       comp.openCheckerAccountEntryDialog();
@@ -2146,7 +2256,11 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       const { comp, api } = setup();
       comp.selectedFunction = A3S;
       comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-utilize', movementType: 'UTILIZE', businessEventId: 'be-a3s' });
-      const sgRedeem = makeMovement({ movementId: 'mv-sg-redeem', movementType: 'FULL_REDEEM', contingentAccountEntry: { drAccount: 'Dr', crAccount: 'Cr', currency: 'USD', amount: '1000' } });
+      const sgRedeem = makeMovement({
+        movementId: 'mv-sg-redeem',
+        movementType: 'FULL_REDEEM',
+        contingentAccountEntry: { drAccount: 'Dr', crAccount: 'Cr', currency: 'USD', amount: '1000' },
+      });
       api.findByBusinessEventId.mockReturnValueOnce(of([comp.selectedCheckerMovement, sgRedeem]) as any);
 
       comp.openCheckerAccountEntryDialog();
@@ -2159,10 +2273,15 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
     // once A3S's own Checker has acknowledged the UTILIZE (the SG leg is ALREADY independently, for-real
     // RELEASED at that point — "already 沖帳"), the SAME record's own Account Entries view (now A4's own
     // business, not A3S's) must NOT merge the SG leg back in — it belongs to an already-closed event.
-    it('A3S UTILIZE that has ALREADY been acknowledged (A3S Checker already Released — SG leg already booked) does NOT merge the SG leg — this is now A4\'s own business, not A3S\'s', () => {
+    it("A3S UTILIZE that has ALREADY been acknowledged (A3S Checker already Released — SG leg already booked) does NOT merge the SG leg — this is now A4's own business, not A3S's", () => {
       const { comp, api } = setup();
       comp.selectedFunction = A3S;
-      comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-utilize', movementType: 'UTILIZE', businessEventId: 'be-a3s', acknowledgedAt: '2026-08-28T00:00:00.000Z' });
+      comp.selectedCheckerMovement = makeMovement({
+        movementId: 'mv-utilize',
+        movementType: 'UTILIZE',
+        businessEventId: 'be-a3s',
+        acknowledgedAt: '2026-08-28T00:00:00.000Z',
+      });
 
       comp.openCheckerAccountEntryDialog();
 
@@ -2186,7 +2305,11 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
       const A9 = IMPORT_FUNCTIONS.find((f) => f.code === 'A9')!;
       comp.selectedFunction = A9;
       comp.selectedCheckerMovement = makeMovement({ movementId: 'mv-sg-redeem', movementType: 'FULL_REDEEM', businessEventId: 'be-a3s' });
-      const utilize = makeMovement({ movementId: 'mv-utilize', movementType: 'UTILIZE', contingentAccountEntry: { drAccount: 'Dr', crAccount: 'Cr', currency: 'USD', amount: '1000' } });
+      const utilize = makeMovement({
+        movementId: 'mv-utilize',
+        movementType: 'UTILIZE',
+        contingentAccountEntry: { drAccount: 'Dr', crAccount: 'Cr', currency: 'USD', amount: '1000' },
+      });
       api.findByBusinessEventId.mockReturnValueOnce(of([comp.selectedCheckerMovement, utilize]) as any);
 
       comp.openCheckerAccountEntryDialog();
@@ -2220,15 +2343,29 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
     it('guards against a stale response landing after the dialog has moved on to a different movement', () => {
       const { comp, api } = setup();
       comp.selectedFunction = A6;
-      const firstMovement = makeMovement({ movementId: 'mv-first', movementType: 'CREATE', balanceContractId: 'bc-acceptance', referencedTransactionId: 'mv-utilize' });
+      const firstMovement = makeMovement({
+        movementId: 'mv-first',
+        movementType: 'CREATE',
+        balanceContractId: 'bc-acceptance',
+        referencedTransactionId: 'mv-utilize',
+      });
       comp.selectedCheckerMovement = firstMovement;
       let resolveListMovements: (v: any) => void;
-      api.listMovements.mockReturnValueOnce(new Observable((subscriber) => { resolveListMovements = (v) => { subscriber.next(v); subscriber.complete(); }; }) as any);
+      api.listMovements.mockReturnValueOnce(
+        new Observable((subscriber) => {
+          resolveListMovements = (v) => {
+            subscriber.next(v);
+            subscriber.complete();
+          };
+        }) as any,
+      );
 
       comp.openCheckerAccountEntryDialog();
       // The Checker moves on to a different movement before the async lookup resolves.
       comp.openAccountEntryDialog(makeMovement({ movementId: 'mv-second' }), 'IPLC_LC');
-      resolveListMovements!([makeMovement({ movementId: 'mv-utilize', contingentAccountEntry: { drAccount: 'Dr', crAccount: 'Cr', currency: 'USD', amount: '1' } })]);
+      resolveListMovements!([
+        makeMovement({ movementId: 'mv-utilize', contingentAccountEntry: { drAccount: 'Dr', crAccount: 'Cr', currency: 'USD', amount: '1' } }),
+      ]);
 
       expect(comp.accountEntryDialogMovement?.movementId).toBe('mv-second');
       expect(comp.accountEntryDialogLinkedMovement).toBeNull();
@@ -2245,12 +2382,25 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
    * `openCheckerAccountEntryDialog()` tests above.
    */
   describe('onMakerOpenAccountEntries()', () => {
-    it('A6, right after Submit: resolves the referenced UTILIZE the same way the Checker\'s own button does', () => {
+    it("A6, right after Submit: resolves the referenced UTILIZE the same way the Checker's own button does", () => {
       const { comp, api } = setup();
-      const created = makeMovement({ movementId: 'mv-a6-create', movementType: 'CREATE', balanceContractId: 'bc-acceptance', referencedTransactionId: 'mv-utilize' });
-      api.getContract.mockReturnValueOnce(of(makeContract({ instrumentType: 'IPLC_ACCEPTANCE', naturalKey: { lcNumber: 'U01', ibNumber: 'B01', sgNumber: null } })) as any);
-      api.resolveContract.mockReturnValueOnce(of(makeContract({ instrumentType: 'IPLC_LC', balanceContractId: 'bc-lc', naturalKey: { lcNumber: 'U01', ibNumber: null, sgNumber: null } })) as any);
-      const utilizeMovement = makeMovement({ movementId: 'mv-utilize', movementType: 'UTILIZE', contingentAccountEntry: { drAccount: 'Dr', crAccount: 'Cr', currency: 'USD', amount: '1000' } });
+      const created = makeMovement({
+        movementId: 'mv-a6-create',
+        movementType: 'CREATE',
+        balanceContractId: 'bc-acceptance',
+        referencedTransactionId: 'mv-utilize',
+      });
+      api.getContract.mockReturnValueOnce(
+        of(makeContract({ instrumentType: 'IPLC_ACCEPTANCE', naturalKey: { lcNumber: 'U01', ibNumber: 'B01', sgNumber: null } })) as any,
+      );
+      api.resolveContract.mockReturnValueOnce(
+        of(makeContract({ instrumentType: 'IPLC_LC', balanceContractId: 'bc-lc', naturalKey: { lcNumber: 'U01', ibNumber: null, sgNumber: null } })) as any,
+      );
+      const utilizeMovement = makeMovement({
+        movementId: 'mv-utilize',
+        movementType: 'UTILIZE',
+        contingentAccountEntry: { drAccount: 'Dr', crAccount: 'Cr', currency: 'USD', amount: '1000' },
+      });
       api.listMovements.mockReturnValueOnce(of([utilizeMovement]) as any);
 
       comp.onMakerOpenAccountEntries({ movement: created, instrumentType: 'IPLC_ACCEPTANCE' });

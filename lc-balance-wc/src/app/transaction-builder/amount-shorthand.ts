@@ -19,7 +19,7 @@ function toDecimalTerm(token: string): DecimalTerm {
   const numeric = suffix ? token.slice(0, -1) : token;
   const [rawWhole, fraction = ''] = numeric.split('.');
   let coefficient = BigInt(`${rawWhole || '0'}${fraction}`);
-  const multiplierPlaces = suffix === 'm' ? 6 : suffix === 'k' ? 3 : suffix === 'h' ? 2 : 0;
+  const multiplierPlaces = multiplierPlacesFor(suffix);
 
   if (multiplierPlaces >= fraction.length) {
     coefficient *= 10n ** BigInt(multiplierPlaces - fraction.length);
@@ -29,6 +29,13 @@ function toDecimalTerm(token: string): DecimalTerm {
   return { coefficient, scale: fraction.length - multiplierPlaces };
 }
 
+function multiplierPlacesFor(suffix: string): number {
+  if (suffix === 'm') return 6;
+  if (suffix === 'k') return 3;
+  if (suffix === 'h') return 2;
+  return 0;
+}
+
 function formatCanonicalDecimal(coefficient: bigint, scale: number): string {
   if (coefficient === 0n) return '0';
   if (scale === 0) return coefficient.toString();
@@ -36,7 +43,8 @@ function formatCanonicalDecimal(coefficient: bigint, scale: number): string {
   const padded = coefficient.toString().padStart(scale + 1, '0');
   const splitAt = padded.length - scale;
   const whole = padded.slice(0, splitAt);
-  const fraction = padded.slice(splitAt).replace(/0+$/, '');
+  let fraction = padded.slice(splitAt);
+  while (fraction.endsWith('0')) fraction = fraction.slice(0, -1);
   return fraction ? `${whole}.${fraction}` : whole;
 }
 
@@ -54,7 +62,7 @@ export function parseAmountShorthand(input: string | number | null | undefined):
   while (offset < source.length) {
     TERM.lastIndex = offset;
     const match = TERM.exec(source);
-    if (!match || match.index !== offset) return invalid();
+    if (match?.index !== offset) return invalid();
 
     const token = match[0];
     offset = TERM.lastIndex;

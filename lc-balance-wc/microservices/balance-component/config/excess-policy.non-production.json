@@ -10,12 +10,19 @@
     "roundingMode": "ROUND_HALF_UP",
     "effectiveFrom": "2026-09-22T00:00:00.000Z",
     "effectiveTo": null,
-    "fallbackPolicy": "FAIL_CLOSED"
+    "fallbackPolicy": "FAIL_CLOSED",
+    "pbdFallbackPolicy": {
+      "authorized": false,
+      "fallbackPolicyId": null,
+      "fallbackPolicyVersion": null,
+      "effectiveFrom": null,
+      "effectiveTo": null
+    }
   },
   {
     "policyVersion": "v11.15-nonprod-2026-09-22",
     "ownerType": "EXPORT_CONFIRMATION",
-    "allowancePercentage": "8",
+    "allowancePercentage": "10",
     "configuredMaximumUsd": "100000",
     "fxMaxStalenessSeconds": 300,
     "currencyPrecisions": { "USD": 2, "EUR": 2, "JPY": 0, "TWD": 0 },
@@ -23,6 +30,13 @@
     "roundingMode": "ROUND_HALF_UP",
     "effectiveFrom": "2026-09-22T00:00:00.000Z",
     "effectiveTo": null,
-    "fallbackPolicy": "FAIL_CLOSED"
+    "fallbackPolicy": "FAIL_CLOSED",
+    "pbdFallbackPolicy": {
+      "authorized": false,
+      "fallbackPolicyId": null,
+      "fallbackPolicyVersion": null,
+      "effectiveFrom": null,
+      "effectiveTo": null
+    }
   }
 ]

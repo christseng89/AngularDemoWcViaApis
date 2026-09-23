@@ -54,9 +54,9 @@
             (searchRequested)="inquireEvents.searchIndex()"
           ></app-transaction-search-field>
           <app-feedback-message *ngIf="indexErrorFeedback as feedback" [message]="feedback" (retry)="inquireEvents.searchIndex()"></app-feedback-message>
-          <div class="tb-hint mt-2" role="status" aria-live="polite" aria-busy="true" *ngIf="inquireEvents.indexLoading">
+          <output class="tb-hint mt-2 d-block" aria-live="polite" aria-busy="true" *ngIf="inquireEvents.indexLoading">
             <span class="tb-spinner" aria-hidden="true"></span>Loading {{ inquireEvents.indexEntityLabel }} Master Records…
-          </div>
+          </output>
 
           <div class="tb-table-scroll mt-2" *ngIf="!inquireEvents.indexLoading && inquireEvents.indexRows.length">
             <table class="tb-table tb-table--lc-index">
@@ -79,7 +79,7 @@
                 </tr>
               </thead>
               <tbody>
-                <tr *ngFor="let row of inquireEvents.indexRows" (click)="inquireEvents.selectLcFromIndex(row.contract)">
+                <tr *ngFor="let row of inquireEvents.indexRows" (click)="inquireEvents.selectLcFromIndex(row.contract)" (keydown.enter)="inquireEvents.selectLcFromIndex(row.contract)" (keydown.space)="inquireEvents.selectLcFromIndex(row.contract); $event.preventDefault()" tabindex="0">
                   <td class="tb-table__ref">{{ row.contract.naturalKey.lcNumber }}</td>
                   <td>{{ row.tenorType }}</td>
                   <td>{{ row.currency }}</td>
@@ -133,9 +133,9 @@
         <ng-container *ngIf="inquireEvents.indexView === 'EVENTS'">
           <div class="mt-3" *ngIf="inquireEvents.rootContract">
             <h3 class="tb-subheading">Events — LC {{ inquireEvents.rootContract.naturalKey.lcNumber }} (all ledgers, Event Date/Time order)</h3>
-            <div class="tb-hint" role="status" aria-live="polite" aria-busy="true" *ngIf="inquireEvents.eventsLoading">
+            <output class="tb-hint d-block" aria-live="polite" aria-busy="true" *ngIf="inquireEvents.eventsLoading">
               <span class="tb-spinner" aria-hidden="true"></span>Loading events…
-            </div>
+            </output>
             <!-- Business instruction 2026-08-17 ("Since the View screen already provides access to Account
              Entries, remove the Account Entries button from the Event List... The View button should
              serve as the single entry point for reviewing the selected Event, including its

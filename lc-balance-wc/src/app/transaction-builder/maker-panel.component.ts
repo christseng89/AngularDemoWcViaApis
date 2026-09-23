@@ -1,8 +1,31 @@
-import { Component, EventEmitter, Inject, InjectionToken, Input, OnChanges, Output, SimpleChanges, inject } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  EventEmitter,
+  Inject,
+  InjectionToken,
+  Input,
+  OnChanges,
+  OnDestroy,
+  Output,
+  SimpleChanges,
+  ViewChild,
+  inject,
+} from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormGroup, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { FormlyFieldConfig, FormlyModule } from '@ngx-formly/core';
-import { BalanceComponentApiService, BalanceContract, BalanceMovement, BalanceSnapshot, CreateMovementRequest } from './balance-component-api.service';
+import {
+  BalanceComponentApiService,
+  BalanceContract,
+  BalanceMovement,
+  BalanceSnapshot,
+  CreateMovementRequest,
+  ExcessPreviewRequest,
+  ExcessPreviewResponse,
+} from './balance-component-api.service';
+import { Subject, Subscription, of } from 'rxjs';
+import { catchError, debounceTime, map, switchMap } from 'rxjs/operators';
 import { IndexPickerComponent } from './index-picker.component';
 import { TbIconComponent } from '../tb-icon.component';
 import { CheckerActionOutcome } from './checker-actions.service';
@@ -39,7 +62,14 @@ import {
   formatCurrencyAmount,
   groupThousands,
 } from './balance-component.model';
-import { BuilderFieldsContext, buildFields, isAmountFieldProtected, isFixPendingFieldEditable, reconstructOriginalModel, toReadOnlyFields } from './builder-fields';
+import {
+  BuilderFieldsContext,
+  buildFields,
+  isAmountFieldProtected,
+  isFixPendingFieldEditable,
+  reconstructOriginalModel,
+  toReadOnlyFields,
+} from './builder-fields';
 import {
   SubmitRulesContext,
   buildSubmitRequest as buildSubmitRequestRules,
@@ -180,7 +210,8 @@ export interface MakerSyncRequest {
     { provide: IB_INDEX_PICKER, useFactory: () => new CatalogPickerService(IB_INDEX_PAGE_SIZE, inject(BalanceComponentApiService)) },
   ],
 })
-export class MakerPanelComponent implements OnChanges {
+export class MakerPanelComponent implements OnChanges, OnDestroy {
+  @ViewChild('makerResultHost', { read: ElementRef }) private makerResultHost?: ElementRef<HTMLElement>;
   @Input() selectedFunction: TransactionFunction | null = null;
   @Input() activeFunctionSide: 'IMPORT' | 'EXPORT' = 'IMPORT';
   /** Same counter-based reset signal as `CheckerPanelComponent.resetTrigger` — one shared counter, bound to both children, incremented every `selectFunction()` call. */
@@ -312,6 +343,13 @@ export class MakerPanelComponent implements OnChanges {
   /** See `CompoundLegState`'s own doc comment for why these 7 fields (A3S/A6/B4/B5's own multi-leg submissions) are grouped here rather than left flat. */
   compoundLegs: CompoundLegState = { ...EMPTY_COMPOUND_LEGS };
 
+  excessPreview: ExcessPreviewResponse | null = null;
+  excessPreviewLoading = false;
+  excessPreviewError: string | null = null;
+  private excessPreviewSequence = 0;
+  private readonly excessPreviewRequests = new Subject<{ sequence: number; request: ExcessPreviewRequest | null }>();
+  private readonly excessPreviewSubscription: Subscription;
+
   constructor(
     private readonly api: BalanceComponentApiService,
     private readonly makerSubmit: MakerSubmitService = new MakerSubmitService(api),
@@ -320,7 +358,30 @@ export class MakerPanelComponent implements OnChanges {
     @Inject(IB_INDEX_PICKER) readonly ibIndexPicker: CatalogPickerService = new CatalogPickerService(IB_INDEX_PAGE_SIZE, api),
     readonly documentArrivalHints: DocumentArrivalHintsService = new DocumentArrivalHintsService(api),
     readonly pickerSelection: PickerSelectionService = new PickerSelectionService(api),
-  ) {}
+  ) {
+    this.excessPreviewSubscription = this.excessPreviewRequests
+      .pipe(
+        debounceTime(250),
+        switchMap(({ sequence, request }) =>
+          request
+            ? this.api.previewExcess(request).pipe(
+                map((response) => ({ sequence, response, errorCode: null as string | null })),
+                catchError((error: unknown) => of({ sequence, response: null, errorCode: this.excessPreviewFailureCode(error) })),
+              )
+            : of({ sequence, response: null, errorCode: null as string | null }),
+        ),
+      )
+      .subscribe(({ sequence, response, errorCode }) => {
+        if (sequence !== this.excessPreviewSequence) return;
+        this.excessPreview = response;
+        this.excessPreviewError = errorCode;
+        this.excessPreviewLoading = false;
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.excessPreviewSubscription.unsubscribe();
+  }
 
   get catalogPageSize(): number {
     return CATALOG_PAGE_SIZE;
@@ -383,6 +444,8 @@ export class MakerPanelComponent implements OnChanges {
     if (!snapshot) return [];
     const usesDocumentArrivalWithSg = !!this.selectedFunctionStrategy?.compoundSubmission.possibleShapes.includes('documentArrivalWithSg');
     return deriveMakerBalanceWarnings({
+      functionCode: this.selectedFunction?.code,
+      excessPreview: this.excessPreview,
       formLocked: this.formLocked,
       amountProtected: isAmountFieldProtected(this.buildFieldsContext()),
       amount: this.model.amount,
@@ -399,8 +462,37 @@ export class MakerPanelComponent implements OnChanges {
     });
   }
 
+  get showExcessPreview(): boolean {
+    const code = this.selectedFunction?.code;
+    return code === 'A3' || code === 'A3S' || code === 'B3';
+  }
+
+  get showExcessPreviewDetails(): boolean {
+    if (!this.showExcessPreview || !this.excessPreview) return false;
+    return Number(this.excessPreview.previousExcessAmountTransaction) > 0 || Number(this.excessPreview.thisExcessAmountTransaction) > 0;
+  }
+
+  get excessPreviewFields(): ReadonlyArray<{ label: string; value: string | null }> {
+    return [
+      { label: 'Previous Exceed Amount', value: this.excessPreview?.previousExcessAmountTransaction ?? null },
+      { label: 'This Exceed Amount', value: this.excessPreview?.thisExcessAmountTransaction ?? null },
+      { label: 'Total Exceed Amount', value: this.excessPreview?.totalExcessAmountTransaction ?? null },
+      { label: 'Max Exceed Amount Equivalent (In Trx Currency)', value: this.excessPreview?.maxExcessAmountTransaction ?? null },
+    ];
+  }
+
+  onMakerModelChange(): void {
+    const sequence = ++this.excessPreviewSequence;
+    const request = this.buildExcessPreviewRequest();
+    this.excessPreview = null;
+    this.excessPreviewError = null;
+    this.excessPreviewLoading = request !== null;
+    this.excessPreviewRequests.next({ sequence, request });
+  }
+
   /** Template-friendly wrapper around `functionSupportsFixPending()` (the single derived source of truth — see `FunctionStrategy.fixPendingEditableFields`'s own doc comment). */
   get fixPendingSupported(): boolean {
+    if (this.selectedFunction?.code === 'A3S' && this.submitResult?.acknowledgedAt) return false;
     return functionSupportsFixPending(this.selectedFunctionStrategy);
   }
 
@@ -477,8 +569,7 @@ export class MakerPanelComponent implements OnChanges {
   private emitContext(): void {
     // MakerCheckerContext only wants the 5 bare movementId fields, never the 2 full-BalanceMovement
     // ones (arrivalSgRedeemMovement/acceptanceMovement) — see CompoundLegState's own doc comment.
-    const { dueFromIssuingBankMovementId, acceptanceMovementId, acceptanceReimbReceivableMovementId, arrivalSgRedeemMovementId } =
-      this.compoundLegs;
+    const { dueFromIssuingBankMovementId, acceptanceMovementId, acceptanceReimbReceivableMovementId, arrivalSgRedeemMovementId } = this.compoundLegs;
     this.contextChanged.emit({
       submitResult: this.submitResult,
       selectedPayMovement: this.pickerSelection.selectedPayMovement,
@@ -726,6 +817,10 @@ export class MakerPanelComponent implements OnChanges {
    */
   private resetForFunction(): void {
     const fn = this.selectedFunction;
+    const sequence = ++this.excessPreviewSequence;
+    this.excessPreview = null;
+    this.excessPreviewLoading = false;
+    this.excessPreviewRequests.next({ sequence, request: null });
     this.subChoiceValue = '';
     this.amendDirection = null;
     this.dynamicSecondaryRefLabel = fn?.secondaryRefLabel ?? null;
@@ -1127,44 +1222,43 @@ export class MakerPanelComponent implements OnChanges {
   }
 
   get allTransactionIndexRows(): TransactionIndexRow[] {
-    const rows: TransactionIndexRow[] = [];
-    if (this.selectedFunction?.code === 'A3S') {
-      for (const root of this.filteredCatalogContracts) {
-        for (const item of this.documentArrivalHints.catalogSgRows.get(root.balanceContractId) ?? []) {
-          rows.push({
-            movementId: item.contract.balanceContractId,
-            root,
-            secondaryRef: item.contract.naturalKey.sgNumber || '—',
-            amount: item.snapshot.availableBalance,
-            currency: item.snapshot.currency,
-            status: item.contract.status,
-            sgContract: item.contract,
-            sgSnapshot: item.snapshot,
-          });
-        }
-      }
-    } else {
-      const isA6 = this.selectedFunction?.code === 'A6';
-      const source = isA6 ? this.documentArrivalHints.parentPayableMovements : this.documentArrivalHints.catalogChildPayableMovements;
-      const roots = isA6 ? this.filteredParentCatalog : this.filteredCatalogContracts;
-      for (const root of roots) {
-        for (const movement of source.get(root.balanceContractId) ?? []) {
-          rows.push({
-            movementId: movement.movementId,
-            root,
-            secondaryRef: movement.sourceTransactionRef || '—',
-            amount: movement.amount,
-            currency: movement.currency,
-            status: movement.acknowledgedAt ? 'EARMARKED' : movement.status,
-            movement,
-          });
-        }
-      }
-    }
+    const rows = this.selectedFunction?.code === 'A3S' ? this.a3sTransactionIndexRows() : this.payableTransactionIndexRows();
     const query = this.transactionIndexSearch.trim().toLowerCase();
     return rows
       .filter((row) => !query || row.root.naturalKey.lcNumber.toLowerCase().includes(query) || row.secondaryRef.toLowerCase().includes(query))
       .sort((a, b) => a.root.naturalKey.lcNumber.localeCompare(b.root.naturalKey.lcNumber) || a.secondaryRef.localeCompare(b.secondaryRef));
+  }
+
+  private a3sTransactionIndexRows(): TransactionIndexRow[] {
+    return this.filteredCatalogContracts.flatMap((root) =>
+      (this.documentArrivalHints.catalogSgRows.get(root.balanceContractId) ?? []).map((item) => ({
+        movementId: item.contract.balanceContractId,
+        root,
+        secondaryRef: item.contract.naturalKey.sgNumber || '—',
+        amount: item.snapshot.availableBalance,
+        currency: item.snapshot.currency,
+        status: item.contract.status,
+        sgContract: item.contract,
+        sgSnapshot: item.snapshot,
+      })),
+    );
+  }
+
+  private payableTransactionIndexRows(): TransactionIndexRow[] {
+    const isA6 = this.selectedFunction?.code === 'A6';
+    const source = isA6 ? this.documentArrivalHints.parentPayableMovements : this.documentArrivalHints.catalogChildPayableMovements;
+    const roots = isA6 ? this.filteredParentCatalog : this.filteredCatalogContracts;
+    return roots.flatMap((root) =>
+      (source.get(root.balanceContractId) ?? []).map((movement) => ({
+        movementId: movement.movementId,
+        root,
+        secondaryRef: movement.sourceTransactionRef || '—',
+        amount: movement.amount,
+        currency: movement.currency,
+        status: movement.acknowledgedAt ? 'EARMARKED' : movement.status,
+        movement,
+      })),
+    );
   }
 
   transactionIndexSearch = '';
@@ -1290,7 +1384,7 @@ export class MakerPanelComponent implements OnChanges {
   get arrivalSgRedeemAmount(): string | null {
     if (!this.pickerSelection.arrivalSgSnapshot) return null;
     const billAmount = Number(this.model.amount);
-    if (!this.model.amount || !isFinite(billAmount) || billAmount <= 0) return null;
+    if (!this.model.amount || !Number.isFinite(billAmount) || billAmount <= 0) return null;
     return String(Math.min(billAmount, Number(this.pickerSelection.arrivalSgSnapshot.confirmedBalance)));
   }
 
@@ -1713,6 +1807,10 @@ export class MakerPanelComponent implements OnChanges {
 
   get noEligibleRecordsMessage(): string | null {
     if (!this.requiresEligibleTarget || this.hasEligibleTargetSelected || this.eligiblePickersLoading) return null;
+    // A3/A3S/B3 keep the Index screen visually clean until the user selects a row. Their protected
+    // Excess preview and transaction fields appear together only after selection; the Index itself is
+    // already the call to action, so repeating a generic "Pick..." sentence below it adds no value.
+    if (this.showExcessPreview && this.eligibleCandidateCount > 0) return null;
     return this.eligibleCandidateCount === 0
       ? 'No eligible records available for this transaction.'
       : 'Pick an eligible record from the list below to continue.';
@@ -1725,7 +1823,8 @@ export class MakerPanelComponent implements OnChanges {
 
   get isSubmitReady(): boolean {
     const context = this.normalizedSubmitRulesContext();
-    return context !== null && this.hasEligibleTargetSelected && validateSubmitRules(context).error === null;
+    const previewAllowsSubmit = !this.showExcessPreview || this.excessPreview?.eligible === true;
+    return previewAllowsSubmit && context !== null && this.hasEligibleTargetSelected && validateSubmitRules(context).error === null;
   }
 
   get displayFields(): FormlyFieldConfig[] {
@@ -1752,6 +1851,16 @@ export class MakerPanelComponent implements OnChanges {
       this.submitErrorCause = null;
       return false;
     }
+    if (this.showExcessPreview && this.excessPreview?.eligible !== true) {
+      this.submitError =
+        this.excessPreview?.businessResultCode === 'EXCESS_LIMIT_EXCEEDED'
+          ? `Total Exceed Amount (${this.excessPreview.totalExcessAmountTransaction}) exceeds Max Exceed Amount (${this.excessPreview.maxExcessAmountTransaction}).`
+          : this.excessPreviewError
+            ? `Excess Preview failed: ${this.excessPreviewError}.`
+            : 'Wait for the Excess Preview to confirm eligibility before submitting.';
+      this.submitErrorCause = null;
+      return false;
+    }
     return true;
   }
 
@@ -1769,6 +1878,59 @@ export class MakerPanelComponent implements OnChanges {
       ...this.submitRulesContext,
       model: { ...this.model, amount: parsed.value },
     };
+  }
+
+  private buildExcessPreviewRequest(): ExcessPreviewRequest | null {
+    if (!this.showExcessPreview || this.formLocked) return null;
+    const context = this.normalizedSubmitRulesContext();
+    if (!context) return null;
+    const { request, error } = buildSubmitRequestRules(context);
+    if (error || !request || !this.selectedFunction) return null;
+
+    const functionCode = this.selectedFunction.code;
+    const excludeMovementId = this.fixPendingMode ? this.submitResult?.movementId : undefined;
+    if (functionCode !== 'A3S') {
+      return {
+        functionCode: functionCode as 'A3' | 'B3',
+        request,
+        ...(excludeMovementId ? { excludeMovementId } : {}),
+      };
+    }
+
+    const selectedSg = this.pickerSelection.selectedArrivalSg;
+    const sgSnapshot = this.pickerSelection.arrivalSgSnapshot;
+    const redeemAmount = this.arrivalSgRedeemAmount;
+    const redeemType = this.arrivalSgRedeemType;
+    if (!selectedSg || !sgSnapshot || !redeemAmount || !redeemType) return null;
+
+    const businessEventId = `EXCESS-PREVIEW-${crypto.randomUUID()}`;
+    const lcRequest: CreateMovementRequest = { ...request, businessEventId };
+    const sgRequest: CreateMovementRequest = {
+      instrumentType: 'SHGT',
+      balanceContractId: selectedSg.balanceContractId,
+      movementType: redeemType,
+      eventSeq: Date.now(),
+      amount: redeemAmount,
+      currency: selectedSg.currency,
+      createdBy: this.model.createdBy!,
+      businessEventId,
+      sourceTransactionRef: this.model.secondaryRef || undefined,
+    };
+    return {
+      functionCode: 'A3S',
+      requests: [sgRequest, lcRequest],
+      ...(excludeMovementId ? { excludeMovementId } : {}),
+    };
+  }
+
+  private excessPreviewFailureCode(error: unknown): string {
+    if (error && typeof error === 'object' && 'error' in error) {
+      const body = (error as { error?: unknown }).error;
+      if (body && typeof body === 'object' && 'code' in body && typeof (body as { code?: unknown }).code === 'string') {
+        return (body as { code: string }).code;
+      }
+    }
+    return 'EXCESS_PREVIEW_UNAVAILABLE';
   }
 
   private get submitRulesContext(): SubmitRulesContext {
@@ -1820,6 +1982,10 @@ export class MakerPanelComponent implements OnChanges {
     if (outcome.kind === 'submitted') {
       this.emitContext();
       this.emitCheckerAndLookupSync();
+      const code = this.selectedFunction?.code;
+      if (code === 'A3' || code === 'A3S' || code === 'B3') {
+        this.makerResultHost?.nativeElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
       return;
     }
     this.emitContext();

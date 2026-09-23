@@ -569,10 +569,17 @@
 // ── Checker action row ─────────────────────────────────────────────────
 
 .tb-checker-actions {
-  display: flex;
-  align-items: center;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
   margin-top: 12px;
+}
+
+.tb-checker-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
 }
 
 // ── Look Up tabs ──────────────────────────────────────────────────────────

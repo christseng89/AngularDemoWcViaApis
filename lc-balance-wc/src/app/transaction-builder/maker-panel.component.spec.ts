@@ -60,13 +60,16 @@ function findFn(list: TransactionFunction[], code: string): TransactionFunction 
 
 const A1 = findFn(IMPORT_FUNCTIONS, 'A1'); // LC Issue — fixed movementType ISSUE, tenorTypeOptions, no parent
 const A2 = findFn(IMPORT_FUNCTIONS, 'A2'); // LC Amendment — subChoice, no fixed movementType
+const A3 = findFn(IMPORT_FUNCTIONS, 'A3'); // Document Arrival
 const A4 = findFn(IMPORT_FUNCTIONS, 'A4'); // Sight Settlement — payExistingUtilize, catalogTenorFilter SIGHT
 const A6 = findFn(IMPORT_FUNCTIONS, 'A6'); // Acceptance (Usance) — defaultParentInstrumentType, tenorTypeOptions, settlesDocumentArrival
 const A3S = findFn(IMPORT_FUNCTIONS, 'A3S'); // Document Arrival w/ Shipping Gtee — flat Catalog picker, documentArrivalWithSg
 const A7 = findFn(IMPORT_FUNCTIONS, 'A7'); // Acceptance Settlement — defaultParentInstrumentType, requiresEligibleParentAcceptance
 const A9 = findFn(IMPORT_FUNCTIONS, 'A9'); // Shipping Gtee (Redemption) — defaultParentInstrumentType, amountVsAvailableDerivation REDEEM
+const A8 = findFn(IMPORT_FUNCTIONS, 'A8'); // Shipping Gtee Issue — remains on legacy client warning path
 const B1 = findFn(EXPORT_FUNCTIONS, 'B1'); // Confirm LC — export side, fixed movementType
 const B2 = findFn(EXPORT_FUNCTIONS, 'B2'); // Confirm LC Amendment — subChoice keyed amendDirection, third option (F1) declares a movementTypeOverride
+const B3 = findFn(EXPORT_FUNCTIONS, 'B3'); // Present Documents
 const B4a = findFn(EXPORT_FUNCTIONS, 'B4'); // Honour / Acceptance — payableMovementInstrumentType EPLC_EXAMINATION, flat Catalog picker
 
 function mkContract(id: string, lcNumber: string, overrides: Partial<BalanceContract> = {}): BalanceContract {
@@ -131,6 +134,16 @@ function makeApiMock() {
     getSnapshot: jest.fn((id: string) => of(mkSnapshot(id))),
     listMovements: jest.fn(() => of([] as any[])),
     submitByMaker: jest.fn(),
+    previewExcess: jest.fn(() =>
+      of({
+        previousExcessAmountTransaction: '0',
+        thisExcessAmountTransaction: '0',
+        totalExcessAmountTransaction: '0',
+        maxExcessAmountTransaction: '0',
+        eligible: true,
+        businessResultCode: 'WITHIN_ALLOWANCE',
+      }),
+    ),
   };
   return api;
 }
@@ -151,6 +164,133 @@ function triggerSelectFunction(comp: MakerPanelComponent, fnDef: TransactionFunc
 }
 
 describe('MakerPanelComponent', () => {
+  it('shows the four exact read-only transaction-currency excess labels only for A3/A3S/B3', () => {
+    const { comp } = makeComponentA();
+    comp.excessPreview = {
+      previousExcessAmountTransaction: '1',
+      thisExcessAmountTransaction: '2',
+      totalExcessAmountTransaction: '3',
+      maxExcessAmountTransaction: '4',
+      eligible: true,
+      businessResultCode: 'WITHIN_ALLOWANCE',
+    };
+
+    for (const fn of [A3, A3S, B3]) {
+      comp.selectedFunction = fn;
+      expect(comp.showExcessPreview).toBe(true);
+      expect(comp.excessPreviewFields).toEqual([
+        { label: 'Previous Exceed Amount', value: '1' },
+        { label: 'This Exceed Amount', value: '2' },
+        { label: 'Total Exceed Amount', value: '3' },
+        { label: 'Max Exceed Amount Equivalent (In Trx Currency)', value: '4' },
+      ]);
+    }
+    comp.selectedFunction = A8;
+    expect(comp.showExcessPreview).toBe(false);
+  });
+
+  it('hides Excess details when both Previous and This Exceed are zero', () => {
+    const { comp } = makeComponentA();
+    comp.selectedFunction = A3;
+    comp.excessPreview = {
+      previousExcessAmountTransaction: '0.00',
+      thisExcessAmountTransaction: '0.00',
+      totalExcessAmountTransaction: '0.00',
+      maxExcessAmountTransaction: '100.00',
+      eligible: true,
+      businessResultCode: 'WITHIN_ALLOWANCE',
+    };
+    expect(comp.showExcessPreviewDetails).toBe(false);
+
+    comp.excessPreview = { ...comp.excessPreview, previousExcessAmountTransaction: '50.00', totalExcessAmountTransaction: '50.00' };
+    expect(comp.showExcessPreviewDetails).toBe(true);
+
+    comp.excessPreview = { ...comp.excessPreview, previousExcessAmountTransaction: '0.00', thisExcessAmountTransaction: '50.00' };
+    expect(comp.showExcessPreviewDetails).toBe(true);
+  });
+
+  it('debounces A3 preview requests, sends exact Maker facts, and ignores stale responses without client FX arithmetic', () => {
+    jest.useFakeTimers();
+    try {
+      const { comp, mockApi } = makeComponentA();
+      const first = new Subject<any>();
+      const second = new Subject<any>();
+      mockApi.previewExcess.mockReturnValueOnce(first.asObservable()).mockReturnValueOnce(second.asObservable());
+      triggerSelectFunction(comp, A3);
+      comp.selectedContract = mkContract('lc-1', 'LC-001', { currency: 'EUR' });
+      comp.model = {
+        ...comp.model,
+        instrumentType: 'IPLC_LC',
+        movementType: 'UTILIZE',
+        amount: '10200',
+        currency: 'EUR',
+        secondaryRef: 'B01',
+        eventSeq: 2,
+      };
+
+      comp.onMakerModelChange();
+      jest.advanceTimersByTime(250);
+      expect(mockApi.previewExcess).toHaveBeenCalledWith(
+        expect.objectContaining({
+          functionCode: 'A3',
+          request: expect.objectContaining({ balanceContractId: 'lc-1', amount: '10200', currency: 'EUR', movementType: 'UTILIZE' }),
+        }),
+      );
+
+      comp.model.amount = '10201';
+      comp.onMakerModelChange();
+      first.next({
+        previousExcessAmountTransaction: '0',
+        thisExcessAmountTransaction: '200',
+        totalExcessAmountTransaction: '200',
+        maxExcessAmountTransaction: '200',
+        eligible: true,
+        businessResultCode: 'WITHIN_ALLOWANCE',
+      });
+      expect(comp.excessPreview).toBeNull();
+      jest.advanceTimersByTime(250);
+      const latest = {
+        previousExcessAmountTransaction: '0',
+        thisExcessAmountTransaction: '201',
+        totalExcessAmountTransaction: '201',
+        maxExcessAmountTransaction: '200',
+        eligible: false,
+        businessResultCode: 'EXCESS_LIMIT_EXCEEDED',
+      };
+      second.next(latest);
+      expect(comp.excessPreview).toEqual(latest);
+      expect(mockApi.previewExcess).toHaveBeenLastCalledWith(
+        expect.objectContaining({ request: expect.objectContaining({ amount: '10201', currency: 'EUR' }) }),
+      );
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('does not offer in-session A3S Fix Pending after Checker Acknowledge (BD-10)', () => {
+    const c = new MakerPanelComponent(mockApiD());
+    c.selectedFunction = A3S;
+    c.submitResult = mkMovement('a3s-acknowledged', { businessEventId: 'be-1', acknowledgedAt: '2026-09-23T01:00:00.000Z' });
+
+    expect(c.fixPendingSupported).toBe(false);
+  });
+
+  it.each([findFn(IMPORT_FUNCTIONS, 'A3'), findFn(IMPORT_FUNCTIONS, 'A3S'), findFn(EXPORT_FUNCTIONS, 'B3')])(
+    '$code Submit keeps Maker Result and scrolls it into view',
+    (transactionFunction) => {
+      const { comp } = makeComponentA();
+      const scrollIntoView = jest.fn();
+      triggerSelectFunction(comp, transactionFunction);
+      (comp as any).makerResultHost = { nativeElement: { scrollIntoView } };
+      const result = mkMovement(`result-${transactionFunction.code}`, { status: 'PENDING' });
+
+      (comp as any).applyMakerSubmitOutcome({ kind: 'submitted', result, secondary: {} });
+
+      expect(comp.submitResult).toBe(result);
+      expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+    },
+  );
+
   describe('constructor', () => {
     it('initializes default Maker-owned state', () => {
       const { comp } = makeComponentA();
@@ -918,7 +1058,7 @@ describe('MakerPanelComponent', () => {
 
       expect(comp.eligiblePickersLoading).toBe(false);
       expect(comp.documentArrivalHints.catalogSgEligible.has('c1')).toBe(true);
-      expect(comp.noEligibleRecordsMessage).toBe('Pick an eligible record from the list below to continue.');
+      expect(comp.noEligibleRecordsMessage).toBeNull();
     });
 
     it('A7 (requiresEligibleParentAcceptance): message stays suppressed while loadParentAcceptanceEligibility is still in flight', () => {
@@ -1520,7 +1660,7 @@ describe('MakerPanelComponent', () => {
   }
 
   describe('balanceWarningMessages protected Amount boundary', () => {
-    it('does not call A4\'s carried Document Arrival amount a Typed amount when current Available is zero', () => {
+    it("does not call A4's carried Document Arrival amount a Typed amount when current Available is zero", () => {
       const comp = makeComponentB(getFn('A4'), makeApi());
       comp.selectedContract = makeContract({ balanceContractId: 'C1' });
       comp.selectedContractSnapshot = makeSnapshot({ availableBalance: '0', tightAvailableBalance: '0' });
@@ -1530,14 +1670,23 @@ describe('MakerPanelComponent', () => {
       expect(comp.balanceWarningMessages).toEqual([]);
     });
 
-    it('continues to warn for a genuinely editable A3 Amount over Available', () => {
+    it('does not apply the legacy Available rejection to A3 and warns only from an authoritative over-limit preview', () => {
       const comp = makeComponentB(getFn('A3'), makeApi());
       comp.selectedContract = makeContract({ balanceContractId: 'C1' });
       comp.selectedContractSnapshot = makeSnapshot({ availableBalance: '0', tightAvailableBalance: '0' });
       comp.model.amount = '100000';
 
+      expect(comp.balanceWarningMessages).toEqual([]);
+      comp.excessPreview = {
+        previousExcessAmountTransaction: '0',
+        thisExcessAmountTransaction: '100000',
+        totalExcessAmountTransaction: '100000',
+        maxExcessAmountTransaction: '200',
+        eligible: false,
+        businessResultCode: 'EXCESS_LIMIT_EXCEEDED',
+      };
       expect(comp.balanceWarningMessages).toHaveLength(1);
-      expect(comp.balanceWarningMessages[0]).toContain('Typed amount (100000) exceeds Available Balance');
+      expect(comp.balanceWarningMessages[0]).toContain('Total Exceed Amount (100000) exceeds Max Exceed Amount (200)');
     });
   });
 
@@ -3324,6 +3473,14 @@ describe('MakerPanelComponent', () => {
         naturalKey: { lcNumber: 'LC001', sgNumber: 'SG01', ibNumber: null },
       });
       comp.pickerSelection.arrivalSgSnapshot = makeSnapshotC({ confirmedBalance: '1000' });
+      comp.excessPreview = {
+        previousExcessAmountTransaction: '0',
+        thisExcessAmountTransaction: '0',
+        totalExcessAmountTransaction: '0',
+        maxExcessAmountTransaction: '200',
+        eligible: true,
+        businessResultCode: 'WITHIN_ALLOWANCE',
+      };
     }
 
     it('creates the SG redemption THEN the Document Arrival, in that order, on full success', () => {
@@ -3823,7 +3980,7 @@ describe('MakerPanelComponent', () => {
       c.submitResult = movement({ movementId: 'mv-new', status: 'PENDING' });
       expect(c.formLocked).toBe(true);
       expect(c.displayFields).not.toBe(c.fields);
-      expect(c.displayFields.length).toBe(c.fields.length);
+      expect(c.displayFields).toHaveLength(c.fields.length);
       for (const f of c.displayFields) {
         expect(f.props?.disabled).toBe(true);
         expect(f.expressions).toBeUndefined();
@@ -3887,6 +4044,16 @@ describe('MakerPanelComponent', () => {
       expect(c.fieldsLocked).toBe(true);
       expect(c.eligibleCandidateCount).toBe(3);
       expect(c.noEligibleRecordsMessage).toBe('Pick an eligible record from the list below to continue.');
+    });
+
+    it.each(['A3', 'A3S', 'B3'])('%s keeps the Index screen free of the generic pick hint and orphaned preview values', (code) => {
+      const c = new MakerPanelComponent(mockApiD());
+      triggerSelectFunction(c, fn(code));
+      c.catalogPicker.total = 3;
+      c.parentPicker.total = 3;
+
+      expect(c.hasEligibleTargetSelected).toBe(false);
+      expect(c.noEligibleRecordsMessage).toBeNull();
     });
 
     it('A2 (flat Catalog) once a contract is picked — unlocked, no message', () => {
@@ -3990,8 +4157,13 @@ describe('MakerPanelComponent', () => {
       triggerSelectFunction(c, fn('A4'));
       const parent = contract({ balanceContractId: 'lc-1', naturalKey: { lcNumber: 'LC001' } });
       c.catalogPicker.contracts = [parent];
-      const movements = Array.from({ length: 11 }, (_, i) => movement({ movementId: `m-${i + 1}`, sourceTransactionRef: `IB${String(i + 1).padStart(2, '0')}` }));
-      c.documentArrivalHints.catalogPayableIbs.set('lc-1', movements.map((item) => item.sourceTransactionRef!));
+      const movements = Array.from({ length: 11 }, (_, i) =>
+        movement({ movementId: `m-${i + 1}`, sourceTransactionRef: `IB${String(i + 1).padStart(2, '0')}` }),
+      );
+      c.documentArrivalHints.catalogPayableIbs.set(
+        'lc-1',
+        movements.map((item) => item.sourceTransactionRef!),
+      );
       c.documentArrivalHints.catalogPayableMovements.set('lc-1', movements);
       c.catalogPicker.total = c.allFlattenedPayableRows.length;
 
@@ -4134,18 +4306,10 @@ describe('MakerPanelComponent', () => {
 
       c.onSubChoice();
 
-      expect(api.catalog).toHaveBeenLastCalledWith(
-        'IPLC_LC',
-        undefined,
-        undefined,
-        1,
-        c.catalogPageSize,
-        undefined,
-        undefined,
-        true,
-        undefined,
-        ['ACTIVE', 'EXPIRED'],
-      );
+      expect(api.catalog).toHaveBeenLastCalledWith('IPLC_LC', undefined, undefined, 1, c.catalogPageSize, undefined, undefined, true, undefined, [
+        'ACTIVE',
+        'EXPIRED',
+      ]);
     });
 
     it('B2 Expiry Date applies the same ACTIVE plus EXPIRED catalog rule to Confirmations', () => {
@@ -4156,18 +4320,10 @@ describe('MakerPanelComponent', () => {
 
       c.onSubChoice();
 
-      expect(api.catalog).toHaveBeenLastCalledWith(
-        'EPLC_CONFIRMATION',
-        undefined,
-        undefined,
-        1,
-        c.catalogPageSize,
-        undefined,
-        undefined,
-        true,
-        undefined,
-        ['ACTIVE', 'EXPIRED'],
-      );
+      expect(api.catalog).toHaveBeenLastCalledWith('EPLC_CONFIRMATION', undefined, undefined, 1, c.catalogPageSize, undefined, undefined, true, undefined, [
+        'ACTIVE',
+        'EXPIRED',
+      ]);
     });
 
     it("F1: A10 (Close) still queries the default ACTIVE status — the CLOSED override applies only to A11/B7's own requiresReopenEligibility", () => {
@@ -4286,7 +4442,7 @@ describe('MakerPanelComponent', () => {
       const m1 = movement({ movementId: '1', sourceTransactionRef: 'IB01' });
       const m2 = movement({ movementId: '2', sourceTransactionRef: 'IB02' });
       c.pickerSelection.payableMovements = [m1, m2];
-      expect(c.pickerSelection.filteredPayableMovements.length).toBe(2);
+      expect(c.pickerSelection.filteredPayableMovements).toHaveLength(2);
       c.pickerSelection.payableMovementSearch = 'ib01';
       expect(c.pickerSelection.filteredPayableMovements).toEqual([m1]);
     });
@@ -4615,9 +4771,7 @@ describe('MakerPanelComponent', () => {
       c.documentArrivalHints.catalogSgEligible.add('lc-a3s');
       c.documentArrivalHints.catalogSgRows.set('lc-a3s', [{ contract: sg, snapshot: sgSnapshot }]);
 
-      expect(c.allTransactionIndexRows).toEqual([
-        expect.objectContaining({ movementId: 'sg-1', secondaryRef: 'SG01', amount: '1200', currency: 'USD' }),
-      ]);
+      expect(c.allTransactionIndexRows).toEqual([expect.objectContaining({ movementId: 'sg-1', secondaryRef: 'SG01', amount: '1200', currency: 'USD' })]);
       c.onSelectTransactionIndex('sg-1');
       expect(c.selectedContract).toBe(lc);
       expect(c.pickerSelection.selectedArrivalSg).toBe(sg);
@@ -4644,7 +4798,14 @@ describe('MakerPanelComponent', () => {
       const c = new MakerPanelComponent(mockApiD());
       triggerSelectFunction(c, fn('B4'));
       const lc = contract({ balanceContractId: 'lc-b4', instrumentType: 'EPLC_CONFIRMATION', tenorType: 'SIGHT', naturalKey: { lcNumber: 'LC03' } });
-      const presentDocs = movement({ movementId: 'b3-1', balanceContractId: 'exam-1', sourceTransactionRef: 'EB01', amount: '3400', currency: 'USD', status: 'RELEASED' });
+      const presentDocs = movement({
+        movementId: 'b3-1',
+        balanceContractId: 'exam-1',
+        sourceTransactionRef: 'EB01',
+        amount: '3400',
+        currency: 'USD',
+        status: 'RELEASED',
+      });
       c.catalogPicker.contracts = [lc];
       c.documentArrivalHints.catalogChildPayableIbs.set('lc-b4', ['EB01']);
       c.documentArrivalHints.catalogChildPayableMovements.set('lc-b4', [presentDocs]);
@@ -4677,7 +4838,10 @@ describe('MakerPanelComponent', () => {
         }),
       );
       c.parentPicker.contracts = [lc];
-      c.documentArrivalHints.parentPayableIbs.set('lc-page', arrivals.map((item) => item.sourceTransactionRef!));
+      c.documentArrivalHints.parentPayableIbs.set(
+        'lc-page',
+        arrivals.map((item) => item.sourceTransactionRef!),
+      );
       c.documentArrivalHints.parentPayableMovements.set('lc-page', arrivals);
 
       expect(c.transactionIndexTotalPages).toBe(2);
@@ -4922,7 +5086,7 @@ describe('MakerPanelComponent', () => {
       c.onCatalogSearch();
       expect(c.documentArrivalHints.catalogPayableIbs.get('bc-1')).toEqual(['(no IB Number)']);
       const rows = c.flattenedPayableRows;
-      expect(rows.length).toBe(2);
+      expect(rows).toHaveLength(2);
       expect(rows.every((r) => r.movement.sourceTransactionRef === undefined)).toBe(true);
     });
 
@@ -4962,7 +5126,7 @@ describe('MakerPanelComponent', () => {
       triggerSelectFunction(c, fn('B5'));
       c.searchNaturalKey = { lcNumber: 'S001', ibNumber: 'IB-PRESENT', sgNumber: '' };
       c.searchExistingContract();
-      expect(resolveContractSpy.mock.calls.length).toBe(1);
+      expect(resolveContractSpy.mock.calls).toHaveLength(1);
       const naturalKeyArg = resolveContractSpy.mock.calls[0][1];
       expect(naturalKeyArg.ibNumber).toBe('IB-PRESENT');
     });
@@ -4976,7 +5140,7 @@ describe('MakerPanelComponent', () => {
       c.selectedContract = contract(); // must be cleared by the error handler
       c.searchExistingContract();
 
-      expect(resolveContractSpy.mock.calls.length).toBe(1);
+      expect(resolveContractSpy.mock.calls).toHaveLength(1);
       expect(c.selectedContract).toBeNull();
       expect(c.selectedContractSnapshot).toBeNull();
       expect(c.searchError).toBe('not found');
@@ -5581,7 +5745,10 @@ describe('MakerPanelComponent', () => {
       expect(comp.submitError).toBeNull();
 
       comp.submitError = 'error left by an earlier request';
-      comp.externalCheckerOutcome = { kind: 'released', result: makeMovement({ movementId: 'mv-a7', amount: '10000', status: 'PENDING', remarks: 'corrected note' }) };
+      comp.externalCheckerOutcome = {
+        kind: 'released',
+        result: makeMovement({ movementId: 'mv-a7', amount: '10000', status: 'PENDING', remarks: 'corrected note' }),
+      };
       comp.ngOnChanges({ externalCheckerOutcome: makeChange(null, comp.externalCheckerOutcome) } as any);
       expect(comp.submitError).toBeNull();
     });

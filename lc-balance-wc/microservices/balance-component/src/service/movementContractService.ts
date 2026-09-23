@@ -33,24 +33,65 @@ export class MovementContractService {
       );
     }
 
-    if (contract && ROOT_INSTRUMENT_TYPES.has(contract.instrumentType) && req.movementType !== 'ISSUE') {
-      this.assertRootIssueReleased(contract, `process a ${req.movementType} event`);
-    }
-    if (contract) this.assertContractStatusEligible(contract, req.movementType);
-    this.assertReferencedTransactionEligible(req, contract);
-    if (contract && req.currency !== contract.currency) {
-      throw new CurrencyMismatchError(
-        `Supplied currency "${req.currency}" does not match this contract's own currency "${contract.currency}" ` +
-          `(balanceContractId ${contract.balanceContractId}).`,
-      );
-    }
-    if (contract) return contract;
+    if (contract) return this.assertExistingEligible(req, contract);
+
+    this.assertReferencedTransactionEligible(req, undefined);
 
     this.assertMayCreate(req);
     this.assertParentReady(req);
     this.assertAcceptanceTenor(req);
     this.policies.assertCreationSufficiency(req);
     return this.create(req);
+  }
+
+  /** Builds a new child contract without writing it; Maker Excess persists it with the movement in one transaction. */
+  prepareNewForExcess(req: CreateMovementRequest): BalanceContract {
+    const existing = this.resolve(req);
+    if (existing) {
+      throw new NaturalKeyAlreadyExistsError(
+        `An ACTIVE ${req.instrumentType} already exists for natural key ${JSON.stringify(req.naturalKey)} ` +
+          `(balanceContractId ${existing.balanceContractId}) — cannot ${req.movementType} again.`,
+      );
+    }
+    this.assertReferencedTransactionEligible(req, undefined);
+    this.assertMayCreate(req);
+    this.assertParentReady(req);
+    this.assertAcceptanceTenor(req);
+    return this.build(req);
+  }
+
+  /** Read-only existing-contract path that applies the same lifecycle and reference gates as resolveOrCreate. */
+  resolveExistingAndValidate(req: CreateMovementRequest): BalanceContract {
+    const contract = this.resolveExistingIdentity(req);
+    return this.assertExistingEligible(req, contract);
+  }
+
+  /** Resolves only immutable owner identity so a stored idempotent response can replay before current-state gates. */
+  resolveExistingIdentity(req: CreateMovementRequest): BalanceContract {
+    if (!req.balanceContractId) throw new RequestValidationError('An existing balanceContractId is required.');
+    const contract = this.contracts.findById(req.balanceContractId);
+    if (!contract) throw new NotFoundError(`No BalanceContract ${req.balanceContractId}`);
+    return contract;
+  }
+
+  private assertExistingEligible(req: CreateMovementRequest, contract: BalanceContract): BalanceContract {
+    if (contract.instrumentType !== req.instrumentType) {
+      throw new RequestValidationError(
+        `Supplied instrumentType "${req.instrumentType}" does not match Balance Contract instrumentType "${contract.instrumentType}".`,
+      );
+    }
+    if (ROOT_INSTRUMENT_TYPES.has(contract.instrumentType) && req.movementType !== 'ISSUE') {
+      this.assertRootIssueReleased(contract, `process a ${req.movementType} event`);
+    }
+    this.assertContractStatusEligible(contract, req.movementType);
+    this.assertReferencedTransactionEligible(req, contract);
+    if (req.currency !== contract.currency) {
+      throw new CurrencyMismatchError(
+        `Supplied currency "${req.currency}" does not match this contract's own currency "${contract.currency}" ` +
+          `(balanceContractId ${contract.balanceContractId}).`,
+      );
+    }
+    return contract;
   }
 
   private resolve(req: CreateMovementRequest): BalanceContract | undefined {
@@ -98,9 +139,7 @@ export class MovementContractService {
     if (movementType === 'CLOSE' && (contract.status === 'ACTIVE' || contract.status === 'EXPIRED')) return;
     if (movementType === 'AMEND_EXPIRY_DATE') {
       if (contract.status === 'ACTIVE' || contract.status === 'EXPIRED') return;
-      throw new IllegalStateTransitionError(
-        `Cannot amend the Expiry Date of a ${contract.status} contract — only ACTIVE or EXPIRED contracts are eligible.`,
-      );
+      throw new IllegalStateTransitionError(`Cannot amend the Expiry Date of a ${contract.status} contract — only ACTIVE or EXPIRED contracts are eligible.`);
     } else if (contract.status === 'ACTIVE') {
       return;
     }
@@ -137,10 +176,11 @@ export class MovementContractService {
 
     if (req.instrumentType === 'EPLC_CONFIRMATION' && (req.movementType === 'HONOUR' || req.movementType === 'ACCEPT')) {
       const sameParent = !!sourceContract && !!target && sourceContract.parentLogicalContractId === target.logicalContractId;
-      const alreadySelected = !!target && this.movements.listByContract(target.balanceContractId).some(
-        (movement) =>
-          movement.eventSeq !== req.eventSeq && movement.status === 'PENDING' && movement.referencedTransactionId === source.movementId,
-      );
+      const alreadySelected =
+        !!target &&
+        this.movements
+          .listByContract(target.balanceContractId)
+          .some((movement) => movement.eventSeq !== req.eventSeq && movement.status === 'PENDING' && movement.referencedTransactionId === source.movementId);
       const eligible =
         sameParent &&
         sourceContract.instrumentType === 'EPLC_EXAMINATION' &&
@@ -185,11 +225,19 @@ export class MovementContractService {
   }
 
   private create(req: CreateMovementRequest): BalanceContract {
+    const contract = this.build(req);
+    this.contracts.insert(contract);
+    return contract;
+  }
+
+  private build(req: CreateMovementRequest): BalanceContract {
     const now = this.now();
     const isRoot = ROOT_INSTRUMENT_TYPES.has(req.instrumentType);
-    const mailFloatGraceDays = isRoot
-      ? (req.mailFloatGraceDays ?? (req.instrumentType === 'EPLC_CONFIRMATION' ? MAIL_FLOAT_GRACE_DAYS.EXPORT : MAIL_FLOAT_GRACE_DAYS.IMPORT))
-      : null;
+    let mailFloatGraceDays: number | null = null;
+    if (isRoot) {
+      const defaultGraceDays = req.instrumentType === 'EPLC_CONFIRMATION' ? MAIL_FLOAT_GRACE_DAYS.EXPORT : MAIL_FLOAT_GRACE_DAYS.IMPORT;
+      mailFloatGraceDays = req.mailFloatGraceDays ?? defaultGraceDays;
+    }
     const contract: BalanceContract = {
       balanceContractId: this.newId(),
       logicalContractId: this.newId(),
@@ -210,7 +258,6 @@ export class MovementContractService {
       createdBy: req.createdBy,
       createdAt: now,
     };
-    this.contracts.insert(contract);
     return contract;
   }
 }

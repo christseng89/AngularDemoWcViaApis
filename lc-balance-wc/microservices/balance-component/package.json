@@ -15,6 +15,7 @@
     "build": "tsc -p tsconfig.build.json",
     "start": "node --env-file=../../.env dist/server.js",
     "dev": "node --env-file=../../.env --watch -r ts-node/register src/server.ts",
+    "dev:bd16-runner": "node --env-file=../../.env --env-file=./config/bd16-runner.env --watch -r ts-node/register src/server.ts",
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:coverage": "jest --coverage",

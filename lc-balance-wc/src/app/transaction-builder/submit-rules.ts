@@ -259,13 +259,9 @@ function validateFunctionSpecificRules(
 }
 
 /**
- * Maker-side capacity backstop for every function whose authoritative API rule is based on the
- * parent/selected contract's Tight Available Balance. The live warning remains useful while typing,
- * but a warning alone must never permit a submission that would make Tight Available Balance negative.
- *
- * A3S is the one widening rule: redeeming the specifically selected SG releases that SG's outstanding
- * capacity as part of the same business event, so its upper limit is current Tight Available plus that
- * SG balance. The base Tight Available itself must still be non-negative; never clamp corrupt data to 0.
+ * Legacy Maker-side capacity backstop for functions that have not moved to the authoritative Excess
+ * preview. A3/A3S/B3 are intentionally absent: their server preview owns booking-rate conversion,
+ * allowance aggregation, and eligibility, so this browser must not recreate those calculations.
  */
 function validateTightAvailableCapacity(ctx: SubmitRulesContext): string | null {
   const { selectedFunction, model, selectedContractSnapshot } = ctx;
@@ -273,10 +269,7 @@ function validateTightAvailableCapacity(ctx: SubmitRulesContext): string | null 
   const applies =
     (code === 'A2' && model.movementType === 'AMEND_DECREASE') ||
     (code === 'B2' && ctx.amendDirection === 'DECREASE') ||
-    code === 'A3' ||
-    code === 'A3S' ||
-    code === 'A8' ||
-    code === 'B3';
+    code === 'A8';
   if (!applies) return null;
   // Preserve the more specific target-selection error from buildSubmitRequest()/the selection gate.
   // There is no balance to validate until the required contract/parent has actually been selected.
@@ -292,11 +285,8 @@ function validateTightAvailableCapacity(ctx: SubmitRulesContext): string | null 
     return `Current Tight Available Balance (${tight}) is invalid. Submission is blocked; please investigate the balance data.`;
   }
 
-  const sgOutstanding = code === 'A3S' ? Number(ctx.arrivalSgSnapshot?.confirmedBalance ?? 0) : 0;
-  const limit = tightAmount + sgOutstanding;
-  if (Number(model.amount) > limit) {
-    const limitExplanation = code === 'A3S' ? `Tight Available Balance plus selected SG Balance (${limit})` : `Tight Available Balance (${tight})`;
-    return `Amount must not exceed ${limitExplanation}; the transaction cannot make Tight Available Balance negative.`;
+  if (Number(model.amount) > tightAmount) {
+    return `Amount must not exceed Tight Available Balance (${tight}); the transaction cannot make Tight Available Balance negative.`;
   }
   return null;
 }
@@ -445,6 +435,13 @@ export function hasEligibleTargetSelected(ctx: SubmitRulesContext): boolean {
   // `settlesDocumentArrival` check right below still requires a real `selectedPayMovement`, and its own
   // `selectedContract` is never set before `selectedParent` in the first place.
   if (lcNumberFromParent(model) && !ctx.selectedParent && !ctx.selectedContract) return false;
+  if (!hasStrategySpecificTarget(ctx, strategy)) return false;
+  // Every other non-creating function (A2/A3/A4/A7/B2/B4) — the flat-Catalog / two-field-search target.
+  if (!isCreatingMovement(model) && !ctx.selectedContract) return false;
+  return true;
+}
+
+function hasStrategySpecificTarget(ctx: SubmitRulesContext, strategy: ReturnType<typeof deriveFunctionStrategy>): boolean {
   // A4 — the specific still-PENDING record to finalize, not just the LC it lives on.
   if (strategy.checkerRelease.releasesExistingMovementInPlace && !ctx.selectedPayMovement) return false;
   // A6/B4 — the specific PENDING Document Arrival / Present Docs record to convert.
@@ -454,9 +451,11 @@ export function hasEligibleTargetSelected(ctx: SubmitRulesContext): boolean {
   // A9 — the Shipping Guarantee to redeem.
   if (strategy.movementDerivation.amountVsAvailableDerivation === 'REDEEM' && !ctx.selectedContractSnapshot) return false;
   // B5 — the Acceptance to settle.
-  if (strategy.movementDerivation.amountVsAvailableDerivation === 'SETTLE' && model.instrumentType === 'EPLC_ACCEPTANCE' && !ctx.selectedContractSnapshot)
+  if (
+    strategy.movementDerivation.amountVsAvailableDerivation === 'SETTLE' &&
+    ctx.model.instrumentType === 'EPLC_ACCEPTANCE' &&
+    !ctx.selectedContractSnapshot
+  )
     return false;
-  // Every other non-creating function (A2/A3/A4/A7/B2/B4) — the flat-Catalog / two-field-search target.
-  if (!isCreatingMovement(model) && !ctx.selectedContract) return false;
   return true;
 }

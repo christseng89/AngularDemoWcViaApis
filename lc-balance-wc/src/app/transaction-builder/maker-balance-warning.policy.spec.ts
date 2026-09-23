@@ -14,6 +14,8 @@ const state: MakerBalanceWarningState = {
   usesDocumentArrivalWithSg: false,
   arrivalSgOutstanding: null,
   referencedPresentationAmount: null,
+  functionCode: 'A8',
+  excessPreview: null,
 };
 
 describe('deriveMakerBalanceWarnings', () => {
@@ -107,8 +109,44 @@ describe('deriveMakerBalanceWarnings', () => {
   });
 
   it('shows the Tight warning for B3/A8 even when plain Available is also exceeded', () => {
-    const warnings = deriveMakerBalanceWarnings({ ...state, amount: '110', movementType: 'CREATE', checksAgainstPlainAvailable: false });
+    const warnings = deriveMakerBalanceWarnings({ ...state, functionCode: 'A8', amount: '110', movementType: 'CREATE', checksAgainstPlainAvailable: false });
     expect(warnings[0]).toContain('exceeds Tight Available Balance');
+  });
+
+  it.each(['A3', 'A3S', 'B3'])('%s never unconditionally rejects amount above Available before authoritative preview', (functionCode) => {
+    expect(deriveMakerBalanceWarnings({ ...state, functionCode, amount: '110', excessPreview: null })).toEqual([]);
+    expect(
+      deriveMakerBalanceWarnings({
+        ...state,
+        functionCode,
+        amount: '110',
+        excessPreview: {
+          previousExcessAmountTransaction: '10',
+          thisExcessAmountTransaction: '10',
+          totalExcessAmountTransaction: '20',
+          maxExcessAmountTransaction: '20',
+          eligible: true,
+          businessResultCode: 'WITHIN_ALLOWANCE',
+        },
+      }),
+    ).toEqual([]);
+  });
+
+  it.each(['A3', 'A3S', 'B3'])('%s rejects only the authoritative preview over-limit result', (functionCode) => {
+    const warnings = deriveMakerBalanceWarnings({
+      ...state,
+      functionCode,
+      amount: '110',
+      excessPreview: {
+        previousExcessAmountTransaction: '10',
+        thisExcessAmountTransaction: '11',
+        totalExcessAmountTransaction: '21',
+        maxExcessAmountTransaction: '20',
+        eligible: false,
+        businessResultCode: 'EXCESS_LIMIT_EXCEEDED',
+      },
+    });
+    expect(warnings).toEqual([expect.stringContaining('Total Exceed Amount (21) exceeds Max Exceed Amount (20)')]);
   });
 
   it('describes SG and presentation widening using the selected source', () => {

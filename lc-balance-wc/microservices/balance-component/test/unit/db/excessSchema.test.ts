@@ -1,7 +1,17 @@
 import { createDb, type Db } from '../../../src/db';
 import { runMigrations } from '../../../src/db/migrations';
 
-const appendOnlyTables = ['excess_ledger_events', 'excess_allocations', 'fx_rate_snapshots', 'sg_capacity_events', 'command_idempotency'] as const;
+const appendOnlyTables = [
+  'excess_ledger_events',
+  'fx_rate_snapshots',
+  'excess_decision_snapshots',
+  'sg_capacity_events',
+  'command_idempotency',
+  'excess_command_attempt_audits',
+  'applicant_waiver_snapshots',
+  'export_authorization_snapshots',
+  'export_asset_postings',
+] as const;
 
 describe('v11.15 Excess persistence schema', () => {
   let db: Db;
@@ -23,23 +33,95 @@ describe('v11.15 Excess persistence schema', () => {
       expect.arrayContaining([
         'excess_accounts',
         'excess_ledger_events',
-        'excess_allocations',
         'fx_rate_snapshots',
         'sg_capacity_events',
         'command_idempotency',
+        'excess_command_attempt_audits',
+        'applicant_waiver_snapshots',
+        'export_authorization_snapshots',
+        'export_asset_postings',
       ]),
     );
+    expect(tableNames).not.toContain('excess_allocations');
+    expect(tableNames).not.toContain('legacy_excess_allocations');
+  });
+
+  test('fresh schema rejects the removed Formal Increase regularization event', () => {
+    db.prepare(
+      `INSERT INTO excess_accounts (
+      excess_account_id, owner_type, owner_id, owner_currency, policy_version, version, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run('ea-formal', 'IMPORT_LC', 'lc-formal', 'EUR', 'policy-1', 1, '2026-09-22T00:00:00Z', '2026-09-22T00:00:00Z');
+
+    expect(() =>
+      db
+        .prepare(
+          `INSERT INTO excess_ledger_events (
+        excess_event_id, excess_account_id, movement_id, event_type, owner_currency,
+        transaction_amount_owner, covered_amount_owner, excess_amount_owner, allowance_amount_owner, policy_version,
+        source_excess_event_id, created_by, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run('formal-1', 'ea-formal', null, 'FORMAL_INCREASE_REGULARIZATION', 'USD', '5', '0', '5', '5', 'policy-1', null, 'maker-1', '2026-09-22T00:00:00Z'),
+    ).toThrow(/FORMAL_INCREASE_REGULARIZATION|CHECK constraint failed/);
+  });
+
+  test.each(['RETURN_REVERSAL', 'CANCELLATION_REVERSAL'] as const)('fresh schema rejects removed active reversal event %s', (eventType) => {
+    db.prepare(
+      `INSERT INTO excess_accounts (
+      excess_account_id, owner_type, owner_id, owner_currency, policy_version, version, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(`ea-${eventType}`, 'IMPORT_LC', `lc-${eventType}`, 'EUR', 'policy-1', 1, '2026-09-22T00:00:00Z', '2026-09-22T00:00:00Z');
+
+    expect(() =>
+      db
+        .prepare(
+          `INSERT INTO excess_ledger_events (
+        excess_event_id, excess_account_id, movement_id, event_type, owner_currency,
+        transaction_amount_owner, covered_amount_owner, excess_amount_owner, allowance_amount_owner, policy_version,
+        source_excess_event_id, created_by, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(`event-${eventType}`, `ea-${eventType}`, null, eventType, 'USD', '5', '0', '5', '5', 'policy-1', null, 'maker-1', '2026-09-22T00:00:00Z'),
+    ).toThrow(/disabled by BD-07|CHECK constraint failed/);
+  });
+
+  test('fresh SG capacity schema rejects the unapproved RESTORE event', () => {
+    db.prepare(
+      `INSERT INTO balance_contracts (
+        balance_contract_id, logical_contract_id, contract_version, instrument_type, lc_number,
+        status, currency, opening_balance, effective_from, created_by, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run('restore-contract', 'restore-owner', 1, 'SHGT', 'RESTORE-LC', 'ACTIVE', 'USD', '100', '2026-09-22', 'maker', '2026-09-22');
+    db.prepare(
+      `INSERT INTO balance_movements (
+        movement_id, balance_contract_id, event_seq, movement_type, exposure_nature, amount,
+        ceiling_amount, currency, status, created_by, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run('restore-movement', 'restore-contract', 1, 'ISSUE', 'CONTINGENT', '100', '100', 'USD', 'RELEASED', 'maker', '2026-09-22');
+
+    expect(() =>
+      db
+        .prepare(
+          `INSERT INTO sg_capacity_events (
+            sg_capacity_event_id, sg_balance_contract_id, source_movement_id, event_type,
+            transaction_currency, capacity_amount, covered_amount, excess_amount,
+            source_capacity_event_id, created_by, created_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run('restore-event', 'restore-contract', 'restore-movement', 'RESTORE', 'USD', '10', '10', '0', null, 'maker', '2026-09-22'),
+    ).toThrow(/CHECK constraint failed/);
   });
 
   test('enforces exactly one allowance account per owner and valid owner type', () => {
     const insert = db.prepare(`INSERT INTO excess_accounts (
-      excess_account_id, owner_type, owner_id, policy_version, version, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?)`);
-    insert.run('ea-1', 'IMPORT_LC', 'logical-lc-1', 'policy-1', 1, '2026-09-22T00:00:00Z', '2026-09-22T00:00:00Z');
-    expect(() => insert.run('ea-2', 'IMPORT_LC', 'logical-lc-1', 'policy-1', 1, '2026-09-22T00:00:00Z', '2026-09-22T00:00:00Z')).toThrow(
+      excess_account_id, owner_type, owner_id, owner_currency, policy_version, version, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
+    insert.run('ea-1', 'IMPORT_LC', 'logical-lc-1', 'EUR', 'policy-1', 1, '2026-09-22T00:00:00Z', '2026-09-22T00:00:00Z');
+    expect(() => insert.run('ea-2', 'IMPORT_LC', 'logical-lc-1', 'EUR', 'policy-1', 1, '2026-09-22T00:00:00Z', '2026-09-22T00:00:00Z')).toThrow(
       /UNIQUE constraint failed/,
     );
-    expect(() => insert.run('ea-3', 'UNKNOWN', 'logical-lc-2', 'policy-1', 1, '2026-09-22T00:00:00Z', '2026-09-22T00:00:00Z')).toThrow(
+    expect(() => insert.run('ea-3', 'UNKNOWN', 'logical-lc-2', 'EUR', 'policy-1', 1, '2026-09-22T00:00:00Z', '2026-09-22T00:00:00Z')).toThrow(
       /CHECK constraint failed/,
     );
   });
@@ -58,13 +140,56 @@ describe('v11.15 Excess persistence schema', () => {
     );
   });
 
+  test('constrains Checker command-attempt audits to fail-closed FX outcomes', () => {
+    db.prepare(
+      `INSERT INTO balance_contracts (
+        balance_contract_id, logical_contract_id, contract_version, instrument_type, lc_number,
+        status, currency, opening_balance, effective_from, created_by, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run('audit-contract', 'audit-owner', 1, 'IPLC_LC', 'AUDIT-LC', 'ACTIVE', 'EUR', '100', '2026-09-22', 'maker', '2026-09-22');
+    db.prepare(
+      `INSERT INTO balance_movements (
+        movement_id, balance_contract_id, event_seq, movement_type, exposure_nature, amount,
+        ceiling_amount, currency, status, created_by, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run('audit-movement', 'audit-contract', 1, 'UTILIZE', 'CONTINGENT', '20', '20', 'EUR', 'PENDING', 'maker', '2026-09-22');
+    const insert = db.prepare(
+      `INSERT INTO excess_command_attempt_audits (
+        command_attempt_audit_id, command_type, movement_id, owner_type, owner_id, owner_currency,
+        actor_context, command_idempotency_key, request_hash, result_code, policy_version, from_currency,
+        to_currency, requested_amount_usd, rate_purpose, decision_time, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    );
+    expect(() =>
+      insert.run(
+        'bad-audit',
+        'CHECKER_RELEASE',
+        'audit-movement',
+        'IMPORT_LC',
+        'audit-owner',
+        'EUR',
+        'checker',
+        'key-1',
+        'request-hash-1',
+        'FX_RATE_PENDING',
+        'policy-1',
+        'USD',
+        'EUR',
+        '1000',
+        'BOOKING',
+        '2026-09-22',
+        '2026-09-22',
+      ),
+    ).toThrow(/CHECK constraint failed/);
+  });
+
   test('rejects production-invalid FX purpose and decision point values at the DB boundary', () => {
     const insert = db.prepare(`INSERT INTO fx_rate_snapshots (
-      fx_snapshot_id, movement_id, decision_point, base_currency, quote_currency, rate_purpose,
-      booking_rate, converted_amount_usd, rate_source, provider_rate_id, provider_rate_version,
+      fx_snapshot_id, movement_id, decision_point, from_currency, to_currency, requested_amount_usd, rate_purpose,
+      booking_rate, converted_amount_owner, rate_source, provider_rate_id, provider_rate_version, request_attempt_id,
       rate_timestamp, approval_status, effective_from, effective_to, freshness_status,
       correlation_id, policy_version, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
     expect(() =>
       insert.run(
         'fx-1',
@@ -72,12 +197,14 @@ describe('v11.15 Excess persistence schema', () => {
         'UNKNOWN',
         'EUR',
         'USD',
+        '100',
         'MIDPOINT',
         '1.1',
         '110',
         'PROVIDER',
         'rate-1',
         'v1',
+        'attempt-1',
         '2026-09-22T00:00:00Z',
         'APPROVED',
         '2026-09-22T00:00:00Z',
@@ -122,7 +249,6 @@ describe('v11.15 Excess persistence schema', () => {
       DROP TABLE command_idempotency;
       DROP TABLE sg_capacity_events;
       DROP TABLE fx_rate_snapshots;
-      DROP TABLE excess_allocations;
       DROP TABLE excess_ledger_events;
       DROP TABLE excess_accounts;
       DELETE FROM schema_migrations WHERE id = 27;
@@ -135,5 +261,56 @@ describe('v11.15 Excess persistence schema', () => {
       lc_number: 'LC-BEFORE-27',
     });
     expect(db.prepare('SELECT COUNT(*) AS count FROM schema_migrations WHERE id = 27').get()).toEqual({ count: 1 });
+  });
+
+  test('migration 32 restores the Checker command-attempt audit schema repeatably', () => {
+    db.exec(`
+      DROP TABLE excess_command_attempt_audits;
+      DELETE FROM schema_migrations WHERE id = 32;
+    `);
+
+    runMigrations(db);
+    runMigrations(db);
+
+    expect(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'excess_command_attempt_audits'").get()).toEqual({
+      name: 'excess_command_attempt_audits',
+    });
+    expect(db.prepare('SELECT COUNT(*) AS count FROM schema_migrations WHERE id = 32').get()).toEqual({ count: 1 });
+  });
+
+  test('migration 34 isolates a legacy RESTORE-capable SG capacity table and recreates the active contract without RESTORE', () => {
+    db.exec(`
+      DROP INDEX IF EXISTS idx_sg_capacity_contract_time;
+      DROP TRIGGER IF EXISTS immutable_sg_capacity_events_update;
+      DROP TRIGGER IF EXISTS immutable_sg_capacity_events_delete;
+      DROP TABLE sg_capacity_events;
+      CREATE TABLE sg_capacity_events (
+        sg_capacity_event_id TEXT PRIMARY KEY,
+        sg_balance_contract_id TEXT NOT NULL REFERENCES balance_contracts(balance_contract_id),
+        source_movement_id TEXT NOT NULL REFERENCES balance_movements(movement_id),
+        event_type TEXT NOT NULL CHECK (event_type IN ('INITIALIZE','RESERVE','REDEEM','RESTORE','REVERSE')),
+        transaction_currency TEXT NOT NULL,
+        capacity_amount TEXT NOT NULL,
+        covered_amount TEXT NOT NULL,
+        excess_amount TEXT NOT NULL,
+        source_capacity_event_id TEXT REFERENCES sg_capacity_events(sg_capacity_event_id),
+        created_by TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+      DELETE FROM schema_migrations WHERE id = 34;
+    `);
+
+    runMigrations(db);
+    runMigrations(db);
+
+    const activeSql = (db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'sg_capacity_events'").get() as { sql: string }).sql;
+    expect(activeSql).not.toContain("'RESTORE'");
+    expect(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'legacy_pre_m34_sg_capacity_events'").get()).toEqual({
+      name: 'legacy_pre_m34_sg_capacity_events',
+    });
+    expect(() => db.prepare("INSERT INTO legacy_pre_m34_sg_capacity_events VALUES ('x','x','x','RESTORE','USD','1','1','0',NULL,'x','x')").run()).toThrow(
+      /read-only/,
+    );
+    expect(db.prepare('SELECT COUNT(*) AS count FROM schema_migrations WHERE id = 34').get()).toEqual({ count: 1 });
   });
 });

@@ -49,6 +49,17 @@ describe('BalanceSnapshotService', () => {
     });
   });
 
+  it('floors Tight LC Balance at zero when covered commitments exceed the remaining confirmed balance', () => {
+    const result = service.assemble(
+      contract('IPLC_LC'),
+      [movement('ISSUE', '10000', 'RELEASED'), movement('UTILIZE', '10000', 'PENDING')],
+      [movement('ISSUE', '200', 'RELEASED')],
+      [],
+    );
+
+    expect(result.tightAvailableBalance).toBe('0');
+  });
+
   it('leaves family-specific fields null for a contract outside the Import LC and Export Confirmation roots', () => {
     const result = service.assemble(contract('SHGT'), [movement('ISSUE', '250', 'RELEASED')], [], []);
 

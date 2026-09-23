@@ -1,3 +1,4 @@
+import Decimal from 'decimal.js';
 import { formatMonetaryAmount, parseMonetaryAmount, ZERO } from '../money';
 import type { ExcessDecisionStatus } from '../types';
 
@@ -40,54 +41,64 @@ export function computeCoveredAndExcess(input: CoveredAndExcessInput): CoveredAn
 }
 
 export interface EffectiveAllowanceLimitInput {
-  contractualMaximumUsd: string;
+  approvedContractualMaximumOwner: string;
   allowancePercentage: string;
-  configuredMaximumUsd: string;
+  configuredMaximumOwner: string;
+  ownerCurrencyPrecision: number;
 }
 
-/** v11.15: Effective Limit = min(Contractual Maximum USD × Allowance %, configured USD cap). */
-export function computeEffectiveAllowanceLimitUsd(input: EffectiveAllowanceLimitInput): string {
-  const contractualMaximumUsd = parseNonNegative(input.contractualMaximumUsd, 'contractualMaximumUsd');
+/** V4: all allowance operands and the result are denominated in the allowance owner's currency. */
+export function computeEffectiveAllowanceLimitOwner(input: EffectiveAllowanceLimitInput): string {
+  const precision = parseOwnerCurrencyPrecision(input.ownerCurrencyPrecision);
+  const contractualMaximumOwner = parseNonNegative(input.approvedContractualMaximumOwner, 'approvedContractualMaximumOwner');
   const allowancePercentage = parseNonNegative(input.allowancePercentage, 'allowancePercentage');
-  const configuredMaximumUsd = parseNonNegative(input.configuredMaximumUsd, 'configuredMaximumUsd');
-  const percentageLimit = contractualMaximumUsd.times(allowancePercentage).dividedBy(100);
-  return formatMonetaryAmount(DecimalMin(percentageLimit, configuredMaximumUsd), 2);
+  const configuredMaximumOwner = parseNonNegative(input.configuredMaximumOwner, 'configuredMaximumOwner');
+  const percentageLimitOwner = contractualMaximumOwner.times(allowancePercentage).dividedBy(100).toDecimalPlaces(precision, Decimal.ROUND_HALF_UP);
+  const roundedConfiguredMaximumOwner = configuredMaximumOwner.toDecimalPlaces(precision, Decimal.ROUND_HALF_UP);
+  return formatMonetaryAmount(DecimalMin(percentageLimitOwner, roundedConfiguredMaximumOwner), precision);
 }
 
-export interface EvaluateExcessAllowanceInput {
-  effectiveLimitUsd: string;
-  approvedUtilizedUsd: string;
-  otherPendingReservedUsd: string;
-  proposedExcessUsd: string;
+export interface EvaluateOwnerExcessAllowanceInput {
+  effectiveLimitOwner: string;
+  approvedUtilizedOwner: string;
+  otherPendingReservedOwner: string;
+  proposedExcessOwner: string;
+  ownerCurrencyPrecision: number;
 }
 
-export interface EvaluateExcessAllowanceResult {
+export interface EvaluateOwnerExcessAllowanceResult {
   decision: ExcessDecisionStatus;
-  availableAllowanceUsd: string;
-  remainingAllowanceUsd: string;
+  availableAllowanceOwner: string;
+  remainingAllowanceOwner: string;
 }
 
-export function evaluateExcessAllowance(input: EvaluateExcessAllowanceInput): EvaluateExcessAllowanceResult {
-  const effectiveLimit = parseNonNegative(input.effectiveLimitUsd, 'effectiveLimitUsd');
-  const approved = parseNonNegative(input.approvedUtilizedUsd, 'approvedUtilizedUsd');
-  const pending = parseNonNegative(input.otherPendingReservedUsd, 'otherPendingReservedUsd');
-  const proposed = parseNonNegative(input.proposedExcessUsd, 'proposedExcessUsd');
+export function evaluateOwnerExcessAllowance(input: EvaluateOwnerExcessAllowanceInput): EvaluateOwnerExcessAllowanceResult {
+  const precision = parseOwnerCurrencyPrecision(input.ownerCurrencyPrecision);
+  const effectiveLimit = parseNonNegative(input.effectiveLimitOwner, 'effectiveLimitOwner');
+  const approved = parseNonNegative(input.approvedUtilizedOwner, 'approvedUtilizedOwner');
+  const pending = parseNonNegative(input.otherPendingReservedOwner, 'otherPendingReservedOwner');
+  const proposed = parseNonNegative(input.proposedExcessOwner, 'proposedExcessOwner');
   const available = effectiveLimit.minus(approved).minus(pending);
   const nonNegativeAvailable = available.isNegative() ? ZERO : available;
 
   if (proposed.isZero()) {
-    const availableWire = formatMonetaryAmount(nonNegativeAvailable, 2);
-    return { decision: 'NOT_REQUIRED', availableAllowanceUsd: availableWire, remainingAllowanceUsd: availableWire };
+    const availableWire = formatMonetaryAmount(nonNegativeAvailable, precision);
+    return { decision: 'NOT_REQUIRED', availableAllowanceOwner: availableWire, remainingAllowanceOwner: availableWire };
   }
   if (proposed.greaterThan(nonNegativeAvailable)) {
-    const availableWire = formatMonetaryAmount(nonNegativeAvailable, 2);
-    return { decision: 'LIMIT_EXCEEDED', availableAllowanceUsd: availableWire, remainingAllowanceUsd: availableWire };
+    const availableWire = formatMonetaryAmount(nonNegativeAvailable, precision);
+    return { decision: 'LIMIT_EXCEEDED', availableAllowanceOwner: availableWire, remainingAllowanceOwner: availableWire };
   }
   return {
     decision: 'WITHIN_ALLOWANCE',
-    availableAllowanceUsd: formatMonetaryAmount(nonNegativeAvailable, 2),
-    remainingAllowanceUsd: formatMonetaryAmount(nonNegativeAvailable.minus(proposed), 2),
+    availableAllowanceOwner: formatMonetaryAmount(nonNegativeAvailable, precision),
+    remainingAllowanceOwner: formatMonetaryAmount(nonNegativeAvailable.minus(proposed), precision),
   };
+}
+
+function parseOwnerCurrencyPrecision(value: number): number {
+  if (!Number.isInteger(value) || value < 0 || value > 3) throw new Error('ownerCurrencyPrecision must be an integer from 0 to 3');
+  return value;
 }
 
 function parseNonNegative(value: string, field: string) {

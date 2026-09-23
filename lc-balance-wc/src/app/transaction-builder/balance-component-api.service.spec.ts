@@ -1,15 +1,16 @@
 import { BalanceComponentApiService, NaturalKey, CreateMovementRequest } from './balance-component-api.service';
+import { firstValueFrom, of } from 'rxjs';
 
 describe('BalanceComponentApiService', () => {
   let http: { get: jest.Mock; post: jest.Mock };
   let service: BalanceComponentApiService;
 
   beforeEach(() => {
-    http = { get: jest.fn().mockReturnValue('OBS'), post: jest.fn().mockReturnValue('OBS') };
+    http = { get: jest.fn().mockReturnValue('OBS'), post: jest.fn().mockReturnValue(of('OBS')) };
     service = new BalanceComponentApiService(http as any);
   });
 
-  it('createMovement() POSTs to /balance-component/balance-movements with observe:response and the raw request body', () => {
+  it('createMovement() POSTs to /balance-component/balance-movements with observe:response and the raw request body', async () => {
     const req: CreateMovementRequest = {
       instrumentType: 'IPLC_LC',
       naturalKey: { lcNumber: 'S001' },
@@ -20,14 +21,23 @@ describe('BalanceComponentApiService', () => {
       createdBy: 'maker1',
     };
     const result = service.createMovement(req);
-    expect(http.post).toHaveBeenCalledWith('/balance-component/balance-movements', req, { observe: 'response' });
-    expect(result).toBe('OBS');
+    expect(http.post).toHaveBeenCalledWith('/balance-component/balance-movements', req, {
+      observe: 'response',
+      headers: { 'Idempotency-Key': expect.any(String) },
+    });
+    await expect(firstValueFrom(result as any)).resolves.toBe('OBS');
   });
 
   it('createCompoundMovements() POSTs one atomic command', () => {
     const requests = [{ instrumentType: 'IPLC_LC', movementType: 'ISSUE' }] as CreateMovementRequest[];
     service.createCompoundMovements(requests);
-    expect(http.post).toHaveBeenCalledWith('/balance-component/balance-movements/compound', { requests });
+    expect(http.post).toHaveBeenCalledWith(
+      '/balance-component/balance-movements/compound',
+      { requests },
+      {
+        headers: { 'Idempotency-Key': expect.any(String) },
+      },
+    );
   });
 
   it('releaseCompoundMovements() POSTs one atomic release command', () => {
@@ -49,7 +59,13 @@ describe('BalanceComponentApiService', () => {
 
   it('release() POSTs to the /release sub-path with releasedBy', () => {
     service.release('MV-1', 'checker1');
-    expect(http.post).toHaveBeenCalledWith('/balance-component/balance-movements/MV-1/release', { releasedBy: 'checker1' });
+    expect(http.post).toHaveBeenCalledWith(
+      '/balance-component/balance-movements/MV-1/release',
+      { releasedBy: 'checker1' },
+      {
+        headers: { 'Idempotency-Key': expect.any(String) },
+      },
+    );
   });
 
   it('reject() POSTs to the /reject sub-path with releasedBy/reasonCode/remarks', () => {
@@ -72,20 +88,20 @@ describe('BalanceComponentApiService', () => {
 
   it('cancel() POSTs to the /cancel sub-path with cancelledBy plus optional reasonCode/remarks', () => {
     service.cancel('MV-1', 'maker1', 'EC', 'wrong amount');
-    expect(http.post).toHaveBeenCalledWith('/balance-component/balance-movements/MV-1/cancel', {
-      cancelledBy: 'maker1',
-      reasonCode: 'EC',
-      remarks: 'wrong amount',
-    });
+    expect(http.post).toHaveBeenCalledWith(
+      '/balance-component/balance-movements/MV-1/cancel',
+      { cancelledBy: 'maker1', reasonCode: 'EC', remarks: 'wrong amount' },
+      { headers: { 'Idempotency-Key': expect.any(String) } },
+    );
   });
 
   it('cancel() works with reasonCode/remarks both omitted', () => {
     service.cancel('MV-1', 'maker1');
-    expect(http.post).toHaveBeenCalledWith('/balance-component/balance-movements/MV-1/cancel', {
-      cancelledBy: 'maker1',
-      reasonCode: undefined,
-      remarks: undefined,
-    });
+    expect(http.post).toHaveBeenCalledWith(
+      '/balance-component/balance-movements/MV-1/cancel',
+      { cancelledBy: 'maker1', reasonCode: undefined, remarks: undefined },
+      { headers: { 'Idempotency-Key': expect.any(String) } },
+    );
   });
 
   it('submitByMaker() POSTs to the /maker-submit sub-path with makerSubmittedBy', () => {
@@ -100,7 +116,91 @@ describe('BalanceComponentApiService', () => {
 
   it('editPending() POSTs to the /edit sub-path with the raw request body (Fix Pending, §2.2/§15/§19)', () => {
     service.editPending('MV-1', { amount: '95000', editedBy: 'maker2' });
-    expect(http.post).toHaveBeenCalledWith('/balance-component/balance-movements/MV-1/edit', { amount: '95000', editedBy: 'maker2' });
+    expect(http.post).toHaveBeenCalledWith(
+      '/balance-component/balance-movements/MV-1/edit',
+      { amount: '95000', editedBy: 'maker2' },
+      { headers: { 'Idempotency-Key': expect.any(String) } },
+    );
+  });
+
+  it('release() sends explicit Applicant Waiver evidence for positive Import Excess finalisation', () => {
+    service.release('MV-A6', 'checker1', {
+      applicantWaiverValidationResult: 'CONFIRMED',
+      waiverReference: 'WAIVER-1',
+      waiverDate: '2026-09-23',
+      waiverEvidence: 'sha256:evidence',
+    });
+    expect(http.post).toHaveBeenCalledWith(
+      '/balance-component/balance-movements/MV-A6/release',
+      {
+        releasedBy: 'checker1',
+        applicantWaiverValidationResult: 'CONFIRMED',
+        waiverReference: 'WAIVER-1',
+        waiverDate: '2026-09-23',
+        waiverEvidence: 'sha256:evidence',
+      },
+      { headers: { 'Idempotency-Key': expect.any(String) } },
+    );
+  });
+
+  it('previewExcess() posts exact Maker facts without command headers or client-side FX arithmetic', () => {
+    const request = {
+      instrumentType: 'IPLC_LC' as const,
+      balanceContractId: 'bc-1',
+      movementType: 'UTILIZE',
+      eventSeq: 2,
+      amount: '10200',
+      currency: 'EUR',
+      sourceTransactionRef: 'B01',
+      createdBy: 'maker1',
+    };
+    const previewRequest = { functionCode: 'A3' as const, request };
+    service.previewExcess(previewRequest);
+    expect(http.post).toHaveBeenCalledWith('/balance-component/balance-movements/excess-preview', previewRequest);
+  });
+
+  it('getExcessReleaseContext() reads the selected event context instead of an LC aggregate', () => {
+    service.getExcessReleaseContext('MV-B02');
+    expect(http.get).toHaveBeenCalledWith('/balance-component/balance-movements/MV-B02/excess-release-context');
+  });
+
+  it('release() unwraps the typed Checker Excess response to the released movement used by the UI', async () => {
+    const movement = { movementId: 'MV-EXCESS', status: 'RELEASED' };
+    http.post.mockReturnValueOnce(of({ movement, excessDecision: 'WITHIN_ALLOWANCE', releaseEligibility: 'ELIGIBLE' }));
+
+    await expect(firstValueFrom(service.release('MV-EXCESS', 'checker1'))).resolves.toBe(movement);
+  });
+
+  it('release() preserves the legacy raw movement response', async () => {
+    const movement = { movementId: 'MV-RAW', status: 'RELEASED' };
+    http.post.mockReturnValueOnce(of(movement));
+
+    await expect(firstValueFrom(service.release('MV-RAW', 'checker1'))).resolves.toBe(movement);
+  });
+
+  it('releaseExportAssets() preserves the authoritative B4 authorization and asset receipt', () => {
+    const exportAuthorization = {
+      claimStatus: 'SUBMITTED' as const,
+      authorizationReference: 'AUTH-1',
+      authorizedAmountOwner: '200',
+      authorizedCurrency: 'USD',
+      authorizationValidationResult: 'CONFIRMED' as const,
+    };
+    service.releaseExportAssets('MV-B4', 'checker1', exportAuthorization);
+    expect(http.post).toHaveBeenCalledWith(
+      '/balance-component/balance-movements/MV-B4/release',
+      { releasedBy: 'checker1', exportAuthorization },
+      { headers: { 'Idempotency-Key': expect.any(String) } },
+    );
+  });
+
+  it('acknowledge() supplies command idempotency for the A3/A3S Checker decision', () => {
+    service.acknowledge('MV-1', 'checker1');
+    expect(http.post).toHaveBeenCalledWith(
+      '/balance-component/balance-movements/MV-1/acknowledge',
+      { acknowledgedBy: 'checker1' },
+      { headers: { 'Idempotency-Key': expect.any(String) } },
+    );
   });
 
   describe('resolveContract()', () => {
@@ -141,6 +241,13 @@ describe('BalanceComponentApiService', () => {
       service.resolveContract('IPLC_LC', nk);
       expect(http.get).toHaveBeenCalledWith('/balance-component/balance-contracts', {
         params: { instrumentType: 'IPLC_LC', lcNumber: 'S001' },
+      });
+    });
+
+    it('adds includeAnyStatus for inquiry-only lookup', () => {
+      service.resolveContract('IPLC_LC', { lcNumber: 'S001' }, true);
+      expect(http.get).toHaveBeenCalledWith('/balance-component/balance-contracts', {
+        params: { instrumentType: 'IPLC_LC', lcNumber: 'S001', includeAnyStatus: 'true' },
       });
     });
   });
@@ -215,6 +322,29 @@ describe('BalanceComponentApiService', () => {
       service.catalog('IPLC_LC', undefined, undefined, 1, 10, undefined, undefined, true, undefined, ['ACTIVE', 'EXPIRED']);
       expect(http.get).toHaveBeenCalledWith('/balance-component/balance-contracts/catalog', {
         params: { instrumentType: 'IPLC_LC', page: 1, pageSize: 10, requireIssueReleased: 'true', statuses: 'ACTIVE,EXPIRED' },
+      });
+    });
+
+    it('adds excludeCancelled for the inquiry catalog', () => {
+      service.catalog('IPLC_LC', undefined, undefined, 1, 10, undefined, undefined, undefined, true);
+      expect(http.get).toHaveBeenCalledWith('/balance-component/balance-contracts/catalog', {
+        params: { instrumentType: 'IPLC_LC', page: 1, pageSize: 10, excludeCancelled: 'true' },
+      });
+    });
+  });
+
+  describe('catalogWithDeletePendingHistory()', () => {
+    it('omits q when no search text is supplied', () => {
+      service.catalogWithDeletePendingHistory('IPLC_LC');
+      expect(http.get).toHaveBeenCalledWith('/balance-component/delete-pending-audit/lc-catalog', {
+        params: { instrumentType: 'IPLC_LC', page: 1, pageSize: 10 },
+      });
+    });
+
+    it('adds q when the user searches delete-pending history', () => {
+      service.catalogWithDeletePendingHistory('IPLC_LC', 'S001', 2, 20);
+      expect(http.get).toHaveBeenCalledWith('/balance-component/delete-pending-audit/lc-catalog', {
+        params: { instrumentType: 'IPLC_LC', page: 2, pageSize: 20, q: 'S001' },
       });
     });
   });

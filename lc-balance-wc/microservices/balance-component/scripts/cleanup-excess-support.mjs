@@ -9,9 +9,22 @@ export function restoreImmutableTriggers(db, triggerSql) {
   for (const sql of triggerSql) db.exec(sql);
 }
 
+function tableExists(db, tableName) {
+  return Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(tableName));
+}
+
 export function deleteAllExcessFacts(db) {
+  if (tableExists(db, 'legacy_excess_allocations')) db.exec('DELETE FROM legacy_excess_allocations');
+  if (tableExists(db, 'legacy_pre_v4_excess_ledger_events')) db.exec('DELETE FROM legacy_pre_v4_excess_ledger_events');
+  if (tableExists(db, 'legacy_pre_v4_fx_rate_snapshots')) db.exec('DELETE FROM legacy_pre_v4_fx_rate_snapshots');
+  if (tableExists(db, 'legacy_pre_v4_command_idempotency')) db.exec('DELETE FROM legacy_pre_v4_command_idempotency');
+  if (tableExists(db, 'legacy_pre_v4_excess_accounts')) db.exec('DELETE FROM legacy_pre_v4_excess_accounts');
   db.exec(`
-    DELETE FROM excess_allocations;
+    DELETE FROM export_asset_postings;
+    DELETE FROM export_authorization_snapshots;
+    DELETE FROM excess_command_attempt_audits;
+    DELETE FROM applicant_waiver_snapshots;
+    DELETE FROM excess_decision_snapshots;
     DELETE FROM fx_rate_snapshots;
     DELETE FROM sg_capacity_events;
     DELETE FROM excess_ledger_events;
@@ -32,6 +45,17 @@ export function deleteExcessFactsForContracts(db, contractIds, logicalContractId
     .all(...logicalContractIds)
     .map(({ excess_account_id }) => excess_account_id);
 
+  if (movementIds.length > 0) {
+    const movementPlaceholders = movementIds.map(() => '?').join(',');
+    db.prepare(`DELETE FROM export_asset_postings WHERE b4_movement_id IN (${movementPlaceholders}) OR source_b3_movement_id IN (${movementPlaceholders})`).run(...movementIds, ...movementIds);
+    db.prepare(`DELETE FROM export_authorization_snapshots WHERE b4_movement_id IN (${movementPlaceholders}) OR source_b3_movement_id IN (${movementPlaceholders})`).run(...movementIds, ...movementIds);
+    db.prepare(`DELETE FROM excess_command_attempt_audits WHERE movement_id IN (${movementPlaceholders})`).run(...movementIds);
+    db.prepare(
+      `DELETE FROM applicant_waiver_snapshots
+       WHERE source_movement_id IN (${movementPlaceholders}) OR release_movement_id IN (${movementPlaceholders})`,
+    ).run(...movementIds, ...movementIds);
+  }
+
   if (accountIds.length > 0) {
     const accountPlaceholders = accountIds.map(() => '?').join(',');
     const eventIds = db
@@ -40,10 +64,12 @@ export function deleteExcessFactsForContracts(db, contractIds, logicalContractId
       .map(({ excess_event_id }) => excess_event_id);
     if (eventIds.length > 0) {
       const eventPlaceholders = eventIds.map(() => '?').join(',');
-      db.prepare(
-        `DELETE FROM excess_allocations
+      if (tableExists(db, 'legacy_excess_allocations')) {
+        db.prepare(
+          `DELETE FROM legacy_excess_allocations
          WHERE adjustment_event_id IN (${eventPlaceholders}) OR approved_excess_event_id IN (${eventPlaceholders})`,
-      ).run(...eventIds, ...eventIds);
+        ).run(...eventIds, ...eventIds);
+      }
     }
     db.prepare(`DELETE FROM excess_ledger_events WHERE excess_account_id IN (${accountPlaceholders})`).run(...accountIds);
     db.prepare(`DELETE FROM excess_accounts WHERE excess_account_id IN (${accountPlaceholders})`).run(...accountIds);
@@ -51,6 +77,7 @@ export function deleteExcessFactsForContracts(db, contractIds, logicalContractId
 
   if (movementIds.length > 0) {
     const movementPlaceholders = movementIds.map(() => '?').join(',');
+    db.prepare(`DELETE FROM excess_decision_snapshots WHERE movement_id IN (${movementPlaceholders})`).run(...movementIds);
     db.prepare(`DELETE FROM fx_rate_snapshots WHERE movement_id IN (${movementPlaceholders})`).run(...movementIds);
     db.prepare(`DELETE FROM sg_capacity_events WHERE source_movement_id IN (${movementPlaceholders})`).run(...movementIds);
   }

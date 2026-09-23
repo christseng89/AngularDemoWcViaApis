@@ -54,7 +54,7 @@ export function applyEligibilityRule(
       if (rule.gatedByMovementType && (!movementType || !DECREASING_MOVEMENT_TYPES.has(movementType))) return [...list];
       return list.filter((c) => {
         const snap = snapshots.get(c.balanceContractId);
-        return !snap || snap.availableBalance !== '0';
+        return snap?.availableBalance !== '0';
       });
     }
   }

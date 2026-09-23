@@ -29,9 +29,9 @@
         (searchRequested)="service.catalogIndex.searchNow()"
       ></app-transaction-search-field>
       <app-feedback-message *ngIf="indexErrorFeedback as feedback" [message]="feedback" (retry)="service.catalogIndex.searchNow()"></app-feedback-message>
-      <div class="tb-hint mt-2" role="status" aria-live="polite" aria-busy="true" *ngIf="service.catalogIndex.loading">
+      <output class="tb-hint mt-2 d-block" aria-live="polite" aria-busy="true" *ngIf="service.catalogIndex.loading">
         <span class="tb-spinner" aria-hidden="true"></span>Loading {{ service.catalogIndex.entityLabel }} Master Records…
-      </div>
+      </output>
 
       <div class="tb-table-scroll mt-2" *ngIf="!service.catalogIndex.loading && service.catalogIndex.rows.length">
         <table class="tb-table">
@@ -46,7 +46,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let row of service.catalogIndex.rows" (click)="service.selectLcFromIndex(row.contract)">
+            <tr *ngFor="let row of service.catalogIndex.rows" (click)="service.selectLcFromIndex(row.contract)" (keydown.enter)="service.selectLcFromIndex(row.contract)" (keydown.space)="service.selectLcFromIndex(row.contract); $event.preventDefault()" tabindex="0">
               <td class="tb-table__ref">{{ row.contract.naturalKey.lcNumber }}</td>
               <td>{{ row.tenorType }}</td>
               <td>{{ row.currency }}</td>
@@ -79,23 +79,23 @@
 
       <div class="tb-dp-query-grid mt-2">
         <div class="tb-field tb-field--inline">
-          <label class="tb-field__label">Function</label>
-          <select class="tb-select" [ngModel]="service.functionFilter" (ngModelChange)="service.functionFilter = $event; service.closeView()">
+          <label class="tb-field__label" for="delete-pending-function">Function</label>
+          <select id="delete-pending-function" class="tb-select" [ngModel]="service.functionFilter" (ngModelChange)="service.functionFilter = $event; service.closeView()">
             <option value="">All</option>
             <option *ngFor="let fn of functionOptions" [value]="fn.code">{{ fn.code }} · {{ fn.label }}</option>
           </select>
         </div>
         <div class="tb-field tb-field--inline">
-          <label class="tb-field__label">Deleted By</label>
-          <input class="tb-input" [(ngModel)]="service.deletedBy" (keyup.enter)="service.search()" />
+          <label class="tb-field__label" for="delete-pending-by">Deleted By</label>
+          <input id="delete-pending-by" class="tb-input" [(ngModel)]="service.deletedBy" (keyup.enter)="service.search()" />
         </div>
         <div class="tb-field tb-field--inline">
-          <label class="tb-field__label">Delete DateTime From</label>
-          <input class="tb-input" type="datetime-local" [(ngModel)]="service.from" />
+          <label class="tb-field__label" for="delete-pending-from">Delete DateTime From</label>
+          <input id="delete-pending-from" class="tb-input" type="datetime-local" [(ngModel)]="service.from" />
         </div>
         <div class="tb-field tb-field--inline">
-          <label class="tb-field__label">Delete DateTime To</label>
-          <input class="tb-input" type="datetime-local" [(ngModel)]="service.to" />
+          <label class="tb-field__label" for="delete-pending-to">Delete DateTime To</label>
+          <input id="delete-pending-to" class="tb-input" type="datetime-local" [(ngModel)]="service.to" />
         </div>
       </div>
       <div class="tb-hint mt-1">Function is filtered on the currently-fetched page only (a client-side refinement, not a server query).</div>
@@ -104,9 +104,9 @@
       </button>
 
       <div class="tb-error mt-2" role="alert" *ngIf="service.error">{{ service.error }}</div>
-      <div class="tb-hint mt-2" role="status" aria-live="polite" aria-busy="true" *ngIf="service.loading">
+      <output class="tb-hint mt-2 d-block" aria-live="polite" aria-busy="true" *ngIf="service.loading">
         <span class="tb-spinner" aria-hidden="true"></span>Loading Delete Pending audit records…
-      </div>
+      </output>
 
       <div class="tb-table-scroll mt-2" *ngIf="!service.loading && service.filteredItems.length">
         <table class="tb-table">
@@ -126,7 +126,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let row of service.filteredItems" (click)="service.view(row)">
+            <tr *ngFor="let row of service.filteredItems" (click)="service.view(row)" (keydown.enter)="service.view(row)" (keydown.space)="service.view(row); $event.preventDefault()" tabindex="0">
               <td class="tb-table__ref">{{ row.lcNumber }}</td>
               <td><span class="tb-type-tag">{{ functionLabel(row) }}</span></td>
               <td class="tb-table__ref">{{ service.secondaryReferenceFor(row) }}</td>

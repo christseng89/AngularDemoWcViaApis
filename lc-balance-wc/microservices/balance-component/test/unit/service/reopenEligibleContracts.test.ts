@@ -37,7 +37,7 @@ function issueAndCloseImportLc(service: BalanceService, lcNumber: string): Balan
   if (!close.created) throw new Error('expected a new movement');
   service.release(close.movement.movementId, 'checker1');
 
-  const closed = service.resolveContract('IPLC_LC', { lcNumber }, true);
+  const closed = service.resolveContractAnyStatus('IPLC_LC', { lcNumber });
   if (!closed) throw new Error('expected the just-closed LC to resolve with includeAnyStatus');
   return closed;
 }

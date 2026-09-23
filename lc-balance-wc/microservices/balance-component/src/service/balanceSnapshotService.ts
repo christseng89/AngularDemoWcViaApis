@@ -30,7 +30,8 @@ export class BalanceSnapshotService {
       );
       const exposure = computeOffBalanceExposure(shgtMovements, matchedPendingUtilizeBusinessEventIds);
       offBalanceExposure = exposure.toFixed();
-      tightAvailableBalance = confirmed.minus(pendingDecreaseTotal).minus(exposure).toFixed();
+      const rawTightAvailable = confirmed.minus(pendingDecreaseTotal).minus(exposure);
+      tightAvailableBalance = rawTightAvailable.isNegative() ? '0' : rawTightAvailable.toFixed();
     }
 
     let presentDocsEarmarkPending: string | null = null;
@@ -39,7 +40,10 @@ export class BalanceSnapshotService {
       const provisionallyConsumedIds = derivePresentDocsProvisionallyConsumedIds(movements);
       presentDocsEarmarkPending = computePresentDocsEarmarkPending(examinationMovements).toFixed();
       presentDocsEarmarkApproved = computePresentDocsEarmarkApproved(examinationMovements, provisionallyConsumedIds).toFixed();
-      tightAvailableBalance = confirmed.minus(pendingDecreaseTotal).minus(computePresentDocsEarmark(examinationMovements, provisionallyConsumedIds)).toFixed();
+      const rawTightAvailable = confirmed
+        .minus(pendingDecreaseTotal)
+        .minus(computePresentDocsEarmark(examinationMovements, provisionallyConsumedIds));
+      tightAvailableBalance = rawTightAvailable.isNegative() ? '0' : rawTightAvailable.toFixed();
     }
 
     return {

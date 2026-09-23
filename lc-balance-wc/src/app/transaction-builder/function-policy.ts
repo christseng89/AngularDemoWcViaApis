@@ -171,11 +171,8 @@ export function checkerSecondaryField(selectedFunction: TransactionFunction | nu
 }
 
 export function checkerSecondaryLabel(selectedFunction: TransactionFunction | null): string {
-  return checkerSecondaryField(selectedFunction) === 'ibNumber'
-    ? selectedFunction?.instrumentType === 'EPLC_ACCEPTANCE'
-      ? 'EB Number'
-      : 'IB Number'
-    : 'SG Number';
+  if (checkerSecondaryField(selectedFunction) !== 'ibNumber') return 'SG Number';
+  return selectedFunction?.instrumentType === 'EPLC_ACCEPTANCE' ? 'EB Number' : 'IB Number';
 }
 
 /** Shared by the parent picker's server-side filter and filteredParentCatalog()'s client-side one. */

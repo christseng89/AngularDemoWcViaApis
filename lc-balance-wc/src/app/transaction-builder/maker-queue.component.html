@@ -42,9 +42,9 @@
       [message]="feedback"
       (retry)="makerQueue.load()"
     ></app-feedback-message>
-    <div class="tb-hint mt-2" role="status" aria-live="polite" aria-busy="true" *ngIf="makerQueue.loading">
+    <output class="tb-hint mt-2 d-block" aria-live="polite" aria-busy="true" *ngIf="makerQueue.loading">
       <span class="tb-spinner" aria-hidden="true"></span>Loading My Pending/My Rejected…
-    </div>
+    </output>
 
     <div class="tb-table-scroll mt-2" *ngIf="!makerQueue.loading && makerQueue.sideFilteredItems.length">
       <table class="tb-table">

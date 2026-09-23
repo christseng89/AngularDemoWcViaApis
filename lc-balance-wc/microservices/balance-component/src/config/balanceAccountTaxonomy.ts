@@ -2,45 +2,55 @@ import { z } from 'zod';
 import rawTaxonomy from '../../config/balance-account-mappings.json';
 import type { InstrumentType, TenorType } from '../types';
 
-const tenorSchema = z.object({
-  tenorKey: z.string().min(1),
-  apiValue: z.string().min(1),
-  label: z.string().min(1),
-  behavior: z.enum(['SIGHT', 'USANCE']),
-}).strict();
+const tenorSchema = z
+  .object({
+    tenorKey: z.string().min(1),
+    apiValue: z.string().min(1),
+    label: z.string().min(1),
+    behavior: z.enum(['SIGHT', 'USANCE']),
+  })
+  .strict();
 
-const categorySchema = z.object({
-  categoryKey: z.string().min(1),
-  label: z.string().min(1),
-  tenorTypes: z.array(tenorSchema).min(1),
-}).strict();
+const categorySchema = z
+  .object({
+    categoryKey: z.string().min(1),
+    label: z.string().min(1),
+    tenorTypes: z.array(tenorSchema).min(1),
+  })
+  .strict();
 
-const familySchema = z.object({
-  familyKey: z.string().min(1),
-  categoryKey: z.string().min(1),
-  label: z.string().min(1),
-  instrumentType: z.string().min(1),
-  defaultTenorKey: z.string().min(1).optional(),
-  tenorKeys: z.array(z.string().min(1)).min(1),
-}).strict();
+const familySchema = z
+  .object({
+    familyKey: z.string().min(1),
+    categoryKey: z.string().min(1),
+    label: z.string().min(1),
+    instrumentType: z.string().min(1),
+    defaultTenorKey: z.string().min(1).optional(),
+    tenorKeys: z.array(z.string().min(1)).min(1),
+  })
+  .strict();
 
 const identitySchema = z.object({ accountNumber: z.string(), accountDescription: z.string() }).strict();
-const mappingSchema = z.object({
-  mappingKey: z.string().min(1),
-  familyKey: z.string().min(1),
-  tenorKey: z.string().min(1),
-  instrumentType: z.string().min(1),
-  riskClass: z.string().min(1),
-  accountA: identitySchema,
-  accountB: identitySchema,
-}).strict();
+const mappingSchema = z
+  .object({
+    mappingKey: z.string().min(1),
+    familyKey: z.string().min(1),
+    tenorKey: z.string().min(1),
+    instrumentType: z.string().min(1),
+    riskClass: z.string().min(1),
+    accountA: identitySchema,
+    accountB: identitySchema,
+  })
+  .strict();
 
-const taxonomySchema = z.object({
-  schemaVersion: z.string().min(1),
-  categories: z.array(categorySchema).min(1),
-  families: z.array(familySchema).min(1),
-  mappings: z.array(mappingSchema).min(1),
-}).strict();
+const taxonomySchema = z
+  .object({
+    schemaVersion: z.string().min(1),
+    categories: z.array(categorySchema).min(1),
+    families: z.array(familySchema).min(1),
+    mappings: z.array(mappingSchema).min(1),
+  })
+  .strict();
 
 export type BalanceAccountCategory = z.infer<typeof categorySchema>;
 export type BalanceAccountFamily = z.infer<typeof familySchema>;
@@ -79,16 +89,44 @@ export class BalanceAccountTaxonomy implements BalanceAccountTaxonomyReader {
 
   constructor(input: unknown) {
     this.config = taxonomySchema.parse(input);
-    unique(this.config.categories.map((item) => item.categoryKey), 'categoryKey');
-    unique(this.config.families.map((item) => item.familyKey), 'familyKey');
-    unique(this.config.families.map((item) => item.instrumentType), 'family instrumentType');
-    unique(this.config.mappings.map((item) => item.mappingKey), 'mappingKey');
+    unique(
+      this.config.categories.map((item) => item.categoryKey),
+      'categoryKey',
+    );
+    unique(
+      this.config.families.map((item) => item.familyKey),
+      'familyKey',
+    );
+    unique(
+      this.config.families.map((item) => item.instrumentType),
+      'family instrumentType',
+    );
+    unique(
+      this.config.mappings.map((item) => item.mappingKey),
+      'mappingKey',
+    );
 
+    this.indexCategories();
+    this.indexFamilies();
+    this.indexMappings();
+    this.assertCompleteRoutes();
+  }
+
+  private indexCategories(): void {
     for (const category of this.config.categories) {
-      unique(category.tenorTypes.map((item) => item.tenorKey), `${category.categoryKey} tenorKey`);
-      unique(category.tenorTypes.map((item) => item.apiValue), `${category.categoryKey} tenor apiValue`);
+      unique(
+        category.tenorTypes.map((item) => item.tenorKey),
+        `${category.categoryKey} tenorKey`,
+      );
+      unique(
+        category.tenorTypes.map((item) => item.apiValue),
+        `${category.categoryKey} tenor apiValue`,
+      );
       this.categoriesByKey.set(category.categoryKey, category);
     }
+  }
+
+  private indexFamilies(): void {
     for (const family of this.config.families) {
       const category = this.categoriesByKey.get(family.categoryKey);
       if (!category) throw new Error(`Unknown categoryKey ${family.categoryKey} for family ${family.familyKey}.`);
@@ -103,6 +141,9 @@ export class BalanceAccountTaxonomy implements BalanceAccountTaxonomyReader {
       this.familiesByKey.set(family.familyKey, family);
       this.familiesByInstrument.set(family.instrumentType, family);
     }
+  }
+
+  private indexMappings(): void {
     for (const mapping of this.config.mappings) {
       const family = this.familiesByKey.get(mapping.familyKey);
       if (!family || family.instrumentType !== mapping.instrumentType || !family.tenorKeys.includes(mapping.tenorKey)) {
@@ -113,6 +154,9 @@ export class BalanceAccountTaxonomy implements BalanceAccountTaxonomyReader {
       }
       this.mappingsByKey.set(mapping.mappingKey, mapping);
     }
+  }
+
+  private assertCompleteRoutes(): void {
     for (const family of this.config.families) {
       for (const tenorKey of family.tenorKeys) {
         const count = this.config.mappings.filter((item) => item.familyKey === family.familyKey && item.tenorKey === tenorKey).length;

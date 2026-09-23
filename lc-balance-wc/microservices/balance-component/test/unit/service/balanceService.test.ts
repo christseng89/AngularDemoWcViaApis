@@ -10,7 +10,7 @@
  * caller would) skips that route-level check entirely, so the invariant needs its own, separate proof.
  */
 import { createDb } from '../../../src/db';
-import { BalanceService } from '../../../src/service/balanceService';
+import { BalanceService, type BalanceMakerExcessRuntime } from '../../../src/service/balanceService';
 import { InvalidMonetaryAmountError } from '../../../src/money';
 import {
   CurrencyMismatchError,
@@ -1931,23 +1931,22 @@ describe('BalanceService.cancel — §3 A3/A3S special-state matrix (Balance-Com
     expect(cancelled.status).toBe('CANCELLED');
   });
 
-  test('Case 3 — Submit -> Checker Acknowledge (EARMARKED, still PENDING) -> Delete Pending: 409 (Defect #4 fix)', () => {
+  test('Case 3 — Submit -> Checker Acknowledge (EARMARKED, still PENDING) -> whole Delete Pending: Success (BD-07 supersession)', () => {
     const { service, movementId } = issueSightLcAndUtilize('MATRIX-3');
     service.acknowledgeArrival(movementId, 'checker1');
-    expect(() => service.cancel(movementId, 'maker1', 'MAKER_EC')).toThrow(IllegalStateTransitionError);
-    const untouched = service.listMovements(service.resolveContract('IPLC_LC', { lcNumber: 'MATRIX-3' })!.balanceContractId).find((m) => m.movementId === movementId)!;
-    expect(untouched.status).toBe('PENDING'); // the rejected cancel() attempt must leave the earmark completely untouched.
-    expect(untouched.acknowledgedAt).toBeTruthy();
+    const cancelled = service.cancel(movementId, 'maker1', 'MAKER_EC');
+    expect(cancelled.status).toBe('CANCELLED');
+    expect(cancelled.acknowledgedAt).toBeTruthy();
   });
 
-  test('Case 4 — (continuing 3) A4 Maker Submit -> Delete Pending: 409 (Defect #4 fix)', () => {
+  test('Case 4 — (continuing 3) A4 Maker Submit -> whole Delete Pending: Success and withdraws the pending finalisation', () => {
     const { service, movementId } = issueSightLcAndUtilize('MATRIX-4');
     service.acknowledgeArrival(movementId, 'checker1');
     service.submitByMaker(movementId, 'maker1');
-    expect(() => service.cancel(movementId, 'maker1', 'MAKER_EC')).toThrow(IllegalStateTransitionError);
-    const untouched = service.listMovements(service.resolveContract('IPLC_LC', { lcNumber: 'MATRIX-4' })!.balanceContractId).find((m) => m.movementId === movementId)!;
-    expect(untouched.status).toBe('PENDING');
-    expect(untouched.makerSubmittedAt).toBeTruthy();
+    const cancelled = service.cancel(movementId, 'maker1', 'MAKER_EC');
+    expect(cancelled.status).toBe('CANCELLED');
+    expect(cancelled.acknowledgedAt).toBeTruthy();
+    expect(cancelled.makerSubmittedAt).toBeTruthy();
   });
 
   test('Case 5 — (continuing 4) A4 Checker Reject -> Delete Pending: Success, all three audit points (Acknowledge/Reject/Delete) independently queryable', () => {
@@ -3500,6 +3499,129 @@ describe('BalanceService.editPending — Phase 4 compound cascade (A3S, document
     expect(() => service.editPending(utilize.movementId, { amount: '12000', editedBy: 'maker2' })).toThrow(RequestValidationError);
   });
 
+  test.each(['PENDING', 'REJECTED'] as const)(
+    'BD-10 — post-Acknowledge A3S Amount Fix is rejected while workflow is %s and preserves both compound legs',
+    (workflowStatus) => {
+      const db = createDb(':memory:');
+      const resolveConfiguredMaximum = jest.fn<ReturnType<BalanceMakerExcessRuntime['fx']['resolveConfiguredMaximum']>, Parameters<BalanceMakerExcessRuntime['fx']['resolveConfiguredMaximum']>>();
+      const runtime = {
+        policy: { resolve: jest.fn(() => { throw new Error('BD-10 must reject before policy resolution.'); }) },
+        fx: { resolveConfiguredMaximum },
+      } as BalanceMakerExcessRuntime;
+      const service = new BalanceService(db, undefined, undefined, runtime);
+      const { lc, sg } = issueSightLcWithSg(service, `A3S-BD10-${workflowStatus}`, '20000');
+      const { sgRedeem, utilize } = submitDocumentArrivalWithSg(
+        service,
+        lc.balanceContractId,
+        sg.balanceContractId,
+        '20000',
+        '20000',
+        'B01',
+      );
+
+      service.release(sgRedeem.movementId, 'checker1');
+      service.acknowledgeArrival(utilize.movementId, 'checker1');
+      if (workflowStatus === 'REJECTED') service.reject(utilize.movementId, 'checker2', 'DOCS_REJECTED');
+
+      const seededAt = '2026-09-23T00:00:00.000Z';
+      db.prepare(
+        `INSERT INTO excess_accounts
+          (excess_account_id, owner_type, owner_id, owner_currency, policy_version, version, created_at, updated_at)
+         VALUES (?, 'IMPORT_LC', ?, 'USD', 'policy-bd10', 1, ?, ?)`,
+      ).run('account-bd10', lc.logicalContractId, seededAt, seededAt);
+      db.prepare(
+        `INSERT INTO excess_ledger_events
+          (excess_event_id, excess_account_id, movement_id, event_type, owner_currency, transaction_amount_owner,
+           covered_amount_owner, excess_amount_owner, allowance_amount_owner, policy_version, source_excess_event_id, created_by, created_at)
+         VALUES ('reservation-bd10', 'account-bd10', ?, 'PENDING_RESERVATION', 'USD', '20000',
+                 '19800', '200', '200', 'policy-bd10', NULL, 'maker1', ?)`,
+      ).run(utilize.movementId, seededAt);
+      db.prepare(
+        `INSERT INTO fx_rate_snapshots
+          (fx_snapshot_id, movement_id, decision_point, from_currency, to_currency, requested_amount_usd,
+           rate_purpose, booking_rate, converted_amount_owner, rate_source, provider_rate_id, provider_rate_version,
+           request_attempt_id, rate_timestamp, approval_status, effective_from, effective_to, freshness_status,
+           rate_origin, correlation_id, policy_version, created_at)
+         VALUES ('fx-bd10', ?, 'MAKER_SUBMIT', 'USD', 'USD', '1000', 'BOOKING', '1', '1000', 'USD_PAR',
+                 'USD_PAR', 'USD_PAR', 'USD_PAR', ?, 'APPROVED', ?, NULL, 'FRESH', 'USD_PAR', ?, 'policy-bd10', ?)`,
+      ).run(utilize.movementId, seededAt, seededAt, utilize.movementId, seededAt);
+      db.prepare(
+        `INSERT INTO excess_decision_snapshots
+          (decision_snapshot_id, movement_id, excess_account_id, facts_version, owner_currency, effective_limit_owner,
+           excess_decision, business_result_code, release_eligibility, policy_snapshot_json, action,
+           command_idempotency_key, actor_context, decision_time, created_at)
+         VALUES ('decision-bd10', ?, 'account-bd10', 'facts-bd10', 'USD', '500', 'WITHIN_ALLOWANCE', NULL,
+                 'ELIGIBLE', '{}', 'MAKER_SUBMIT', 'maker-key-bd10', 'maker1', ?, ?)`,
+      ).run(utilize.movementId, seededAt, seededAt);
+      db.prepare(
+        `INSERT INTO sg_capacity_events
+          (sg_capacity_event_id, sg_balance_contract_id, source_movement_id, event_type, transaction_currency,
+           capacity_amount, covered_amount, excess_amount, source_capacity_event_id, created_by, created_at)
+         VALUES ('capacity-bd10', ?, ?, 'REDEEM', 'USD', '20000', '19800', '200', NULL, 'checker1', ?)`,
+      ).run(sg.balanceContractId, sgRedeem.movementId, seededAt);
+      db.prepare(
+        `INSERT INTO command_idempotency
+          (idempotency_record_id, command_type, owner_id, actor_context, idempotency_key, request_hash,
+           response_status, response_body, created_at)
+         VALUES ('command-bd10', 'MAKER_SUBMIT', ?, 'maker1', 'maker-key-bd10', 'hash-bd10', 201, '{}', ?)`,
+      ).run(lc.logicalContractId, seededAt);
+      db.prepare(
+        `INSERT INTO excess_command_attempt_audits
+          (command_attempt_audit_id, command_type, movement_id, owner_type, owner_id, owner_currency, actor_context,
+           command_idempotency_key, request_hash, result_code, policy_version, from_currency, to_currency,
+           requested_amount_usd, rate_purpose, decision_time, created_at)
+         VALUES ('attempt-bd10', 'CHECKER_RELEASE', ?, 'IMPORT_LC', ?, 'USD', 'checker1', 'checker-key-bd10',
+                 'checker-hash-bd10', 'FX_RATE_STALE', 'policy-bd10', 'USD', 'USD', '1000', 'BOOKING', ?, ?)`,
+      ).run(utilize.movementId, lc.logicalContractId, seededAt, seededAt);
+      const factTables = [
+        'excess_ledger_events',
+        'fx_rate_snapshots',
+        'excess_decision_snapshots',
+        'sg_capacity_events',
+        'command_idempotency',
+        'excess_command_attempt_audits',
+      ] as const;
+      const snapshotFacts = () => factTables.map((table) => [table, db.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all()]);
+      const beforeFacts = snapshotFacts();
+
+      expect(() => service.editPending(utilize.movementId, { amount: '21000', editedBy: 'maker2' })).toThrow(IllegalStateTransitionError);
+
+      const unchangedUtilize = service.listMovements(lc.balanceContractId).find((candidate) => candidate.movementId === utilize.movementId)!;
+      const unchangedSg = service.listMovements(sg.balanceContractId).find((candidate) => candidate.movementId === sgRedeem.movementId)!;
+      expect(unchangedUtilize).toMatchObject({ amount: '20000', status: workflowStatus, acknowledgedBy: 'checker1' });
+      expect(unchangedUtilize.acknowledgedAt).not.toBeNull();
+      expect(unchangedSg).toMatchObject({ amount: '20000', status: 'RELEASED' });
+      expect(service.listFixPendingAudit(utilize.movementId)).toHaveLength(0);
+      expect(service.listFixPendingAudit(sgRedeem.movementId)).toHaveLength(0);
+      expect(runtime.policy.resolve).not.toHaveBeenCalled();
+      expect(resolveConfiguredMaximum).not.toHaveBeenCalled();
+      expect(snapshotFacts()).toEqual(beforeFacts);
+    },
+  );
+
+  test('BD-10 — an acknowledged plain A3 carrying an unrelated businessEventId is not misclassified as A3S', () => {
+    const service = new BalanceService(createDb(':memory:'));
+    const { lc } = issueSightLcWithSg(service, 'A3-BD10-CORRELATION', '20000');
+    const plainA3 = service.createMovement({
+      instrumentType: 'IPLC_LC',
+      balanceContractId: lc.balanceContractId,
+      movementType: 'UTILIZE',
+      eventSeq: Date.now() + Math.random(),
+      amount: '15000',
+      currency: 'USD',
+      businessEventId: 'ordinary-a3-correlation-only',
+      sourceTransactionRef: 'B01',
+      createdBy: 'maker1',
+    });
+    if (!plainA3.created) throw new Error('expected a new plain A3 movement');
+    service.acknowledgeArrival(plainA3.movement.movementId, 'checker1');
+
+    const corrected = service.editPending(plainA3.movement.movementId, { amount: '16000', editedBy: 'maker2' });
+
+    expect(corrected).toMatchObject({ movementId: plainA3.movement.movementId, amount: '16000', status: 'PENDING' });
+    expect(service.listFixPendingAudit(plainA3.movement.movementId)).toHaveLength(1);
+  });
+
   test('a plain, non-compound A3 UTILIZE (no businessEventId) is completely unaffected by the compound-detection branch', () => {
     const service = new BalanceService(createDb(':memory:'));
     const lcIssue = service.createMovement({
@@ -3540,7 +3662,11 @@ describe('BalanceService.editPending — Phase 4 compound cascade (A3S, document
 
     // First findById() call (in editPending()'s own preamble) resolves the LC contract normally; the
     // SECOND (inside applyArrivalWithSgCompoundEdit(), looking up the linked SG's own contract) fails.
-    const contractSpy = jest.spyOn(BalanceContractStore.prototype, 'findById').mockReturnValueOnce(lc).mockReturnValueOnce(undefined);
+    const contractSpy = jest
+      .spyOn(BalanceContractStore.prototype, 'findById')
+      .mockReturnValueOnce(lc)
+      .mockReturnValueOnce(sg)
+      .mockReturnValueOnce(undefined);
     try {
       expect(() => service.editPending(utilize.movementId, { amount: '8000', editedBy: 'maker2' })).toThrow(NotFoundError);
     } finally {

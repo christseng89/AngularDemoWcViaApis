@@ -2439,6 +2439,68 @@ describe('HTTP integration — B4\'s OWN still-PENDING Accept (Maker Submit, bef
 });
 
 describe('POST /admin/reset-database — dev-only Business Case Runner "Cleanup Database Tables" button', () => {
+  test('also resets and recreates Excess／FX support tables before deleting their referenced movement', async () => {
+    const db = createDb(':memory:');
+    const app = createApp(db);
+
+    const created = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'RESET-EXCESS-001' },
+        movementType: 'ISSUE',
+        expiryDate: '2099-12-31',
+        eventSeq: 1,
+        amount: '1000',
+        currency: 'USD',
+        tenorType: 'SIGHT',
+        createdBy: 'maker1',
+      })
+      .expect(201);
+
+    db.prepare(
+      `INSERT INTO excess_accounts
+       (excess_account_id, owner_type, owner_id, owner_currency, policy_version, version, created_at, updated_at)
+       VALUES ('reset-account', 'IMPORT_LC', 'reset-owner', 'USD', 'v1', 1, '2026-09-23T00:00:00.000Z', '2026-09-23T00:00:00.000Z')`,
+    ).run();
+    db.prepare(
+      `INSERT INTO excess_ledger_events
+       (excess_event_id, excess_account_id, movement_id, event_type, owner_currency,
+        transaction_amount_owner, covered_amount_owner, excess_amount_owner, allowance_amount_owner,
+        policy_version, source_excess_event_id, created_by, created_at)
+       VALUES ('reset-event', 'reset-account', ?, 'PENDING_RESERVATION', 'USD',
+        '1000', '1000', '0', '0', 'v1', NULL, 'maker1', '2026-09-23T00:00:00.000Z')`,
+    ).run(created.body.movementId);
+    db.prepare(
+      `INSERT INTO export_authorization_snapshots
+       (authorization_snapshot_id, b4_movement_id, source_b3_movement_id, claim_status,
+        authorization_validation_result, checker_context, decision_time, confirmed_at,
+        excess_debtor, created_at)
+       VALUES ('reset-auth', ?, ?, 'ABSENT', 'NOT_CONFIRMED', 'checker1',
+        '2026-09-23T00:00:00.000Z', '2026-09-23T00:00:00.000Z',
+        'BENEFICIARY_OR_RECOURSE_PARTY', '2026-09-23T00:00:00.000Z')`,
+    ).run(created.body.movementId, created.body.movementId);
+
+    await request(app).post('/admin/reset-database').expect(200, { status: 'ok' });
+
+    for (const table of [
+      'export_asset_postings',
+      'export_authorization_snapshots',
+      'excess_command_attempt_audits',
+      'applicant_waiver_snapshots',
+      'sg_capacity_events',
+      'excess_decision_snapshots',
+      'fx_rate_snapshots',
+      'excess_ledger_events',
+      'excess_accounts',
+      'command_idempotency',
+    ]) {
+      expect((db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }).n).toBe(0);
+    }
+    expect((db.prepare('SELECT COUNT(*) AS n FROM balance_movements').get() as { n: number }).n).toBe(0);
+    db.close();
+  });
+
   test('wipes every balance_movements/balance_contracts row', async () => {
     const db = createDb(':memory:');
     const app = createApp(db);

@@ -126,11 +126,12 @@ export class CatalogPickerService {
     // BalanceComponentApiService.catalog()'s own doc comment for why this is opt-in.
     const status = args.status === undefined ? 'ACTIVE' : (args.status ?? undefined);
     const requireIssueReleased = args.requireIssueReleased ?? true;
+    const query = args.query === undefined ? this.search || undefined : (args.query ?? undefined);
     const request = args.statuses?.length
       ? this.api.catalog(
           args.instrumentType,
           undefined,
-          args.query === undefined ? this.search || undefined : (args.query ?? undefined),
+          query,
           1,
           this.fetchSize,
           args.lcNumber,
@@ -142,7 +143,7 @@ export class CatalogPickerService {
       : this.api.catalog(
         args.instrumentType,
         status,
-        args.query === undefined ? this.search || undefined : (args.query ?? undefined),
+        query,
         1,
         this.fetchSize,
         args.lcNumber,

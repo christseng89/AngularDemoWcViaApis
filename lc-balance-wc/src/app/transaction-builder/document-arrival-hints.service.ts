@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { catchError, forkJoin, of } from 'rxjs';
+import { catchError, forkJoin, Observable, of } from 'rxjs';
 import { map, switchMap } from 'rxjs/operators';
 import { BalanceComponentApiService, BalanceContract, BalanceMovement, BalanceSnapshot } from './balance-component-api.service';
 import { InstrumentType } from './balance-component.model';
@@ -106,28 +106,7 @@ export class DocumentArrivalHintsService {
       onDone();
       return;
     }
-    forkJoin(
-      list.map((c) =>
-        this.api.catalog(childInstrumentType, 'ACTIVE', undefined, 1, 50, c.naturalKey.lcNumber).pipe(
-          switchMap((result) => {
-            if (!result.items.length) return of([] as BalanceMovement[]);
-            return forkJoin(
-              result.items.map((child) =>
-                this.api.listMovements(child.balanceContractId).pipe(
-                  map((movs) =>
-                    (movs as any[])
-                      .filter((m: any) => m.movementType === wantedMovementType && m.status === 'RELEASED' && !m.presentDocsConsumedAt)
-                      .map((m: any) => ({ ...m, sourceTransactionRef: m.sourceTransactionRef || child.naturalKey.ibNumber || '(no EB Number)' })),
-                  ),
-                  catchError(() => of([] as BalanceMovement[])),
-                ),
-              ),
-            ).pipe(map((lists) => lists.flat()));
-          }),
-          catchError(() => of([] as BalanceMovement[])),
-        ),
-      ),
-    ).subscribe((results) => {
+    forkJoin(list.map((contract) => this.loadChildPayables(contract, childInstrumentType, wantedMovementType))).subscribe((results) => {
       list.forEach((c, i) => {
         const movements = results[i];
         if (movements.length) {
@@ -140,6 +119,30 @@ export class DocumentArrivalHintsService {
       });
       onDone();
     });
+  }
+
+  private loadChildPayables(contract: BalanceContract, childInstrumentType: InstrumentType, wantedMovementType: string): Observable<BalanceMovement[]> {
+    return this.api.catalog(childInstrumentType, 'ACTIVE', undefined, 1, 50, contract.naturalKey.lcNumber).pipe(
+      switchMap((result) => {
+        if (!result.items.length) return of([] as BalanceMovement[]);
+        return forkJoin(result.items.map((child) => this.loadPayablesForChild(child, wantedMovementType))).pipe(map((lists) => lists.flat()));
+      }),
+      catchError(() => of([] as BalanceMovement[])),
+    );
+  }
+
+  private loadPayablesForChild(child: BalanceContract, wantedMovementType: string): Observable<BalanceMovement[]> {
+    return this.api.listMovements(child.balanceContractId).pipe(
+      map((movements) =>
+        movements
+          .filter((movement) => movement.movementType === wantedMovementType && movement.status === 'RELEASED' && !movement.presentDocsConsumedAt)
+          .map((movement) => ({
+            ...movement,
+            sourceTransactionRef: movement.sourceTransactionRef || child.naturalKey.ibNumber || '(no EB Number)',
+          })),
+      ),
+      catchError(() => of([] as BalanceMovement[])),
+    );
   }
 
   /** A3S's own hint fetch — see loadChildBalanceEligibility()'s own doc comment. */

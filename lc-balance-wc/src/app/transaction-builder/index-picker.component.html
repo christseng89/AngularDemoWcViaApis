@@ -2,7 +2,9 @@
   <div class="index-picker__label" *ngIf="label">{{ label }}</div>
 
   <div class="index-picker__search" *ngIf="searchable">
+    <label class="visually-hidden" for="index-picker-search">{{ label || searchPlaceholder }}</label>
     <input
+      id="index-picker-search"
       class="index-picker__search-input"
       [ngModel]="searchValue"
       (ngModelChange)="searchValueChange.emit($event)"
@@ -11,9 +13,9 @@
     <button type="button" class="index-picker__search-btn" (click)="search.emit()">Search</button>
   </div>
 
-  <div class="index-picker__loading" *ngIf="loading" role="status" aria-live="polite" aria-busy="true">
+  <output class="index-picker__loading" *ngIf="loading" aria-live="polite" aria-busy="true">
     <span class="tb-spinner" aria-hidden="true"></span>Loading…
-  </div>
+  </output>
 
   <ng-container *ngIf="!loading">
     <div class="index-picker__empty" [class.index-picker__empty--not-found]="isNotFound" [attr.role]="isNotFound ? 'alert' : null" [attr.aria-live]="isNotFound ? 'polite' : null" *ngIf="!items.length">

@@ -6,7 +6,7 @@ import { catchError, map, switchMap } from 'rxjs/operators';
 import { FormlyModule } from '@ngx-formly/core';
 import { IndexPickerComponent } from './index-picker.component';
 import { TbIconComponent } from '../tb-icon.component';
-import { BalanceComponentApiService, BalanceMovement, EditMovementRequest } from './balance-component-api.service';
+import { BalanceComponentApiService, BalanceMovement, EditMovementRequest, ExportAssetReleaseResult } from './balance-component-api.service';
 import { CheckerActionContext, CheckerActionOutcome, CheckerActionsService } from './checker-actions.service';
 import { LookUpPanelService } from './look-up-panel.service';
 import { InquireEventsService } from './inquire-events.service';
@@ -38,6 +38,7 @@ import { FeedbackMessageComponent } from '../shared/feedback/feedback-message.co
 import { UiMessage } from '../shared/feedback/ui-message.model';
 import { presentApiError, presentValidationError } from '../shared/feedback/api-error-presenter';
 import { MonetaryAmountPipe } from './monetary-amount.pipe';
+import { CheckerExcessReviewComponent } from './checker-excess-review.component';
 
 /**
  * Named Import (A-series) / Export (B-series) business functions, not a raw instrumentType/
@@ -61,6 +62,7 @@ import { MonetaryAmountPipe } from './monetary-amount.pipe';
     InquireDeletePendingComponent,
     FeedbackMessageComponent,
     MonetaryAmountPipe,
+    CheckerExcessReviewComponent,
   ],
   templateUrl: './transaction-builder.component.html',
   styleUrl: './transaction-builder.component.scss',
@@ -69,7 +71,6 @@ import { MonetaryAmountPipe } from './monetary-amount.pipe';
 export class TransactionBuilderComponent {
   readonly importFunctions = IMPORT_FUNCTIONS;
   readonly exportFunctions = EXPORT_FUNCTIONS;
-
 
   /**
    * User-reported live ("A3交易 SUBMIT後 CHECKER沒顯示" → confirmed via direct DOM inspection: the
@@ -85,6 +86,106 @@ export class TransactionBuilderComponent {
   activeFunctionSide: 'IMPORT' | 'EXPORT' = 'IMPORT';
   activeMode: 'PROCESSING' | 'INQUIRE' | 'MAKER_QUEUE' | 'DELETE_PENDING_AUDIT' = 'PROCESSING';
   selectedFunction: TransactionFunction | null = null;
+  applicantWaiverConfirmed = false;
+  waiverReference = '';
+  waiverDate = '';
+  waiverEvidence = '';
+  applicantWaiverExcessAmountOwner = '0';
+  applicantWaiverOwnerCurrency = '';
+  applicantWaiverContextLoading = false;
+  applicantWaiverContextError: string | null = null;
+  private applicantWaiverContextRequestId = 0;
+  exportClaimStatus: 'ABSENT' | 'SUBMITTED' = 'ABSENT';
+  exportAuthorizationReference = '';
+  exportAuthorizedAmountOwner = '';
+  exportAuthorizedCurrency = 'USD';
+  exportAuthorizationScopeConfirmed = false;
+  exportAuthorizationApplicabilityConfirmed = false;
+  exportAuthorizationAuthenticityConfirmed = false;
+  exportExcessCheckerApproved = false;
+  exportAuthorizationExcessAmountOwner = '0';
+  exportAuthorizationOwnerCurrency = '';
+  lastB4ExportAssetDecision: ExportAssetReleaseResult | null = null;
+
+  get showApplicantWaiverConfirmation(): boolean {
+    return (this.selectedFunction?.code === 'A4' || this.selectedFunction?.code === 'A6') && Number(this.applicantWaiverExcessAmountOwner) > 0;
+  }
+
+  private applicantWaiverPayload() {
+    // A4/A6 follow the same demo Checker contract as B4: the external
+    // waiver/authorization claim is ABSENT.  The shared checkbox is the
+    // Checker's explicit approval of the Excess, not evidence of a waiver.
+    return undefined;
+  }
+
+  private resetApplicantWaiver(): void {
+    this.applicantWaiverContextRequestId += 1;
+    this.applicantWaiverConfirmed = false;
+    this.waiverReference = '';
+    this.waiverDate = '';
+    this.waiverEvidence = '';
+    this.applicantWaiverExcessAmountOwner = '0';
+    this.applicantWaiverOwnerCurrency = '';
+    this.applicantWaiverContextLoading = false;
+    this.applicantWaiverContextError = null;
+  }
+
+  private resetExportAuthorization(): void {
+    this.exportClaimStatus = 'ABSENT';
+    this.exportAuthorizationReference = '';
+    this.exportAuthorizedAmountOwner = '';
+    this.exportAuthorizedCurrency = 'USD';
+    this.exportAuthorizationScopeConfirmed = false;
+    this.exportAuthorizationApplicabilityConfirmed = false;
+    this.exportAuthorizationAuthenticityConfirmed = false;
+    this.exportExcessCheckerApproved = false;
+    this.exportAuthorizationExcessAmountOwner = '0';
+    this.exportAuthorizationOwnerCurrency = '';
+  }
+
+  get showB4ExportAuthorization(): boolean {
+    return this.selectedFunction?.code === 'B4' && Number(this.exportAuthorizationExcessAmountOwner) > 0;
+  }
+
+  get checkerExcessApproved(): boolean {
+    return this.showB4ExportAuthorization ? this.exportExcessCheckerApproved : this.applicantWaiverConfirmed;
+  }
+
+  get checkerExcessApprovalRequired(): boolean {
+    return (this.showApplicantWaiverConfirmation || this.showB4ExportAuthorization) && !this.checkerExcessApproved;
+  }
+
+  onCheckerExcessApprovedChange(approved: boolean): void {
+    if (this.showB4ExportAuthorization) {
+      this.exportExcessCheckerApproved = approved;
+      return;
+    }
+    this.applicantWaiverConfirmed = approved;
+  }
+
+  private exportAuthorizationPayload() {
+    const confirmed = this.exportAuthorizationScopeConfirmed && this.exportAuthorizationApplicabilityConfirmed && this.exportAuthorizationAuthenticityConfirmed;
+    if (this.exportClaimStatus === 'ABSENT') return { claimStatus: 'ABSENT' as const, authorizationValidationResult: 'NOT_CONFIRMED' as const };
+    const optional = (value: string) => value.trim() || undefined;
+    return {
+      claimStatus: 'SUBMITTED' as const,
+      authorizationValidationResult: confirmed ? ('CONFIRMED' as const) : ('NOT_CONFIRMED' as const),
+      ...(optional(this.exportAuthorizationReference) ? { authorizationReference: optional(this.exportAuthorizationReference) } : {}),
+      ...(optional(this.exportAuthorizedAmountOwner) ? { authorizedAmountOwner: optional(this.exportAuthorizedAmountOwner) } : {}),
+      ...(optional(this.exportAuthorizedCurrency) ? { authorizedCurrency: optional(this.exportAuthorizedCurrency) } : {}),
+    };
+  }
+
+  exportAssetTotal(decision: ExportAssetReleaseResult): string {
+    const values = decision.assets.map((asset) => asset.amountOwner);
+    const scale = Math.max(0, ...values.map((value) => value.split('.')[1]?.length ?? 0));
+    const sum = values.reduce((total, value) => {
+      const [whole, fraction = ''] = value.split('.');
+      return total + BigInt(`${whole}${fraction.padEnd(scale, '0')}`);
+    }, 0n);
+    const raw = sum.toString().padStart(scale + 1, '0');
+    return scale === 0 ? raw : `${raw.slice(0, -scale)}.${raw.slice(-scale)}`.replace(/\.0+$/, '');
+  }
 
   get selectedFunctionStrategy() {
     return this.selectedFunction ? deriveFunctionStrategy(this.selectedFunction) : null;
@@ -246,6 +347,9 @@ export class TransactionBuilderComponent {
     this.pendingMakerQueueDeleteRow = null;
     this.externalDeletePendingReviewRequest = null;
     this.selectedFunction = fn;
+    this.lastB4ExportAssetDecision = null;
+    this.resetApplicantWaiver();
+    this.resetExportAuthorization();
     this.activeFunctionSide = fn.side;
     this.lookUp.resetForSide(fn.side);
     this.releaseSuccessHint = null;
@@ -677,6 +781,31 @@ export class TransactionBuilderComponent {
   onCheckerMovementPicked(movement: BalanceMovement | null): void {
     this.selectedCheckerMovement = movement;
     this.arrivalApproved = false;
+    this.resetApplicantWaiver();
+    this.resetExportAuthorization();
+    const selectedFunctionCode = this.selectedFunction?.code;
+    if (!movement || (selectedFunctionCode !== 'A4' && selectedFunctionCode !== 'A6' && selectedFunctionCode !== 'B4')) return;
+    const selectedMovementId = movement.movementId;
+    const requestId = this.applicantWaiverContextRequestId;
+    this.applicantWaiverContextLoading = true;
+    this.api.getExcessReleaseContext(selectedMovementId).subscribe({
+      next: (context) => {
+        if (requestId !== this.applicantWaiverContextRequestId || this.selectedCheckerMovement?.movementId !== selectedMovementId) return;
+        this.applicantWaiverContextLoading = false;
+        if (selectedFunctionCode === 'B4') {
+          this.exportAuthorizationExcessAmountOwner = context.thisExcessAmountOwner;
+          this.exportAuthorizationOwnerCurrency = context.ownerCurrency;
+        } else {
+          this.applicantWaiverExcessAmountOwner = context.thisExcessAmountOwner;
+          this.applicantWaiverOwnerCurrency = context.ownerCurrency;
+        }
+      },
+      error: () => {
+        if (requestId !== this.applicantWaiverContextRequestId || this.selectedCheckerMovement?.movementId !== selectedMovementId) return;
+        this.applicantWaiverContextLoading = false;
+        this.applicantWaiverContextError = "Unable to verify this event's Excess amount. Release is temporarily unavailable.";
+      },
+    });
   }
 
   onCheckerQueueReloaded(): void {
@@ -752,6 +881,7 @@ export class TransactionBuilderComponent {
       this.actionBusy = false;
       if (fn && outcome.kind === 'released') {
         this.resetAfterSuccessfulCheckerRelease(fn, outcome.result.movementId);
+        this.lastB4ExportAssetDecision = null;
         return;
       }
       this.forwardOutcomeToMaker(outcome);
@@ -783,6 +913,8 @@ export class TransactionBuilderComponent {
       arrivalSgRedeemMovementId: this.makerContext.arrivalSgRedeemMovementId,
       createdBy: this.makerContext.createdBy,
       selectedCheckerMovement: this.selectedCheckerMovement,
+      applicantWaiver: this.applicantWaiverPayload(),
+      exportAuthorization: this.showB4ExportAuthorization ? this.exportAuthorizationPayload() : undefined,
     };
   }
 
@@ -812,13 +944,21 @@ export class TransactionBuilderComponent {
       this.selectedFunctionStrategy?.checkerRelease.releasesExistingMovementInPlace &&
       !this.selectedCheckerMovement.makerSubmittedAt
     ) {
-      this.setCheckerValidationFailure('This Document Arrival has not been Submitted by a Maker yet (A4) — go to the Maker section above, pick it, and Submit first.');
+      this.setCheckerValidationFailure(
+        'This Document Arrival has not been Submitted by a Maker yet (A4) — go to the Maker section above, pick it, and Submit first.',
+      );
       return;
     }
 
     this.checkerBusy = true;
     this.clearCheckerFailure();
-    const obs = action === 'release' ? this.api.release(movementId, this.checkerId) : this.api.reject(movementId, this.checkerId, 'MANUAL_QUEUE_REJECT');
+    const waiver = this.applicantWaiverPayload();
+    const obs =
+      action === 'release'
+        ? waiver
+          ? this.api.release(movementId, this.checkerId, waiver)
+          : this.api.release(movementId, this.checkerId)
+        : this.api.reject(movementId, this.checkerId, 'MANUAL_QUEUE_REJECT');
     obs.subscribe({
       next: (result) => {
         this.checkerBusy = false;

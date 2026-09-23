@@ -10,7 +10,11 @@ import { BalanceService } from '../../../src/service/balanceService';
 import { BATCH_CHECKER_ACTOR, BATCH_MAKER_ACTOR } from '../../../src/config';
 import type { TenorType } from '../../../src/types';
 
-function issueImportLc(service: BalanceService, lcNumber: string, opts: { amount?: string; expiryDate?: string; mailFloatGraceDays?: number; tenorType?: TenorType } = {}) {
+function issueImportLc(
+  service: BalanceService,
+  lcNumber: string,
+  opts: { amount?: string; expiryDate?: string; mailFloatGraceDays?: number; tenorType?: TenorType } = {},
+) {
   const issue = service.createMovement({
     instrumentType: 'IPLC_LC',
     naturalKey: { lcNumber },
@@ -53,9 +57,7 @@ describe('ISSUE captures expiryDate/mailFloatGraceDays onto the contract (F1)', 
   // direct DB write rather than a real ISSUE.
   test('omitted expiryDate is rejected at ISSUE for a root instrumentType (mandatory since AUTO EXPIRY needs it)', () => {
     const service = new BalanceService(createDb(':memory:'));
-    expect(() => issueImportLc(service, 'F1-CAPTURE-003')).toThrow(
-      /expiryDate is required for ISSUE against IPLC_LC/,
-    );
+    expect(() => issueImportLc(service, 'F1-CAPTURE-003')).toThrow(/expiryDate is required for ISSUE against IPLC_LC/);
   });
 
   test('Export side (B1/EPLC_CONFIRMATION) falls back to the Export-side config default', () => {
@@ -114,7 +116,7 @@ describe('EXPIRE movementType (createMovement/release wiring)', () => {
 
     const snapshot = service.getBalanceSnapshot(lc.balanceContractId);
     expect(snapshot.confirmedBalance).toBe('0');
-    const reloaded = service.resolveContract('IPLC_LC', { lcNumber: 'EXPIRE-001' }, true);
+    const reloaded = service.resolveContractAnyStatus('IPLC_LC', { lcNumber: 'EXPIRE-001' });
     expect(reloaded?.status).toBe('EXPIRED');
   });
 
@@ -232,8 +234,8 @@ describe('runAutoExpirySweep (F1)', () => {
     const results = service.runAutoExpirySweep(new Date('2026-01-08'));
 
     expect(results).toEqual([{ balanceContractId: due.balanceContractId, ok: true }]);
-    expect(service.resolveContract('IPLC_LC', { lcNumber: 'SWEEP-001' }, true)?.status).toBe('EXPIRED');
-    expect(service.resolveContract('IPLC_LC', { lcNumber: 'SWEEP-002' }, true)?.status).toBe('ACTIVE');
+    expect(service.resolveContractAnyStatus('IPLC_LC', { lcNumber: 'SWEEP-001' })?.status).toBe('EXPIRED');
+    expect(service.resolveContractAnyStatus('IPLC_LC', { lcNumber: 'SWEEP-002' })?.status).toBe('ACTIVE');
   });
 
   test('leaves a contract with no recorded expiryDate untouched', () => {
@@ -331,8 +333,8 @@ describe('runAutoCloseSweep (F1 §7.3) — independent second batch, reuses eval
 
     const asOf = new Date('2026-01-08');
     service.runAutoExpirySweep(asOf);
-    expect(service.resolveContract('IPLC_LC', { lcNumber: 'AUTOCLOSE-001' }, true)?.status).toBe('EXPIRED');
-    expect(service.resolveContract('IPLC_LC', { lcNumber: 'AUTOCLOSE-002' }, true)?.status).toBe('EXPIRED');
+    expect(service.resolveContractAnyStatus('IPLC_LC', { lcNumber: 'AUTOCLOSE-001' })?.status).toBe('EXPIRED');
+    expect(service.resolveContractAnyStatus('IPLC_LC', { lcNumber: 'AUTOCLOSE-002' })?.status).toBe('EXPIRED');
 
     // runAutoCloseSweep() reports one entry per EXPIRED candidate it attempted, success or failure —
     // not just the successes — so an operator can see WHY a still-EXPIRED contract wasn't auto-closed.
@@ -340,10 +342,14 @@ describe('runAutoCloseSweep (F1 §7.3) — independent second batch, reuses eval
     expect(results).toHaveLength(2);
     expect(results).toContainEqual({ balanceContractId: clean.balanceContractId, ok: true });
     expect(results).toContainEqual(
-      expect.objectContaining({ balanceContractId: dirty.balanceContractId, ok: false, error: expect.stringContaining('Shipping Guarantee Balance must be 0') }),
+      expect.objectContaining({
+        balanceContractId: dirty.balanceContractId,
+        ok: false,
+        error: expect.stringContaining('Shipping Guarantee Balance must be 0'),
+      }),
     );
-    expect(service.resolveContract('IPLC_LC', { lcNumber: 'AUTOCLOSE-001' }, true)?.status).toBe('CLOSED');
-    expect(service.resolveContract('IPLC_LC', { lcNumber: 'AUTOCLOSE-002' }, true)?.status).toBe('EXPIRED');
+    expect(service.resolveContractAnyStatus('IPLC_LC', { lcNumber: 'AUTOCLOSE-001' })?.status).toBe('CLOSED');
+    expect(service.resolveContractAnyStatus('IPLC_LC', { lcNumber: 'AUTOCLOSE-002' })?.status).toBe('EXPIRED');
   });
 
   test('never touches an ACTIVE contract, even one already past its own expiry+grace (AUTO CLOSE only scans EXPIRED, never derives it)', () => {
@@ -369,7 +375,7 @@ describe('runExpirySweepCycle (F1) — AUTO EXPIRY then, same cycle, AUTO CLOSE'
     expect(expiry).toHaveLength(1);
     expect(expiry[0]!.ok).toBe(true);
     expect(close).toHaveLength(0); // Grace Period not yet elapsed — nothing to CLOSE this cycle.
-    expect(service.resolveContract('IPLC_LC', { lcNumber: 'CYCLE-001' }, true)?.status).toBe('EXPIRED');
+    expect(service.resolveContractAnyStatus('IPLC_LC', { lcNumber: 'CYCLE-001' })?.status).toBe('EXPIRED');
   });
 
   test('once the Auto Close Grace Period has since elapsed, a LATER cycle does CLOSE the same contract', () => {
@@ -380,13 +386,13 @@ describe('runExpirySweepCycle (F1) — AUTO EXPIRY then, same cycle, AUTO CLOSE'
     const first = service.runExpirySweepCycle(new Date('2026-01-08'));
     expect(first.expiry).toHaveLength(1);
     expect(first.close).toHaveLength(0);
-    expect(service.resolveContract('IPLC_LC', { lcNumber: 'CYCLE-002' }, true)?.status).toBe('EXPIRED');
+    expect(service.resolveContractAnyStatus('IPLC_LC', { lcNumber: 'CYCLE-002' })?.status).toBe('EXPIRED');
 
     const later = service.runExpirySweepCycle(new Date('2026-01-18'));
     expect(later.expiry).toHaveLength(0); // already EXPIRED, nothing left for AUTO EXPIRY to do.
     expect(later.close).toHaveLength(1);
     expect(later.close[0]!.ok).toBe(true);
-    expect(service.resolveContract('IPLC_LC', { lcNumber: 'CYCLE-002' }, true)?.status).toBe('CLOSED');
+    expect(service.resolveContractAnyStatus('IPLC_LC', { lcNumber: 'CYCLE-002' })?.status).toBe('CLOSED');
   });
 });
 
@@ -420,9 +426,7 @@ describe('CLOSE/EXPIRE Release-time re-check — state can move between Submit a
        VALUES ('bypass-sg-mv-1', 'bypass-sg-contract-1', 1, 'ISSUE', 'CONTINGENT', '1000', '1000', 'USD', 'PENDING', 'maker1', '2026-01-01T00:00:00Z')`,
     );
 
-    expect(() => service.release(close.movement.movementId, 'checker1')).toThrow(
-      /eligibility no longer holds/,
-    );
+    expect(() => service.release(close.movement.movementId, 'checker1')).toThrow(/eligibility no longer holds/);
   });
 
   test('EXPIRE: a new PENDING SG appears after Submit — Release re-checks eligibility and throws', () => {
@@ -450,9 +454,7 @@ describe('CLOSE/EXPIRE Release-time re-check — state can move between Submit a
        VALUES ('bypass-sg-mv-2', 'bypass-sg-contract-2', 1, 'ISSUE', 'CONTINGENT', '1000', '1000', 'USD', 'PENDING', 'maker1', '2026-01-01T00:00:00Z')`,
     );
 
-    expect(() => service.release(expire.movement.movementId, BATCH_CHECKER_ACTOR)).toThrow(
-      /eligibility no longer holds/,
-    );
+    expect(() => service.release(expire.movement.movementId, BATCH_CHECKER_ACTOR)).toThrow(/eligibility no longer holds/);
   });
 
   test('EXPIRE: Confirmed Balance changes after Submit (an unrelated AMEND_INCREASE releases first) — Release re-checks the frozen amount and throws', () => {
@@ -482,9 +484,7 @@ describe('CLOSE/EXPIRE Release-time re-check — state can move between Submit a
     if (!increase.created) throw new Error('expected a new movement');
     service.release(increase.movement.movementId, 'checker1'); // Confirmed Balance is now 10500, not the 10000 EXPIRE was frozen at.
 
-    expect(() => service.release(expire.movement.movementId, BATCH_CHECKER_ACTOR)).toThrow(
-      /Confirmed Balance has changed since Submit/,
-    );
+    expect(() => service.release(expire.movement.movementId, BATCH_CHECKER_ACTOR)).toThrow(/Confirmed Balance has changed since Submit/);
   });
 });
 

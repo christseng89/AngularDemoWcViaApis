@@ -4,7 +4,8 @@ import { FieldType, FieldTypeConfig, FormlyModule } from '@ngx-formly/core';
 import { parseAmountShorthand } from './amount-shorthand';
 
 function commaFree(value: unknown): string {
-  return value === null || value === undefined ? '' : String(value).replace(/,/g, '');
+  if (typeof value !== 'string' && typeof value !== 'number') return '';
+  return String(value).replaceAll(',', '');
 }
 
 function groupNumericInput(value: string): string {
@@ -13,12 +14,15 @@ function groupNumericInput(value: string): string {
   const decimalAt = value.indexOf('.');
   const whole = decimalAt < 0 ? value : value.slice(0, decimalAt);
   const fraction = decimalAt < 0 ? '' : value.slice(decimalAt + 1);
-  const groupedWhole = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const firstGroupLength = whole.length % 3 || 3;
+  const groups = whole.length <= 3 ? [whole] : [whole.slice(0, firstGroupLength)];
+  for (let offset = firstGroupLength; offset < whole.length; offset += 3) groups.push(whole.slice(offset, offset + 3));
+  const groupedWhole = groups.join(',');
   return decimalAt < 0 ? groupedWhole : `${groupedWhole}.${fraction}`;
 }
 
 function logicalCaret(value: string, caret: number): number {
-  return value.slice(0, caret).replace(/,/g, '').length;
+  return value.slice(0, caret).replaceAll(',', '').length;
 }
 
 function renderedCaret(value: string, logicalPosition: number): number {

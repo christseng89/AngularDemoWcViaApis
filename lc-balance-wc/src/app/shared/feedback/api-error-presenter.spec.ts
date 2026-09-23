@@ -19,6 +19,85 @@ describe('presentApiError', () => {
     );
   });
 
+  it('presents an initial Excess limit rejection as zero-write, never as an already-processed conflict', () => {
+    expect(
+      presentApiError({ status: 409, error: { code: 'EXCESS_LIMIT_EXCEEDED', message: 'The current Excess allowance is insufficient.' } }, 'SUBMIT'),
+    ).toMatchObject({
+      severity: 'WARNING',
+      title: 'Excess limit exceeded',
+      message: 'The transaction exceeds the current Excess allowance. No pending transaction or Excess reservation was created.',
+      retryable: false,
+      supportCode: 'EXCESS_LIMIT_EXCEEDED',
+      technicalCode: 'EXCESS_LIMIT_EXCEEDED',
+    });
+  });
+
+  it.each([
+    ['SUBMIT', 'No pending transaction or Excess reservation was created.'],
+    ['FIX', 'original pending transaction and Excess reservation were retained unchanged.'],
+    ['APPROVE', 'pending transaction and Excess reservation were retained.'],
+  ] as const)('EXCESS_LIMIT_EXCEEDED preserves the %s lifecycle boundary', (context, expectedMessage) => {
+    const result = presentApiError({ status: 409, error: { code: 'EXCESS_LIMIT_EXCEEDED' } }, context);
+    expect(result).toMatchObject({ supportCode: 'EXCESS_LIMIT_EXCEEDED', message: expect.stringContaining(expectedMessage) });
+    expect(JSON.stringify(result)).not.toContain('FX_RATE_PENDING');
+  });
+
+  it.each(['FX_RATE_UNAVAILABLE', 'FX_RATE_STALE'] as const)('%s distinguishes initial Submit, Fix and Checker retention', (code) => {
+    const error = { status: 409, error: { code } };
+
+    expect(presentApiError(error, 'SUBMIT')).toMatchObject({
+      title: code === 'FX_RATE_STALE' ? 'Booking rate is stale' : 'Booking rate unavailable',
+      message: expect.stringContaining('No pending transaction or Excess reservation was created.'),
+      retryable: true,
+      supportCode: code,
+    });
+    expect(presentApiError(error, 'FIX')).toMatchObject({
+      message: expect.stringContaining('original pending transaction and Excess reservation were retained unchanged.'),
+      retryable: true,
+      supportCode: code,
+    });
+    expect(presentApiError(error, 'APPROVE')).toMatchObject({
+      message: expect.stringContaining('pending transaction and Excess reservation were retained.'),
+      retryable: true,
+      supportCode: code,
+    });
+    for (const context of ['SUBMIT', 'FIX', 'APPROVE'] as const) {
+      expect(JSON.stringify(presentApiError(error, context))).not.toContain('FX_RATE_PENDING');
+    }
+  });
+
+  it('shows Minimum Required Increase only after the server returns final over-limit guidance', () => {
+    const result = presentApiError(
+      {
+        status: 409,
+        error: {
+          code: 'EXCESS_LIMIT_EXCEEDED',
+          guidance: { outcome: 'FINITE', minimumRequiredIncreaseOwner: '300.00' },
+        },
+      },
+      'SUBMIT',
+    );
+    expect(result.nextAction).toContain('Minimum Required Increase: 300.00');
+    expect(result.nextAction).toContain('A2/B2');
+  });
+
+  it('requires A3S Eligible SG re-selection first and does not simultaneously show increase guidance', () => {
+    const result = presentApiError(
+      {
+        status: 409,
+        error: {
+          code: 'A3S_RESELECT_ELIGIBLE_SG',
+          eligibleAlternatives: [{ sgNumber: 'SG-002' }],
+          guidance: { outcome: 'FINITE', minimumRequiredIncreaseOwner: '300.00' },
+        },
+      },
+      'SUBMIT',
+    );
+    expect(result).toMatchObject({ title: 'Re-select Eligible SG', retryable: false });
+    expect(`${result.message} ${result.nextAction}`).toContain('SG-002');
+    expect(`${result.message} ${result.nextAction}`).not.toContain('Minimum Required Increase');
+  });
+
   it.each([400, 422])('maps HTTP %s business validation without BAL-UI-UNEXPECTED', (status) => {
     const result = presentApiError({ status, error: { code: 'REQUEST_VALIDATION_FAILED', message: 'Amount exceeds the available balance.' } }, 'SUBMIT');
     expect(result).toMatchObject({
@@ -40,6 +119,16 @@ describe('presentApiError', () => {
   it('maps other HTTP 4xx statuses without treating them as client exceptions', () => {
     expect(presentApiError({ status: 418, error: { code: 'POLICY_REJECTED' } }, 'SUBMIT')).toMatchObject({
       supportCode: 'POLICY_REJECTED',
+      retryable: false,
+    });
+  });
+
+  it('presents APPLICANT_WAIVER_REQUIRED as an actionable retained-pending Checker decision', () => {
+    expect(presentApiError({ status: 409, error: { code: 'APPLICANT_WAIVER_REQUIRED' } }, 'APPROVE')).toMatchObject({
+      severity: 'WARNING',
+      title: 'Applicant waiver confirmation required',
+      message: expect.stringContaining('pending transaction and Excess reservation were retained'),
+      supportCode: 'APPLICANT_WAIVER_REQUIRED',
       retryable: false,
     });
   });

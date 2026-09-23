@@ -1,0 +1,54 @@
+:host {
+  display: block;
+  width: 100%;
+}
+
+.tb-excess-review {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--red-border);
+  border-radius: var(--radius-md);
+  background: var(--red-bg-soft);
+}
+
+.tb-excess-review__legend {
+  padding: 0 6px;
+  color: var(--red-dark);
+  font-weight: 700;
+}
+
+.tb-excess-review__summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  color: var(--red-dark);
+}
+
+.tb-excess-review__amount-label,
+.tb-excess-review__amount {
+  font-weight: 700;
+}
+
+.tb-excess-review__check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--red-dark);
+}
+
+.tb-excess-review__hint {
+  margin: 8px 0 0;
+  color: var(--red-dark);
+  font-size: 12px;
+}
+
+@media (max-width: 760px) {
+  .tb-excess-review__summary {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+}

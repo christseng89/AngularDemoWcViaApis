@@ -94,38 +94,60 @@ app.get('/api/fx/rates', (_req, res) => {
 // Non-production virtual Currency Exchange used by Balance regression only. Production adapters must
 // reject this source and must never derive BOOKING from BUY/SELL; see lc-balance-wc BD-01/BD-02.
 app.get('/api/fx/booking-rate', (req, res) => {
-  const { base, quote, amount, decisionTime, correlationId, policyVersion, maxStalenessSeconds } = req.query;
+  const { fromCurrency: from, toCurrency: to, amount, decisionTime, correlationId, requestAttemptId, policyVersion, maxStalenessSeconds } = req.query;
+  const attemptEcho =
+    typeof requestAttemptId === 'string' && requestAttemptId.trim() !== '' ? { requestAttemptId } : {};
   if (
-    typeof base !== 'string' ||
-    typeof quote !== 'string' ||
+    typeof from !== 'string' ||
+    typeof to !== 'string' ||
     typeof amount !== 'string' ||
     typeof decisionTime !== 'string' ||
     typeof correlationId !== 'string' ||
+    typeof requestAttemptId !== 'string' ||
     typeof policyVersion !== 'string' ||
     typeof maxStalenessSeconds !== 'string'
   ) {
     return res.status(400).json({
       code: 'INVALID_FX_REQUEST',
-      message: 'base, quote, amount, decisionTime, correlationId, policyVersion and maxStalenessSeconds are required.',
+      ...attemptEcho,
+      message: 'fromCurrency, toCurrency, amount, decisionTime, correlationId, requestAttemptId, policyVersion and maxStalenessSeconds are required.',
     });
   }
-  const baseCurrency = base.trim().toUpperCase();
-  const quoteCurrency = quote.trim().toUpperCase();
-  const pair = `${baseCurrency}/${quoteCurrency}`;
+  const fromCurrency = from.trim().toUpperCase();
+  const toCurrency = to.trim().toUpperCase();
+  if (fromCurrency !== 'USD') {
+    return res
+      .status(400)
+      .json({ code: 'INVALID_FX_REQUEST', ...attemptEcho, message: 'fromCurrency must be USD for the virtual allowance quote.' });
+  }
+  const pair = `${fromCurrency}/${toCurrency}`;
+  // Non-production demo fixture only: a quote explicitly marked rollingFreshness behaves like a
+  // virtual provider publishing an Approved quote at the requested decision instant. Production never
+  // uses this adapter (the Balance Component rejects the virtual-adapter header in production).
+  const configuredQuote = BOOKING_QUOTES[pair];
+  const quote = configuredQuote?.rollingFreshness === true ? { ...configuredQuote, rateTimestamp: decisionTime } : configuredQuote;
   const result = buildVirtualBookingQuote({
-    quote: BOOKING_QUOTES[pair],
-    baseCurrency,
-    quoteCurrency,
+    quote,
+    fromCurrency,
+    toCurrency,
+    expectedTargetMinorUnits: DECIMALS[toCurrency],
     amount,
     decisionTime,
     correlationId,
+    requestAttemptId,
     policyVersion,
     maxStalenessSeconds,
   });
   if (result.error === 'INVALID_FX_REQUEST') {
-    return res.status(400).json({ code: result.error, message: 'decisionTime must be an ISO date-time.' });
+    return res.status(400).json({ code: result.error, ...attemptEcho, message: 'decisionTime must be an ISO date-time.' });
   }
-  if (result.error) return res.status(503).json({ code: result.error, message: result.message, ...(result.reason ? { reason: result.reason } : {}) });
+  if (result.error)
+    return res.status(503).json({
+      code: result.error,
+      requestAttemptId,
+      message: result.message,
+      ...(result.reason ? { reason: result.reason } : {}),
+    });
   res.set('X-Virtual-FX-Adapter', 'true');
   return res.json(result);
 });

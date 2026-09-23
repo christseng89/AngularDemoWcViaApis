@@ -2,11 +2,11 @@
 
 ### Requirement: Zero Allowance Skips Currency Exchange
 
-當 BD-03 legacy route 生效時，A8／A3／A3S／B3 SHALL NOT 呼叫 production 或 virtual Currency Exchange，亦 SHALL NOT 建立 `USD_PAR` 或其他 FX snapshot；FX availability／freshness 不得影響該 legacy command 的結果。
+當BD-03 legacy route生效時，A3／A3S／B3 SHALL NOT呼叫production或virtual Currency Exchange，亦 SHALL NOT建立`USD_PAR`或其他FX snapshot；FX availability／freshness不得影響該legacy command。
 
 #### Scenario: Non-USD Legacy Route Has No Booking Lookup
 
-- **GIVEN** transaction currency 非 USD
+- **GIVEN** allowance owner currency 非 USD
 - **AND** `configuredMaximumUsd = 0` 或 `allowancePercentage = 0`
 - **WHEN** Maker Submit 或 Checker action 執行
 - **THEN** Currency Exchange request count SHALL 為零
@@ -14,12 +14,12 @@
 
 ### Requirement: Authoritative Booking Rate Contract
 
-非 USD A8、A3、A3S、B3 的 Excess USD Equivalent SHALL 使用 Currency Exchange 回傳的 `BOOKING` rate；response MUST 包含 currency pair、exact decimal rate、converted amount、rate ID／version、source、rate timestamp、Approved status、Effective interval、correlation ID 與 policy version。
+非 USD allowance owner 的 Configured Maximum USD cap SHALL 透過 Currency Exchange request `fromCurrency=USD`、`toCurrency=ownerCurrency`、`amount=configuredMaximumUsd`、`purpose=BOOKING` 轉換。Allowance decision MUST 使用 provider 回傳的 owner-currency `convertedAmount`；response MUST 包含 currency pair／direction、requested amount、exact decimal rate、converted amount、rate ID／version、source、rate timestamp、Approved status、Effective interval、correlation ID 與 policy version。Balance SHALL NOT 以反向 rate 自行倒算。
 
 #### Scenario: Approved Effective Fresh Rate
 
 - **WHEN** response 與 request pair／purpose／correlation 相符，status 為 Approved、decision time 位於 Effective interval 且 age 未超過 Max Staleness
-- **THEN** 系統 SHALL 使用該 rate 計算 USD Equivalent
+- **THEN** 系統 SHALL 使用 provider `convertedAmount` 作為 Configured Maximum 的 owner-currency cap
 - **AND** SHALL snapshot 完整 rate evidence
 
 #### Scenario: Rate 未 Approved 或未 Effective
@@ -48,30 +48,36 @@
 
 ### Requirement: Checker Release Revaluation
 
-僅當 resolved policy 的 `configuredMaximumUsd > 0` 且 `allowancePercentage > 0` 時，Checker Release SHALL 以 release decision time 的最新合格 Booking Rate 重新計算 Excess USD Equivalent 與 allowance，且 SHALL NOT 只重用 Maker rate。任一配置值為零時 SHALL 依 BD-03 使用既有 Checker sufficiency flow，且不得執行 FX revaluation。
+僅當resolved policy的`configuredMaximumUsd > 0`且`allowancePercentage > 0`時，B3及A3／A3S適用Checker decision point SHALL以當時最新合格USD→owner Booking quote重新取得configured cap的provider `convertedAmount`並重算owner-currency allowance，且 SHALL NOT只重用Maker quote。B3使用自身Checker Release；A3／A3S在Checker Acknowledge重估並鎖定Legal／Covered／Excess但保持reservation Pending；Sight A4或Usance A6 final Checker Release再重驗FX、allowance、waiver及eligibility後才可轉Approved，且不得依later parent capacity重新拆分locked amounts。任一配置值為零時 SHALL依BD-03使用既有Checker sufficiency flow。
 
 #### Scenario: Release Rate 可用且仍在 Allowance 內
 
 - **GIVEN** `configuredMaximumUsd > 0` 且 `allowancePercentage > 0`
-- **WHEN** Checker 取得最新 Approved／Effective／fresh rate 且 revalued excess 未超限
-- **THEN** Release SHALL 原子核准 movement 並轉換 pending reservation
+- **WHEN** Checker 取得最新 Approved／Effective／fresh USD→owner provider `convertedAmount` 且 owner-currency Excess 未超限
+- **THEN** B3 Release SHALL原子核准movement並轉換pending reservation；A3／A3S Acknowledge SHALL保持Pending並鎖定split，A4／A6 final Release SHALL再次重驗後按locked split轉換
 - **AND** Checker FX snapshot SHALL 與 Maker snapshot 分別保存
 
 #### Scenario: Release Rate Unavailable 或 Stale
 
 - **GIVEN** `configuredMaximumUsd > 0` 且 `allowancePercentage > 0`
-- **WHEN** Checker Release 無法取得合格 rate 或 rate 已 stale
-- **THEN** Release SHALL NOT 被允許並回傳對應 `FX_RATE_UNAVAILABLE` 或 `FX_RATE_STALE`
+- **WHEN** Checker Acknowledge或final Release無法取得合格rate或rate已stale
+- **THEN** 適用的Acknowledge或Release SHALL NOT被允許並回傳對應`FX_RATE_UNAVAILABLE`或`FX_RATE_STALE`
 - **AND** Pending Transaction 與 Pending Excess Reservation SHALL 保留不變
 
 ### Requirement: FX Retry and Out-of-order Safety
 
-FX lookup retry SHALL 使用相同 command correlation／idempotency identity；不符合 active correlation、pair、purpose 或 provider version 的 late／out-of-order response MUST 被忽略，且本期 MUST NOT 建立 `FX_RATE_PENDING` state。
+FX lookup retry SHALL 使用相同 command correlation／idempotency identity。每一次實際 provider lookup SHALL 產生不同且不可為空的 `requestAttemptId`；provider MUST 原值回傳該 ID，Balance MUST 僅接受與目前 active attempt 完全相符的 response。不符合 active `requestAttemptId`、correlation、pair 或 purpose 的 late／out-of-order response MUST 被忽略。`providerRateVersion` 是 opaque audit evidence，MUST 保存且不可為空，但不得假設其可按數字或字串排序，也不得用它取代 active-attempt matching。本期 MUST NOT 建立 `FX_RATE_PENDING` state。
 
 #### Scenario: Timeout 後 late response
 
 - **WHEN** Maker command 已以 `FX_RATE_UNAVAILABLE` 結束後才收到 provider response
 - **THEN** late response SHALL NOT 建立或修改 movement、reservation 或 allowance
+
+#### Scenario: Provider Echoes a Non-active Attempt ID
+
+- **WHEN** provider response 的 `requestAttemptId` 不等於目前 active lookup 的 ID，即使 correlation、pair、purpose 與 rate evidence 其他欄位皆有效
+- **THEN** response SHALL 被忽略並以 `FX_RATE_UNAVAILABLE` 結束該 attempt
+- **AND** `providerRateVersion` 的值或表面排序 SHALL NOT 使該 response 被接受
 
 #### Scenario: Checker retry 成功
 
@@ -81,7 +87,7 @@ FX lookup retry SHALL 使用相同 command correlation／idempotency identity；
 
 ### Requirement: Virtual Booking Rate Derivation
 
-僅限 non-production virtual Currency Exchange／regression fixture SHALL 為每個 quote 提供 exact-decimal `BUY_RATE` 與 `SELL_RATE`，並 MAY 在 fixture 未提供獨立 `BOOKING_RATE` 時，以 exact decimal 計算 `BOOKING_RATE = (BUY_RATE + SELL_RATE) / 2`，套用配置的 rate scale 與 rounding。此 midpoint 規則 MUST NOT 用於 production adapter。
+僅限 non-production virtual Currency Exchange／regression fixture SHALL 為每個 direct USD→owner quote 提供 exact-decimal `BUY_RATE` 與 `SELL_RATE`，並 MAY 在 fixture 未提供獨立 `BOOKING_RATE` 時，以 exact decimal 計算 `BOOKING_RATE = (BUY_RATE + SELL_RATE) / 2`，套用配置的 rate scale 與 rounding。Virtual provider SHALL 接收 `amount=configuredMaximumUsd`，直接回傳依 target owner currency minor-unit precision rounded once 的 `convertedAmount`；Balance MUST NOT 對 legacy owner→USD fixture 取倒數。此 midpoint 規則 MUST NOT 用於 production adapter。
 
 #### Scenario: Booking Rate Missing from Fixture
 
@@ -109,7 +115,7 @@ FX lookup retry SHALL 使用相同 command correlation／idempotency identity；
 
 ### Requirement: Production Provider-supplied Booking Rate Only
 
-Production Currency Exchange MUST 回傳 provider-supplied `BOOKING` rate 及其 Approved、Effective、Freshness evidence。Production Balance integration MUST NOT 從 Buy、Sell、mid-market、cached alternate-purpose 或其他 rate 推導或 fallback Booking Rate；缺少任一必要 Booking evidence MUST 依 BD-01 fail closed。
+Production Currency Exchange MUST 回傳 provider-supplied `BOOKING` rate 及其 Approved、Effective、Freshness evidence。Production Balance integration MUST NOT 從 Buy、Sell、mid-market、cached alternate-purpose 或其他 rate 推導、倒算或替代 Booking Rate。只有 FX Policy 明確授權時，MAY 使用 provider-supplied Previous Business Day `BOOKING` rate；該 rate 仍須 Approved／Effective 且通過 Freshness／Max Staleness，並保存 `fallbackPolicyId`、`fallbackPolicyVersion`、fallback reason、rate date 與 rate source。缺少任一必要 evidence MUST 依 BD-01 fail closed。
 
 #### Scenario: Production Maker Has No Provider Booking Rate
 
@@ -122,19 +128,32 @@ Production Currency Exchange MUST 回傳 provider-supplied `BOOKING` rate 及其
 #### Scenario: Production Checker Has No Provider Booking Rate
 
 - **GIVEN** `configuredMaximumUsd > 0` 且 `allowancePercentage > 0`
-- **WHEN** Checker Release 的 production provider 未提供合格 Booking Rate，即使 Buy／Sell rates 可用
-- **THEN** Release SHALL NOT 被允許並 SHALL 回傳 `FX_RATE_UNAVAILABLE`
+- **WHEN** 任一適用Checker decision point的production provider未提供合格Booking Rate，即使Buy／Sell rates可用
+- **THEN** 適用的Acknowledge或Release SHALL NOT被允許並 SHALL回傳`FX_RATE_UNAVAILABLE`
 - **AND** Pending Transaction 與 Pending Excess Reservation SHALL 保留不變
+
+#### Scenario: Policy-authorized Previous Business Day Booking Rate
+
+- **GIVEN** FX Policy 明確授權 PBD fallback
+- **WHEN** provider 回傳 PBD `BOOKING` rate，且 rate 為 Approved／Effective 並通過 Max Staleness
+- **THEN** Maker Submit、B3 Release、A3／A3S Acknowledge及A4／A6 final Release MAY各自在其decision point使用該provider rate完成revaluation
+- **AND** snapshot SHALL 保存 `fallbackPolicyId`、`fallbackPolicyVersion`、fallback reason、rate date 與 rate source
+
+#### Scenario: Unauthorized or Stale Previous Business Day Rate
+
+- **WHEN** PBD `BOOKING` rate 未受 FX Policy 授權、非 provider-supplied、未 Approved／Effective 或超過 Max Staleness
+- **THEN** Balance SHALL NOT 使用、推導或替代該 rate
+- **AND** Maker SHALL依BD-01 zero-write；適用Checker Acknowledge或Release SHALL被拒絕並保留pending facts
 
 ### Requirement: USD Par and Non-production Stub Boundary
 
-USD transaction SHALL 使用 exact rate 1 與 internal `USD_PAR` evidence，不呼叫外部 provider。擴充後的 `lc-payment-wc` virtual Currency Exchange MAY 只透過明確標示的 test adapter 使用，且 MUST NOT 作為 production Approved／Effective／fresh evidence。
+USD allowance owner SHALL 對 Configured Maximum 使用 exact identity conversion rate 1 與 internal `USD_PAR` evidence，不呼叫外部 provider。擴充後的 `lc-payment-wc` virtual Currency Exchange MAY 只透過明確標示的 test adapter 使用，且 MUST NOT 作為 production Approved／Effective／fresh evidence。
 
-#### Scenario: USD Excess
+#### Scenario: USD Owner Cap
 
 - **GIVEN** `configuredMaximumUsd > 0` 且 `allowancePercentage > 0`
-- **WHEN** A8／A3／A3S／B3 transaction currency 為 USD
-- **THEN** USD Equivalent SHALL 等於 Excess Amount 並 snapshot `USD_PAR`
+- **WHEN** Import LC／Export Confirmation owner currency 為 USD
+- **THEN** `configuredMaximumOwner` SHALL 等於 `configuredMaximumUsd` 並 snapshot `USD_PAR`
 
 #### Scenario: Production 指向 demo endpoint
 

@@ -8,13 +8,21 @@ describe('Balance Account Number maintenance API', () => {
   test('lists configured mappings under the same Import LC / Export Confirmed categories used by transactions', async () => {
     const db = createDb(':memory:');
     const response = await request(createApp(db)).get('/balance-account-mappings').expect(200);
-    expect(response.body.items).toHaveLength(11);
+    expect(response.body.items).toHaveLength(15);
     expect(response.body.items.map((item: { mappingKey: string }) => item.mappingKey)).toContain('SHGT:SELLERS_USANCE');
     expect(response.body.categories.map((item: { categoryKey: string; label: string }) => [item.categoryKey, item.label])).toEqual([
       ['IMPORT', 'Import LC'],
       ['EXPORT', 'Export Confirmed'],
     ]);
-    expect(response.body.categories.flatMap((item: { families: unknown[] }) => item.families)).toHaveLength(5);
+    expect(response.body.categories.flatMap((item: { families: unknown[] }) => item.families)).toHaveLength(8);
+    expect(response.body.items.map((item: { mappingKey: string }) => item.mappingKey)).toEqual(
+      expect.arrayContaining([
+        'EPLC_DUE_FROM_ISSUING_BANK:SIGHT',
+        'EPLC_ACCEPTANCE_REIMB_RECEIVABLE:USANCE',
+        'EXPORT_EXCESS_ASSET:SIGHT',
+        'EXPORT_EXCESS_ASSET:USANCE',
+      ]),
+    );
     expect(response.body.categories[0].tenorTypes.map((item: { tenorKey: string }) => item.tenorKey)).toEqual(['SIGHT', 'SELLERS_USANCE', 'BUYERS_USANCE']);
     expect(response.body.categories[1].tenorTypes.map((item: { tenorKey: string }) => item.tenorKey)).toEqual(['SIGHT', 'USANCE']);
     expect(response.body.validation).toEqual({ pattern: '^.+$', minLength: 1, maxLength: 128 });
@@ -24,16 +32,21 @@ describe('Balance Account Number maintenance API', () => {
   test('reloads every Account Number mapping from configuration in one request', async () => {
     const db = createDb(':memory:');
     const app = createApp(db);
-    await request(app).put('/balance-account-mappings/IPLC_LC%3ASIGHT').send({
-      expectedVersion: 1,
-      updatedBy: 'operator',
-      accountA: { accountNumber: 'TEMP-A', accountDescription: 'Temporary A' },
-      accountB: { accountNumber: 'TEMP-B', accountDescription: 'Temporary B' },
-    }).expect(200);
+    await request(app)
+      .put('/balance-account-mappings/IPLC_LC%3ASIGHT')
+      .send({
+        expectedVersion: 1,
+        updatedBy: 'operator',
+        accountA: { accountNumber: 'TEMP-A', accountDescription: 'Temporary A' },
+        accountB: { accountNumber: 'TEMP-B', accountDescription: 'Temporary B' },
+      })
+      .expect(200);
 
     const response = await request(app).post('/balance-account-mappings/reload-configuration').send({}).expect(200);
-    expect(response.body.items).toHaveLength(11);
-    expect(response.body.items.every((item: { version: number; updatedBy: string }) => item.version === 1 && item.updatedBy === 'SYSTEM_CONFIG_RELOAD')).toBe(true);
+    expect(response.body.items).toHaveLength(15);
+    expect(response.body.items.every((item: { version: number; updatedBy: string }) => item.version === 1 && item.updatedBy === 'SYSTEM_CONFIG_RELOAD')).toBe(
+      true,
+    );
     expect(response.body.items.find((item: { mappingKey: string }) => item.mappingKey === 'IPLC_LC:SIGHT')).toMatchObject({
       accountA: { accountNumber: 'Customer Liability for DC — Sight', accountDescription: 'Customer Liability for DC — Sight' },
       accountB: { accountNumber: 'DC Liability — Sight', accountDescription: 'DC Liability — Sight' },
@@ -44,12 +57,15 @@ describe('Balance Account Number maintenance API', () => {
   test('rolls back every configuration mapping when one reload write fails', async () => {
     const db = createDb(':memory:');
     const app = createApp(db);
-    await request(app).put('/balance-account-mappings/IPLC_LC%3ASIGHT').send({
-      expectedVersion: 1,
-      updatedBy: 'operator',
-      accountA: { accountNumber: 'KEEP-A', accountDescription: 'Keep A' },
-      accountB: { accountNumber: 'KEEP-B', accountDescription: 'Keep B' },
-    }).expect(200);
+    await request(app)
+      .put('/balance-account-mappings/IPLC_LC%3ASIGHT')
+      .send({
+        expectedVersion: 1,
+        updatedBy: 'operator',
+        accountA: { accountNumber: 'KEEP-A', accountDescription: 'Keep A' },
+        accountB: { accountNumber: 'KEEP-B', accountDescription: 'Keep B' },
+      })
+      .expect(200);
     db.exec(`CREATE TRIGGER force_configuration_reload_failure
       BEFORE UPDATE ON balance_account_mappings
       WHEN NEW.mapping_key = 'IPLC_LC:SELLERS_USANCE' AND NEW.updated_by = 'SYSTEM_CONFIG_RELOAD'
@@ -60,7 +76,10 @@ describe('Balance Account Number maintenance API', () => {
 
     const after = await request(app).get('/balance-account-mappings').expect(200);
     expect(after.body.items.find((item: { mappingKey: string }) => item.mappingKey === 'IPLC_LC:SIGHT')).toMatchObject({
-      accountA: { accountNumber: 'KEEP-A' }, accountB: { accountNumber: 'KEEP-B' }, version: 2, updatedBy: 'operator',
+      accountA: { accountNumber: 'KEEP-A' },
+      accountB: { accountNumber: 'KEEP-B' },
+      version: 2,
+      updatedBy: 'operator',
     });
     db.close();
   });
@@ -94,8 +113,14 @@ describe('Balance Account Number maintenance API', () => {
     const listed = await request(app).get('/balance-account-mappings').expect(200);
     const mapping = listed.body.categories[0].families[0].mappings[0];
     const row = { mappingKey: mapping.mappingKey, expectedVersion: mapping.version, accountA: mapping.accountA, accountB: mapping.accountB };
-    await request(app).put('/balance-account-mappings/families/IMPORT_LC_BALANCE').send({ updatedBy: 'ops-user', mappings: [row] }).expect(400);
-    await request(app).put('/balance-account-mappings/families/UNKNOWN').send({ updatedBy: 'ops-user', mappings: [row] }).expect(404);
+    await request(app)
+      .put('/balance-account-mappings/families/IMPORT_LC_BALANCE')
+      .send({ updatedBy: 'ops-user', mappings: [row] })
+      .expect(400);
+    await request(app)
+      .put('/balance-account-mappings/families/UNKNOWN')
+      .send({ updatedBy: 'ops-user', mappings: [row] })
+      .expect(404);
     db.close();
   });
 
@@ -126,61 +151,108 @@ describe('Balance Account Number maintenance API', () => {
     const service = new BalanceAccountMappingService(db, config);
     expect(() =>
       service.update({
-        mappingKey: 'IPLC_LC:SIGHT', expectedVersion: 1, updatedBy: 'demo-user',
+        mappingKey: 'IPLC_LC:SIGHT',
+        expectedVersion: 1,
+        updatedBy: 'demo-user',
         accountA: { accountNumber: '123', accountDescription: 'A' },
         accountB: { accountNumber: '5678', accountDescription: 'B' },
       }),
     ).toThrow('exactly 4');
     expect(() => loadBalanceAccountNumberConfig({ BALANCE_ACCOUNT_NUMBER_MIN_LEN: '5', BALANCE_ACCOUNT_NUMBER_MAX_LEN: '4' })).toThrow('must not exceed');
+    expect(() => loadBalanceAccountNumberConfig({ BALANCE_ACCOUNT_NUMBER_MIN_LEN: '-1' })).toThrow('must be a non-negative integer');
+    expect(() => loadBalanceAccountNumberConfig({ BALANCE_ACCOUNT_NUMBER_REGEX: '[' })).toThrow('must be a valid regular expression');
     expect(service.findFor('UNKNOWN' as never, 'SIGHT')).toBeUndefined();
-    expect(() => service.update({
-      mappingKey: 'UNKNOWN', expectedVersion: 1, updatedBy: 'demo-user',
-      accountA: { accountNumber: '1234', accountDescription: 'A' },
-      accountB: { accountNumber: '5678', accountDescription: 'B' },
-    })).toThrow('No balance account mapping UNKNOWN');
-    expect(() => service.update({
-      mappingKey: 'IPLC_LC:SIGHT', expectedVersion: 1, updatedBy: 'demo-user',
-      accountA: { accountNumber: '12X4', accountDescription: 'A' },
-      accountB: { accountNumber: '5678', accountDescription: 'B' },
-    })).toThrow('does not match BALANCE_ACCOUNT_NUMBER_REGEX');
-    expect(() => service.update({
-      mappingKey: 'IPLC_LC:SIGHT', expectedVersion: 1, updatedBy: 'demo-user',
-      accountA: { accountNumber: '1234', accountDescription: ' ' },
-      accountB: { accountNumber: '5678', accountDescription: 'B' },
-    })).toThrow('accountDescription must contain 1-200 characters');
+    expect(() =>
+      service.update({
+        mappingKey: 'UNKNOWN',
+        expectedVersion: 1,
+        updatedBy: 'demo-user',
+        accountA: { accountNumber: '1234', accountDescription: 'A' },
+        accountB: { accountNumber: '5678', accountDescription: 'B' },
+      }),
+    ).toThrow('No balance account mapping UNKNOWN');
+    expect(() =>
+      service.update({
+        mappingKey: 'IPLC_LC:SIGHT',
+        expectedVersion: 1,
+        updatedBy: 'demo-user',
+        accountA: { accountNumber: '12X4', accountDescription: 'A' },
+        accountB: { accountNumber: '5678', accountDescription: 'B' },
+      }),
+    ).toThrow('does not match BALANCE_ACCOUNT_NUMBER_REGEX');
+    expect(() =>
+      service.update({
+        mappingKey: 'IPLC_LC:SIGHT',
+        expectedVersion: 1,
+        updatedBy: 'demo-user',
+        accountA: { accountNumber: '1234', accountDescription: ' ' },
+        accountB: { accountNumber: '5678', accountDescription: 'B' },
+      }),
+    ).toThrow('accountDescription must contain 1-200 characters');
 
     const family = service.list().categories[0]!.families.find((item) => item.familyKey === 'IMPORT_LC_BALANCE')!;
     const familyRows = family.mappings.map((item) => ({
-      mappingKey: item.mappingKey, expectedVersion: item.version, accountA: item.accountA, accountB: item.accountB,
+      mappingKey: item.mappingKey,
+      expectedVersion: item.version,
+      accountA: item.accountA,
+      accountB: item.accountB,
     }));
     expect(() => service.updateFamily({ familyKey: family.familyKey, updatedBy: ' ', mappings: familyRows })).toThrow('updatedBy is required');
-    expect(() => service.updateFamily({ familyKey: family.familyKey, updatedBy: 'ops', mappings: [familyRows[0]!, familyRows[0]!, familyRows[2]!] })).toThrow('exactly once');
+    expect(() => service.updateFamily({ familyKey: family.familyKey, updatedBy: 'ops', mappings: [familyRows[0]!, familyRows[0]!, familyRows[2]!] })).toThrow(
+      'exactly once',
+    );
     db.close();
   });
 
   test('new movements snapshot the latest mapping while historical vouchers stay unchanged', async () => {
     const db = createDb(':memory:');
     const app = createApp(db);
-    const oldMovement = await request(app).post('/balance-movements').send({
-      instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'MAP-OLD' }, movementType: 'ISSUE',
-      expiryDate: '2099-12-31', eventSeq: 1, amount: '1000', currency: 'USD', tenorType: 'SIGHT', createdBy: 'maker1',
-    }).expect(201);
+    const oldMovement = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'MAP-OLD' },
+        movementType: 'ISSUE',
+        expiryDate: '2099-12-31',
+        eventSeq: 1,
+        amount: '1000',
+        currency: 'USD',
+        tenorType: 'SIGHT',
+        createdBy: 'maker1',
+      })
+      .expect(201);
 
-    await request(app).put('/balance-account-mappings/IPLC_LC%3ASIGHT').send({
-      expectedVersion: 1,
-      updatedBy: 'demo-user',
-      accountA: { accountNumber: 'GL-110001', accountDescription: 'Customer liability' },
-      accountB: { accountNumber: 'GL-210001', accountDescription: 'Outstanding LC' },
-    }).expect(200);
-    const newMovement = await request(app).post('/balance-movements').send({
-      instrumentType: 'IPLC_LC', naturalKey: { lcNumber: 'MAP-NEW' }, movementType: 'ISSUE',
-      expiryDate: '2099-12-31', eventSeq: 1, amount: '2000', currency: 'USD', tenorType: 'SIGHT', createdBy: 'maker1',
-    }).expect(201);
+    await request(app)
+      .put('/balance-account-mappings/IPLC_LC%3ASIGHT')
+      .send({
+        expectedVersion: 1,
+        updatedBy: 'demo-user',
+        accountA: { accountNumber: 'GL-110001', accountDescription: 'Customer liability' },
+        accountB: { accountNumber: 'GL-210001', accountDescription: 'Outstanding LC' },
+      })
+      .expect(200);
+    const newMovement = await request(app)
+      .post('/balance-movements')
+      .send({
+        instrumentType: 'IPLC_LC',
+        naturalKey: { lcNumber: 'MAP-NEW' },
+        movementType: 'ISSUE',
+        expiryDate: '2099-12-31',
+        eventSeq: 1,
+        amount: '2000',
+        currency: 'USD',
+        tenorType: 'SIGHT',
+        createdBy: 'maker1',
+      })
+      .expect(201);
 
     expect(newMovement.body.contingentAccountEntry).toMatchObject({
-      drAccountNumber: 'GL-110001', drAccountDescription: 'Customer liability',
-      crAccountNumber: 'GL-210001', crAccountDescription: 'Outstanding LC',
-      accountMappingKey: 'IPLC_LC:SIGHT', accountMappingVersion: 2,
+      drAccountNumber: 'GL-110001',
+      drAccountDescription: 'Customer liability',
+      crAccountNumber: 'GL-210001',
+      crAccountDescription: 'Outstanding LC',
+      accountMappingKey: 'IPLC_LC:SIGHT',
+      accountMappingVersion: 2,
     });
     const oldTimeline = await request(app).get(`/balance-contracts/${oldMovement.body.balanceContractId}/movements`).expect(200);
     expect(oldTimeline.body[0].contingentAccountEntry).toMatchObject({

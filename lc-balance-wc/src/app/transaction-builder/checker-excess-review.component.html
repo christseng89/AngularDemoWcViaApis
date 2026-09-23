@@ -1,0 +1,12 @@
+<fieldset class="tb-excess-review" aria-label="Excess Review">
+  <legend class="tb-excess-review__legend">Excess Review</legend>
+  <div class="tb-excess-review__summary">
+    <span class="tb-excess-review__amount-label">This Exceed Amount:</span>
+    <strong class="tb-excess-review__amount">{{ amount | number: '1.2-2' }} {{ currency }}</strong>
+  </div>
+  <label class="tb-excess-review__check">
+    <input type="checkbox" [ngModel]="approved" (ngModelChange)="approvedChange.emit($event)" />
+    <strong>Checker Approve</strong>
+  </label>
+  <p class="tb-excess-review__hint">Required before Release. The service remains authoritative for the final Excess decision.</p>
+</fieldset>

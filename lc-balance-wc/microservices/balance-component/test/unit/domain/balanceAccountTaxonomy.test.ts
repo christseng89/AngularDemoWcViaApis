@@ -2,18 +2,37 @@ import rawTaxonomy from '../../../config/balance-account-mappings.json';
 import { BALANCE_ACCOUNT_TAXONOMY, BalanceAccountTaxonomy } from '../../../src/config/balanceAccountTaxonomy';
 
 describe('BalanceAccountTaxonomy', () => {
-  it('defines two categories, five category-scoped Tenors, and five GL families', () => {
+  it('defines two categories, five category-scoped Tenors, and dedicated export asset GL families', () => {
     expect(BALANCE_ACCOUNT_TAXONOMY.categories().map((item) => [item.categoryKey, item.tenorTypes.map((tenor) => tenor.tenorKey)])).toEqual([
       ['IMPORT', ['SIGHT', 'SELLERS_USANCE', 'BUYERS_USANCE']],
       ['EXPORT', ['SIGHT', 'USANCE']],
     ]);
     expect(BALANCE_ACCOUNT_TAXONOMY.categories().map((item) => item.label)).toEqual(['Import LC', 'Export Confirmed']);
-    expect(BALANCE_ACCOUNT_TAXONOMY.families()).toHaveLength(5);
-    expect(BALANCE_ACCOUNT_TAXONOMY.families().filter((item) => item.categoryKey === 'IMPORT').map((item) => item.familyKey)).toEqual([
-      'IMPORT_LC_BALANCE',
-      'SHIPPING_GUARANTEE_BALANCE',
-      'IMPORT_ACCEPTANCE_BALANCE',
-    ]);
+    expect(BALANCE_ACCOUNT_TAXONOMY.families()).toHaveLength(8);
+    expect(
+      BALANCE_ACCOUNT_TAXONOMY.families()
+        .filter((item) => item.categoryKey === 'IMPORT')
+        .map((item) => item.familyKey),
+    ).toEqual(['IMPORT_LC_BALANCE', 'SHIPPING_GUARANTEE_BALANCE', 'IMPORT_ACCEPTANCE_BALANCE']);
+  });
+
+  it('keeps existing Covered asset names and provides distinct Sight/Usance EXPORT_EXCESS_ASSET mappings', () => {
+    expect(BALANCE_ACCOUNT_TAXONOMY.mapping('EPLC_DUE_FROM_ISSUING_BANK:SIGHT')).toMatchObject({
+      instrumentType: 'EPLC_DUE_FROM_ISSUING_BANK',
+      tenorKey: 'SIGHT',
+    });
+    expect(BALANCE_ACCOUNT_TAXONOMY.mapping('EPLC_ACCEPTANCE_REIMB_RECEIVABLE:USANCE')).toMatchObject({
+      instrumentType: 'EPLC_ACCEPTANCE_REIMB_RECEIVABLE',
+      tenorKey: 'USANCE',
+    });
+    expect(BALANCE_ACCOUNT_TAXONOMY.mapping('EXPORT_EXCESS_ASSET:SIGHT')).toMatchObject({
+      instrumentType: 'EXPORT_EXCESS_ASSET',
+      tenorKey: 'SIGHT',
+    });
+    expect(BALANCE_ACCOUNT_TAXONOMY.mapping('EXPORT_EXCESS_ASSET:USANCE')).toMatchObject({
+      instrumentType: 'EXPORT_EXCESS_ASSET',
+      tenorKey: 'USANCE',
+    });
   });
 
   it('keeps Import Sight and Export Sight in separate configuration domains', () => {
@@ -39,9 +58,23 @@ describe('BalanceAccountTaxonomy', () => {
   });
 
   it.each([
-    ['categoryKey', (value: typeof rawTaxonomy) => value.categories.push({ ...value.categories[0]!, tenorTypes: structuredClone(value.categories[0]!.tenorTypes) }), 'Duplicate categoryKey'],
-    ['familyKey', (value: typeof rawTaxonomy) => value.families.push({ ...value.families[0]!, tenorKeys: [...value.families[0]!.tenorKeys] }), 'Duplicate familyKey'],
-    ['family instrument', (value: typeof rawTaxonomy) => { value.families[1]!.instrumentType = value.families[0]!.instrumentType; }, 'Duplicate family instrumentType'],
+    [
+      'categoryKey',
+      (value: typeof rawTaxonomy) => value.categories.push({ ...value.categories[0]!, tenorTypes: structuredClone(value.categories[0]!.tenorTypes) }),
+      'Duplicate categoryKey',
+    ],
+    [
+      'familyKey',
+      (value: typeof rawTaxonomy) => value.families.push({ ...value.families[0]!, tenorKeys: [...value.families[0]!.tenorKeys] }),
+      'Duplicate familyKey',
+    ],
+    [
+      'family instrument',
+      (value: typeof rawTaxonomy) => {
+        value.families[1]!.instrumentType = value.families[0]!.instrumentType;
+      },
+      'Duplicate family instrumentType',
+    ],
     ['mappingKey', (value: typeof rawTaxonomy) => value.mappings.push(structuredClone(value.mappings[0]!)), 'Duplicate mappingKey'],
   ])('rejects duplicate %s values', (_label, mutate, message) => {
     const invalid = structuredClone(rawTaxonomy);

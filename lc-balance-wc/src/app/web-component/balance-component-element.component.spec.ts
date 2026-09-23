@@ -139,6 +139,13 @@ describe('BalanceComponentElementComponent', () => {
     expect(shadowRoot().querySelector('link[rel="stylesheet"]')?.getAttribute('href')).toBe('https://assets.example.test/balance/styles.css');
   });
 
+  it('rejects executable stylesheet protocols before creating a shadow-root link', () => {
+    fixture.componentRef.setInput('stylesheetUrl', 'javascript:alert(1)');
+    fixture.detectChanges();
+
+    expect(shadowRoot().querySelector('link[rel="stylesheet"]')?.getAttribute('href')).not.toBe('javascript:alert(1)');
+  });
+
   it('applies light and dark themes per instance without mutating the document root', () => {
     const secondFixture = TestBed.createComponent(BalanceComponentElementComponent);
     const documentThemeBefore = document.documentElement.getAttribute('data-theme');

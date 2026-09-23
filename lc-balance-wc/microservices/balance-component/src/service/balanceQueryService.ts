@@ -45,8 +45,12 @@ export class BalanceQueryService {
     private readonly snapshots: BalanceSnapshotService,
   ) {}
 
-  resolveContract(instrumentType: InstrumentType, naturalKey: NaturalKey, includeAnyStatus = false): BalanceContract | undefined {
-    return includeAnyStatus ? this.contracts.findByNaturalKey(instrumentType, naturalKey) : this.contracts.findActiveByNaturalKey(instrumentType, naturalKey);
+  resolveContract(instrumentType: InstrumentType, naturalKey: NaturalKey): BalanceContract | undefined {
+    return this.contracts.findActiveByNaturalKey(instrumentType, naturalKey);
+  }
+
+  resolveContractAnyStatus(instrumentType: InstrumentType, naturalKey: NaturalKey): BalanceContract | undefined {
+    return this.contracts.findByNaturalKey(instrumentType, naturalKey);
   }
 
   catalog(filter: CatalogFilter): CatalogPage {

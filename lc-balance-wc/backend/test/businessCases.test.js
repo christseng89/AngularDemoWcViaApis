@@ -1,7 +1,9 @@
 const { buildRegistry } = require('../data/businessCases');
+const defaultExcessPolicy = require('../../microservices/balance-component/config/excess-policy.non-production.json');
+const bd16ExcessPolicy = require('../../microservices/balance-component/config/excess-policy.bd16-runner.json');
 
 // data/businessCases.js's buildRegistry() is pure structure-building (only lcNumberFor()'s
-// Date.now()/Math.random() suffix varies run-to-run) — no fetch/microservice mocking needed here,
+// Date.now()/cryptographically secure random suffix varies run-to-run) — no fetch/microservice mocking needed here,
 // unlike server.test.js. See lc-balance-wc/CLAUDE.md for the domain background (Import/Export LC
 // Business Case Registry, §7.4 "one movement, one call").
 
@@ -37,6 +39,14 @@ const EXPECTED_IDS = [
   'export-case-13',
   'export-case-14',
   'export-case-15',
+  'overdrawn-a3-a4',
+  'overdrawn-a3s-anti-double-counting',
+  'overdrawn-b3-b4',
+  'overdrawn-b4-authorization-full',
+  'overdrawn-b4-authorization-partial',
+  'overdrawn-b4-authorization-absent',
+  'overdrawn-a2-b2-remediation',
+  'overdrawn-bd16-boundary',
   'import-a3s-ready',
   'import-a4-ready',
   'import-a6-ready',
@@ -51,8 +61,111 @@ describe('data/businessCases.js buildRegistry()', () => {
   const registry = buildRegistry();
 
   it('returns all lifecycle and manual-readiness business cases in Run All order', () => {
-    expect(registry).toHaveLength(37);
+    expect(registry).toHaveLength(45);
     expect(registry.map((c) => c.id)).toEqual(EXPECTED_IDS);
+  });
+
+  it('keeps BD-16 2% opt-in and leaves the default 10% Import demo policy unchanged', () => {
+    expect(defaultExcessPolicy.find((policy) => policy.ownerType === 'IMPORT_LC').allowancePercentage).toBe('10');
+    expect(bd16ExcessPolicy.find((policy) => policy.ownerType === 'IMPORT_LC').allowancePercentage).toBe('2');
+    expect(bd16ExcessPolicy.find((policy) => policy.ownerType === 'EXPORT_CONFIRMATION').allowancePercentage).toBe('10');
+  });
+
+  it('publishes the minimal OVERDRAWN runner matrix for A3/A3S/B3 and A2/B2 remediation', () => {
+    const byId = Object.fromEntries(registry.map((businessCase) => [businessCase.id, businessCase]));
+    const ids = ['overdrawn-a3-a4', 'overdrawn-a3s-anti-double-counting', 'overdrawn-b3-b4', 'overdrawn-a2-b2-remediation'];
+    expect(ids.map((id) => byId[id].title)).toEqual(ids.map(() => expect.stringContaining('OVERDRAWN')));
+
+    const allSteps = ids.flatMap((id) => byId[id].steps);
+    const allRequests = allSteps.flatMap((step) => (step.request ? [step.request] : step.requests || []));
+    expect(allRequests).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ instrumentType: 'IPLC_LC', movementType: 'UTILIZE', amount: '10200' }),
+        expect.objectContaining({ instrumentType: 'EPLC_EXAMINATION', movementType: 'CREATE', amount: '10200' }),
+      ]),
+    );
+
+    const a3s = byId['overdrawn-a3s-anti-double-counting'];
+    const compound = a3s.steps.find((step) => step.type === 'createCompoundMovements');
+    expect(compound.requests).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ instrumentType: 'SHGT', movementType: 'FULL_REDEEM', amount: '5000' }),
+        expect.objectContaining({ instrumentType: 'IPLC_LC', movementType: 'UTILIZE', amount: '10200' }),
+      ]),
+    );
+
+    const b3b4 = byId['overdrawn-b3-b4'];
+    expect(b3b4.steps).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: 'createMovement',
+          functionCode: 'B4',
+          request: expect.objectContaining({ movementType: 'HONOUR', amount: '10200', referencedTransactionIdRef: 'docs' }),
+        }),
+        expect.objectContaining({
+          type: 'release',
+          functionCode: 'B4',
+          expectExportAssets: expect.objectContaining({
+            coveredBalanceType: 'Due from Issuing Bank',
+            covered: '10000',
+            excess: '200',
+            legal: '10200',
+          }),
+        }),
+      ]),
+    );
+
+    const remediation = byId['overdrawn-a2-b2-remediation'];
+    expect(remediation.steps.filter((step) => step.expectError)).toHaveLength(3);
+    expect(remediation.steps.filter((step) => step.autoFormalIncrease)).toEqual([
+      expect.objectContaining({ functionCode: 'A3', autoFormalIncrease: { functionCode: 'A2', contractRef: 'lc' } }),
+      expect.objectContaining({ functionCode: 'A3S', autoFormalIncrease: { functionCode: 'A2', contractRef: 'a3sLc', decisionRequestIndex: 1 } }),
+      expect.objectContaining({ functionCode: 'B3', autoFormalIncrease: { functionCode: 'B2', contractRef: 'conf' } }),
+    ]);
+    expect(remediation.steps.some((step) => step.request?.movementType === 'AMEND_INCREASE')).toBe(false);
+    expect(remediation.steps.some((step) => step.request?.movementType === 'AMEND')).toBe(false);
+  });
+
+  it('publishes exact BD-16 boundary and the common ABSENT Checker Approve release path', () => {
+    const byId = Object.fromEntries(registry.map((businessCase) => [businessCase.id, businessCase]));
+    const boundary = byId['overdrawn-bd16-boundary'];
+    expect(boundary.requiredPolicy).toEqual({ ownerType: 'IMPORT_LC', allowancePercentage: '2' });
+    expect(boundary.steps).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ functionCode: 'A3', request: expect.objectContaining({ amount: '11200' }) }),
+        expect.objectContaining({
+          functionCode: 'A3',
+          expectError: true,
+          expectedStatus: 409,
+          expectedErrorCode: 'EXCESS_LIMIT_EXCEEDED',
+          request: expect.objectContaining({ amount: '11201' }),
+        }),
+      ]),
+    );
+
+    const a3 = byId['overdrawn-a3-a4'];
+    const a4Releases = a3.steps.filter((step) => step.type === 'release' && step.functionCode === 'A4');
+    expect(a4Releases).toEqual([expect.objectContaining({ releasedBy: 'checker1' })]);
+    expect(a4Releases[0].request).toBeUndefined();
+  });
+
+  it('publishes B4 full/partial/absent authorization with Sight/Usance 10,000 + 200 = 10,200 reconciliation', () => {
+    const byId = Object.fromEntries(registry.map((businessCase) => [businessCase.id, businessCase]));
+    const releases = ['full', 'partial', 'absent'].map((variant) =>
+      byId[`overdrawn-b4-authorization-${variant}`].steps.find((step) => step.expectExportAssets),
+    );
+    expect(releases.map((step) => step.request.exportAuthorization.claimStatus)).toEqual(['SUBMITTED', 'SUBMITTED', 'ABSENT']);
+    expect(releases.map((step) => step.expectExportAssets.excessDebtor)).toEqual([
+      'ISSUING_BANK',
+      'BENEFICIARY_OR_RECOURSE_PARTY',
+      'BENEFICIARY_OR_RECOURSE_PARTY',
+    ]);
+    expect(releases.map((step) => step.expectExportAssets)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ coveredBalanceType: 'Due from Issuing Bank', covered: '10000', excess: '200', legal: '10200' }),
+        expect.objectContaining({ coveredBalanceType: 'Reimbursement Receivable', covered: '10000', excess: '200', legal: '10200' }),
+      ]),
+    );
   });
 
   it('adds four sequential amount/tolerance amendments against the same Import LC and Export Confirmation', () => {
@@ -68,9 +181,7 @@ describe('data/businessCases.js buildRegistry()', () => {
     ]);
     expect(new Set(importAmendments.map((step) => step.request.balanceContractIdRef))).toEqual(new Set(['lc']));
 
-    const exportAmendments = byId['export-case-15'].steps.filter(
-      (step) => step.type === 'createMovement' && step.request?.movementType === 'AMEND',
-    );
+    const exportAmendments = byId['export-case-15'].steps.filter((step) => step.type === 'createMovement' && step.request?.movementType === 'AMEND');
     expect(exportAmendments.map((step) => [step.request.amount, step.request.toleranceChangePct])).toEqual([
       ['20000', '10'],
       ['10000', '5'],
@@ -124,27 +235,15 @@ describe('data/businessCases.js buildRegistry()', () => {
   });
 
   it('Run All retains at least three generated transactions for A3S, A6, A7, B4, and B5', () => {
-    const requests = registry.flatMap((businessCase) =>
-      businessCase.steps.flatMap((step) => (step.request ? [step.request] : step.requests || [])),
-    );
+    const requests = registry.flatMap((businessCase) => businessCase.steps.flatMap((step) => (step.request ? [step.request] : step.requests || [])));
     const count = (predicate) => requests.filter(predicate).length;
 
     const generatedCounts = {
-      A3S: count(
-        (request) => request.instrumentType === 'IPLC_LC' && request.movementType === 'UTILIZE' && Boolean(request.businessEventId),
-      ),
+      A3S: count((request) => request.instrumentType === 'IPLC_LC' && request.movementType === 'UTILIZE' && Boolean(request.businessEventId)),
       A6: count((request) => request.instrumentType === 'IPLC_ACCEPTANCE' && request.movementType === 'CREATE'),
-      A7: count(
-        (request) =>
-          request.instrumentType === 'IPLC_ACCEPTANCE' && ['PARTIAL_SETTLE', 'FULL_SETTLE'].includes(request.movementType),
-      ),
-      B4: count(
-        (request) => request.instrumentType === 'EPLC_CONFIRMATION' && ['HONOUR', 'ACCEPT'].includes(request.movementType),
-      ),
-      B5: count(
-        (request) =>
-          request.instrumentType === 'EPLC_ACCEPTANCE' && ['PARTIAL_SETTLE', 'FULL_SETTLE'].includes(request.movementType),
-      ),
+      A7: count((request) => request.instrumentType === 'IPLC_ACCEPTANCE' && ['PARTIAL_SETTLE', 'FULL_SETTLE'].includes(request.movementType)),
+      B4: count((request) => request.instrumentType === 'EPLC_CONFIRMATION' && ['HONOUR', 'ACCEPT'].includes(request.movementType)),
+      B5: count((request) => request.instrumentType === 'EPLC_ACCEPTANCE' && ['PARTIAL_SETTLE', 'FULL_SETTLE'].includes(request.movementType)),
     };
 
     Object.values(generatedCounts).forEach((generatedCount) => expect(generatedCount).toBeGreaterThanOrEqual(3));
@@ -278,7 +377,9 @@ describe('data/businessCases.js buildRegistry()', () => {
     registry.forEach((c) => {
       const firstWithNaturalKey = c.steps.find((s) => s.type === 'createMovement' && s.request && s.request.naturalKey && s.request.naturalKey.lcNumber);
       expect(firstWithNaturalKey).toBeDefined();
-      expect(firstWithNaturalKey.request.naturalKey.lcNumber).toMatch(/^(IMP|EXP)-(C\d+|A3S|A4|A6|A7|B4|B5)-\d+-\d+$/);
+      expect(firstWithNaturalKey.request.naturalKey.lcNumber).toMatch(
+        /^(?:(?:IMP|EXP)-(?:C\d+|A3S|A4|A6|A7|B4|B5)|OD-(?:A8|A3|A3S|B3|A2|B4-(?:FULL|PARTIAL|ABSENT)))-\d+-\d+$/,
+      );
     });
   });
 
@@ -350,22 +451,18 @@ describe('data/businessCases.js buildRegistry()', () => {
     });
   });
 
-  it('creates both A3S legs before Checker acknowledgment and releases the SG redemption afterwards', () => {
+  it('creates both A3S legs atomically before Checker acknowledgment, which owns the once-only SG redemption', () => {
     for (const caseId of ['import-case-7', 'import-case-8']) {
       const businessCase = registry.find((candidate) => candidate.id === caseId);
-      const redemptionIndex = businessCase.steps.findIndex(
-        (step) => step.type === 'createMovement' && step.captureAs === 'redeemSg1' && step.request?.businessEventId,
-      );
-      const arrivalIndex = businessCase.steps.findIndex(
-        (step) => step.type === 'createMovement' && step.captureAs === 'utilizeB02' && step.request?.businessEventId,
+      const compoundIndex = businessCase.steps.findIndex(
+        (step) => step.type === 'createCompoundMovements' && step.captureAs?.includes('redeemSg1') && step.captureAs?.includes('utilizeB02'),
       );
       const acknowledgeIndex = businessCase.steps.findIndex((step) => step.type === 'acknowledge' && step.movementRef === 'utilizeB02');
       const releaseIndex = businessCase.steps.findIndex((step) => step.type === 'release' && step.movementRef === 'redeemSg1');
 
-      expect(redemptionIndex).toBeGreaterThan(-1);
-      expect(arrivalIndex).toBeGreaterThan(redemptionIndex);
-      expect(acknowledgeIndex).toBeGreaterThan(arrivalIndex);
-      expect(releaseIndex).toBeGreaterThan(acknowledgeIndex);
+      expect(compoundIndex).toBeGreaterThan(-1);
+      expect(acknowledgeIndex).toBeGreaterThan(compoundIndex);
+      expect(releaseIndex).toBe(-1);
     }
   });
 

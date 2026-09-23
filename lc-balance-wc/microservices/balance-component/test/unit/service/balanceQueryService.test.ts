@@ -75,7 +75,7 @@ describe('BalanceQueryService', () => {
     const key = { lcNumber: 'LC001' };
 
     service.resolveContract('IPLC_LC', key);
-    service.resolveContract('IPLC_LC', key, true);
+    service.resolveContractAnyStatus('IPLC_LC', key);
 
     expect(contracts.findActiveByNaturalKey).toHaveBeenCalledWith('IPLC_LC', key);
     expect(contracts.findByNaturalKey).toHaveBeenCalledWith('IPLC_LC', key);

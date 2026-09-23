@@ -9,6 +9,7 @@ export interface BusinessCaseSummary {
   title: string;
   description: string;
   stepCount: number;
+  requiredPolicy?: { ownerType: string; allowancePercentage: string };
 }
 
 export interface TraceStep {

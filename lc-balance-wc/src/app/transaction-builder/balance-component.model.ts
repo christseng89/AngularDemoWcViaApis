@@ -633,6 +633,17 @@ export function isEarmarkFunction(
   return (instrumentType === 'IPLC_LC' && movementType === 'UTILIZE') || (instrumentType === 'EPLC_EXAMINATION' && movementType === 'CREATE');
 }
 
+function lifecycleStatus(status: string, pendingLabel: string, releasedLabel: string): string | undefined {
+  if (status === 'PENDING') return pendingLabel;
+  if (status === 'RELEASED') return releasedLabel;
+  return undefined;
+}
+
+function pendingEarmarkStatus(earmark: boolean, acknowledgedAt?: string | null): string {
+  if (!earmark) return 'PENDING';
+  return acknowledgedAt ? 'EARMARKED' : 'EARMARKING';
+}
+
 /** PENDING/RELEASED/etc. display label per `isEarmarkFunction()`'s own mapping above. Shared by TransactionBuilderComponent and AccountEntriesDialogComponent so neither re-derives the rule independently. */
 export function displayStatus(
   status: string,
@@ -645,14 +656,20 @@ export function displayStatus(
   // LC/Confirmation reads as contradictory (red usually signals a problem, "APPROVED" sounds positive);
   // CLOSED/CLOSING make the row self-explanatory without relying on color alone. See statusBadgeClass()'s
   // own doc comment just below for the full rationale — this mirrors that same PENDING/RELEASED split.
-  if (isCloseMovement(movementType) && (status === 'PENDING' || status === 'RELEASED')) return status === 'PENDING' ? 'CLOSING' : 'CLOSED';
+  if (isCloseMovement(movementType)) {
+    const closeStatus = lifecycleStatus(status, 'CLOSING', 'CLOSED');
+    if (closeStatus) return closeStatus;
+  }
   // F1 (external BA review, v1.19.0) — AUTO EXPIRY's own EXPIRE movementType. A genuinely separate legal
   // event from CLOSE (date-triggered vs. human/Maker-Checker-triggered) — same red/negative warning
   // treatment (see statusBadgeClass() below) but its own EXPIRING/EXPIRED label text so the two are never
   // visually confused, even though both retire the contract's own remaining Confirmed Balance.
-  if (isExpireMovement(movementType) && (status === 'PENDING' || status === 'RELEASED')) return status === 'PENDING' ? 'EXPIRING' : 'EXPIRED';
+  if (isExpireMovement(movementType)) {
+    const expiryStatus = lifecycleStatus(status, 'EXPIRING', 'EXPIRED');
+    if (expiryStatus) return expiryStatus;
+  }
   const earmark = isEarmarkFunction(instrumentType, movementType, phase);
-  if (status === 'PENDING') return earmark ? (acknowledgedAt ? 'EARMARKED' : 'EARMARKING') : 'PENDING';
+  if (status === 'PENDING') return pendingEarmarkStatus(earmark, acknowledgedAt);
   if (status === 'RELEASED') return earmark ? 'EARMARKED' : 'APPROVED';
   return status;
 }

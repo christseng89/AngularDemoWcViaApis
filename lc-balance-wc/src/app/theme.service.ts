@@ -103,9 +103,9 @@ export class ThemeService {
     this.syncSystemListener();
     const theme = this.effectiveTheme;
     if (typeof document === 'undefined') return;
-    document.documentElement.setAttribute('data-theme', theme);
+    document.documentElement.dataset['theme'] = theme;
     if (this.supportsBootstrapTheme) {
-      document.documentElement.setAttribute('data-bs-theme', theme);
+      document.documentElement.dataset['bsTheme'] = theme;
     }
   }
 

@@ -68,4 +68,20 @@ describe('computeFaceAmount (Design doc §3.3/§6.2)', () => {
     ];
     expect(computeFaceAmount(movements).toFixed()).toBe('110000');
   });
+
+  test('uses only Checker-released A2/B2 monetary facts; pending, rejected and deleted increases are not authoritative', () => {
+    const movements: M[] = [
+      m('ISSUE', '100', '100', 'RELEASED'),
+      m('AMEND_INCREASE', '5', '5', 'PENDING'),
+      m('AMEND_INCREASE', '6', '6', 'REJECTED'),
+      m('AMEND_INCREASE', '7', '7', 'CANCELLED'),
+      m('AMEND_INCREASE', '8', '8', 'RELEASED'),
+      m('AMEND', '9', '9', 'PENDING'),
+      m('AMEND', '10', '10', 'REJECTED'),
+      m('AMEND', '11', '11', 'CANCELLED'),
+      m('AMEND', '12', '12', 'RELEASED'),
+    ];
+
+    expect(computeFaceAmount(movements).toFixed()).toBe('120');
+  });
 });

@@ -6,16 +6,27 @@ interface DecimalParts {
 }
 
 function parseUnsignedDecimal(value: unknown): DecimalParts | null {
-  const text = String(value ?? '').trim();
-  if (!/^\d+(?:\.\d+)?$/.test(text)) return null;
+  if (typeof value !== 'string' && typeof value !== 'number') return null;
+  const text = String(value).trim();
   const [whole, fraction = ''] = text.split('.');
+  if (!whole || text.split('.').length > 2 || !isAsciiDigits(whole) || (text.includes('.') && !isAsciiDigits(fraction))) return null;
   return { digits: BigInt(`${whole}${fraction}`), scale: fraction.length };
+}
+
+function isAsciiDigits(value: string): boolean {
+  if (!value) return false;
+  for (const character of value) {
+    if (character < '0' || character > '9') return false;
+  }
+  return true;
 }
 
 function formatDecimal(digits: bigint, scale: number): string {
   if (scale === 0) return digits.toString();
   const padded = digits.toString().padStart(scale + 1, '0');
-  return `${padded.slice(0, -scale)}.${padded.slice(-scale)}`.replace(/0+$/, '').replace(/\.$/, '');
+  let formatted = `${padded.slice(0, -scale)}.${padded.slice(-scale)}`;
+  while (formatted.endsWith('0')) formatted = formatted.slice(0, -1);
+  return formatted.endsWith('.') ? formatted.slice(0, -1) : formatted;
 }
 
 /** Exact decimal calculation shared by the live Formly preview and submit validation. */

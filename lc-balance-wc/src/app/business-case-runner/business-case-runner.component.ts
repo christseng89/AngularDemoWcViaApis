@@ -27,6 +27,11 @@ export class BusinessCaseRunnerComponent implements OnInit {
   running = false;
   runningAll = false;
   allResults: BusinessCaseRunResult[] = [];
+  runFailures: { id: string; title: string; message: string }[] = [];
+  runAllSkipped: BusinessCaseSummary[] = [];
+  runAllCompleted = 0;
+  runAllTotal = 0;
+  currentRunAllCase: string | null = null;
   loadError: string | null = null;
   loadingCases = false;
   recoveringAfterCleanup = false;
@@ -85,6 +90,7 @@ export class BusinessCaseRunnerComponent implements OnInit {
     if (!this.model.caseId) return;
     this.running = true;
     this.result = null;
+    this.loadError = null;
     this.api.runCase(this.model.caseId).subscribe({
       next: (r) => {
         this.result = r;
@@ -100,26 +106,39 @@ export class BusinessCaseRunnerComponent implements OnInit {
   runAll(): void {
     this.runningAll = true;
     this.allResults = [];
+    this.runFailures = [];
+    this.runAllSkipped = this.cases.filter((businessCase) => businessCase.requiredPolicy);
+    this.runAllCompleted = 0;
+    this.loadError = null;
     this.result = null;
-    const remaining = [...this.cases];
+    const remaining = this.cases.filter((businessCase) => !businessCase.requiredPolicy);
+    this.runAllTotal = remaining.length;
     const next = () => {
       const c = remaining.shift();
       if (!c) {
         this.runningAll = false;
+        this.currentRunAllCase = null;
         return;
       }
+      this.currentRunAllCase = c.id;
       this.api.runCase(c.id).subscribe({
         next: (r) => {
           this.allResults = [...this.allResults, r];
+          this.runAllCompleted += 1;
           next();
         },
         error: (err) => {
-          this.runningAll = false;
-          this.loadError = `Run failed on ${c.id}: ${err.message ?? err}`;
+          this.runFailures = [...this.runFailures, { id: c.id, title: c.title, message: String(err.message ?? err) }];
+          this.runAllCompleted += 1;
+          next();
         },
       });
     };
     next();
+  }
+
+  completedCount(prefix: 'import-' | 'export-' | 'overdrawn-'): number {
+    return this.allResults.filter((businessCase) => businessCase.id.startsWith(prefix)).length;
   }
 
   /** Cleanup also clears stale case traces after the database is empty. */

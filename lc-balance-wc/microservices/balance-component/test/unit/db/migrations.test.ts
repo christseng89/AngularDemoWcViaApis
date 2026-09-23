@@ -19,6 +19,52 @@ function bareDbWithBalanceMovementsTable(): DatabaseSync {
 }
 
 describe('runMigrations (src/db/migrations.ts)', () => {
+  test('self-heals a previously migrated mapping table that still has the legacy instrument CHECK', () => {
+    const db = new DatabaseSync(':memory:');
+    try {
+      db.exec(`
+        CREATE TABLE schema_migrations (id INTEGER PRIMARY KEY, applied_at TEXT NOT NULL);
+        CREATE TABLE balance_account_mappings (
+          mapping_key TEXT PRIMARY KEY,
+          instrument_type TEXT NOT NULL CHECK (instrument_type IN ('IPLC_LC','EPLC_CONFIRMATION')),
+          risk_class TEXT NOT NULL,
+          account_a_number TEXT NOT NULL,
+          account_a_description TEXT NOT NULL,
+          account_b_number TEXT NOT NULL,
+          account_b_description TEXT NOT NULL,
+          version INTEGER NOT NULL CHECK (version > 0),
+          updated_by TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          UNIQUE (instrument_type, risk_class)
+        );
+        INSERT INTO balance_account_mappings VALUES (
+          'IPLC_LC:SIGHT', 'IPLC_LC', 'SIGHT', 'A-100', 'A description',
+          'B-100', 'B description', 7, 'ops-user', '2026-09-04T00:00:00.000Z'
+        );
+      `);
+      const applied = db.prepare('INSERT INTO schema_migrations (id, applied_at) VALUES (?, ?)');
+      for (const migration of MIGRATIONS.filter((item) => item.id < 37)) applied.run(migration.id, '2026-09-04T00:00:00.000Z');
+
+      runMigrations(db);
+
+      expect(db.prepare('SELECT * FROM balance_account_mappings WHERE mapping_key = ?').get('IPLC_LC:SIGHT')).toMatchObject({
+        account_a_number: 'A-100',
+        account_b_number: 'B-100',
+        version: 7,
+        updated_by: 'ops-user',
+      });
+      expect(() => db.prepare(`INSERT INTO balance_account_mappings (
+        mapping_key, instrument_type, risk_class, account_a_number, account_a_description,
+        account_b_number, account_b_description, version, updated_by, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+        'EXPORT_EXCESS_ASSET:SIGHT', 'EXPORT_EXCESS_ASSET', 'SIGHT', 'A-200', 'A excess', 'B-200', 'B excess', 1, 'SYSTEM_SEED',
+        '2026-09-23T00:00:00.000Z',
+      )).not.toThrow();
+    } finally {
+      db.close();
+    }
+  });
+
   test('migration 26 preserves maintained mappings and permits a future configured SL value', () => {
     const db = bareDbWithBalanceMovementsTable();
     try {

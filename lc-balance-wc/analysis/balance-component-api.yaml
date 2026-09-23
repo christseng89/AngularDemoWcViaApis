@@ -17,6 +17,22 @@ info:
     the discrepancy inline.
 
 
+    v1.52.0 (2026-09-23, V4 approved Excess contract): A3, A3S and B3
+    Maker Submit and the applicable Acknowledge／Checker Release points expose typed Excess outcomes and require
+    `Idempotency-Key`. Production never derives BOOKING from BUY or SELL;
+    production accepts only a provider-supplied Approved and Effective BOOKING
+    rate that passes the configured Freshness policy. USD uses `USD_PAR`, while
+    midpoint derivation remains restricted to the non-production virtual FX
+    adapter and regression fixtures. A Maker FX or allowance failure is
+    zero-write: no movement, reservation, FX snapshot, decision snapshot or idempotent success
+    is created. Checker failure retains the pending movement, Pending Excess Reservation and committed linked facts
+    and denies Release. No `FX_RATE_PENDING` workflow state exists. Delete
+    Pending is a whole-transaction withdrawal; Fix Pending replaces the old
+    pending Excess reservation with the recalculated reservation atomically.
+    When either configuredMaximumUsd or allowancePercentage is zero, the
+    existing legacy sufficiency flow applies and Excess is not allowed.
+
+
     v1.51.0 (2026-09-04, Account Number configuration reload):
     `POST /balance-account-mappings/reload-configuration` atomically overwrites
     every configured Account Number mapping with the defaults in
@@ -1093,7 +1109,7 @@ info:
         callers no longer need client-side compensation for an approved multi-leg command.
       - DOCUMENTED business routing: Import A3/A3S continues to A4 for Sight or A6 for Seller's/Buyer's
         Usance; Export B3 continues to B4, whose HONOUR/ACCEPT compound shape is selected by Sight/Usance.
-  version: "1.51.0"
+  version: '1.51.0'
 x-client-retry-policy:
   configuration:
     maxRetries: BALANCE_HTTP_RETRY_COUNT
@@ -1124,7 +1140,6 @@ tags:
     description: Confirmed/Available balance and movement queries, including as-of historical queries.
 
 paths:
-
   /balance-contracts:
     get:
       tags: [BalanceContracts]
@@ -1449,6 +1464,40 @@ paths:
                 type: array
                 items: { $ref: '#/components/schemas/BalanceMovement' }
 
+  /balance-movements/excess-preview:
+    post:
+      tags: [BalanceMovements]
+      summary: Read-only A3/A3S/B3 Maker Excess preview
+      description: >
+        Calculates Previous, This, Total and effective Maximum Excess in the transaction/allowance-owner
+        currency using the same current facts, exact-decimal split, effective policy and BOOKING-rate
+        controls as Maker Submit. A3S accepts exactly the linked SG redemption and LC UTILIZE legs.
+        `excludeMovementId` removes one PENDING/REJECTED movement and its outstanding reservation for
+        Fix Pending preview. USD uses USD_PAR; non-USD requires an Approved, Effective and fresh provider
+        BOOKING rate. This operation never creates or changes contracts, movements, allowance accounts,
+        reservations, FX/decision snapshots, idempotency facts or audit facts.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ExcessPreviewRequest' }
+      responses:
+        '200':
+          description: Exact read-only Excess preview.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExcessPreviewResult' }
+        '400':
+          description: Unsupported function or malformed/inconsistent movement request.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: Non-USD BOOKING rate is unavailable or stale; no preview facts are persisted.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExcessCommandError' }
+
   /balance-movements:
     post:
       tags: [BalanceMovements]
@@ -1482,6 +1531,13 @@ paths:
         (no existing resolution, no `parentLogicalContractId`) the
         supplied value must match the resolved contract's or parent's own
         currency, rejecting a mismatch with `409 CURRENCY_MISMATCH`.
+
+        FROZEN V2 B4 exception: when HONOUR/ACCEPT references a Released,
+        unconsumed B3 with positive Approved Excess, `amount` remains the
+        B3-locked Legal amount while sufficiency and the persisted
+        `ceilingAmount` use only that B3-locked Covered amount. The request
+        is rejected if the reference owner, Legal amount or owner currency
+        does not match; callers cannot provide a bypass or alternate split.
 
 
         Idempotent on (balanceContractId, eventSeq) — Design doc §8:
@@ -1555,6 +1611,8 @@ paths:
         must be a same-Confirmation, RELEASED and unconsumed
         `EPLC_EXAMINATION`/`CREATE`, and cannot already be reserved by another
         pending B4 movement.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -1562,10 +1620,13 @@ paths:
             schema: { $ref: '#/components/schemas/BalanceMovementCreateRequest' }
       responses:
         '201':
-          description: New PENDING movement created (new eventSeq).
+          description: New PENDING movement created; Excess candidates return the typed Maker decision.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/BalanceMovement' }
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/BalanceMovement'
+                  - $ref: '#/components/schemas/MakerExcessAccepted'
         '200':
           description: Already exists — resubmission of the same (balanceContractId, eventSeq) returned unchanged.
           content:
@@ -1577,10 +1638,13 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
         '409':
-          description: Available Balance insufficient for this movementType (INSUFFICIENT_AVAILABLE_BALANCE), the natural key already resolves to an ACTIVE contract for a creating movementType (NATURAL_KEY_ALREADY_EXISTS), or the caller-supplied currency does not match the derived one (CURRENCY_MISMATCH). No record is created in any case.
+          description: Available Balance or Excess limit/FX/idempotency validation failed, the natural key already exists, or currency is inconsistent. Maker Excess failures are zero-write.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Error' }
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/Error'
+                  - $ref: '#/components/schemas/ExcessCommandError'
 
     get:
       tags: [BalanceMovements]
@@ -1628,7 +1692,7 @@ paths:
           schema: { type: string }
         - name: status
           in: query
-          description: "Shape (b) only. Comma-separated MovementStatus values, e.g. \"PENDING,REJECTED\". Defaults to PENDING,REJECTED when omitted."
+          description: 'Shape (b) only. Comma-separated MovementStatus values, e.g. "PENDING,REJECTED". Defaults to PENDING,REJECTED when omitted.'
           schema: { type: string }
         - name: page
           in: query
@@ -1686,6 +1750,8 @@ paths:
         and B4's Usance ACCEPT + Acceptance + Reimbursement Receivable legs. Import A6 itself creates one
         new Acceptance movement and therefore continues to use the single-movement create endpoint; its
         multi-record transition occurs at Checker approval.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -1708,7 +1774,10 @@ paths:
           description: A domain conflict such as insufficient balance, currency mismatch, or an existing natural key occurred in any leg. Nothing is committed.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Error' }
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/Error'
+                  - $ref: '#/components/schemas/ExcessCommandError'
 
   /balance-movements/compound-release:
     post:
@@ -1817,6 +1886,33 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
 
+  /balance-movements/{movementId}/excess-release-context:
+    get:
+      tags: [BalanceMovements]
+      summary: Resolve event-specific Excess context for A4/A6/B4 Checker review
+      description: >
+        Read-only, zero-write lookup. Resolves A4's selected A3/A3S movement, or A6's referenced
+        A3/A3S movement, to that source event's own active Pending Excess reservation. For B4 it
+        resolves the referenced B3 movement's own Approved Excess. It never uses the LC aggregate;
+        therefore a covered-only B01 returns zero even when another B02 on the same LC has positive
+        Excess.
+      parameters:
+        - name: movementId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Event-specific Excess context used to decide whether Applicant Waiver or Export Authorization UI applies.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExcessReleaseContext' }
+        '404':
+          description: Movement not found.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
   /balance-movements/{movementId}/release:
     post:
       tags: [BalanceMovements]
@@ -1907,6 +2003,7 @@ paths:
           in: path
           required: true
           schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -1916,12 +2013,29 @@ paths:
               required: [releasedBy]
               properties:
                 releasedBy: { type: string }
+                applicantWaiverValidationResult:
+                  type: string
+                  enum: [CONFIRMED, NOT_CONFIRMED]
+                  deprecated: true
+                  description: Legacy compatibility field. A4/A6 now use the common ABSENT Checker approval path and do not require or persist Applicant Waiver confirmation.
+                waiverReference: { type: string, minLength: 1 }
+                waiverDate: { type: string, format: date }
+                waiverEvidence:
+                  type: string
+                  minLength: 1
+                  description: Opaque evidence reference or hash; binary document content is not accepted.
+                exportAuthorization:
+                  $ref: '#/components/schemas/ExportAuthorizationClaim'
       responses:
         '200':
-          description: Movement released.
+          description: Movement released; an Excess candidate includes the latest Checker revaluation outcome.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/BalanceMovement' }
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/BalanceMovement'
+                  - $ref: '#/components/schemas/CheckerExcessAccepted'
+                  - $ref: '#/components/schemas/B4ExportAssetRelease'
         '404':
           description: Movement not found.
           content:
@@ -1940,10 +2054,14 @@ paths:
             (v1.16.0) for a `CLOSE` movement whose eligibility no longer holds
             or whose own frozen amount no longer matches the contract's
             current Confirmed Balance — see this endpoint's own description
-            above.
+            above. A4/A6 positive Import Excess uses the same ABSENT Checker
+            approval operation as B4; legacy Applicant Waiver fields are ignored.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Error' }
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/Error'
+                  - $ref: '#/components/schemas/ExcessCommandError'
 
   /balance-movements/{movementId}/maker-submit:
     post:
@@ -2072,6 +2190,7 @@ paths:
           in: path
           required: true
           schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -2097,7 +2216,10 @@ paths:
           description: Illegal state, Maker/Checker violation, duplicate reference or insufficient balance.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Error' }
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/Error'
+                  - $ref: '#/components/schemas/ExcessCommandError'
 
   /balance-movements/{movementId}/acknowledge:
     post:
@@ -2126,6 +2248,7 @@ paths:
           in: path
           required: true
           schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -2140,7 +2263,10 @@ paths:
           description: Movement acknowledged by Checker; status unchanged (still PENDING).
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/BalanceMovement' }
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/BalanceMovement'
+                  - $ref: '#/components/schemas/CheckerExcessAccepted'
         '400':
           description: Not an IPLC_LC UTILIZE movement.
           content:
@@ -2155,7 +2281,10 @@ paths:
           description: Movement is not PENDING, or was already acknowledged.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Error' }
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/Error'
+                  - $ref: '#/components/schemas/ExcessCommandError'
 
   /balance-movements/{movementId}/reject:
     post:
@@ -2180,7 +2309,11 @@ paths:
               type: object
               required: [releasedBy, reasonCode]
               properties:
-                releasedBy: { type: string, description: "The Checker performing the reject — field name kept as releasedBy for symmetry with /release's own body, not a copy/paste error." }
+                releasedBy:
+                  {
+                    type: string,
+                    description: "The Checker performing the reject — field name kept as releasedBy for symmetry with /release's own body, not a copy/paste error.",
+                  }
                 reasonCode: { type: string }
                 remarks: { type: string }
       responses:
@@ -2253,23 +2386,20 @@ paths:
         the single audit record of the whole two-record business event.
 
 
-        v1.41.0 (2026-08-31) — one call still cancels exactly one movement.
-        Transaction Processing may expose this operation immediately after
-        any registered Maker Submit. For A3S/B4, the client uses its
-        function strategy to cancel linked sibling movements first and the
-        primary movement last, producing one audit record per cancelled leg.
-        This ordered sequence is not an atomic batch operation: if a call
-        fails, the client must stop, preserve the screen and report the
-        actual error/state. A4 is the exception and uses
-        `/withdraw-maker-submit` instead, preserving its A3/A3S source.
-        A1/B1 versus Index-screen reset is client navigation only. Maker
-        Queue/Fix Pending remains a separate UI entry flow and does not alter
-        this endpoint contract.
+        v1.52.0 supersedes the earlier client-sequenced cancellation wording
+        for Excess transactions. Delete Pending is one whole-transaction
+        server operation. For pre-Ack A3S it cancels the linked LC and SG
+        legs and reverses Pending Excess and SG capacity reservations
+        atomically. No partial Return/Cancellation amount is accepted.
+        Post-Ack deletion preserves committed SG facts. A4 remains the
+        exception and uses `/withdraw-maker-submit`, preserving its A3/A3S
+        source.
       parameters:
         - name: movementId
           in: path
           required: true
           schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -2290,7 +2420,10 @@ paths:
           description: Movement is not in a cancellable state (already RELEASED/CANCELLED).
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/Error' }
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/Error'
+                  - $ref: '#/components/schemas/ExcessCommandError'
 
   /delete-pending-audit:
     get:
@@ -2342,7 +2475,7 @@ paths:
                   pageSize: { type: integer }
 
         '400':
-          description: "`status` and `statuses` were both supplied, or `statuses` contains an unsupported lifecycle value."
+          description: '`status` and `statuses` were both supplied, or `statuses` contains an unsupported lifecycle value.'
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -2488,7 +2621,259 @@ paths:
         '500': { description: Unexpected server failure. }
 
 components:
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: >
+        Required for Excess-capable A3, A3S and B3 Maker/Checker
+        commands. Reusing a key with a different request fingerprint returns
+        `409 IDEMPOTENCY_CONFLICT`; a successful retry returns the stored
+        business result without duplicating a movement or reservation.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
   schemas:
+    ExportAuthorizationClaim:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required: [claimStatus, authorizationValidationResult]
+          properties:
+            claimStatus: { type: string, enum: [ABSENT] }
+            authorizationValidationResult: { type: string, enum: [NOT_CONFIRMED] }
+        - type: object
+          additionalProperties: false
+          required: [claimStatus, authorizationValidationResult]
+          properties:
+            claimStatus: { type: string, enum: [SUBMITTED] }
+            authorizationReference: { type: string }
+            authorizedAmountOwner: { type: string, pattern: '^\\d+(?:\\.\\d+)?$' }
+            authorizedCurrency: { type: string, minLength: 1 }
+            authorizationValidationResult: { type: string, enum: [CONFIRMED, NOT_CONFIRMED] }
+      description: >
+        Optional B4 claim only; Balance performs no external authorization
+        lookup. A fully valid CONFIRMED claim covering the complete locked
+        Excess in owner currency attributes all Excess to ISSUING_BANK.
+        Otherwise all Excess is attributed to BENEFICIARY_OR_RECOURSE_PARTY;
+        partial debtor split is never produced.
+
+    ExportAuthorizationSnapshot:
+      type: object
+      required:
+        [
+          authorizationSnapshotId,
+          b4MovementId,
+          sourceB3MovementId,
+          claimStatus,
+          authorizationValidationResult,
+          checkerContext,
+          decisionTime,
+          confirmedAt,
+          excessDebtor,
+          createdAt,
+        ]
+      properties:
+        authorizationSnapshotId: { type: string, format: uuid }
+        b4MovementId: { type: string, format: uuid }
+        sourceB3MovementId: { type: string, format: uuid }
+        claimStatus: { type: string, enum: [ABSENT, SUBMITTED] }
+        authorizationReference: { type: string }
+        authorizedAmountOwner: { type: string }
+        authorizedCurrency: { type: string }
+        authorizationValidationResult: { type: string, enum: [CONFIRMED, NOT_CONFIRMED] }
+        checkerContext: { type: string }
+        decisionTime: { type: string, format: date-time }
+        confirmedAt: { type: string, format: date-time }
+        excessDebtor: { type: string, enum: [ISSUING_BANK, BENEFICIARY_OR_RECOURSE_PARTY] }
+        createdAt: { type: string, format: date-time }
+
+    ExportAssetPosting:
+      type: object
+      required:
+        [
+          postingId,
+          businessEventId,
+          b4MovementId,
+          sourceB3MovementId,
+          balanceType,
+          amountOwner,
+          ownerCurrency,
+          debtor,
+          mappingKey,
+          mappingVersion,
+          accountANumber,
+          accountBNumber,
+          authorizationSnapshotId,
+          createdAt,
+        ]
+      properties:
+        postingId: { type: string, format: uuid }
+        businessEventId: { type: string }
+        b4MovementId: { type: string, format: uuid }
+        sourceB3MovementId: { type: string, format: uuid }
+        balanceType: { type: string, enum: [Due from Issuing Bank, Reimbursement Receivable, EXPORT_EXCESS_ASSET] }
+        amountOwner: { type: string }
+        ownerCurrency: { type: string }
+        debtor: { type: string, enum: [ISSUING_BANK, BENEFICIARY_OR_RECOURSE_PARTY] }
+        mappingKey: { type: string }
+        mappingVersion: { type: integer, minimum: 1 }
+        accountANumber: { type: string }
+        accountBNumber: { type: string }
+        authorizationSnapshotId: { type: string, format: uuid }
+        createdAt: { type: string, format: date-time }
+
+    B4ExportAssetRelease:
+      type: object
+      additionalProperties: false
+      required: [movement, authorization, assets]
+      properties:
+        movement: { $ref: '#/components/schemas/BalanceMovement' }
+        authorization: { $ref: '#/components/schemas/ExportAuthorizationSnapshot' }
+        assets:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items: { $ref: '#/components/schemas/ExportAssetPosting' }
+
+    FxRateEvidence:
+      type: object
+      required: [rateOrigin, bookingRate, providerRateId, providerRateVersion, rateTimestamp]
+      properties:
+        rateOrigin: { type: string, description: Provider identity, USD_PAR, or explicitly non-production VIRTUAL_MIDPOINT. }
+        bookingRate: { type: string, pattern: '^\\d+(?:\\.\\d+)?$' }
+        providerRateId: { type: string }
+        providerRateVersion: { type: string }
+        rateTimestamp: { type: string, format: date-time }
+
+    MinimumRequiredIncreaseEvidence:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          transactionAmountOwner,
+          effectiveCapacityOwner,
+          proposedExcessOwner,
+          approvedContractualMaximumOwner,
+          allowancePercentage,
+          configuredMaximumOwner,
+          approvedUtilizedOwner,
+          otherPendingReservedOwner,
+          capacityGainPerIncrease,
+        ]
+      properties:
+        transactionAmountOwner: { type: string }
+        effectiveCapacityOwner: { type: string }
+        proposedExcessOwner: { type: string }
+        approvedContractualMaximumOwner: { type: string }
+        allowancePercentage: { type: string }
+        configuredMaximumOwner: { type: string }
+        approvedUtilizedOwner: { type: string }
+        otherPendingReservedOwner: { type: string }
+        capacityGainPerIncrease: { type: string }
+
+    MinimumRequiredIncrease:
+      type: object
+      additionalProperties: false
+      required: [outcome, snapshotTime, fxContribution, fxEvidence, evidence]
+      properties:
+        outcome:
+          type: string
+          enum: [FINITE, INCREASE_ALONE_CANNOT_RESOLVE]
+        minimumRequiredIncreaseOwner:
+          type: string
+          description: Present only for FINITE; guidance does not create or allocate an A2/B2 amendment.
+        snapshotTime: { type: string, format: date-time }
+        fxContribution: { type: boolean }
+        fxEvidence:
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/FxRateEvidence'
+        evidence: { $ref: '#/components/schemas/MinimumRequiredIncreaseEvidence' }
+
+    MakerExcessAccepted:
+      type: object
+      additionalProperties: false
+      required: [movementId, workflowStatus, coveredAmountOwner, excessAmountOwner, excessDecision, businessResultCode, releaseEligibility]
+      properties:
+        movementId: { type: string, format: uuid }
+        workflowStatus: { type: string, enum: [PENDING] }
+        coveredAmountOwner: { type: string }
+        excessAmountOwner: { type: string }
+        excessDecision: { type: string, enum: [WITHIN_ALLOWANCE] }
+        businessResultCode: { type: string, nullable: true, enum: [EXCESS_LIMIT_EXCEEDED] }
+        releaseEligibility: { type: string, enum: [ELIGIBLE] }
+
+    ExcessPreviewRequest:
+      type: object
+      additionalProperties: false
+      required: [functionCode]
+      properties:
+        functionCode: { type: string, enum: [A3, A3S, B3] }
+        request:
+          type: object
+          description: A3 IPLC_LC UTILIZE or B3 EPLC_EXAMINATION CREATE movement request; mutually exclusive with requests.
+          additionalProperties: true
+        requests:
+          type: array
+          description: A3S only; exactly one linked SHGT redemption and one IPLC_LC UTILIZE request.
+          minItems: 2
+          maxItems: 2
+          items: { type: object, additionalProperties: true }
+        excludeMovementId:
+          type: string
+          description: Optional PENDING/REJECTED movement omitted from capacity and outstanding allowance for Fix Pending preview.
+
+    ExcessPreviewResult:
+      type: object
+      additionalProperties: false
+      required:
+        [previousExcessAmountTransaction, thisExcessAmountTransaction, totalExcessAmountTransaction, maxExcessAmountTransaction, eligible, businessResultCode]
+      properties:
+        previousExcessAmountTransaction: { $ref: '#/components/schemas/MonetaryAmount' }
+        thisExcessAmountTransaction: { $ref: '#/components/schemas/MonetaryAmount' }
+        totalExcessAmountTransaction: { $ref: '#/components/schemas/MonetaryAmount' }
+        maxExcessAmountTransaction: { $ref: '#/components/schemas/MonetaryAmount' }
+        eligible: { type: boolean }
+        businessResultCode:
+          type: string
+          nullable: true
+          enum: [EXCESS_LIMIT_EXCEEDED, INSUFFICIENT_AVAILABLE_BALANCE]
+
+    ExcessReleaseContext:
+      type: object
+      additionalProperties: false
+      required: [sourceMovementId, thisExcessAmountOwner, ownerCurrency, requiresApplicantWaiver, requiresExportAuthorization]
+      properties:
+        sourceMovementId: { type: string, format: uuid, nullable: true }
+        thisExcessAmountOwner: { type: string, description: Selected source event's own active Excess; zero for a covered-only event. }
+        ownerCurrency: { type: string, pattern: '^[A-Z]{3}$' }
+        requiresApplicantWaiver: { type: boolean, deprecated: true, description: Compatibility field; always false because A4/A6 use the common ABSENT Checker approval path. }
+        requiresExportAuthorization: { type: boolean, description: True only for a B4 movement referencing a B3 event with positive Approved Excess. }
+
+    CheckerExcessAccepted:
+      type: object
+      description: Typed Checker outcome after fresh revaluation; Release remains denied unless eligible.
+      required: [movement, excessDecision, businessResultCode, releaseEligibility]
+      properties:
+        movement: { $ref: '#/components/schemas/BalanceMovement' }
+        excessDecision: { type: string, enum: [NOT_REQUIRED, WITHIN_ALLOWANCE] }
+        businessResultCode: { type: string, nullable: true, enum: [EXCESS_LIMIT_EXCEEDED] }
+        releaseEligibility: { type: string, enum: [ELIGIBLE] }
+        fxSnapshot: { $ref: '#/components/schemas/FxRateEvidence' }
+
+    ExcessCommandError:
+      type: object
+      additionalProperties: false
+      required: [code]
+      properties:
+        code:
+          type: string
+          enum: [EXCESS_LIMIT_EXCEEDED, FX_RATE_UNAVAILABLE, FX_RATE_STALE, IDEMPOTENCY_CONFLICT, ILLEGAL_STATE_TRANSITION, INSUFFICIENT_AVAILABLE_BALANCE]
+        message: { type: string }
+        guidance: { $ref: '#/components/schemas/MinimumRequiredIncrease' }
 
     BalanceAccountIdentity:
       type: object
@@ -2505,7 +2890,23 @@ components:
         The maintenance UI may render these existing fields as two GL sections
         containing Tenor SL rows and compose their displayed GL + SL values into
         this identity before saving; no separate GL or SL persistence fields exist.
-      required: [mappingKey, instrumentType, riskClass, categoryKey, categoryLabel, familyKey, familyLabel, tenorKey, tenorLabel, accountA, accountB, version, updatedBy, updatedAt]
+      required:
+        [
+          mappingKey,
+          instrumentType,
+          riskClass,
+          categoryKey,
+          categoryLabel,
+          familyKey,
+          familyLabel,
+          tenorKey,
+          tenorLabel,
+          accountA,
+          accountB,
+          version,
+          updatedBy,
+          updatedAt,
+        ]
       properties:
         mappingKey: { type: string, example: IPLC_LC:SIGHT }
         instrumentType: { type: string, description: Configured business/instrument type. Existing transaction types continue to use InstrumentType. }
@@ -2624,7 +3025,19 @@ components:
         settles paired with `EPLC_ACCEPTANCE`'s own FULL_SETTLE/PARTIAL_SETTLE;
         `EPLC_EXPORT_BILLS_DISCOUNTED` is a reclass target only, no consuming
         endpoint yet.
-      enum: [IPLC_LC, EPLC_LC, IPLC_ACCEPTANCE, EPLC_ACCEPTANCE, SHGT, EPLC_CONFIRMATION, EPLC_EXAMINATION, EPLC_DUE_FROM_ISSUING_BANK, EPLC_ACCEPTANCE_REIMB_RECEIVABLE, EPLC_EXPORT_BILLS_DISCOUNTED]
+      enum:
+        [
+          IPLC_LC,
+          EPLC_LC,
+          IPLC_ACCEPTANCE,
+          EPLC_ACCEPTANCE,
+          SHGT,
+          EPLC_CONFIRMATION,
+          EPLC_EXAMINATION,
+          EPLC_DUE_FROM_ISSUING_BANK,
+          EPLC_ACCEPTANCE_REIMB_RECEIVABLE,
+          EPLC_EXPORT_BILLS_DISCOUNTED,
+        ]
 
     ContractStatus:
       type: string
@@ -2712,17 +3125,21 @@ components:
         separators. UI display layers format the same value with separators
         and exactly the currency's minor-unit digits (for example USD
         `71,000.00`, JPY `71,000`, and KWD `71,000.000`).
-      example: "300000.00"
+      example: '300000.00'
 
     NaturalKey:
       type: object
       description: Design doc §3.1 natural-key table. Which fields are required depends on instrumentType — see the per-endpoint parameter descriptions.
       required: [lcNumber]
       properties:
-        lcNumber: { type: string, description: "C_MAIN_REF of the underlying LC." }
-        ibNumber: { type: string, description: "Required for IPLC_ACCEPTANCE/EPLC_ACCEPTANCE/EPLC_EXAMINATION/EPLC_DUE_FROM_ISSUING_BANK/EPLC_ACCEPTANCE_REIMB_RECEIVABLE/EPLC_EXPORT_BILLS_DISCOUNTED — the presentation/bill reference." }
-        sgNumber: { type: string, description: "Required for SHGT." }
-        legSeq: { type: string, description: "v1.16.0 — Mixed Tenor LC leg discriminator (Design doc §7.1). Not required by any currently-implemented flow." }
+        lcNumber: { type: string, description: 'C_MAIN_REF of the underlying LC.' }
+        ibNumber:
+          {
+            type: string,
+            description: 'Required for IPLC_ACCEPTANCE/EPLC_ACCEPTANCE/EPLC_EXAMINATION/EPLC_DUE_FROM_ISSUING_BANK/EPLC_ACCEPTANCE_REIMB_RECEIVABLE/EPLC_EXPORT_BILLS_DISCOUNTED — the presentation/bill reference.',
+          }
+        sgNumber: { type: string, description: 'Required for SHGT.' }
+        legSeq: { type: string, description: 'v1.16.0 — Mixed Tenor LC leg discriminator (Design doc §7.1). Not required by any currently-implemented flow.' }
 
     AccountEntry:
       type: object
@@ -2846,7 +3263,11 @@ components:
         balanceContractId: { type: string, format: uuid }
         eventSeq: { type: integer }
         businessEventId: { type: string, nullable: true, description: Caller-defined correlation identifier; the service does not require UUID syntax. }
-        movementType: { type: string, description: "Legal values depend on instrumentType (Design doc §5) — this service does not itself enforce a per-instrumentType allowlist server-side; that legality mapping is owned by the caller (see the companion Web/Mobile Channel API, which derives instrumentType+movementType from a named business function rather than accepting either as free caller input). The server does group every accepted movementType into one of a small number of behavioral buckets for its own balance-direction/sufficiency math — see Design doc §5's direction table." }
+        movementType:
+          {
+            type: string,
+            description: "Legal values depend on instrumentType (Design doc §5) — this service does not itself enforce a per-instrumentType allowlist server-side; that legality mapping is owned by the caller (see the companion Web/Mobile Channel API, which derives instrumentType+movementType from a named business function rather than accepting either as free caller input). The server does group every accepted movementType into one of a small number of behavioral buckets for its own balance-direction/sufficiency math — see Design doc §5's direction table.",
+          }
         exposureNature: { $ref: '#/components/schemas/ExposureNature' }
         amount:
           allOf: [{ $ref: '#/components/schemas/MonetaryAmount' }]
@@ -2899,7 +3320,12 @@ components:
         currency:
           type: string
           description: Always equal to the resolved contract's own currency at the time this movement was created (validated, not derived — see CURRENCY CONSISTENCY).
-        legRef: { type: string, nullable: true, description: "Mixed Tenor LC leg's logicalContractId — Design doc §7.1. Reserved for future leg-level LC support; not currently populated by any implemented flow." }
+        legRef:
+          {
+            type: string,
+            nullable: true,
+            description: "Mixed Tenor LC leg's logicalContractId — Design doc §7.1. Reserved for future leg-level LC support; not currently populated by any implemented flow.",
+          }
         accountEntries:
           type: array
           nullable: true
@@ -2979,7 +3405,12 @@ components:
         valueDate: { type: string, format: date, nullable: true }
         sourceModule: { type: string, nullable: true }
         sourceFunction: { type: string, nullable: true }
-        sourceTransactionRef: { type: string, nullable: true, description: "Unique per balanceContractId (server-enforced, 400 on reuse against the same contract with a new eventSeq)." }
+        sourceTransactionRef:
+          {
+            type: string,
+            nullable: true,
+            description: 'Unique per balanceContractId (server-enforced, 400 on reuse against the same contract with a new eventSeq).',
+          }
         referencedTransactionId:
           type: string
           format: uuid
@@ -3020,7 +3451,7 @@ components:
             out from releasedBy (which cancel() used to reuse, disambiguated only by status ===
             'CANCELLED'). Null unless status === 'CANCELLED'. /reject still reuses releasedBy/releasedAt
             for a REJECTED movement — no dedicated rejectedBy/rejectedAt pair exists.
-        cancelledAt: { type: string, format: date-time, nullable: true, description: "Paired with cancelledBy above." }
+        cancelledAt: { type: string, format: date-time, nullable: true, description: 'Paired with cancelledBy above.' }
         acknowledgedBy:
           type: string
           nullable: true
@@ -3047,7 +3478,12 @@ components:
             BalanceSnapshot.presentDocsEarmarkApproved: a presentation with status RELEASED and this
             field still null continues to occupy Present Docs Earmark capacity; it drops out only once
             this is set. Null for movements predating this field.
-        presentDocsConsumedBy: { type: string, nullable: true, description: "Audit metadata only, paired with presentDocsConsumedAt above — the checkerId who released the consuming HONOUR/ACCEPT." }
+        presentDocsConsumedBy:
+          {
+            type: string,
+            nullable: true,
+            description: 'Audit metadata only, paired with presentDocsConsumedAt above — the checkerId who released the consuming HONOUR/ACCEPT.',
+          }
         makerSubmittedBy:
           type: string
           nullable: true
@@ -3162,7 +3598,15 @@ components:
             existing amount rules.
         editedBy: { type: string, minLength: 1 }
         editMode: { type: string, enum: [STANDARD, REMARKS_ONLY], default: STANDARD }
-        remarks: { type: string, minLength: 1, maxLength: 500, pattern: '.*\S.*', nullable: true, description: "Required and non-blank when editMode is REMARKS_ONLY; optional otherwise." }
+        remarks:
+          {
+            type: string,
+            minLength: 1,
+            maxLength: 500,
+            pattern: '.*\S.*',
+            nullable: true,
+            description: 'Required and non-blank when editMode is REMARKS_ONLY; optional otherwise.',
+          }
         legRef: { type: string, nullable: true }
         accountEntries:
           type: array
@@ -3181,9 +3625,16 @@ components:
         amendmentApproved: { type: boolean, nullable: true }
         amendmentEffective: { type: string, nullable: true }
         consentStatus: { type: string, enum: [NOT_REQUIRED, OBTAINED], nullable: true }
-        tolerancePct: { type: string, pattern: '^\d+$', nullable: true, description: "A1/B1 ISSUE Fix Pending only. Non-negative whole-number opening Tolerance; rejected for Amendment and unrelated movement types." }
-        toleranceChangePct: { type: string, pattern: '^\d+$', nullable: true, description: "A2/B2 Amendment Fix Pending only. Non-negative whole-number change magnitude." }
-        toleranceChangeDirection: { type: string, enum: [INCREASE, DECREASE], nullable: true, description: "Required when toleranceChangePct is supplied." }
+        tolerancePct:
+          {
+            type: string,
+            pattern: '^\d+$',
+            nullable: true,
+            description: 'A1/B1 ISSUE Fix Pending only. Non-negative whole-number opening Tolerance; rejected for Amendment and unrelated movement types.',
+          }
+        toleranceChangePct:
+          { type: string, pattern: '^\d+$', nullable: true, description: 'A2/B2 Amendment Fix Pending only. Non-negative whole-number change magnitude.' }
+        toleranceChangeDirection: { type: string, enum: [INCREASE, DECREASE], nullable: true, description: 'Required when toleranceChangePct is supplied.' }
         tenorType: { $ref: '#/components/schemas/TenorType' }
         tenorDays: { type: integer, nullable: true }
         expiryDate: { type: string, format: date, nullable: true }
@@ -3260,29 +3711,78 @@ components:
           enum: [INCREASE, DECREASE]
           nullable: true
           description: Required whenever toleranceChangePct is supplied; rejected on non-Amendment requests.
-        tenorType: { allOf: [{ $ref: '#/components/schemas/TenorType' }], nullable: true, description: IPLC_LC/EPLC_CONFIRMATION ISSUE, or IPLC_ACCEPTANCE/EPLC_ACCEPTANCE CREATE (checked for consistency against the parent's own tenorType — 400 on mismatch, and 400 if the parent is Sight). }
+        tenorType:
+          {
+            allOf: [{ $ref: '#/components/schemas/TenorType' }],
+            nullable: true,
+            description: IPLC_LC/EPLC_CONFIRMATION ISSUE,
+            or IPLC_ACCEPTANCE/EPLC_ACCEPTANCE CREATE (checked for consistency against the parent's own tenorType — 400 on mismatch,
+            and 400 if the parent is Sight).,
+          }
         tenorDays: { type: integer, nullable: true }
         maturityDate: { type: string, format: date, nullable: true }
-        expiryDate: { type: string, format: date, nullable: true, description: "v1.19.0, F1 — IPLC_LC/EPLC_LC/EPLC_CONFIRMATION ISSUE only. v1.25.0: REQUIRED (400 if absent) for ISSUE against those three instrumentTypes — a contract issued with none could never be picked up by the AUTO EXPIRY sweep. See BalanceContract.expiryDate's own description." }
-        mailFloatGraceDays: { type: integer, nullable: true, description: "v1.19.0, F1 — optional override of the per-side config default (captured onto the contract at ISSUE, fixed thereafter); omit to use the config default." }
-        newExpiryDate: { type: string, format: date, nullable: true, description: "v1.19.0, F1 — movementType 'AMEND_EXPIRY_DATE' only. See BalanceMovement.newExpiryDate's own description." }
+        expiryDate:
+          {
+            type: string,
+            format: date,
+            nullable: true,
+            description: "v1.19.0, F1 — IPLC_LC/EPLC_LC/EPLC_CONFIRMATION ISSUE only. v1.25.0: REQUIRED (400 if absent) for ISSUE against those three instrumentTypes — a contract issued with none could never be picked up by the AUTO EXPIRY sweep. See BalanceContract.expiryDate's own description.",
+          }
+        mailFloatGraceDays:
+          {
+            type: integer,
+            nullable: true,
+            description: 'v1.19.0, F1 — optional override of the per-side config default (captured onto the contract at ISSUE, fixed thereafter); omit to use the config default.',
+          }
+        newExpiryDate:
+          {
+            type: string,
+            format: date,
+            nullable: true,
+            description: "v1.19.0, F1 — movementType 'AMEND_EXPIRY_DATE' only. See BalanceMovement.newExpiryDate's own description.",
+          }
         legRef: { type: string, nullable: true }
         accountEntries:
           type: array
           nullable: true
           items: { $ref: '#/components/schemas/AccountEntry' }
-        businessEventId: { type: string, nullable: true, description: Correlates sibling movements from the same named business function; UUID syntax is not required. Required and identical across every request in POST /balance-movements/compound, where it identifies the legs governed by one atomic transaction boundary; optional correlation metadata on the single-movement endpoint. }
-        reasonCode: { type: string, nullable: true, description: "v1.24.0 — REQUIRED (400 if absent) for movementType 'CLOSE'/'REOPEN'; optional/passthrough otherwise. See BalanceMovement.reasonCode's own description." }
-        amendmentApproved: { type: boolean, nullable: true, description: "v1.24.0, F1 proposal §13.1 item 2. See BalanceMovement.amendmentApproved's own description." }
-        amendmentEffective: { type: string, nullable: true, description: "v1.24.0, F1 proposal §13.1 item 2. See BalanceMovement.amendmentEffective's own description." }
-        consentStatus: { type: string, nullable: true, enum: [NOT_REQUIRED, OBTAINED], description: "v1.24.0, F1 proposal §13.1 item 2. See BalanceMovement.consentStatus's own description." }
+        businessEventId:
+          {
+            type: string,
+            nullable: true,
+            description: Correlates sibling movements from the same named business function; UUID syntax is not required. Required and identical across every request in POST /balance-movements/compound,
+            where it identifies the legs governed by one atomic transaction boundary; optional correlation metadata on the single-movement endpoint.,
+          }
+        reasonCode:
+          {
+            type: string,
+            nullable: true,
+            description: "v1.24.0 — REQUIRED (400 if absent) for movementType 'CLOSE'/'REOPEN'; optional/passthrough otherwise. See BalanceMovement.reasonCode's own description.",
+          }
+        amendmentApproved:
+          { type: boolean, nullable: true, description: "v1.24.0, F1 proposal §13.1 item 2. See BalanceMovement.amendmentApproved's own description." }
+        amendmentEffective:
+          { type: string, nullable: true, description: "v1.24.0, F1 proposal §13.1 item 2. See BalanceMovement.amendmentEffective's own description." }
+        consentStatus:
+          {
+            type: string,
+            nullable: true,
+            enum: [NOT_REQUIRED, OBTAINED],
+            description: "v1.24.0, F1 proposal §13.1 item 2. See BalanceMovement.consentStatus's own description.",
+          }
         transactionDate: { type: string, format: date, nullable: true }
         businessDate: { type: string, format: date, nullable: true }
         valueDate: { type: string, format: date, nullable: true }
         sourceModule: { type: string, nullable: true }
         sourceFunction: { type: string, nullable: true }
         sourceTransactionRef: { type: string, nullable: true, description: Must be unique per resolved balanceContractId (400 on reuse). }
-        referencedTransactionId: { type: string, format: uuid, nullable: true, description: "v1.3.0 — A6/B4 only: the movementId of the pre-existing source Document Arrival/Present Docs record this movement converts/finalizes. See BalanceMovement.referencedTransactionId's own description for the full rule." }
+        referencedTransactionId:
+          {
+            type: string,
+            format: uuid,
+            nullable: true,
+            description: "v1.3.0 — A6/B4 only: the movementId of the pre-existing source Document Arrival/Present Docs record this movement converts/finalizes. See BalanceMovement.referencedTransactionId's own description for the full rule.",
+          }
         createdBy: { type: string }
 
     CompoundMovementCreateRequest:
@@ -3331,12 +3831,17 @@ components:
 
     BalanceMovementCancelRequest:
       type: object
+      additionalProperties: false
       description: >
         Body for POST /balance-movements/{movementId}/cancel (v1.0.0 — real
         shape, correcting an earlier draft's DELETE+query-param description).
-        The endpoint acts on one movement only; linked-leg ordering is a
-        caller responsibility and is not atomic. Do not use this body for A4
-        Maker Submit withdrawal, which has its own endpoint and request body.
+        Delete Pending withdraws the complete transaction; it never accepts
+        an amount or performs a partial Return/Cancellation. For an Excess
+        transaction the server atomically releases its Pending Excess
+        Reservation. A pre-Ack A3S also cancels its linked LC/SG legs and
+        reverses pending SG capacity, while post-Ack committed SG facts are
+        retained. Do not use this body for A4 Maker Submit withdrawal, which
+        has its own endpoint and request body.
       required: [cancelledBy]
       properties:
         cancelledBy: { type: string, minLength: 1 }
@@ -3491,7 +3996,13 @@ components:
             Available Balance (confirmedBalance-based since v1.13.0 — see tightAvailableBalance's own
             description), not plain availableBalance.
             Null for every other instrumentType.
-        asOf: { type: string, format: date, nullable: true, description: Echoes the request's asOf parameter (GET .../balance only); null means this is the live balance or a balance-as-of-movement query. }
+        asOf:
+          {
+            type: string,
+            format: date,
+            nullable: true,
+            description: Echoes the request's asOf parameter (GET .../balance only); null means this is the live balance or a balance-as-of-movement query.,
+          }
 
     Error:
       type: object

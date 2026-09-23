@@ -1,8 +1,8 @@
 <!-- View Voucher pop-up. The parent controls whether this exists at all (`*ngIf="accountEntryDialogMovement"`
      on the `<app-account-entries-dialog>` tag) — `movement` is never actually null while alive, but every
      binding below still guards on it (`movement as m`) to stay type-safe against the nullable @Input(). -->
-<div class="tb-dialog-overlay" *ngIf="movement as m" (click)="closed.emit()">
-  <div class="tb-dialog" role="dialog" aria-modal="true" aria-label="View Voucher" (click)="$event.stopPropagation()">
+<div class="tb-dialog-overlay" *ngIf="movement as m" (click)="closed.emit()" (keydown.escape)="closed.emit()" tabindex="-1">
+  <dialog open class="tb-dialog" aria-label="View Voucher" (click)="$event.stopPropagation()" (keydown)="$event.stopPropagation()">
     <div class="tb-dialog__header">
       <h3 class="tb-dialog__title">View Voucher</h3>
       <button type="button" class="tb-dialog__close" (click)="closed.emit()" aria-label="Close">×</button>
@@ -121,5 +121,5 @@
 
     <p class="tb-hint mt-2" *ngIf="m.contingentAccountEntry">Historical entries recorded with this event — never recalculated from the current balance.</p>
     <button type="button" class="tb-btn tb-btn--outline mt-2" (click)="closed.emit()">Close</button>
-  </div>
+  </dialog>
 </div>

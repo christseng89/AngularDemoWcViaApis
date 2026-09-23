@@ -1,7 +1,21 @@
-<div class="tb-result" *ngIf="result || error" role="status" aria-live="polite" aria-atomic="true">
+<div
+  class="tb-result"
+  *ngIf="result || error"
+  [attr.role]="error ? null : 'status'"
+  [attr.aria-live]="error ? null : 'polite'"
+  [attr.aria-atomic]="error ? null : 'true'"
+>
   <h3 class="tb-result__title">Maker Result</h3>
   <app-feedback-message *ngIf="errorFeedback as feedback" [message]="feedback"></app-feedback-message>
-  <p class="tb-result__status" *ngIf="result?.status"><strong>Status:</strong> {{ statusLabel }}</p>
+  <p class="tb-result__status" *ngIf="result?.status || result?.workflowStatus"><strong>Status:</strong> {{ statusLabel }}</p>
+  <dl
+    class="tb-result__excess"
+    *ngIf="showExcessDetails && result?.coveredAmountOwner !== null && result?.coveredAmountOwner !== undefined && result?.excessAmountOwner !== null && result?.excessAmountOwner !== undefined"
+  >
+    <div><dt>Covered Amount</dt><dd>{{ result!.coveredAmountOwner | number: '1.2-2' }}</dd></div>
+    <div><dt>Excess Amount</dt><dd>{{ result!.excessAmountOwner | number: '1.2-2' }}</dd></div>
+    <div><dt>Excess Decision</dt><dd>{{ result!.excessDecision }}</dd></div>
+  </dl>
 
   <button
     type="button"
@@ -20,17 +34,12 @@
     Account Entries — Acceptance
   </button>
 
-  <p class="tb-hint" *ngIf="result?.status === 'PENDING'">
+  <p class="tb-hint" *ngIf="result?.status === 'PENDING' || result?.workflowStatus === 'PENDING'">
     Go to the Checker section below to Release or Reject this — or any other still-PENDING item on this same contract.
   </p>
 
   <div class="tb-maker-result-actions tb-maker-result-actions--emphasized mt-2" *ngIf="!deletePendingReviewMode">
-    <button
-      type="button"
-      class="tb-btn tb-btn--outline"
-      *ngIf="result?.contingentAccountEntry"
-      (click)="openEntries(result!, instrumentType, resultPhase)"
-    >
+    <button type="button" class="tb-btn tb-btn--outline" *ngIf="result?.contingentAccountEntry" (click)="openEntries(result!, instrumentType, resultPhase)">
       Account Entries
     </button>
     <button

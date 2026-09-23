@@ -1,0 +1,30 @@
+[
+  {
+    "policyVersion": "v11.15-bd16-demo-2pct",
+    "ownerType": "IMPORT_LC",
+    "allowancePercentage": "2",
+    "configuredMaximumUsd": "150000",
+    "fxMaxStalenessSeconds": 300,
+    "currencyPrecisions": { "USD": 2, "EUR": 2, "JPY": 0, "TWD": 0 },
+    "rateScale": 6,
+    "roundingMode": "ROUND_HALF_UP",
+    "effectiveFrom": "2026-09-22T00:00:00.000Z",
+    "effectiveTo": null,
+    "fallbackPolicy": "FAIL_CLOSED",
+    "pbdFallbackPolicy": { "authorized": false, "fallbackPolicyId": null, "fallbackPolicyVersion": null, "effectiveFrom": null, "effectiveTo": null }
+  },
+  {
+    "policyVersion": "v11.15-nonprod-2026-09-22",
+    "ownerType": "EXPORT_CONFIRMATION",
+    "allowancePercentage": "10",
+    "configuredMaximumUsd": "100000",
+    "fxMaxStalenessSeconds": 300,
+    "currencyPrecisions": { "USD": 2, "EUR": 2, "JPY": 0, "TWD": 0 },
+    "rateScale": 6,
+    "roundingMode": "ROUND_HALF_UP",
+    "effectiveFrom": "2026-09-22T00:00:00.000Z",
+    "effectiveTo": null,
+    "fallbackPolicy": "FAIL_CLOSED",
+    "pbdFallbackPolicy": { "authorized": false, "fallbackPolicyId": null, "fallbackPolicyVersion": null, "effectiveFrom": null, "effectiveTo": null }
+  }
+]

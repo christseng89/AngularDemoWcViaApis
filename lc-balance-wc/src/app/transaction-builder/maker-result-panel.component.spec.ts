@@ -54,8 +54,9 @@ describe('MakerResultPanelComponent', () => {
     fixture.componentInstance.deletePending.subscribe(requested);
     fixture.detectChanges();
 
-    const button = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('button'))
-      .find((candidate) => candidate.textContent?.trim() === 'Delete Pending');
+    const button = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('button')).find(
+      (candidate) => candidate.textContent?.trim() === 'Delete Pending',
+    );
     expect(button).toBeDefined();
     button?.click();
     expect(requested).toHaveBeenCalledTimes(1);
@@ -91,6 +92,7 @@ describe('MakerResultPanelComponent', () => {
     const element = fixture.nativeElement as HTMLElement;
     expect(element.querySelector('[role="alert"]')?.textContent).toContain('Check transaction details');
     expect(element.querySelector('[role="alert"]')?.textContent).toContain('Submission failed');
+    expect(element.querySelector('[role="status"]')).toBeNull();
     expect(element.textContent).not.toContain('BAL-UI-UNEXPECTED');
     expect(element.querySelector('button')).toBeNull();
     expect(fixture.componentInstance.statusLabel).toBe('');
@@ -118,6 +120,90 @@ describe('MakerResultPanelComponent', () => {
     expect(text).toContain('Balance service temporarily unavailable');
     expect(text).toContain('BAL-SVC-HTTP-500');
     expect(text).not.toContain('BAL-UI-UNEXPECTED');
+  });
+
+  it('renders an Excess over-limit Submit as zero-write with no pending result actions', () => {
+    const fixture = TestBed.createComponent(MakerResultPanelComponent);
+    fixture.componentRef.setInput('error', 'EXCESS_LIMIT_EXCEEDED');
+    fixture.componentRef.setInput('errorCause', { status: 409, error: { code: 'EXCESS_LIMIT_EXCEEDED' } });
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('Excess limit exceeded');
+    expect(text).toContain('No pending transaction or Excess reservation was created.');
+    expect(text).not.toContain('Transaction already processed');
+    expect((fixture.nativeElement as HTMLElement).querySelector('button')).toBeNull();
+  });
+
+  it('renders a successful Excess Maker response with Covered and Excess amounts', () => {
+    const fixture = TestBed.createComponent(MakerResultPanelComponent);
+    fixture.componentRef.setInput('showExcessDetails', true);
+    fixture.componentRef.setInput('result', {
+      movementId: 'movement-excess-1',
+      workflowStatus: 'PENDING',
+      coveredAmountOwner: '10000.00',
+      excessAmountOwner: '200.00',
+      excessDecision: 'WITHIN_ALLOWANCE',
+      businessResultCode: null,
+      releaseEligibility: 'ELIGIBLE',
+    });
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('PENDING');
+    expect(text).toContain('Covered Amount');
+    expect(text).toContain('10,000.00');
+    expect(text).toContain('Excess Amount');
+    expect(text).toContain('200.00');
+    expect(text).not.toContain('FX_RATE_PENDING');
+  });
+
+  it('hides Covered/Excess/Decision when the transaction has no Previous or This Exceed', () => {
+    const fixture = TestBed.createComponent(MakerResultPanelComponent);
+    fixture.componentRef.setInput('showExcessDetails', false);
+    fixture.componentRef.setInput('result', {
+      movementId: 'movement-covered-only',
+      workflowStatus: 'PENDING',
+      coveredAmountOwner: '500.00',
+      excessAmountOwner: '0.00',
+      excessDecision: 'WITHIN_ALLOWANCE',
+      businessResultCode: null,
+      releaseEligibility: 'ELIGIBLE',
+    });
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('PENDING');
+    expect(text).not.toContain('Covered Amount');
+    expect(text).not.toContain('Excess Amount');
+    expect(text).not.toContain('Excess Decision');
+  });
+
+  it('renders a failed Excess Fix as retention of the original pending facts', () => {
+    const fixture = TestBed.createComponent(MakerResultPanelComponent);
+    fixture.componentRef.setInput('fixPendingMode', true);
+    fixture.componentRef.setInput('error', 'FX_RATE_STALE');
+    fixture.componentRef.setInput('errorCause', { status: 409, error: { code: 'FX_RATE_STALE' } });
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('Booking rate is stale');
+    expect(text).toContain('original pending transaction and Excess reservation were retained unchanged.');
+    expect(text).not.toContain('FX_RATE_PENDING');
+  });
+
+  it('renders an over-limit Excess Fix as retention of the original pending facts', () => {
+    const fixture = TestBed.createComponent(MakerResultPanelComponent);
+    fixture.componentRef.setInput('fixPendingMode', true);
+    fixture.componentRef.setInput('error', 'EXCESS_LIMIT_EXCEEDED');
+    fixture.componentRef.setInput('errorCause', { status: 409, error: { code: 'EXCESS_LIMIT_EXCEEDED' } });
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('Excess limit exceeded');
+    expect(text).toContain('original pending transaction and Excess reservation were retained unchanged.');
+    expect(text).not.toContain('No pending transaction or Excess reservation was created.');
+    expect(text).not.toContain('FX_RATE_PENDING');
   });
 
   it('emits the standalone compound-leg fallback when the primary result has no account entry', () => {

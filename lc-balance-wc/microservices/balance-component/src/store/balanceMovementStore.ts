@@ -19,6 +19,11 @@ function serializeNullableSnapshot(snapshot: BalanceSnapshot | null): string | n
   return snapshot === null ? null : JSON.stringify(snapshot);
 }
 
+function toSqliteBoolean(value: boolean | null | undefined): number | null {
+  if (value === null || value === undefined) return null;
+  return value ? 1 : 0;
+}
+
 interface MovementRow {
   movement_id: string;
   balance_contract_id: string;
@@ -214,7 +219,7 @@ export class BalanceMovementStore {
           rootEventSnapshot: movement.rootEventSnapshot ? JSON.stringify(movement.rootEventSnapshot) : null,
           acceptanceEventSnapshot: movement.acceptanceEventSnapshot ? JSON.stringify(movement.acceptanceEventSnapshot) : null,
           sgEventSnapshot: movement.sgEventSnapshot ? JSON.stringify(movement.sgEventSnapshot) : null,
-          amendmentApproved: movement.amendmentApproved === null || movement.amendmentApproved === undefined ? null : movement.amendmentApproved ? 1 : 0,
+          amendmentApproved: toSqliteBoolean(movement.amendmentApproved),
           amendmentEffective: movement.amendmentEffective ?? null,
           consentStatus: movement.consentStatus ?? null,
         });
@@ -705,7 +710,7 @@ export class BalanceMovementStore {
         sourceModule: params.sourceModule,
         sourceFunction: params.sourceFunction,
         referencedTransactionId: params.referencedTransactionId,
-        amendmentApproved: params.amendmentApproved === null ? null : params.amendmentApproved ? 1 : 0,
+        amendmentApproved: toSqliteBoolean(params.amendmentApproved),
         amendmentEffective: params.amendmentEffective,
         consentStatus: params.consentStatus,
         eventSnapshot: JSON.stringify(params.eventSnapshot),
@@ -727,7 +732,9 @@ export class BalanceMovementStore {
    */
   applyRemarksOnlyCorrection(params: { movementId: string; remarks: string | null; editedBy: string; editedAt: string }): void {
     this.db
-      .prepare("UPDATE balance_movements SET status = 'PENDING', remarks = @remarks, edited_by = @editedBy, edited_at = @editedAt WHERE movement_id = @movementId")
+      .prepare(
+        "UPDATE balance_movements SET status = 'PENDING', remarks = @remarks, edited_by = @editedBy, edited_at = @editedAt WHERE movement_id = @movementId",
+      )
       .run(params);
   }
 
@@ -749,7 +756,9 @@ export class BalanceMovementStore {
    */
   withdrawMakerSubmit(movementId: string, revertToPending: boolean): void {
     const statusClause = revertToPending ? `, status = 'PENDING'` : '';
-    this.db.prepare(`UPDATE balance_movements SET maker_submitted_by = NULL, maker_submitted_at = NULL${statusClause} WHERE movement_id = @movementId`).run({ movementId });
+    this.db
+      .prepare(`UPDATE balance_movements SET maker_submitted_by = NULL, maker_submitted_at = NULL${statusClause} WHERE movement_id = @movementId`)
+      .run({ movementId });
   }
 
   /**

@@ -64,7 +64,7 @@ describe('PickerSelectionService', () => {
       svc.sgsForArrival = Array.from({ length: 15 }, (_, i) => contract({ balanceContractId: `sg-${i}`, naturalKey: { lcNumber: 'S001', sgNumber: `G${i}` } }));
       svc.arrivalSgPaging.total = 15;
 
-      expect(svc.pagedSgsForArrival.length).toBe(10);
+      expect(svc.pagedSgsForArrival).toHaveLength(10);
       expect(svc.pagedSgsForArrival[0].balanceContractId).toBe('sg-0');
 
       svc.arrivalSgPrevPage(); // already page 1 — no-op
@@ -72,7 +72,7 @@ describe('PickerSelectionService', () => {
 
       svc.arrivalSgNextPage();
       expect(svc.arrivalSgPaging.page).toBe(2);
-      expect(svc.pagedSgsForArrival.length).toBe(5);
+      expect(svc.pagedSgsForArrival).toHaveLength(5);
       expect(svc.pagedSgsForArrival[0].balanceContractId).toBe('sg-10');
 
       svc.arrivalSgNextPage(); // already last page — no-op
@@ -95,14 +95,14 @@ describe('PickerSelectionService', () => {
       }));
       svc.settleableBalancesPaging.total = 12;
 
-      expect(svc.pagedSettleableBalances.length).toBe(10);
+      expect(svc.pagedSettleableBalances).toHaveLength(10);
 
       svc.settleableBalancesPrevPage(); // already page 1 — no-op
       expect(svc.settleableBalancesPaging.page).toBe(1);
 
       svc.settleableBalancesNextPage();
       expect(svc.settleableBalancesPaging.page).toBe(2);
-      expect(svc.pagedSettleableBalances.length).toBe(2);
+      expect(svc.pagedSettleableBalances).toHaveLength(2);
 
       svc.settleableBalancesNextPage(); // already last page — no-op
       expect(svc.settleableBalancesPaging.page).toBe(2);
@@ -129,14 +129,14 @@ describe('PickerSelectionService', () => {
       svc.payableMovements = Array.from({ length: 13 }, (_, i) => movement({ movementId: `m-${i}`, sourceTransactionRef: `B${i}` }));
       svc.payableMovementsPaging.total = 13;
 
-      expect(svc.pagedFilteredPayableMovements.length).toBe(10);
+      expect(svc.pagedFilteredPayableMovements).toHaveLength(10);
 
       svc.payableMovementsPrevPage(); // already page 1 — no-op
       expect(svc.payableMovementsPaging.page).toBe(1);
 
       svc.payableMovementsNextPage();
       expect(svc.payableMovementsPaging.page).toBe(2);
-      expect(svc.pagedFilteredPayableMovements.length).toBe(3);
+      expect(svc.pagedFilteredPayableMovements).toHaveLength(3);
 
       svc.payableMovementsNextPage(); // already last page — no-op
       expect(svc.payableMovementsPaging.page).toBe(2);

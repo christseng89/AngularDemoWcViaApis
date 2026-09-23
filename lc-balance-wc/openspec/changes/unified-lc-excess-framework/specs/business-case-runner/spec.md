@@ -1,90 +1,145 @@
 ## ADDED Requirements
 
-### Requirement: Zero Allowance Legacy Regression
+### Requirement: Zero Allowance Regression
 
-Runner SHALL 對 A8、A3、A3S、B3 分別覆蓋三個明確配置 row：`(configuredMaximumUsd, allowancePercentage) = (0, 0)`、`(0, positive)`、`(positive, 0)`，並證明 within-capacity 維持原成功行為、over-capacity 維持原 `INSUFFICIENT_AVAILABLE_BALANCE` hard-reject。每一 config × function × command-path case SHALL 證明 Currency Exchange request count 為零，且 `USD_PAR`、`fx_rate_snapshot`、`ExcessDecision`、Pending Excess Reservation、Approved Excess utilization 與 Excess ledger row 的 before／after count 均不變。
+Runner SHALL對A3、A3S、B3覆蓋`(configuredMaximumUsd, allowancePercentage) = (0, 0)`、`(0, positive)`、`(positive, 0)`，證明任一零值代表不允許超押且不呼叫FX。
 
-#### Scenario: Four-function Legacy Matrix
+#### Scenario: Excess-enabled Functions With Zero Policy Value
 
-- **WHEN** Runner 對三個 zero-config rows 與 A8／A3／A3S／B3 執行 Maker within-capacity、Maker over-capacity、Checker Release、Fix within-capacity 與 Fix over-capacity cases
-- **THEN** 每一 case SHALL 驗證原 success／reject boundary、既有 `409 INSUFFICIENT_AVAILABLE_BALANCE` code／message 與 Maker／Checker／Fix lifecycle
-- **AND** SHALL 以 spy 與 before／after database counts 驗證沒有 Currency Exchange request、`USD_PAR`、`fx_rate_snapshot`、`ExcessDecision`、Pending Excess Reservation、Approved Excess utilization 或 Excess ledger row
-- **AND** 所有 zero-route response SHALL NOT 回傳 `FX_RATE_UNAVAILABLE`、`FX_RATE_STALE` 或 `EXCESS_LIMIT_EXCEEDED`
+- **WHEN** A3／A3S／B3在任一zero-config row超過既有capacity
+- **THEN** SHALL驗證既有`INSUFFICIENT_AVAILABLE_BALANCE`及zero FX／Excess facts
 
-### Requirement: v11.15 Excess Regression Suite
+### Requirement: Excess Regression Suite
 
-Business Case Runner SHALL 對 A8、A3、A3S、B3 執行 Covered-only、partial Excess、full Excess、exact-limit、over-limit、Maker／Checker FX failure、revaluation、concurrency、Fix、Formal Increase、Return／Cancellation 與 downstream lifecycle cases。
+Business Case Runner SHALL對A3、A3S、B3執行Covered-only、partial Excess、full Excess、exact-limit、over-limit zero-write rejection、Maker／Checker FX failure、revaluation、concurrency、eligible Fix／Resubmit、Formal Increase guidance、full Delete Pending及downstream lifecycle cases。A3與A3S SHALL覆蓋pre-Acknowledge eligible Fix及post-Acknowledge Amount Fix拒絕。
 
 #### Scenario: Run All Excess Cases
 
-- **WHEN** dependencies 與 deterministic Currency Exchange stub 已就緒且選擇 Run All
-- **THEN** 每個 v11.15 case SHALL 按隔離的 owner data 執行
-- **AND** 每一步 SHALL 驗證 movement、reservation、approved utilization、FX snapshot 與 error code
+- **WHEN** dependencies與deterministic Currency Exchange stub已就緒且選擇Run All
+- **THEN** 每個case SHALL按隔離owner data執行
+- **AND** 每一步 SHALL驗證movement、reservation、approved utilization、FX snapshot與error code
 
-#### Scenario: Expected FX Failure
+#### Scenario: Calculable Over-limit Submit Is Rejected
 
-- **WHEN** case 配置 unavailable 或 stale Booking Rate
-- **THEN** Runner SHALL 驗證精確 error type 與 zero-write／retain-pending semantics
-- **AND** 收到非預期 success SHALL 記為失敗
+- **WHEN** A3／A3S／B3 projected total超過Effective Limit
+- **THEN** SHALL驗證HTTP `409`／`EXCESS_LIMIT_EXCEEDED`及zero-write
+- **AND** 完成A2／B2 Increase後 SHALL以fresh command重驗，而不是cure不存在的movement
 
-### Requirement: A8 to A3S Anti-double-counting Regression
+#### Scenario: Covered-only Formal Capacity Movement
 
-Runner SHALL 驗證 A8 Approved Excess attribution 經 A3S capacity transfer 後不會再次消耗 parent allowance，並 SHALL 分別驗證 partial、full、over-capacity 與 reversal。
+- **GIVEN** A3／A3S／B3 Legal Amount為`10,200`、Covered為`10,000`且Excess為`200`
+- **WHEN** source及A4／A6／B4 downstream lifecycle完成
+- **THEN** LC／Confirmation capacity movement／earmark／finalisation SHALL只使用Covered `10,000`
+- **AND** Excess `200` SHALL只存在於Excess ledger／attribution，Tight不得低於零或被downstream重複扣減
 
-#### Scenario: Partial Capacity Transfer
+#### Scenario: Runner-only Automatic Formal Increase
 
-- **WHEN** A3S 使用 A8 Eligible SG Capacity 的一部分
-- **THEN** Approved Excess aggregate SHALL 不增加相同 attributable amount
-- **AND** SG legal balance SHALL 不因 capacity transfer 自動減少
+- **WHEN** 指定demo case收到A3／A3S／B3 `EXCESS_LIMIT_EXCEEDED`及`FINITE` guidance
+- **THEN** 僅Runner MAY建立並Release A02／B02，再fresh Submit原交易
+- **AND** 負Tight、其他error code或non-`FINITE` guidance SHALL NOT觸發此流程
 
-#### Scenario: A3S Amount Exceeds SG Capacity
+### Requirement: A3S Anti-double-counting Regression
 
-- **WHEN** A3S amount 大於 SG Eligible Capacity Outstanding
-- **THEN** Runner SHALL 驗證只有差額建立新的 Covered／Excess decision
-- **AND** SHALL 驗證無 double count
+Runner SHALL驗證A3S以normalized Base Parent Tight加main Current SG Redemption Amount計算Effective Presentation Capacity，並淨除本筆self SG／LC UTILIZE legs各一次；本Change不建立或修改SG Redemption、SG Available Balance或legal lifecycle。
 
-### Requirement: Existing Lifecycle Regression
+#### Scenario: Normalized A3S Concrete Case
 
-引入 Excess framework 後，A1–A11、B1–B7 既有非 Excess lifecycle、Maker／Checker、accounting、cleanup 與 inquiry suites SHALL 維持通過，只有本 Change 明確修改的 hard-reject expectations MAY 更新。
+- **GIVEN** Base Parent Tight為`4,000`、Current SG Redemption Amount為`6,000`且Arrival為`10,200`
+- **WHEN** Maker Submit執行A3S，即使SG redemption leg仍為pending
+- **THEN** Effective Presentation Capacity SHALL為`10,000`、Covered SHALL為`10,000`、Pending Excess SHALL為`200`且不得為`6,200`
+- **AND** main entries SHALL保持SG `-6,000`、LC UTILIZE `-10,000`及parent net effect `-4,000`
 
-#### Scenario: Existing Non-excess Cases
+#### Scenario: A3S Re-selection Re-normalizes Capacity
 
-- **WHEN** 完整 regression suite 使用不產生 Excess 的資料執行
-- **THEN** API、balance、voucher 與 UI outcomes SHALL 與核准 baseline 一致
+- **WHEN** Maker依提示re-select另一Eligible SG
+- **THEN** Runner SHALL驗證Current SG Redemption Amount被重讀、Base Parent Tight被重新normalize且Covered／Excess完整重算
+- **AND** 若仍超限才顯示新的Minimum Required Increase，且parent capacity與allowance均沒有double count
 
-#### Scenario: Old Hard-reject Assertions
+### Requirement: Unified ABSENT Checker Approval Regression
 
-- **GIVEN** `configuredMaximumUsd > 0` 且 `allowancePercentage > 0`
-- **WHEN** 舊 case 期待 A8／A3／A3S／B3 只因超過 Tight Available 被拒絕
-- **THEN** case SHALL 改為依 allowance 與 FX 結果判定
-- **AND** 其他 domain rejection SHALL 不被放寬
+Runner SHALL對A4 Sight Payment、A6 Acceptance及B4驗證相同的ABSENT Checker approval操作。
 
-#### Scenario: Zero Allowance Preserves Old Hard-reject
+#### Scenario: Positive Import Excess Uses ABSENT Approval
 
-- **GIVEN** `configuredMaximumUsd = 0` 或 `allowancePercentage = 0`
-- **WHEN** 舊 case 的 A8／A3／A3S／B3 超過既有 Tight Available／sufficiency boundary
-- **THEN** 原 `409 INSUFFICIENT_AVAILABLE_BALANCE` code 與 message SHALL 保持不變
-- **AND** case SHALL NOT 改為依 allowance 或 FX 結果判定
+- **GIVEN** Legal Amount 10,200、Covered 10,000、Excess 200
+- **WHEN** Checker尚未勾選共同`Checker Approve`
+- **THEN** SHALL驗證UI不可Release且pending transaction／reservation保留
+- **AND** 勾選後 SHALL在不提交Applicant Waiver資料下驗證final Release成功
 
-### Requirement: Virtual Booking Rate Regression
+#### Scenario: Covered-only Import Does Not Require Excess Approval
 
-Runner SHALL 使用虛擬 Currency Exchange 驗證 explicit Booking Rate、由 Buy／Sell midpoint 衍生的 Booking Rate、missing side、stale、not Approved、not Effective 與 timeout cases。
+- **WHEN** referenced A3／A3S Excess為零
+- **THEN** common Excess approval SHALL不是Release必要條件
 
-#### Scenario: Derived Midpoint
+#### Scenario: A6 and A7 Preserve Locked Attribution
 
-- **WHEN** fixture 只有 exact-decimal Buy Rate 與 Sell Rate
-- **THEN** Runner SHALL 驗證回傳 Booking Rate 精確等於兩者平均
-- **AND** Maker 與 Checker USD equivalent SHALL 使用該 Booking Rate
+- **GIVEN** A3／A3S locked Legal為`10,200`、Covered為`10,000`、Excess為`200`
+- **WHEN** A6成功建立Legal Acceptance Outstanding後再執行A7 settlement
+- **THEN** A6 SHALL保存Legal `10,200`及immutable Covered／Excess attribution，且不得建立新的capacity-control balance
+- **AND** A7 SHALL只減少Legal Outstanding，不得重新allocation或減少Approved Excess
 
-#### Scenario: Incomplete Quote
+### Requirement: Export Authorization Regression
 
-- **WHEN** fixture 缺少必要 Buy 或 Sell 且沒有 explicit Booking Rate
-- **THEN** Runner SHALL 驗證 `FX_RATE_UNAVAILABLE`
-- **AND** SHALL 驗證 Maker zero-write 與 Checker retain-pending 的不同結果
+Runner SHALL驗證Export authorization全額有效或完整Recourse兩種結果，不得partial split或外部lookup。
+
+#### Scenario: Full Valid Authorization
+
+- **GIVEN** Excess為200且authorization reference存在、authorized amount為200、currency等於owner currency、Checker不同於Maker且validation result為`CONFIRMED`
+- **WHEN** B4 Checker完成validation並建立assets
+- **THEN** 完整200 debtor attribution SHALL為Issuing Bank
+
+#### Scenario: Partial or Invalid Authorization
+
+- **WHEN** authorized amount為100、currency錯誤、reference缺失或validation result不是`CONFIRMED`
+- **THEN** 完整Excess 200 debtor attribution SHALL為Beneficiary／Recourse Party
+- **AND** SHALL NOT建立100／100 split
+
+#### Scenario: Maker Checker Conflict Does Not Route to Recourse
+
+- **WHEN** B4 Checker等於Maker
+- **THEN** Runner SHALL驗證`MAKER_CHECKER_CONFLICT`及zero finalisation writes
+- **AND** SHALL NOT建立Recourse attribution作為fallback
+
+### Requirement: Export Asset and Voucher Regression
+
+Runner SHALL同步驗證`balance-account-mappings.json`、accounting vouchers、inquiry及B4／B5 lifecycle的Covered／Excess分離。
+
+#### Scenario: Sight Asset Equals Legal Amount
+
+- **GIVEN** Legal Amount 10,200、Covered 10,000、Excess 200
+- **WHEN** Sight case完成
+- **THEN** `Due from Issuing Bank` SHALL為10,000，`EXPORT_EXCESS_ASSET` SHALL為200
+- **AND** Total Asset SHALL為10,200
+
+#### Scenario: Usance Asset Equals Legal Amount
+
+- **GIVEN** Legal Amount 10,200、Covered 10,000、Excess 200
+- **WHEN** Usance case完成
+- **THEN** `Reimbursement Receivable` SHALL為10,000，`EXPORT_EXCESS_ASSET` SHALL為200
+- **AND** Total Asset SHALL為10,200，B5 SHALL保持兩腿分離
+
+#### Scenario: B5 Settles Legal Outstanding Without Clearing Assets
+
+- **WHEN** B5完成Usance legal settlement
+- **THEN** SHALL驗證Legal Acceptance Outstanding依既有lifecycle減少
+- **AND** `Reimbursement Receivable`與`EXPORT_EXCESS_ASSET`不得auto-clear、merge或減少Approved Excess
+
+### Requirement: FX and Existing Lifecycle Regression
+
+Runner SHALL對A3／A3S／B3驗證production provider-supplied BOOKING only、Approved／Effective／Freshness、authorized PBD、virtual-only midpoint、Maker zero-write及Checker retain-pending。A1–A11、B1–B7未被本Change明確修改的lifecycle、Maker／Checker、accounting、cleanup及inquiry suites SHALL保持通過。
 
 #### Scenario: Production Must Not Derive Midpoint
 
-- **WHEN** production-mode adapter fixture 只提供 Approved／Effective／fresh Buy Rate 與 Sell Rate，但沒有 provider Booking Rate
-- **THEN** Runner SHALL 驗證系統未計算 `(BUY_RATE + SELL_RATE) / 2`
-- **AND** Maker SHALL 回傳 `FX_RATE_UNAVAILABLE` 且不建立 transaction／reservation
-- **AND** Checker SHALL 回傳 `FX_RATE_UNAVAILABLE` 且保留原 pending transaction／reservation
+- **WHEN** production adapter只有BUY／SELL而沒有provider BOOKING
+- **THEN** SHALL驗證`FX_RATE_UNAVAILABLE`且不計算midpoint
+
+#### Scenario: Applicant and Authorization Evidence Is Auditable
+
+- **WHEN** waiver或authorization決定成功
+- **THEN** Runner SHALL驗證validation result、Checker identity、server timestamp及適用reference facts可查詢且immutable
+
+#### Scenario: No Return or Partial Cancellation Capability
+
+- **WHEN** caller嘗試Return Documents、partial return／cancellation或Approved Excess reversal
+- **THEN** SHALL驗證unsupported rejection及zero-write
+- **AND** Delete Pending仍只接受整筆`PENDING`／`REJECTED` movement

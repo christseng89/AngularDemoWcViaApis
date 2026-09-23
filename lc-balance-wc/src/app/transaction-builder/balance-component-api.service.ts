@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpResponse } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 import type { InstrumentType } from './balance-component.model';
 
 export interface NaturalKey {
@@ -209,6 +210,86 @@ export interface BalanceMovement {
   editedAt?: string | null;
 }
 
+export interface ExcessPreviewResponse {
+  previousExcessAmountTransaction: string;
+  thisExcessAmountTransaction: string;
+  totalExcessAmountTransaction: string;
+  maxExcessAmountTransaction: string;
+  eligible: boolean;
+  businessResultCode: string;
+}
+
+export interface ExcessPreviewRequest {
+  functionCode: 'A3' | 'A3S' | 'B3';
+  request?: CreateMovementRequest;
+  requests?: readonly CreateMovementRequest[];
+  excludeMovementId?: string;
+}
+
+export interface ExportAuthorizationInput {
+  claimStatus: 'ABSENT' | 'SUBMITTED';
+  authorizationReference?: string;
+  authorizedAmountOwner?: string;
+  authorizedCurrency?: string;
+  authorizationValidationResult: 'CONFIRMED' | 'NOT_CONFIRMED';
+}
+
+export interface ExportAuthorizationSnapshot extends ExportAuthorizationInput {
+  authorizationSnapshotId: string;
+  excessDebtor: string;
+}
+
+export interface ExportAssetPosting {
+  postingId: string;
+  balanceType: 'Due from Issuing Bank' | 'Reimbursement Receivable' | 'EXPORT_EXCESS_ASSET';
+  amountOwner: string;
+  ownerCurrency: string;
+  debtor: string;
+}
+
+export interface ExportAssetReleaseResult {
+  movement: BalanceMovement;
+  authorization: ExportAuthorizationSnapshot;
+  assets: ExportAssetPosting[];
+}
+
+function secureCommandId(): string {
+  if (typeof globalThis.crypto.randomUUID === 'function') return globalThis.crypto.randomUUID();
+
+  const bytes = new Uint8Array(16);
+  globalThis.crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Command-response projection used by Maker Submit. Excess-enabled functions add these fields to
+ * the normal movement response; keeping them outside BalanceMovement preserves the persisted wire
+ * model contract checked by wire-type-contract.spec.ts.
+ */
+export interface BalanceMovementCommandResponse extends BalanceMovement {
+  workflowStatus?: 'PENDING';
+  coveredAmountOwner?: string;
+  excessAmountOwner?: string;
+  excessDecision?: 'NOT_REQUIRED' | 'WITHIN_ALLOWANCE' | 'LIMIT_EXCEEDED';
+  businessResultCode?: 'EXCESS_LIMIT_EXCEEDED' | null;
+  releaseEligibility?: 'ELIGIBLE' | 'BLOCKED';
+}
+
+export interface ExcessReleaseContext {
+  sourceMovementId: string | null;
+  thisExcessAmountOwner: string;
+  ownerCurrency: string;
+  requiresApplicantWaiver: boolean;
+  requiresExportAuthorization: boolean;
+}
+
+export interface ApplicantWaiverConfirmation {
+  applicantWaiverValidationResult: 'CONFIRMED' | 'NOT_CONFIRMED';
+  waiverReference?: string;
+  waiverDate?: string;
+  waiverEvidence?: string;
+}
+
 /**
  * Fix Pending (analysis/Balance-Component-FixPending-DeletePending-Proposal-zh.md §2.2/§15/§19,
  * 2026-08-27) — the microservice's own `editMovementRequestSchema` is a `.strict()` allowlist; this
@@ -255,16 +336,43 @@ export class BalanceComponentApiService {
 
   constructor(private readonly http: HttpClient) {}
 
-  createMovement(req: CreateMovementRequest): Observable<HttpResponse<BalanceMovement>> {
-    return this.http.post<BalanceMovement>(`${this.base}/balance-movements`, req, { observe: 'response' });
+  private commandOptions(): { headers: { 'Idempotency-Key': string } } {
+    const key = secureCommandId();
+    return { headers: { 'Idempotency-Key': key } };
+  }
+
+  createMovement(req: CreateMovementRequest): Observable<HttpResponse<BalanceMovementCommandResponse>> {
+    return this.http.post<BalanceMovementCommandResponse>(`${this.base}/balance-movements`, req, { observe: 'response', ...this.commandOptions() });
   }
 
   createCompoundMovements(requests: readonly CreateMovementRequest[]): Observable<BalanceMovement[]> {
-    return this.http.post<BalanceMovement[]>(`${this.base}/balance-movements/compound`, { requests });
+    return this.http.post<BalanceMovement[]>(`${this.base}/balance-movements/compound`, { requests }, this.commandOptions());
   }
 
-  release(movementId: string, releasedBy: string): Observable<BalanceMovement> {
-    return this.http.post<BalanceMovement>(`${this.base}/balance-movements/${movementId}/release`, { releasedBy });
+  release(movementId: string, releasedBy: string, applicantWaiver?: ApplicantWaiverConfirmation): Observable<BalanceMovement> {
+    return this.http
+      .post<BalanceMovement | { movement: BalanceMovement }>(
+        `${this.base}/balance-movements/${movementId}/release`,
+        { releasedBy, ...applicantWaiver },
+        this.commandOptions(),
+      )
+      .pipe(map((response) => ('movement' in response ? response.movement : response)));
+  }
+
+  previewExcess(request: ExcessPreviewRequest): Observable<ExcessPreviewResponse> {
+    return this.http.post<ExcessPreviewResponse>(`${this.base}/balance-movements/excess-preview`, request);
+  }
+
+  getExcessReleaseContext(movementId: string): Observable<ExcessReleaseContext> {
+    return this.http.get<ExcessReleaseContext>(`${this.base}/balance-movements/${movementId}/excess-release-context`);
+  }
+
+  releaseExportAssets(movementId: string, releasedBy: string, exportAuthorization: ExportAuthorizationInput): Observable<ExportAssetReleaseResult> {
+    return this.http.post<ExportAssetReleaseResult>(
+      `${this.base}/balance-movements/${movementId}/release`,
+      { releasedBy, exportAuthorization },
+      this.commandOptions(),
+    );
   }
 
   releaseCompoundMovements(movementIds: readonly string[], releasedBy: string): Observable<BalanceMovement[]> {
@@ -281,7 +389,7 @@ export class BalanceComponentApiService {
 
   /** Maker-initiated withdrawal of their own still-PENDING entry (EC), distinct from reject() (a Checker's 4-eyes decline). */
   cancel(movementId: string, cancelledBy: string, reasonCode?: string, remarks?: string): Observable<BalanceMovement> {
-    return this.http.post<BalanceMovement>(`${this.base}/balance-movements/${movementId}/cancel`, { cancelledBy, reasonCode, remarks });
+    return this.http.post<BalanceMovement>(`${this.base}/balance-movements/${movementId}/cancel`, { cancelledBy, reasonCode, remarks }, this.commandOptions());
   }
 
   /**
@@ -291,12 +399,12 @@ export class BalanceComponentApiService {
    * microservice already supports.
    */
   editPending(movementId: string, req: EditMovementRequest): Observable<BalanceMovement> {
-    return this.http.post<BalanceMovement>(`${this.base}/balance-movements/${movementId}/edit`, req);
+    return this.http.post<BalanceMovement>(`${this.base}/balance-movements/${movementId}/edit`, req, this.commandOptions());
   }
 
   /** A3/A3S only. Restored 2026-08-20 — the Checker's own acknowledgment on the LC's own UTILIZE (status stays PENDING; A4/A6 finalizes for real later). B3's own Checker Release is still the standard release() above. */
   acknowledge(movementId: string, acknowledgedBy: string): Observable<BalanceMovement> {
-    return this.http.post<BalanceMovement>(`${this.base}/balance-movements/${movementId}/acknowledge`, { acknowledgedBy });
+    return this.http.post<BalanceMovement>(`${this.base}/balance-movements/${movementId}/acknowledge`, { acknowledgedBy }, this.commandOptions());
   }
 
   /** A4's own real Maker action; a genuine backend acknowledgment (status stays PENDING — the Checker's release() below is still the real finalizing transition), not a new movement. */
@@ -452,7 +560,14 @@ export class BalanceComponentApiService {
    * Inquire Events. All filter fields are optional. Function is deliberately not a filter param here —
    * see InquireDeletePendingService's own doc comment for why it's applied client-side instead.
    */
-  listDeletePendingAudit(filter: { lcNumber?: string; deletedBy?: string; from?: string; to?: string; page?: number; pageSize?: number }): Observable<DeletePendingAuditPage> {
+  listDeletePendingAudit(filter: {
+    lcNumber?: string;
+    deletedBy?: string;
+    from?: string;
+    to?: string;
+    page?: number;
+    pageSize?: number;
+  }): Observable<DeletePendingAuditPage> {
     const params: Record<string, string> = {};
     if (filter.lcNumber) params['lcNumber'] = filter.lcNumber;
     if (filter.deletedBy) params['deletedBy'] = filter.deletedBy;

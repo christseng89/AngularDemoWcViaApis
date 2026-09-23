@@ -2,12 +2,14 @@ import { createDb } from './db';
 import { createApp } from './app';
 import { BalanceService } from './service/balanceService';
 import { EXPIRY_SWEEP_INTERVAL, toIntervalMs } from './config';
+import { createMakerExcessRuntime } from './config/makerExcessRuntime';
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 4100;
 const DB_PATH = process.env.DB_PATH ?? 'balance-component.sqlite';
 
+const makerExcessRuntime = createMakerExcessRuntime({ env: process.env });
 const db = createDb(DB_PATH);
-const service = new BalanceService(db);
+const service = new BalanceService(db, undefined, undefined, makerExcessRuntime);
 const app = createApp(db, service);
 
 const server = app.listen(PORT, () => {

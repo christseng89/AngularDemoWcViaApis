@@ -10,6 +10,8 @@
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const { randomUUID } = require('node:crypto');
+const { URLSearchParams } = require('node:url');
 const { rateLimit } = require('express-rate-limit');
 const { buildRegistry } = require('./data/businessCases');
 
@@ -25,9 +27,11 @@ app.use(express.json());
 const BALANCE_SERVICE_URL = process.env.BALANCE_SERVICE_URL || 'http://localhost:4100';
 
 async function callMicroservice(method, path, body) {
+  const headers = body ? { 'Content-Type': 'application/json' } : {};
+  if (method !== 'GET') headers['Idempotency-Key'] = randomUUID();
   const res = await fetch(`${BALANCE_SERVICE_URL}${path}`, {
     method,
-    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    headers: Object.keys(headers).length ? headers : undefined,
     body: body ? JSON.stringify(body) : undefined,
   });
   const json = await res.json().catch(() => null);
@@ -78,6 +82,34 @@ async function resolveMovementRequest(captured, source) {
   return request;
 }
 
+/**
+ * Excess Maker Submit deliberately returns a compact command result rather than the full
+ * movement/contract aggregate.  The demo runner still needs the contract id when a later
+ * lifecycle step references the captured movement (for example A8 -> A9), so enrich only
+ * the runner's private captured/trace value from the authoritative natural-key lookup.
+ */
+async function hydrateCapturedMovementResponse(request, response) {
+  if (!response?.movementId || response.balanceContractId) return response;
+  if (request.balanceContractId) return { ...response, balanceContractId: request.balanceContractId };
+
+  const naturalKey = request.naturalKey;
+  if (!request.instrumentType || !naturalKey?.lcNumber) return response;
+
+  const params = new URLSearchParams({
+    instrumentType: request.instrumentType,
+    lcNumber: naturalKey.lcNumber,
+  });
+  for (const key of ['ibNumber', 'sgNumber', 'legSeq']) {
+    if (naturalKey[key]) params.set(key, naturalKey[key]);
+  }
+
+  const resolved = await callMicroservice('GET', `/balance-contracts?${params.toString()}`);
+  if (!resolved.ok || !resolved.body?.balanceContractId) {
+    throw new Error(`Maker Submit succeeded but its compact response could not be resolved to a balance contract: ${JSON.stringify(resolved.body)}`);
+  }
+  return { ...response, balanceContractId: resolved.body.balanceContractId };
+}
+
 function assertExpectedOutcome(step, result) {
   if (step.expectError && result.ok) {
     throw new Error(`Step "${step.label}" expected a business rejection but succeeded with HTTP ${result.status}.`);
@@ -85,48 +117,132 @@ function assertExpectedOutcome(step, result) {
   if (!step.expectError && !result.ok) {
     throw new Error(`Step "${step.label}" unexpectedly failed with HTTP ${result.status}: ${JSON.stringify(result.body)}`);
   }
-}
-
-function assertNonNegativeTightAvailable(label, response) {
-  const value = response?.eventSnapshot?.tightAvailableBalance ?? response?.tightAvailableBalance;
-  if (value !== null && value !== undefined && Number(value) < 0) {
-    throw new Error(`Step "${label}" produced an invalid negative Tight Available Balance (${value}).`);
+  if (step.expectError && step.expectedStatus !== undefined && result.status !== step.expectedStatus) {
+    throw new Error(`Step "${step.label}" expected HTTP ${step.expectedStatus} but received HTTP ${result.status}.`);
+  }
+  if (step.expectError && step.expectedErrorCode && result.body?.code !== step.expectedErrorCode) {
+    throw new Error(`Step "${step.label}" expected error ${step.expectedErrorCode} but received ${result.body?.code || 'no code'}.`);
   }
 }
 
-/** Test-runner safety net: repair an unexpected negative Tight balance with A02/B02. */
-async function autoAmendNegativeTightAvailable({ label, response, balanceContractId, instrumentType, trace }) {
-  const value = response?.eventSnapshot?.tightAvailableBalance ?? response?.tightAvailableBalance;
-  if (value === null || value === undefined || Number(value) >= 0) return;
+function decimalSum(values) {
+  const scale = Math.max(0, ...values.map((value) => String(value).split('.')[1]?.length || 0));
+  const sum = values.reduce((total, value) => {
+    const [whole, fraction = ''] = String(value).split('.');
+    return total + BigInt(`${whole}${fraction.padEnd(scale, '0')}`);
+  }, 0n);
+  const raw = sum.toString().padStart(scale + 1, '0');
+  return scale ? `${raw.slice(0, -scale)}.${raw.slice(-scale)}`.replace(/\.0+$/, '') : raw;
+}
 
-  const isImport = instrumentType === 'IPLC_LC';
-  const isExport = instrumentType === 'EPLC_CONFIRMATION' || instrumentType === 'EPLC_LC';
-  if (!isImport && !isExport) assertNonNegativeTightAvailable(label, response);
+function assertExportAssets(step, result) {
+  const expected = step.expectExportAssets;
+  if (!expected) return;
+  const assets = result.body?.assets;
+  const authorization = result.body?.authorization;
+  if (!Array.isArray(assets) || !authorization) throw new Error(`Step "${step.label}" did not return authorization + assets.`);
+  const covered = assets.find((asset) => asset.balanceType === expected.coveredBalanceType);
+  const excess = assets.find((asset) => asset.balanceType === 'EXPORT_EXCESS_ASSET');
+  if (covered?.amountOwner !== expected.covered || excess?.amountOwner !== expected.excess || excess?.debtor !== expected.excessDebtor) {
+    throw new Error(`Step "${step.label}" returned unexpected export asset allocation: ${JSON.stringify(result.body)}`);
+  }
+  if (authorization.claimStatus !== expected.claimStatus || authorization.authorizationValidationResult !== expected.authorizationValidationResult) {
+    throw new Error(`Step "${step.label}" returned unexpected export authorization decision: ${JSON.stringify(authorization)}`);
+  }
+  if (decimalSum(assets.map((asset) => asset.amountOwner)) !== expected.legal) {
+    throw new Error(`Step "${step.label}" failed Covered + Excess = Legal reconciliation.`);
+  }
+}
 
-  const functionCode = isImport ? 'A2' : 'B2';
-  const sourceTransactionRef = isImport ? 'A02' : 'B02';
-  const amendment = {
-    instrumentType,
-    balanceContractId,
+/**
+ * Demo Business Case Runner remediation only. Production clients continue to receive the original
+ * zero-write EXCESS_LIMIT_EXCEEDED response and never get an automatically-created amendment.
+ */
+async function runAutoFormalIncrease(step, rejectedRequest, rejectedResult, captured, trace, retryCommand) {
+  const config = step.autoFormalIncrease;
+  if (!config) return null;
+  if (rejectedResult.ok !== false || rejectedResult.status !== 409 || rejectedResult.body?.code !== 'EXCESS_LIMIT_EXCEEDED') {
+    throw new Error(
+      `Step "${step.label}" auto-remediation expected HTTP 409 EXCESS_LIMIT_EXCEEDED but received HTTP ${rejectedResult.status}: ${JSON.stringify(rejectedResult.body)}`,
+    );
+  }
+
+  const guidance = rejectedResult.body?.guidance;
+  if (guidance?.outcome !== 'FINITE' || !guidance.minimumRequiredIncreaseOwner) {
+    throw new Error(`Step "${step.label}" requested Runner auto-remediation, but EXCESS_LIMIT_EXCEEDED did not provide a finite Minimum Required Increase.`);
+  }
+
+  const parent = captured[config.contractRef];
+  if (!parent?.response?.balanceContractId) {
+    throw new Error(`Runner auto-remediation for "${step.label}" cannot resolve contractRef "${config.contractRef}".`);
+  }
+
+  const isImport = config.functionCode === 'A2';
+  if (!isImport && config.functionCode !== 'B2') {
+    throw new Error(`Runner auto-remediation supports only A2 or B2, not "${config.functionCode}".`);
+  }
+  const formalFunction = isImport ? 'A02' : 'B02';
+
+  const increaseRequest = {
+    instrumentType: isImport ? 'IPLC_LC' : 'EPLC_CONFIRMATION',
+    balanceContractId: parent.response.balanceContractId,
     movementType: isImport ? 'AMEND_INCREASE' : 'AMEND',
-    eventSeq: Date.now(),
-    amount: String(value).replace(/^-/, ''),
-    currency: response.currency,
-    sourceTransactionRef,
-    createdBy: 'maker1',
+    eventSeq: Number(rejectedRequest.eventSeq) + 1,
+    amount: String(guidance.minimumRequiredIncreaseOwner),
+    currency: rejectedRequest.currency,
+    sourceTransactionRef: `AUTO-${formalFunction}`,
+    createdBy: rejectedRequest.createdBy,
   };
-  const created = await callMicroservice('POST', '/balance-movements', amendment);
-  if (!created.ok) throw new Error(`Automatic ${sourceTransactionRef} failed with HTTP ${created.status}: ${JSON.stringify(created.body)}`);
-  trace.push({ type: 'createMovement', functionCode, label: `Auto ${sourceTransactionRef} — restore negative Tight LC Balance`, request: amendment, status: created.status, ok: true, response: created.body });
+  const increase = await callMicroservice('POST', '/balance-movements', increaseRequest);
+  if (!increase.ok) {
+    throw new Error(`Runner automatic ${config.functionCode} failed with HTTP ${increase.status}: ${JSON.stringify(increase.body)}`);
+  }
+  trace.push({
+    type: 'autoFormalIncrease',
+    functionCode: config.functionCode,
+    label: `Runner auto-creates ${formalFunction} from Minimum Required Increase`,
+    request: increaseRequest,
+    status: increase.status,
+    ok: true,
+    response: increase.body,
+  });
 
-  const released = await callMicroservice('POST', `/balance-movements/${created.body.movementId}/release`, { releasedBy: 'checker1' });
-  if (!released.ok) throw new Error(`Automatic ${sourceTransactionRef} release failed with HTTP ${released.status}: ${JSON.stringify(released.body)}`);
-  trace.push({ type: 'release', functionCode, label: `Checker releases automatic ${sourceTransactionRef}`, status: released.status, ok: true, response: released.body });
+  const release = await callMicroservice('POST', `/balance-movements/${increase.body?.movementId}/release`, {
+    releasedBy: config.releasedBy || 'checker1',
+  });
+  if (!release.ok) {
+    throw new Error(`Runner automatic ${config.functionCode} Release failed with HTTP ${release.status}: ${JSON.stringify(release.body)}`);
+  }
+  trace.push({
+    type: 'autoFormalIncreaseRelease',
+    functionCode: config.functionCode,
+    label: `Runner releases automatic ${formalFunction}`,
+    status: release.status,
+    ok: true,
+    response: release.body,
+  });
 
-  const repaired = await callMicroservice('GET', `/balance-contracts/${balanceContractId}/balance`);
-  if (!repaired.ok) throw new Error(`Automatic ${sourceTransactionRef} verification failed with HTTP ${repaired.status}: ${JSON.stringify(repaired.body)}`);
-  assertNonNegativeTightAvailable(`Automatic ${sourceTransactionRef}`, repaired.body);
-  trace.push({ type: 'snapshot', functionCode, label: `Balance after automatic ${sourceTransactionRef}`, status: repaired.status, ok: true, response: repaired.body });
+  const retryRequest = retryCommand?.body || {
+    ...rejectedRequest,
+    // A3 updates the same parent contract, so A02 occupies the next sequence. A8/B3 are child
+    // contracts whose rejected initial Submit was zero-write; their fresh retry remains event 1.
+    eventSeq: rejectedRequest.balanceContractId ? Number(rejectedRequest.eventSeq) + 2 : rejectedRequest.eventSeq,
+  };
+  const retry = await callMicroservice('POST', retryCommand?.path || '/balance-movements', retryRequest);
+  if (!retry.ok) {
+    throw new Error(`Runner retry after automatic ${config.functionCode} failed with HTTP ${retry.status}: ${JSON.stringify(retry.body)}`);
+  }
+  const retryResponse = retryCommand ? retry.body : await hydrateCapturedMovementResponse(retryRequest, retry.body);
+  trace.push({
+    type: 'autoRetry',
+    functionCode: step.functionCode,
+    label: `Runner retries ${step.functionCode || step.label} after ${formalFunction}`,
+    request: retryRequest,
+    status: retry.status,
+    ok: true,
+    response: retryResponse,
+  });
+  return { response: retryResponse, request: retryRequest };
 }
 
 // Quality-report-balance.md BAL-124 (2026-08-17, found while fixing BAL-131): 'release' and
@@ -156,124 +272,136 @@ const RELEASE_SHAPED_STEP_TYPES = {
   acknowledge: { subPath: 'acknowledge', bodyKey: 'acknowledgedBy' },
 };
 
+async function runCreateMovementStep(step, captured, trace) {
+  const request = await resolveMovementRequest(captured, step.request);
+  const result = await callMicroservice('POST', '/balance-movements', request);
+  assertExpectedOutcome(step, result);
+  assertExportAssets(step, result);
+  const response = result.ok ? await hydrateCapturedMovementResponse(request, result.body) : result.body;
+  if (step.captureAs) captured[step.captureAs] = { response, request };
+  trace.push({
+    type: 'createMovement',
+    functionCode: step.functionCode,
+    label: step.label,
+    request,
+    status: result.status,
+    ok: result.ok,
+    expectedError: Boolean(step.expectError),
+    response,
+  });
+  const remediated = await runAutoFormalIncrease(step, request, result, captured, trace);
+  if (remediated && step.captureAs) captured[step.captureAs] = remediated;
+}
+
+function captureCompoundResponses(step, captured, responses, requests) {
+  step.captureAs.forEach((key, index) => {
+    captured[key] = { response: responses[index], request: requests[index] };
+  });
+}
+
+async function runCompoundMovementStep(step, captured, trace) {
+  const requests = [];
+  for (const request of step.requests) requests.push(await resolveMovementRequest(captured, request));
+  const result = await callMicroservice('POST', '/balance-movements/compound', { requests });
+  assertExpectedOutcome(step, result);
+  if (result.ok) captureCompoundResponses(step, captured, result.body, requests);
+  trace.push({
+    type: step.type,
+    functionCode: step.functionCode,
+    label: step.label,
+    requests,
+    status: result.status,
+    ok: result.ok,
+    response: result.body,
+  });
+  if (!step.autoFormalIncrease) return;
+
+  const decisionIndex = step.autoFormalIncrease.decisionRequestIndex;
+  const decisionRequest = requests[decisionIndex];
+  const retryRequests = requests.map((request, index) => (index === decisionIndex ? { ...request, eventSeq: Number(request.eventSeq) + 2 } : request));
+  const remediated = await runAutoFormalIncrease(step, decisionRequest, result, captured, trace, {
+    path: '/balance-movements/compound',
+    body: { requests: retryRequests },
+  });
+  if (remediated) captureCompoundResponses(step, captured, remediated.response, retryRequests);
+}
+
+async function runCompoundActionsStep(step, captured, trace) {
+  const actions = step.actions.map(({ kind, movementRef }) => ({ kind, movementId: captured[movementRef]?.response?.movementId }));
+  if (actions.some((action) => !action.movementId)) {
+    throw new Error(`Compound action "${step.label}" references a movement that was not created.`);
+  }
+  const result = await callMicroservice('POST', '/balance-movements/compound-actions', { actions, actor: step.actor });
+  assertExpectedOutcome(step, result);
+  trace.push({ type: step.type, functionCode: step.functionCode, label: step.label, status: result.status, ok: result.ok, response: result.body });
+}
+
+async function runReleaseShapedStep(step, captured, trace) {
+  const { subPath, bodyKey } = RELEASE_SHAPED_STEP_TYPES[step.type];
+  const movementId = captured[step.movementRef]?.response?.movementId;
+  if (!movementId) {
+    trace.push({
+      type: step.type,
+      label: step.label,
+      skipped: true,
+      reason: `No movementId captured under "${step.movementRef}" (likely because that createMovement step returned an expected error).`,
+    });
+    return;
+  }
+  const result = await callMicroservice('POST', `/balance-movements/${movementId}/${subPath}`, {
+    [bodyKey]: step[bodyKey],
+    ...step.request,
+  });
+  assertExpectedOutcome(step, result);
+  assertExportAssets(step, result);
+  trace.push({
+    type: step.type,
+    functionCode: step.functionCode,
+    label: step.label,
+    status: result.status,
+    ok: result.ok,
+    expectedError: Boolean(step.expectError),
+    response: result.body,
+  });
+}
+
+async function runSnapshotStep(step, captured, trace) {
+  const balanceContractId = captured[step.contractRef]?.response?.balanceContractId;
+  const result = await callMicroservice('GET', `/balance-contracts/${balanceContractId}/balance`);
+  if (!result.ok) {
+    throw new Error(`Snapshot step "${step.label}" unexpectedly failed with HTTP ${result.status}: ${JSON.stringify(result.body)}`);
+  }
+  trace.push({ type: 'snapshot', label: step.label, status: result.status, ok: result.ok, response: result.body });
+}
+
 /** Runs one business case's step list against the microservice, returning a full trace for the UI. */
 async function runCase(businessCase) {
   const captured = {}; // captureAs key -> { response, logicalContractId? }
   const trace = [];
 
   for (const step of businessCase.steps) {
-    if (step.type === 'note') {
-      trace.push({ type: 'note', label: step.label });
-      continue;
-    }
-
-    if (step.type === 'createMovement') {
-      const request = await resolveMovementRequest(captured, step.request);
-      const result = await callMicroservice('POST', '/balance-movements', request);
-      assertExpectedOutcome(step, result);
-      if (step.captureAs) captured[step.captureAs] = { response: result.body, request };
-      trace.push({
-        type: 'createMovement',
-        functionCode: step.functionCode,
-        label: step.label,
-        request,
-        status: result.status,
-        ok: result.ok,
-        expectedError: Boolean(step.expectError),
-        response: result.body,
-      });
-      if (result.ok) {
-        await autoAmendNegativeTightAvailable({
-          label: step.label,
-          response: result.body,
-          balanceContractId: result.body.balanceContractId,
-          instrumentType: request.instrumentType,
-          trace,
-        });
-      }
-      continue;
-    }
-
-    if (step.type === 'createCompoundMovements') {
-      const requests = [];
-      for (const request of step.requests) requests.push(await resolveMovementRequest(captured, request));
-      const result = await callMicroservice('POST', '/balance-movements/compound', { requests });
-      assertExpectedOutcome(step, result);
-      if (result.ok) {
-        step.captureAs.forEach((key, index) => {
-          captured[key] = { response: result.body[index], request: requests[index] };
-        });
-      }
-      trace.push({
-        type: step.type,
-        functionCode: step.functionCode,
-        label: step.label,
-        requests,
-        status: result.status,
-        ok: result.ok,
-        response: result.body,
-      });
-      continue;
-    }
-
-    if (step.type === 'compoundActions') {
-      const actions = step.actions.map(({ kind, movementRef }) => ({ kind, movementId: captured[movementRef]?.response?.movementId }));
-      if (actions.some((action) => !action.movementId)) throw new Error(`Compound action "${step.label}" references a movement that was not created.`);
-      const result = await callMicroservice('POST', '/balance-movements/compound-actions', { actions, actor: step.actor });
-      assertExpectedOutcome(step, result);
-      trace.push({ type: step.type, functionCode: step.functionCode, label: step.label, status: result.status, ok: result.ok, response: result.body });
-      continue;
-    }
-
-    if (RELEASE_SHAPED_STEP_TYPES[step.type]) {
-      const { subPath, bodyKey } = RELEASE_SHAPED_STEP_TYPES[step.type];
-      const movementId = captured[step.movementRef]?.response?.movementId;
-      if (!movementId) {
-        trace.push({
-          type: step.type,
-          label: step.label,
-          skipped: true,
-          reason: `No movementId captured under "${step.movementRef}" (likely because that createMovement step returned an expected error).`,
-        });
-        continue;
-      }
-      const result = await callMicroservice('POST', `/balance-movements/${movementId}/${subPath}`, { [bodyKey]: step[bodyKey] });
-      assertExpectedOutcome(step, result);
-      trace.push({ type: step.type, functionCode: step.functionCode, label: step.label, status: result.status, ok: result.ok, response: result.body });
-      const capturedEntry = captured[step.movementRef];
-      await autoAmendNegativeTightAvailable({
-        label: step.label,
-        response: result.body,
-        balanceContractId: capturedEntry?.response?.balanceContractId,
-        instrumentType: capturedEntry?.request?.instrumentType,
-        trace,
-      });
-      continue;
-    }
-
-    if (step.type === 'snapshot') {
-      const balanceContractId = captured[step.contractRef]?.response?.balanceContractId;
-      const result = await callMicroservice('GET', `/balance-contracts/${balanceContractId}/balance`);
-      if (!result.ok) throw new Error(`Snapshot step "${step.label}" unexpectedly failed with HTTP ${result.status}: ${JSON.stringify(result.body)}`);
-      trace.push({ type: 'snapshot', label: step.label, status: result.status, ok: result.ok, response: result.body });
-      await autoAmendNegativeTightAvailable({
-        label: step.label,
-        response: result.body,
-        balanceContractId,
-        instrumentType: captured[step.contractRef]?.request?.instrumentType,
-        trace,
-      });
-      continue;
-    }
-
-    throw new Error(`Unknown step type "${step.type}"`);
+    if (step.type === 'note') trace.push({ type: 'note', label: step.label });
+    else if (step.type === 'createMovement') await runCreateMovementStep(step, captured, trace);
+    else if (step.type === 'createCompoundMovements') await runCompoundMovementStep(step, captured, trace);
+    else if (step.type === 'compoundActions') await runCompoundActionsStep(step, captured, trace);
+    else if (RELEASE_SHAPED_STEP_TYPES[step.type]) await runReleaseShapedStep(step, captured, trace);
+    else if (step.type === 'snapshot') await runSnapshotStep(step, captured, trace);
+    else throw new Error(`Unknown step type "${step.type}"`);
   }
 
   return trace;
 }
 
 app.get('/api/business-cases', (_req, res) => {
-  res.json(buildRegistry().map(({ id, title, description, steps }) => ({ id, title, description, stepCount: steps.length })));
+  res.json(
+    buildRegistry().map(({ id, title, description, steps, requiredPolicy }) => ({
+      id,
+      title,
+      description,
+      stepCount: steps.length,
+      ...(requiredPolicy ? { requiredPolicy } : {}),
+    })),
+  );
 });
 
 // Quality-report-balance.md BAL-118: this is the orchestrator's own highest-amplification endpoint —
@@ -310,6 +438,17 @@ app.post('/api/business-cases/:id/run', runLimiter, async (req, res) => {
 app.post('/api/admin/reset-database', async (_req, res) => {
   const result = await callMicroservice('POST', '/admin/reset-database');
   res.status(result.status).json(result.body);
+});
+
+// Thin read-only proxy used by the transaction builder. All validation, FX controls and exact
+// allowance arithmetic stay authoritative in the Balance Component.
+app.post('/api/excess-preview', async (req, res, next) => {
+  try {
+    const result = await callMicroservice('POST', '/balance-movements/excess-preview', req.body);
+    res.status(result.status).json(result.body);
+  } catch (error) {
+    next(error);
+  }
 });
 
 app.get('/healthz', (_req, res) => res.json({ status: 'ok', balanceServiceUrl: BALANCE_SERVICE_URL }));
@@ -356,7 +495,7 @@ const PORT = process.env.PORT || 4300;
    `require.main === module` guard) — same "nothing meaningful to unit-test at this stage" rationale
    microservices/balance-component/src/server.ts's own jest.config.js exclusion already documents.
    handleListenError()/shutdown() themselves are real unit-tested logic, not excluded here. */
-if (require.main === module) {
+if (require.main?.filename === process.argv[1]) {
   const server = app.listen(PORT, () => {
     console.log(`balance-component-backend (中台) listening on :${PORT} -> ${BALANCE_SERVICE_URL}`);
   });
@@ -371,4 +510,4 @@ if (require.main === module) {
 // handler's own public surface (`app`) separate from the test-only seam (`runCase`/
 // `resolveLogicalContractId`/`callMicroservice`/`handleListenError`/`shutdown`, exported purely so
 // runCase.test.js/server.test.js can unit-test them directly — see each file's own doc comment for why).
-module.exports = { app, runCase, resolveLogicalContractId, callMicroservice, handleListenError, shutdown };
+module.exports = { app, runCase, runAutoFormalIncrease, resolveLogicalContractId, callMicroservice, handleListenError, shutdown };

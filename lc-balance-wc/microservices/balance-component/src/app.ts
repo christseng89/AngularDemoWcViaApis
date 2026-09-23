@@ -11,6 +11,7 @@ import { deletePendingAuditRouter } from './routes/deletePendingAudit';
 import { balanceAccountMappingsRouter } from './routes/balanceAccountMappings';
 import { BalanceAccountMappingService } from './service/balanceAccountMappingService';
 import { ApiError } from './errors';
+import { APPLICANT_WAIVER_SCHEMA_SQL, EXCESS_COMMAND_ATTEMPT_AUDIT_SCHEMA_SQL, EXCESS_SCHEMA_SQL, EXPORT_ASSET_SCHEMA_SQL } from './db/schema';
 
 /**
  * F1 (external BA review) — `service` is now an optional param (defaulting to a fresh instance, exactly
@@ -59,10 +60,28 @@ export function createApp(db: Db, service: BalanceService = new BalanceService(d
   // 2026-08-29 — every new FK-constrained table needs this same check, not just a green test suite for
   // the new feature alone).
   app.post('/admin/reset-database', (_req, res) => {
-    db.exec('DELETE FROM delete_pending_audit');
-    db.exec('DELETE FROM fix_pending_audit');
-    db.exec('DELETE FROM balance_movements');
-    db.exec('DELETE FROM balance_contracts');
+    db.exec(`
+      BEGIN;
+      DROP TABLE IF EXISTS export_asset_postings;
+      DROP TABLE IF EXISTS export_authorization_snapshots;
+      DROP TABLE IF EXISTS excess_command_attempt_audits;
+      DROP TABLE IF EXISTS applicant_waiver_snapshots;
+      DROP TABLE IF EXISTS sg_capacity_events;
+      DROP TABLE IF EXISTS excess_decision_snapshots;
+      DROP TABLE IF EXISTS fx_rate_snapshots;
+      DROP TABLE IF EXISTS excess_ledger_events;
+      DROP TABLE IF EXISTS excess_accounts;
+      DROP TABLE IF EXISTS command_idempotency;
+      DELETE FROM delete_pending_audit;
+      DELETE FROM fix_pending_audit;
+      DELETE FROM balance_movements;
+      DELETE FROM balance_contracts;
+      ${EXCESS_SCHEMA_SQL}
+      ${EXCESS_COMMAND_ATTEMPT_AUDIT_SCHEMA_SQL}
+      ${APPLICANT_WAIVER_SCHEMA_SQL}
+      ${EXPORT_ASSET_SCHEMA_SQL}
+      COMMIT;
+    `);
     res.json({ status: 'ok' });
   });
 

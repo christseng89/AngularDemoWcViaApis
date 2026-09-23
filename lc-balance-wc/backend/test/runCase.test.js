@@ -1,4 +1,4 @@
-const { runCase, resolveLogicalContractId, callMicroservice } = require('../server');
+const { runCase, runAutoFormalIncrease, resolveLogicalContractId, callMicroservice } = require('../server');
 
 // Direct unit tests against the internal orchestration functions (exported alongside the Express
 // `app` as `module.exports = { app, runCase, resolveLogicalContractId, callMicroservice }` —
@@ -88,6 +88,133 @@ describe('server.js internals — direct unit tests (not via HTTP/businessCases.
   });
 
   describe('runCase', () => {
+    it('validates B4 authorization and exact Covered + EXPORT_EXCESS_ASSET = Legal reconciliation', async () => {
+      global.fetch = jest
+        .fn()
+        .mockResolvedValueOnce(jsonResponse(201, { movementId: 'mv-b4', balanceContractId: 'bc-1' }))
+        .mockResolvedValueOnce(jsonResponse(200, {
+          movement: { movementId: 'mv-b4', status: 'RELEASED' },
+          authorization: { claimStatus: 'SUBMITTED', authorizationValidationResult: 'CONFIRMED' },
+          assets: [
+            { balanceType: 'Due from Issuing Bank', amountOwner: '10000', debtor: 'ISSUING_BANK' },
+            { balanceType: 'EXPORT_EXCESS_ASSET', amountOwner: '200', debtor: 'ISSUING_BANK' },
+          ],
+        }));
+      await expect(runCase({ id: 'b4-assets', steps: [
+        { type: 'createMovement', label: 'B4', captureAs: 'b4', request: { instrumentType: 'EPLC_CONFIRMATION', movementType: 'HONOUR' } },
+        { type: 'release', label: 'release B4', movementRef: 'b4', releasedBy: 'checker1', request: { exportAuthorization: { claimStatus: 'SUBMITTED', authorizationValidationResult: 'CONFIRMED' } }, expectExportAssets: { claimStatus: 'SUBMITTED', authorizationValidationResult: 'CONFIRMED', coveredBalanceType: 'Due from Issuing Bank', covered: '10000', excess: '200', legal: '10200', excessDebtor: 'ISSUING_BANK' } },
+      ] })).resolves.toHaveLength(2);
+      expect(JSON.parse(global.fetch.mock.calls[1][1].body).exportAuthorization).toEqual({ claimStatus: 'SUBMITTED', authorizationValidationResult: 'CONFIRMED' });
+    });
+
+    it('rejects a B4 receipt whose assets do not reconcile to Legal', async () => {
+      global.fetch = jest
+        .fn()
+        .mockResolvedValueOnce(jsonResponse(201, { movementId: 'mv-b4', balanceContractId: 'bc-1' }))
+        .mockResolvedValueOnce(jsonResponse(200, { movement: {}, authorization: { claimStatus: 'ABSENT', authorizationValidationResult: 'NOT_CONFIRMED' }, assets: [
+          { balanceType: 'Reimbursement Receivable', amountOwner: '10000', debtor: 'ISSUING_BANK' },
+          { balanceType: 'EXPORT_EXCESS_ASSET', amountOwner: '199', debtor: 'BENEFICIARY_OR_RECOURSE_PARTY' },
+        ] }));
+      await expect(runCase({ id: 'bad-b4-assets', steps: [
+        { type: 'createMovement', label: 'B4', captureAs: 'b4', request: {} },
+        { type: 'release', label: 'release B4', movementRef: 'b4', releasedBy: 'checker1', expectExportAssets: { claimStatus: 'ABSENT', authorizationValidationResult: 'NOT_CONFIRMED', coveredBalanceType: 'Reimbursement Receivable', covered: '10000', excess: '200', legal: '10200', excessDebtor: 'BENEFICIARY_OR_RECOURSE_PARTY' } },
+      ] })).rejects.toThrow(/unexpected export asset allocation|reconciliation/);
+    });
+
+    it('rejects a B4 receipt missing authorization/assets or returning a different authorization result', async () => {
+      global.fetch = jest.fn()
+        .mockResolvedValueOnce(jsonResponse(201, { movementId: 'mv-1', balanceContractId: 'bc-1' }))
+        .mockResolvedValueOnce(jsonResponse(200, { movement: {} }));
+      const steps = [
+        { type: 'createMovement', label: 'B4', captureAs: 'b4', request: {} },
+        { type: 'release', label: 'release B4', movementRef: 'b4', releasedBy: 'checker1', expectExportAssets: { claimStatus: 'ABSENT', authorizationValidationResult: 'NOT_CONFIRMED', coveredBalanceType: 'Due from Issuing Bank', covered: '10000', excess: '200', legal: '10200', excessDebtor: 'BENEFICIARY_OR_RECOURSE_PARTY' } },
+      ];
+      await expect(runCase({ id: 'missing-receipt', steps })).rejects.toThrow(/did not return authorization/);
+
+      global.fetch = jest.fn()
+        .mockResolvedValueOnce(jsonResponse(201, { movementId: 'mv-1', balanceContractId: 'bc-1' }))
+        .mockResolvedValueOnce(jsonResponse(200, { movement: {}, authorization: { claimStatus: 'SUBMITTED', authorizationValidationResult: 'CONFIRMED' }, assets: [
+          { balanceType: 'Due from Issuing Bank', amountOwner: '10000', debtor: 'ISSUING_BANK' },
+          { balanceType: 'EXPORT_EXCESS_ASSET', amountOwner: '200', debtor: 'BENEFICIARY_OR_RECOURSE_PARTY' },
+        ] }));
+      await expect(runCase({ id: 'wrong-decision', steps })).rejects.toThrow(/unexpected export authorization decision/);
+    });
+
+    it('uses exact decimal reconciliation and rejects a mismatched Legal total', async () => {
+      global.fetch = jest.fn()
+        .mockResolvedValueOnce(jsonResponse(201, { movementId: 'mv-1', balanceContractId: 'bc-1' }))
+        .mockResolvedValueOnce(jsonResponse(200, { movement: {}, authorization: { claimStatus: 'ABSENT', authorizationValidationResult: 'NOT_CONFIRMED' }, assets: [
+          { balanceType: 'Due from Issuing Bank', amountOwner: '10000.50', debtor: 'ISSUING_BANK' },
+          { balanceType: 'EXPORT_EXCESS_ASSET', amountOwner: '199.50', debtor: 'BENEFICIARY_OR_RECOURSE_PARTY' },
+        ] }));
+      await expect(runCase({ id: 'bad-legal', steps: [
+        { type: 'createMovement', label: 'B4', captureAs: 'b4', request: {} },
+        { type: 'release', label: 'release B4', movementRef: 'b4', releasedBy: 'checker1', expectExportAssets: { claimStatus: 'ABSENT', authorizationValidationResult: 'NOT_CONFIRMED', coveredBalanceType: 'Due from Issuing Bank', covered: '10000.50', excess: '199.50', legal: '10201', excessDebtor: 'BENEFICIARY_OR_RECOURSE_PARTY' } },
+      ] })).rejects.toThrow(/failed Covered \+ Excess = Legal reconciliation/);
+    });
+
+    it('releases A4 through the common ABSENT Checker Approve path without waiver metadata', async () => {
+      global.fetch = jest
+        .fn()
+        .mockResolvedValueOnce(jsonResponse(201, { movementId: 'mv-a4', balanceContractId: 'bc-lc' }))
+        .mockResolvedValueOnce(jsonResponse(200, { movementId: 'mv-a4', status: 'RELEASED' }));
+
+      const trace = await runCase({
+        id: 'absent-checker-approve-contract',
+        steps: [
+          { type: 'createMovement', label: 'arrival', captureAs: 'arrival', request: { instrumentType: 'IPLC_LC', movementType: 'UTILIZE' } },
+          {
+            type: 'release', label: 'common Checker Approve', movementRef: 'arrival', releasedBy: 'checker1',
+          },
+        ],
+      });
+
+      expect(trace[1]).toMatchObject({ ok: true, response: { movementId: 'mv-a4', status: 'RELEASED' } });
+      expect(JSON.parse(global.fetch.mock.calls[1][1].body)).toEqual({ releasedBy: 'checker1' });
+    });
+
+    it('fails when an expected rejection returns a different business code', async () => {
+      global.fetch = jest
+        .fn()
+        .mockResolvedValueOnce(jsonResponse(201, { movementId: 'mv-a3', balanceContractId: 'bc-lc' }))
+        .mockResolvedValueOnce(jsonResponse(409, { code: 'FX_RATE_STALE' }));
+
+      await expect(runCase({
+        id: 'exact-error-contract',
+        steps: [
+          { type: 'createMovement', label: 'arrival', captureAs: 'arrival', request: { instrumentType: 'IPLC_LC', movementType: 'UTILIZE' } },
+          {
+            type: 'release', label: 'waiver required', movementRef: 'arrival', releasedBy: 'checker1',
+            expectError: true, expectedStatus: 409, expectedErrorCode: 'APPLICANT_WAIVER_REQUIRED',
+          },
+        ],
+      })).rejects.toThrow(/expected error APPLICANT_WAIVER_REQUIRED/);
+    });
+    it('hydrates a compact Maker Excess response so a later runner step can reference its contract', async () => {
+      global.fetch = jest
+        .fn()
+        .mockResolvedValueOnce(jsonResponse(201, { movementId: 'mv-sg', workflowStatus: 'PENDING', excessAmountOwner: '200' }))
+        .mockResolvedValueOnce(jsonResponse(200, { balanceContractId: 'bc-sg', logicalContractId: 'logical-sg' }))
+        .mockResolvedValueOnce(jsonResponse(201, { movementId: 'mv-redeem', balanceContractId: 'bc-sg' }));
+
+      const trace = await runCase({
+        id: 'compact-excess-response',
+        steps: [
+          {
+            type: 'createMovement', label: 'A8 Excess', captureAs: 'sg',
+            request: { instrumentType: 'SHGT', naturalKey: { lcNumber: 'LC1', sgNumber: 'G01' }, movementType: 'ISSUE', amount: '10200' },
+          },
+          {
+            type: 'createMovement', label: 'A9 Redeem', captureAs: 'redeem',
+            request: { instrumentType: 'SHGT', balanceContractIdRef: 'sg', movementType: 'FULL_REDEEM', amount: '10200' },
+          },
+        ],
+      });
+
+      expect(JSON.parse(global.fetch.mock.calls[2][1].body)).toMatchObject({ balanceContractId: 'bc-sg' });
+      expect(trace[0].response).toMatchObject({ movementId: 'mv-sg', balanceContractId: 'bc-sg', excessAmountOwner: '200' });
+    });
+
     it('runs a createMovement step with no captureAs without crashing and captures nothing', async () => {
       global.fetch = jest.fn(async () => jsonResponse(201, { movementId: 'mv-1', balanceContractId: 'bc-1' }));
 
@@ -246,88 +373,173 @@ describe('server.js internals — direct unit tests (not via HTTP/businessCases.
       expect(global.fetch).toHaveBeenCalledTimes(2);
     });
 
-    it('automatically creates and releases A02 when an Import test step reports a negative Tight Available Balance', async () => {
-      global.fetch = jest
-        .fn()
-        .mockImplementationOnce(async () => jsonResponse(201, { movementId: 'mv-original', balanceContractId: 'bc-1', currency: 'USD', eventSnapshot: { tightAvailableBalance: '-0.01' } }))
-        .mockImplementationOnce(async (_url, opts) => {
-          expect(JSON.parse(opts.body)).toMatchObject({ instrumentType: 'IPLC_LC', movementType: 'AMEND_INCREASE', amount: '0.01', sourceTransactionRef: 'A02' });
-          return jsonResponse(201, { movementId: 'mv-a02', balanceContractId: 'bc-1' });
-        })
-        .mockImplementationOnce(async () => jsonResponse(200, { movementId: 'mv-a02', status: 'RELEASED' }))
-        .mockImplementationOnce(async () => jsonResponse(200, { balanceContractId: 'bc-1', tightAvailableBalance: '0', currency: 'USD' }));
+    it('never auto-creates A2/B2 merely from a negative Tight snapshot', async () => {
+      global.fetch = jest.fn(async () => jsonResponse(201, { movementId: 'mv-1', balanceContractId: 'bc-1', tightAvailableBalance: '-1' }));
       const businessCase = {
-        id: 'synthetic-negative-tight',
-        steps: [
-          {
-            type: 'createMovement',
-            label: 'Invalid successful transaction',
-            captureAs: 'invalid',
-            request: { instrumentType: 'IPLC_LC', movementType: 'UTILIZE', amount: '1' },
-          },
-        ],
+        id: 'synthetic-no-auto-amend',
+        steps: [{ type: 'createMovement', label: 'Approved Excess result', request: { instrumentType: 'IPLC_LC', movementType: 'UTILIZE', amount: '1' } }],
       };
-
       const trace = await runCase(businessCase);
-      expect(trace.map((step) => step.label)).toEqual([
-        'Invalid successful transaction',
-        'Auto A02 — restore negative Tight LC Balance',
-        'Checker releases automatic A02',
-        'Balance after automatic A02',
-      ]);
+      expect(trace).toHaveLength(1);
+      expect(global.fetch).toHaveBeenCalledTimes(1);
     });
 
-    it('automatically creates and releases B02 when an Export snapshot reports a negative Tight Available Balance', async () => {
+    it('Business Case Runner only: auto-creates and releases A02 after EXCESS_LIMIT_EXCEEDED, then retries the original A3', async () => {
       global.fetch = jest
         .fn()
-        .mockImplementationOnce(async () => jsonResponse(201, { movementId: 'mv-1', balanceContractId: 'bc-1' }))
-        .mockImplementationOnce(async () => jsonResponse(200, { balanceContractId: 'bc-1', tightAvailableBalance: '-1', currency: 'USD' }))
-        .mockImplementationOnce(async (_url, opts) => {
-          expect(JSON.parse(opts.body)).toMatchObject({ instrumentType: 'EPLC_CONFIRMATION', movementType: 'AMEND', amount: '1', sourceTransactionRef: 'B02' });
-          return jsonResponse(201, { movementId: 'mv-b02', balanceContractId: 'bc-1' });
+        .mockImplementationOnce(async () => jsonResponse(201, { movementId: 'a1-movement', balanceContractId: 'lc-contract' }))
+        .mockImplementationOnce(async () => jsonResponse(200, { status: 'APPROVED' }))
+        .mockImplementationOnce(async () =>
+          jsonResponse(409, {
+            code: 'EXCESS_LIMIT_EXCEEDED',
+            guidance: { outcome: 'FINITE', minimumRequiredIncreaseOwner: '2000' },
+          }),
+        )
+        .mockImplementationOnce(async (_url, options) => {
+          expect(JSON.parse(options.body)).toMatchObject({
+            instrumentType: 'IPLC_LC',
+            balanceContractId: 'lc-contract',
+            movementType: 'AMEND_INCREASE',
+            amount: '2000',
+            eventSeq: 3,
+          });
+          return jsonResponse(201, { movementId: 'a02-movement', balanceContractId: 'lc-contract' });
         })
-        .mockImplementationOnce(async () => jsonResponse(200, { movementId: 'mv-b02', status: 'RELEASED' }))
-        .mockImplementationOnce(async () => jsonResponse(200, { balanceContractId: 'bc-1', tightAvailableBalance: '0', currency: 'USD' }));
-      const businessCase = {
-        id: 'synthetic-negative-snapshot',
+        .mockImplementationOnce(async (url) => {
+          expect(url).toMatch(/\/balance-movements\/a02-movement\/release$/);
+          return jsonResponse(200, { status: 'APPROVED' });
+        })
+        .mockImplementationOnce(async (_url, options) => {
+          expect(JSON.parse(options.body)).toMatchObject({ movementType: 'UTILIZE', amount: '12000', eventSeq: 4 });
+          return jsonResponse(201, { movementId: 'a3-retry', balanceContractId: 'lc-contract' });
+        });
+
+      const trace = await runCase({
+        id: 'synthetic-runner-auto-a02',
         steps: [
           {
             type: 'createMovement',
-            label: 'Valid create',
+            functionCode: 'A1',
+            label: 'A1 Issue',
             captureAs: 'lc',
-            request: { instrumentType: 'EPLC_CONFIRMATION', movementType: 'ISSUE', amount: '1000' },
+            request: { instrumentType: 'IPLC_LC', movementType: 'ISSUE', eventSeq: 1, amount: '10000', currency: 'USD' },
           },
-          { type: 'snapshot', label: 'Invalid balance snapshot', contractRef: 'lc' },
+          { type: 'release', label: 'Release A1', movementRef: 'lc', releasedBy: 'checker1' },
+          {
+            type: 'createMovement',
+            functionCode: 'A3',
+            label: 'A3 over allowance',
+            captureAs: 'arrival',
+            expectError: true,
+            autoFormalIncrease: { functionCode: 'A2', contractRef: 'lc' },
+            request: {
+              instrumentType: 'IPLC_LC',
+              balanceContractIdRef: 'lc',
+              movementType: 'UTILIZE',
+              eventSeq: 2,
+              amount: '12000',
+              currency: 'USD',
+              sourceTransactionRef: 'B01',
+              createdBy: 'maker1',
+            },
+          },
         ],
-      };
+      });
 
-      const trace = await runCase(businessCase);
-      expect(trace.at(-3)?.label).toBe('Auto B02 — restore negative Tight LC Balance');
-      expect(trace.at(-1)?.response.tightAvailableBalance).toBe('0');
+      expect(global.fetch).toHaveBeenCalledTimes(6);
+      expect(trace.map((entry) => entry.type)).toEqual([
+        'createMovement',
+        'release',
+        'createMovement',
+        'autoFormalIncrease',
+        'autoFormalIncreaseRelease',
+        'autoRetry',
+      ]);
+      expect(trace.at(-1)).toMatchObject({ ok: true, response: { movementId: 'a3-retry' } });
     });
 
-    it.each([
-      ['create', [jsonResponse(201, { movementId: 'mv-original', balanceContractId: 'bc-1', currency: 'USD', tightAvailableBalance: '-1' }), jsonResponse(409, { code: 'REJECTED' })], /Automatic A02 failed/],
-      ['release', [jsonResponse(201, { movementId: 'mv-original', balanceContractId: 'bc-1', currency: 'USD', tightAvailableBalance: '-1' }), jsonResponse(201, { movementId: 'mv-a02' }), jsonResponse(409, { code: 'REJECTED' })], /Automatic A02 release failed/],
-      ['verification', [jsonResponse(201, { movementId: 'mv-original', balanceContractId: 'bc-1', currency: 'USD', tightAvailableBalance: '-1' }), jsonResponse(201, { movementId: 'mv-a02' }), jsonResponse(200, { status: 'RELEASED' }), jsonResponse(500, { code: 'INTERNAL_ERROR' })], /Automatic A02 verification failed/],
-      ['still negative', [jsonResponse(201, { movementId: 'mv-original', balanceContractId: 'bc-1', currency: 'USD', tightAvailableBalance: '-1' }), jsonResponse(201, { movementId: 'mv-a02' }), jsonResponse(200, { status: 'RELEASED' }), jsonResponse(200, { tightAvailableBalance: '-0.01' })], /invalid negative Tight Available Balance/],
-    ])('reports an automatic A02 %s failure', async (_stage, responses, expected) => {
-      global.fetch = jest.fn();
-      responses.forEach((response) => global.fetch.mockResolvedValueOnce(response));
-      const businessCase = {
-        id: 'synthetic-auto-a02-failure',
-        steps: [{ type: 'createMovement', label: 'Negative Import result', request: { instrumentType: 'IPLC_LC', movementType: 'UTILIZE', amount: '1' } }],
-      };
-      await expect(runCase(businessCase)).rejects.toThrow(expected);
+    it('fails the auto-remediation case without creating a Formal Increase for a different rejection code', async () => {
+      global.fetch = jest.fn(async () => jsonResponse(409, { code: 'INSUFFICIENT_AVAILABLE_BALANCE' }));
+
+      await expect(runCase({
+        id: 'synthetic-runner-no-auto-for-other-error',
+        steps: [{
+          type: 'createMovement',
+          label: 'legacy rejection',
+          expectError: true,
+          autoFormalIncrease: { functionCode: 'A2', contractRef: 'lc' },
+          request: { instrumentType: 'IPLC_LC', movementType: 'UTILIZE', amount: '12000' },
+        }],
+      })).rejects.toThrow(/expected HTTP 409 EXCESS_LIMIT_EXCEEDED/);
+
+      expect(global.fetch).toHaveBeenCalledTimes(1);
     });
 
-    it('rejects a negative Tight result for an instrument without an A02/B02 repair rule', async () => {
-      global.fetch = jest.fn(async () => jsonResponse(201, { movementId: 'mv-sg', balanceContractId: 'sg-1', tightAvailableBalance: '-1' }));
-      const businessCase = {
-        id: 'synthetic-unsupported-auto-amend',
-        steps: [{ type: 'createMovement', label: 'Negative SG result', request: { instrumentType: 'SHGT', movementType: 'ISSUE', amount: '1' } }],
-      };
-      await expect(runCase(businessCase)).rejects.toThrow(/invalid negative Tight Available Balance/);
+    it('fails the auto-remediation case without creating when EXCESS_LIMIT_EXCEEDED uses a non-409 HTTP status', async () => {
+      global.fetch = jest.fn(async () => jsonResponse(500, { code: 'EXCESS_LIMIT_EXCEEDED' }));
+
+      await expect(runCase({
+        id: 'synthetic-runner-no-auto-for-non-409',
+        steps: [{
+          type: 'createMovement',
+          label: 'invalid transport contract',
+          expectError: true,
+          autoFormalIncrease: { functionCode: 'A2', contractRef: 'lc' },
+          request: { instrumentType: 'IPLC_LC', movementType: 'UTILIZE', amount: '12000' },
+        }],
+      })).rejects.toThrow(/expected HTTP 409 EXCESS_LIMIT_EXCEEDED/);
+
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('Business Case Runner only: auto-creates A02 and retries the complete A3S compound command', async () => {
+      global.fetch = jest
+        .fn()
+        .mockImplementationOnce(async () => jsonResponse(201, { movementId: 'a1', balanceContractId: 'lc-contract' }))
+        .mockImplementationOnce(async () => jsonResponse(201, { movementId: 'a8', balanceContractId: 'sg-contract' }))
+        .mockImplementationOnce(async () => jsonResponse(409, {
+          code: 'EXCESS_LIMIT_EXCEEDED',
+          guidance: { outcome: 'FINITE', minimumRequiredIncreaseOwner: '5000' },
+        }))
+        .mockImplementationOnce(async () => jsonResponse(201, { movementId: 'a02', balanceContractId: 'lc-contract' }))
+        .mockImplementationOnce(async () => jsonResponse(200, { status: 'APPROVED' }))
+        .mockImplementationOnce(async (url, options) => {
+          expect(url).toMatch(/\/balance-movements\/compound$/);
+          const body = JSON.parse(options.body);
+          expect(body.requests).toHaveLength(2);
+          expect(body.requests.find((request) => request.instrumentType === 'IPLC_LC').eventSeq).toBe(4);
+          expect(body.requests.find((request) => request.instrumentType === 'SHGT').eventSeq).toBe(2);
+          return jsonResponse(201, [
+            { movementId: 'sg-redeem', balanceContractId: 'sg-contract' },
+            { movementId: 'a3s-retry', balanceContractId: 'lc-contract' },
+          ]);
+        });
+
+      const trace = await runCase({
+        id: 'synthetic-runner-auto-a3s',
+        steps: [
+          { type: 'createMovement', label: 'A1', captureAs: 'lc', request: { instrumentType: 'IPLC_LC', movementType: 'ISSUE', eventSeq: 1, amount: '10000' } },
+          { type: 'createMovement', label: 'A8', captureAs: 'sg', request: { instrumentType: 'SHGT', movementType: 'ISSUE', eventSeq: 1, amount: '5000' } },
+          {
+            type: 'createCompoundMovements',
+            functionCode: 'A3S',
+            label: 'A3S over allowance',
+            captureAs: ['redeem', 'arrival'],
+            expectError: true,
+            autoFormalIncrease: { functionCode: 'A2', contractRef: 'lc', decisionRequestIndex: 1 },
+            requests: [
+              { instrumentType: 'SHGT', balanceContractIdRef: 'sg', movementType: 'FULL_REDEEM', eventSeq: 2, amount: '5000' },
+              { instrumentType: 'IPLC_LC', balanceContractIdRef: 'lc', movementType: 'UTILIZE', eventSeq: 2, amount: '17000', currency: 'USD', createdBy: 'maker1' },
+            ],
+          },
+        ],
+      });
+
+      expect(trace.map((entry) => entry.type)).toEqual([
+        'createMovement', 'createMovement', 'createCompoundMovements',
+        'autoFormalIncrease', 'autoFormalIncreaseRelease', 'autoRetry',
+      ]);
+      expect(global.fetch).toHaveBeenCalledTimes(6);
     });
 
     it('makerSubmit step: POSTs to .../maker-submit with makerSubmittedBy, distinct from release', async () => {
@@ -435,9 +647,100 @@ describe('server.js internals — direct unit tests (not via HTTP/businessCases.
     });
   });
 
+  describe('Runner-only automatic Formal Increase failures', () => {
+    const baseStep = {
+      label: 'over-limit demo',
+      functionCode: 'A3',
+      autoFormalIncrease: { functionCode: 'A2', contractRef: 'lc' },
+    };
+    const request = { balanceContractId: 'lc-contract', eventSeq: 2, currency: 'USD', createdBy: 'maker1' };
+    const finite = {
+      status: 409,
+      ok: false,
+      body: { code: 'EXCESS_LIMIT_EXCEEDED', guidance: { outcome: 'FINITE', minimumRequiredIncreaseOwner: '100' } },
+    };
+    const captured = { lc: { response: { balanceContractId: 'lc-contract' } } };
+
+    it('rejects non-finite guidance instead of inventing an amendment amount', async () => {
+      await expect(runAutoFormalIncrease(
+        baseStep,
+        request,
+        { status: 409, ok: false, body: { code: 'EXCESS_LIMIT_EXCEEDED', guidance: { outcome: 'INCREASE_ALONE_CANNOT_RESOLVE' } } },
+        captured,
+        [],
+      )).rejects.toThrow(/did not provide a finite Minimum Required Increase/);
+    });
+
+    it('rejects an unresolved parent contract and unsupported amendment function', async () => {
+      await expect(runAutoFormalIncrease(baseStep, request, finite, {}, [])).rejects.toThrow(/cannot resolve contractRef/);
+      await expect(runAutoFormalIncrease(
+        { ...baseStep, autoFormalIncrease: { functionCode: 'C2', contractRef: 'lc' } },
+        request,
+        finite,
+        captured,
+        [],
+      )).rejects.toThrow(/supports only A2 or B2/);
+    });
+
+    it.each([
+      ['create', [jsonResponse(409, { code: 'CREATE_FAILED' })], /automatic A2 failed/],
+      ['release', [jsonResponse(201, { movementId: 'a2' }), jsonResponse(409, { code: 'RELEASE_FAILED' })], /A2 Release failed/],
+      ['retry', [jsonResponse(201, { movementId: 'a2' }), jsonResponse(200, {}), jsonResponse(409, { code: 'RETRY_FAILED' })], /retry after automatic A2 failed/],
+    ])('surfaces automatic %s failure', async (_stage, responses, expected) => {
+      global.fetch = jest.fn();
+      responses.forEach((response) => global.fetch.mockImplementationOnce(async () => response));
+      await expect(runAutoFormalIncrease(baseStep, request, finite, captured, [])).rejects.toThrow(expected);
+    });
+
+    it('builds B02 for a child transaction, uses an explicit checker, and preserves the child retry sequence', async () => {
+      global.fetch = jest
+        .fn()
+        .mockImplementationOnce(async (_url, options) => {
+          expect(JSON.parse(options.body)).toMatchObject({ instrumentType: 'EPLC_CONFIRMATION', movementType: 'AMEND', eventSeq: 2 });
+          return jsonResponse(201, { movementId: 'b02', balanceContractId: 'conf-contract' });
+        })
+        .mockImplementationOnce(async (_url, options) => {
+          expect(JSON.parse(options.body)).toEqual({ releasedBy: 'checker-demo' });
+          return jsonResponse(200, {});
+        })
+        .mockImplementationOnce(async (_url, options) => {
+          expect(JSON.parse(options.body).eventSeq).toBe(1);
+          return jsonResponse(201, { movementId: 'b3', balanceContractId: 'b3-contract' });
+        });
+      const trace = [];
+
+      const result = await runAutoFormalIncrease(
+        { label: 'B3 over-limit', autoFormalIncrease: { functionCode: 'B2', contractRef: 'conf', releasedBy: 'checker-demo' } },
+        { instrumentType: 'EPLC_EXAMINATION', eventSeq: 1, currency: 'USD', createdBy: 'maker1' },
+        finite,
+        { conf: { response: { balanceContractId: 'conf-contract' } } },
+        trace,
+      );
+
+      expect(result.response.movementId).toBe('b3');
+      expect(trace.map((entry) => entry.label)).toEqual(expect.arrayContaining([
+        expect.stringContaining('B02'),
+        expect.stringContaining('B3 over-limit'),
+      ]));
+    });
+  });
+
   describe('callMicroservice (sanity — already exercised indirectly via runCase/resolveLogicalContractId above)', () => {
     it('is the same function exported from server.js', () => {
       expect(typeof callMicroservice).toBe('function');
+    });
+
+    it('adds Idempotency-Key to mutation commands used by OVERDRAWN cases', async () => {
+      global.fetch = jest.fn(async () => jsonResponse(201, { movementId: 'mv-1' }));
+
+      await callMicroservice('POST', '/balance-movements', { amount: '10200' });
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/balance-movements'),
+        expect.objectContaining({
+          headers: expect.objectContaining({ 'Content-Type': 'application/json', 'Idempotency-Key': expect.any(String) }),
+        }),
+      );
     });
   });
 });

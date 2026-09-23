@@ -228,19 +228,25 @@ describe('BusinessCaseRunnerComponent', () => {
       expect(arrayAfterSecondEmit).not.toBe(arrayAfterFirstEmit);
     });
 
-    it('stops on the first error, sets loadError, and never calls runCase for remaining cases', () => {
+    it('records a case failure and continues so later Export/OVERDRAWN cases still run', () => {
       const result1: BusinessCaseRunResult = { id: 'import-1', title: 'Import LC Case 1', description: 'd', trace: [] };
-      const runCase = jest.fn((id: string) => (id === 'import-1' ? of(result1) : throwError(() => new Error('case 2 blew up'))));
+      const result3: BusinessCaseRunResult = { id: 'overdrawn-1', title: 'OVERDRAWN Case', description: 'd', trace: [] };
+      const runCase = jest.fn((id: string) => {
+        if (id === 'import-1') return of(result1);
+        if (id === 'import-2') return throwError(() => new Error('case 2 blew up'));
+        return of(result3);
+      });
       const api = makeApi({ runCase });
       const component = makeComponent(api);
-      component.cases = [...cases, { id: 'import-3', title: 'Import LC Case 3', description: 'd', stepCount: 1 }];
+      component.cases = [...cases, { id: 'overdrawn-1', title: 'OVERDRAWN Case', description: 'd', stepCount: 1 }];
 
       component.runAll();
 
-      expect(runCase).toHaveBeenCalledTimes(2);
-      expect(runCase).not.toHaveBeenCalledWith('import-3');
-      expect(component.allResults).toEqual([result1]);
-      expect(component.loadError).toBe('Run failed on import-2: case 2 blew up');
+      expect(runCase).toHaveBeenCalledTimes(3);
+      expect(runCase).toHaveBeenCalledWith('overdrawn-1');
+      expect(component.allResults).toEqual([result1, result3]);
+      expect(component.runFailures).toEqual([{ id: 'import-2', title: 'Import LC Case 2', message: 'case 2 blew up' }]);
+      expect(component.loadError).toBeNull();
       expect(component.runningAll).toBe(false);
     });
 
@@ -252,8 +258,30 @@ describe('BusinessCaseRunnerComponent', () => {
 
       component.runAll();
 
-      expect(component.loadError).toBe('Run failed on import-1: plain string failure');
+      expect(component.runFailures).toEqual([{ id: 'import-1', title: 'Import LC Case 1', message: 'plain string failure' }]);
       expect(component.runningAll).toBe(false);
+    });
+
+    it('leaves opt-in policy cases available for manual selection but skips them in the default Run All', () => {
+      const result1: BusinessCaseRunResult = { id: 'import-1', title: 'Import LC Case 1', description: 'd', trace: [] };
+      const runCase = jest.fn(() => of(result1));
+      const api = makeApi({ runCase });
+      const component = makeComponent(api);
+      const optIn = {
+        id: 'overdrawn-bd16-boundary',
+        title: 'OVERDRAWN — BD-16 boundary',
+        description: 'requires 2%',
+        stepCount: 4,
+        requiredPolicy: { ownerType: 'IMPORT_LC', allowancePercentage: '2' },
+      };
+      component.cases = [cases[0], optIn];
+
+      component.runAll();
+
+      expect(runCase).toHaveBeenCalledTimes(1);
+      expect(runCase).toHaveBeenCalledWith('import-1');
+      expect(component.runAllSkipped).toEqual([optIn]);
+      expect(component.cases).toContain(optIn);
     });
 
     it('sets runningAll=false immediately when there are no cases to run', () => {

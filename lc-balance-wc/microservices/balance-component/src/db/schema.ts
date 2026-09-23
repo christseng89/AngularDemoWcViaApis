@@ -89,6 +89,7 @@ CREATE TABLE IF NOT EXISTS excess_accounts (
   excess_account_id       TEXT PRIMARY KEY,
   owner_type               TEXT NOT NULL CHECK (owner_type IN ('IMPORT_LC','EXPORT_CONFIRMATION')),
   owner_id                 TEXT NOT NULL,
+  owner_currency           TEXT NOT NULL,
   policy_version           TEXT NOT NULL,
   version                  INTEGER NOT NULL CHECK (version > 0),
   created_at               TEXT NOT NULL,
@@ -101,14 +102,13 @@ CREATE TABLE IF NOT EXISTS excess_ledger_events (
   excess_account_id        TEXT NOT NULL REFERENCES excess_accounts(excess_account_id),
   movement_id              TEXT REFERENCES balance_movements(movement_id),
   event_type               TEXT NOT NULL CHECK (event_type IN (
-    'PENDING_RESERVATION','APPROVED_UTILIZATION','RESERVATION_RELEASE',
-    'FORMAL_INCREASE_REGULARIZATION','RETURN_REVERSAL','CANCELLATION_REVERSAL'
+    'PENDING_RESERVATION','APPROVED_UTILIZATION','RESERVATION_RELEASE'
   )),
-  transaction_currency     TEXT NOT NULL,
-  transaction_amount       TEXT NOT NULL,
-  covered_amount           TEXT NOT NULL,
-  excess_amount            TEXT NOT NULL,
-  amount_usd               TEXT NOT NULL,
+  owner_currency           TEXT NOT NULL,
+  transaction_amount_owner TEXT NOT NULL,
+  covered_amount_owner     TEXT NOT NULL,
+  excess_amount_owner      TEXT NOT NULL,
+  allowance_amount_owner   TEXT NOT NULL,
   policy_version           TEXT NOT NULL,
   source_excess_event_id   TEXT REFERENCES excess_ledger_events(excess_event_id),
   created_by               TEXT NOT NULL,
@@ -120,49 +120,67 @@ CREATE INDEX IF NOT EXISTS idx_excess_events_account_time
 CREATE INDEX IF NOT EXISTS idx_excess_events_movement
   ON excess_ledger_events(movement_id);
 
-CREATE TABLE IF NOT EXISTS excess_allocations (
-  excess_allocation_id     TEXT PRIMARY KEY,
-  adjustment_event_id      TEXT NOT NULL REFERENCES excess_ledger_events(excess_event_id),
-  approved_excess_event_id TEXT NOT NULL REFERENCES excess_ledger_events(excess_event_id),
-  transaction_amount       TEXT NOT NULL,
-  amount_usd               TEXT NOT NULL,
-  created_at               TEXT NOT NULL,
-  UNIQUE (adjustment_event_id, approved_excess_event_id)
-);
-
 CREATE TABLE IF NOT EXISTS fx_rate_snapshots (
   fx_snapshot_id           TEXT PRIMARY KEY,
   movement_id              TEXT REFERENCES balance_movements(movement_id),
   decision_point           TEXT NOT NULL CHECK (decision_point IN ('MAKER_SUBMIT','CHECKER_RELEASE','FIX_PENDING')),
-  base_currency            TEXT NOT NULL,
-  quote_currency           TEXT NOT NULL CHECK (quote_currency = 'USD'),
+  from_currency            TEXT NOT NULL CHECK (from_currency = 'USD'),
+  to_currency              TEXT NOT NULL,
+  requested_amount_usd     TEXT NOT NULL,
   rate_purpose             TEXT NOT NULL CHECK (rate_purpose = 'BOOKING'),
   booking_rate             TEXT NOT NULL,
-  converted_amount_usd     TEXT NOT NULL,
+  converted_amount_owner   TEXT NOT NULL,
   rate_source              TEXT NOT NULL,
   provider_rate_id         TEXT NOT NULL,
   provider_rate_version    TEXT NOT NULL,
+  request_attempt_id       TEXT NOT NULL,
   rate_timestamp           TEXT NOT NULL,
   approval_status          TEXT NOT NULL CHECK (approval_status = 'APPROVED'),
   effective_from           TEXT NOT NULL,
   effective_to             TEXT,
   freshness_status         TEXT NOT NULL CHECK (freshness_status = 'FRESH'),
   rate_origin              TEXT NOT NULL DEFAULT 'PROVIDER_SUPPLIED' CHECK (rate_origin IN (
-    'PROVIDER_SUPPLIED','USD_PAR','VIRTUAL_EXPLICIT','VIRTUAL_DERIVED_MID'
+    'PROVIDER_SUPPLIED','USD_PAR','VIRTUAL_EXPLICIT','DERIVED_MID'
   )),
   correlation_id           TEXT NOT NULL,
   policy_version           TEXT NOT NULL,
+  fallback_reason          TEXT,
+  rate_date                TEXT,
+  fallback_policy_id       TEXT,
+  fallback_policy_version  TEXT,
   created_at               TEXT NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_fx_snapshots_movement
   ON fx_rate_snapshots(movement_id, decision_point);
 
+CREATE TABLE IF NOT EXISTS excess_decision_snapshots (
+  decision_snapshot_id     TEXT PRIMARY KEY,
+  movement_id              TEXT NOT NULL REFERENCES balance_movements(movement_id),
+  excess_account_id        TEXT NOT NULL REFERENCES excess_accounts(excess_account_id),
+  facts_version            TEXT NOT NULL,
+  owner_currency           TEXT NOT NULL,
+  effective_limit_owner    TEXT NOT NULL,
+  excess_decision          TEXT NOT NULL CHECK (excess_decision IN ('NOT_REQUIRED','WITHIN_ALLOWANCE','LIMIT_EXCEEDED')),
+  business_result_code     TEXT CHECK (business_result_code IS NULL OR business_result_code = 'EXCESS_LIMIT_EXCEEDED'),
+  release_eligibility      TEXT NOT NULL CHECK (release_eligibility IN ('ELIGIBLE','BLOCKED')),
+  policy_snapshot_json     TEXT NOT NULL CHECK (json_valid(policy_snapshot_json)),
+  action                   TEXT NOT NULL CHECK (action IN ('MAKER_SUBMIT','FIX_PENDING','RESUBMIT','CHECKER_RELEASE')),
+  command_idempotency_key  TEXT NOT NULL,
+  actor_context            TEXT NOT NULL,
+  decision_time            TEXT NOT NULL,
+  created_at               TEXT NOT NULL,
+  UNIQUE (movement_id, action, command_idempotency_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_excess_decisions_movement_time
+ON excess_decision_snapshots(movement_id, created_at);
+
 CREATE TABLE IF NOT EXISTS sg_capacity_events (
   sg_capacity_event_id     TEXT PRIMARY KEY,
   sg_balance_contract_id   TEXT NOT NULL REFERENCES balance_contracts(balance_contract_id),
   source_movement_id       TEXT NOT NULL REFERENCES balance_movements(movement_id),
-  event_type               TEXT NOT NULL CHECK (event_type IN ('INITIALIZE','RESERVE','REDEEM','RESTORE','REVERSE')),
+  event_type               TEXT NOT NULL CHECK (event_type IN ('INITIALIZE','RESERVE','REDEEM','REVERSE')),
   transaction_currency     TEXT NOT NULL,
   capacity_amount          TEXT NOT NULL,
   covered_amount           TEXT NOT NULL,
@@ -194,15 +212,14 @@ BEFORE UPDATE ON excess_ledger_events BEGIN SELECT RAISE(ABORT, 'excess_ledger_e
 CREATE TRIGGER IF NOT EXISTS immutable_excess_ledger_events_delete
 BEFORE DELETE ON excess_ledger_events BEGIN SELECT RAISE(ABORT, 'excess_ledger_events is append-only'); END;
 
-CREATE TRIGGER IF NOT EXISTS immutable_excess_allocations_update
-BEFORE UPDATE ON excess_allocations BEGIN SELECT RAISE(ABORT, 'excess_allocations is append-only'); END;
-CREATE TRIGGER IF NOT EXISTS immutable_excess_allocations_delete
-BEFORE DELETE ON excess_allocations BEGIN SELECT RAISE(ABORT, 'excess_allocations is append-only'); END;
-
 CREATE TRIGGER IF NOT EXISTS immutable_fx_rate_snapshots_update
 BEFORE UPDATE ON fx_rate_snapshots BEGIN SELECT RAISE(ABORT, 'fx_rate_snapshots is append-only'); END;
 CREATE TRIGGER IF NOT EXISTS immutable_fx_rate_snapshots_delete
 BEFORE DELETE ON fx_rate_snapshots BEGIN SELECT RAISE(ABORT, 'fx_rate_snapshots is append-only'); END;
+CREATE TRIGGER IF NOT EXISTS immutable_excess_decision_snapshots_update
+BEFORE UPDATE ON excess_decision_snapshots BEGIN SELECT RAISE(ABORT, 'excess_decision_snapshots is append-only'); END;
+CREATE TRIGGER IF NOT EXISTS immutable_excess_decision_snapshots_delete
+BEFORE DELETE ON excess_decision_snapshots BEGIN SELECT RAISE(ABORT, 'excess_decision_snapshots is append-only'); END;
 
 CREATE TRIGGER IF NOT EXISTS immutable_sg_capacity_events_update
 BEFORE UPDATE ON sg_capacity_events BEGIN SELECT RAISE(ABORT, 'sg_capacity_events is append-only'); END;
@@ -213,6 +230,111 @@ CREATE TRIGGER IF NOT EXISTS immutable_command_idempotency_update
 BEFORE UPDATE ON command_idempotency BEGIN SELECT RAISE(ABORT, 'command_idempotency is append-only'); END;
 CREATE TRIGGER IF NOT EXISTS immutable_command_idempotency_delete
 BEFORE DELETE ON command_idempotency BEGIN SELECT RAISE(ABORT, 'command_idempotency is append-only'); END;
+`;
+
+/** Checker fail-closed command attempts are audit facts, never workflow or FX snapshot facts. */
+export const EXCESS_COMMAND_ATTEMPT_AUDIT_SCHEMA_SQL = `
+CREATE TABLE IF NOT EXISTS excess_command_attempt_audits (
+  command_attempt_audit_id TEXT PRIMARY KEY,
+  command_type             TEXT NOT NULL CHECK (command_type = 'CHECKER_RELEASE'),
+  movement_id              TEXT NOT NULL REFERENCES balance_movements(movement_id),
+  owner_type               TEXT NOT NULL CHECK (owner_type IN ('IMPORT_LC','EXPORT_CONFIRMATION')),
+  owner_id                 TEXT NOT NULL,
+  owner_currency           TEXT NOT NULL,
+  actor_context            TEXT NOT NULL,
+  command_idempotency_key  TEXT NOT NULL,
+  request_hash             TEXT NOT NULL,
+  result_code              TEXT NOT NULL CHECK (result_code IN ('FX_RATE_UNAVAILABLE','FX_RATE_STALE')),
+  policy_version           TEXT NOT NULL,
+  from_currency            TEXT NOT NULL CHECK (from_currency = 'USD'),
+  to_currency              TEXT NOT NULL,
+  requested_amount_usd     TEXT NOT NULL,
+  rate_purpose             TEXT NOT NULL CHECK (rate_purpose = 'BOOKING'),
+  decision_time            TEXT NOT NULL,
+  created_at               TEXT NOT NULL,
+  UNIQUE (command_type, movement_id, actor_context, command_idempotency_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_excess_command_attempts_movement_time
+  ON excess_command_attempt_audits(movement_id, created_at);
+
+CREATE TRIGGER IF NOT EXISTS immutable_excess_command_attempt_audits_update
+BEFORE UPDATE ON excess_command_attempt_audits BEGIN SELECT RAISE(ABORT, 'excess_command_attempt_audits is append-only'); END;
+CREATE TRIGGER IF NOT EXISTS immutable_excess_command_attempt_audits_delete
+BEFORE DELETE ON excess_command_attempt_audits BEGIN SELECT RAISE(ABORT, 'excess_command_attempt_audits is append-only'); END;
+`;
+
+/** Immutable A4/A6 Applicant Waiver confirmations for positive Import Excess. */
+export const APPLICANT_WAIVER_SCHEMA_SQL = `
+CREATE TABLE IF NOT EXISTS applicant_waiver_snapshots (
+  waiver_snapshot_id       TEXT PRIMARY KEY,
+  source_movement_id       TEXT NOT NULL REFERENCES balance_movements(movement_id),
+  release_movement_id      TEXT NOT NULL REFERENCES balance_movements(movement_id),
+  excess_account_id        TEXT NOT NULL REFERENCES excess_accounts(excess_account_id),
+  excess_amount_owner      TEXT NOT NULL,
+  validation_result        TEXT NOT NULL CHECK (validation_result = 'CONFIRMED'),
+  checker_context          TEXT NOT NULL,
+  confirmed_at             TEXT NOT NULL,
+  waiver_reference         TEXT,
+  waiver_date              TEXT,
+  waiver_evidence          TEXT,
+  created_at               TEXT NOT NULL,
+  UNIQUE (release_movement_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_applicant_waiver_source
+  ON applicant_waiver_snapshots(source_movement_id, confirmed_at);
+CREATE TRIGGER IF NOT EXISTS immutable_applicant_waiver_snapshots_update
+BEFORE UPDATE ON applicant_waiver_snapshots BEGIN SELECT RAISE(ABORT, 'applicant_waiver_snapshots is append-only'); END;
+CREATE TRIGGER IF NOT EXISTS immutable_applicant_waiver_snapshots_delete
+BEFORE DELETE ON applicant_waiver_snapshots BEGIN SELECT RAISE(ABORT, 'applicant_waiver_snapshots is append-only'); END;
+`;
+
+/** Immutable B4 authorization decision and two-leg export asset voucher. */
+export const EXPORT_ASSET_SCHEMA_SQL = `
+CREATE TABLE IF NOT EXISTS export_authorization_snapshots (
+  authorization_snapshot_id      TEXT PRIMARY KEY,
+  b4_movement_id                 TEXT NOT NULL UNIQUE REFERENCES balance_movements(movement_id),
+  source_b3_movement_id          TEXT NOT NULL REFERENCES balance_movements(movement_id),
+  claim_status                   TEXT NOT NULL CHECK (claim_status IN ('ABSENT','SUBMITTED')),
+  authorization_reference       TEXT,
+  authorized_amount_owner       TEXT,
+  authorized_currency           TEXT,
+  authorization_validation_result TEXT NOT NULL CHECK (authorization_validation_result IN ('CONFIRMED','NOT_CONFIRMED')),
+  checker_context               TEXT NOT NULL,
+  decision_time                 TEXT NOT NULL,
+  confirmed_at                  TEXT NOT NULL,
+  excess_debtor                 TEXT NOT NULL CHECK (excess_debtor IN ('ISSUING_BANK','BENEFICIARY_OR_RECOURSE_PARTY')),
+  created_at                    TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS export_asset_postings (
+  posting_id                     TEXT PRIMARY KEY,
+  business_event_id             TEXT NOT NULL,
+  b4_movement_id                TEXT NOT NULL REFERENCES balance_movements(movement_id),
+  source_b3_movement_id         TEXT NOT NULL REFERENCES balance_movements(movement_id),
+  balance_type                  TEXT NOT NULL CHECK (balance_type IN ('Due from Issuing Bank','Reimbursement Receivable','EXPORT_EXCESS_ASSET')),
+  amount_owner                  TEXT NOT NULL,
+  owner_currency               TEXT NOT NULL,
+  debtor                       TEXT NOT NULL CHECK (debtor IN ('ISSUING_BANK','BENEFICIARY_OR_RECOURSE_PARTY')),
+  mapping_key                  TEXT NOT NULL REFERENCES balance_account_mappings(mapping_key),
+  mapping_version              INTEGER NOT NULL CHECK (mapping_version > 0),
+  account_a_number             TEXT NOT NULL,
+  account_b_number             TEXT NOT NULL,
+  authorization_snapshot_id    TEXT NOT NULL REFERENCES export_authorization_snapshots(authorization_snapshot_id),
+  created_at                   TEXT NOT NULL,
+  UNIQUE (b4_movement_id, balance_type)
+);
+
+CREATE INDEX IF NOT EXISTS idx_export_asset_source ON export_asset_postings(source_b3_movement_id, created_at);
+CREATE TRIGGER IF NOT EXISTS immutable_export_authorization_snapshots_update
+BEFORE UPDATE ON export_authorization_snapshots BEGIN SELECT RAISE(ABORT, 'export_authorization_snapshots is append-only'); END;
+CREATE TRIGGER IF NOT EXISTS immutable_export_authorization_snapshots_delete
+BEFORE DELETE ON export_authorization_snapshots BEGIN SELECT RAISE(ABORT, 'export_authorization_snapshots is append-only'); END;
+CREATE TRIGGER IF NOT EXISTS immutable_export_asset_postings_update
+BEFORE UPDATE ON export_asset_postings BEGIN SELECT RAISE(ABORT, 'export_asset_postings is append-only'); END;
+CREATE TRIGGER IF NOT EXISTS immutable_export_asset_postings_delete
+BEFORE DELETE ON export_asset_postings BEGIN SELECT RAISE(ABORT, 'export_asset_postings is append-only'); END;
 `;
 
 export const SCHEMA_SQL = `
@@ -497,4 +619,7 @@ CREATE TABLE IF NOT EXISTS balance_account_mappings (
 );
 
 ${EXCESS_SCHEMA_SQL}
+${EXCESS_COMMAND_ATTEMPT_AUDIT_SCHEMA_SQL}
+${APPLICANT_WAIVER_SCHEMA_SQL}
+${EXPORT_ASSET_SCHEMA_SQL}
 `;

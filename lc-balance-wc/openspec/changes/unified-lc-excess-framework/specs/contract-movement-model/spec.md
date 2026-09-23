@@ -18,9 +18,9 @@
 
 #### Scenario: 相同 Key 與 Payload 重送
 
-- **WHEN** 使用相同 scope、key 與 canonical payload 再次送出 Maker／compound／Fix／regularization／return command
+- **WHEN** 使用相同 scope、key 與 canonical payload 再次送出 Maker／compound／Fix／Resubmit／Delete Pending command
 - **THEN** 系統 SHALL 回傳既有 status 與 response body
-- **AND** SHALL NOT 重複 movement、reservation、adjustment 或 balance effect
+- **AND** SHALL NOT 重複 movement、reservation、reservation release、deletion audit 或 balance effect
 
 #### Scenario: 相同 Key 但 Payload 不同
 
@@ -63,15 +63,41 @@
 
 ### Requirement: Immutable Excess and FX Evidence
 
-每個接受的 Excess movement SHALL 保存 Covered／Excess、owner、policy version、Maker／Checker FX snapshots、decision inputs／outputs 與 attribution；後續 rate、configuration、regularization 或 downstream lifecycle MUST NOT 改寫歷史 snapshot。
+每個接受的A3／A3S／B3 Excess movement SHALL保存Legal Amount、Covered Amount、Excess Amount、workflow／Excess statuses、owner、policy version、Maker及所有適用Checker decision-point FX snapshots、decision inputs／outputs與attribution；A3S另 SHALL保存Base Parent Tight、Current SG Redemption Amount及Effective Presentation Capacity。後續rate、configuration、Formal Increase guidance或downstream lifecycle MUST NOT改寫歷史snapshot。
 
 #### Scenario: Rate 後續變更
 
 - **WHEN** provider 發布新 Booking Rate
-- **THEN** 既有 Maker／Checker FX snapshots SHALL 維持原歷史 evidence
+- **THEN** 既有Maker及各Checker decision-point FX snapshots SHALL維持原歷史evidence
 
-#### Scenario: Formal Increase Regularizes Excess
+#### Scenario: Formal Increase Does Not Rewrite Excess
 
-- **WHEN** Formal Increase 調整既有 Approved Excess
-- **THEN** 系統 SHALL 追加 adjustment 與 allocation events
-- **AND** 原 Approved Excess event SHALL 保持不可變
+- **WHEN** 最新 Checker-released Approved Contractual Maximum 因既有 A2／B2 processing 增加
+- **THEN** 系統 SHALL 保持原 Approved Excess event 與 utilization 不變
+- **AND** SHALL NOT 建立 `FORMAL_INCREASE_REGULARIZATION`、allocation 或 cure event
+
+### Requirement: Immutable Authorization Evidence and Legacy Waiver Compatibility
+
+新A4／A6 Release SHALL以共同`ABSENT + Checker Approve`操作處理，且 SHALL NOT建立Applicant Waiver snapshot；既有waiver table／fields只供歷史資料讀取及API相容。每筆positive B3 Excess在B4 asset creation時 MUST保存authorization decision snapshot：`claimStatus`、validation result、Checker、timestamp及resolved debtor為必填；reference／amount／currency在`ABSENT`時為null，在`SUBMITTED`時保存實際submitted values（包括partial／invalid claim）。B3不得預先保存debtor decision。任何Fix／Resubmit不得覆寫已成功B4 snapshot。
+
+#### Scenario: Legacy Waiver Evidence Changes After Release
+
+- **WHEN** 歷史Applicant文件或外部reference在既有A4／A6 Release後改變
+- **THEN** 原Release snapshot SHALL保持不可變
+- **AND** inquiry SHALL顯示decision-time evidence而非重新查詢外部狀態
+
+#### Scenario: Authorization Has No External Provider State
+
+- **WHEN** Checker確認Export authorization
+- **THEN** authoritative fact SHALL是本地snapshot與Checker assertion
+- **AND** data model SHALL不包含外部authorization service request／response或pending lookup state
+
+### Requirement: Export Asset Attribution Is Separate From Balance Type
+
+Export asset movement SHALL分別保存`legalAmountOwner`、`coveredAssetAmountOwner`、`excessAssetAmountOwner`、`balanceType`、`debtor`及source Excess attribution。`debtor`不得改變`EXPORT_EXCESS_ASSET` balance type；三個amount MUST以exact decimal滿足Legal = Covered + Excess。
+
+#### Scenario: Issuing Bank Is Excess Debtor
+
+- **WHEN**完整authorization有效且Checker confirmed
+- **THEN**Excess Asset debtor SHALL為`ISSUING_BANK`
+- **AND**balanceType SHALL仍為`EXPORT_EXCESS_ASSET`，不得變成`Due from Issuing Bank`或`Reimbursement Receivable`

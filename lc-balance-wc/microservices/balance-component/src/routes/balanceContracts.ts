@@ -18,16 +18,16 @@ export function balanceContractsRouter(service: BalanceService): Router {
     if (!instrumentType || !lcNumber) {
       throw new RequestValidationError('instrumentType and lcNumber are required.');
     }
-    const contract = service.resolveContract(
-      instrumentType as InstrumentType,
-      {
-        lcNumber: lcNumber as string,
-        ibNumber: (ibNumber as string) ?? null,
-        sgNumber: (sgNumber as string) ?? null,
-        legSeq: (legSeq as string) ?? null,
-      },
-      includeAnyStatus === 'true',
-    );
+    const naturalKey = {
+      lcNumber: lcNumber as string,
+      ibNumber: (ibNumber as string) ?? null,
+      sgNumber: (sgNumber as string) ?? null,
+      legSeq: (legSeq as string) ?? null,
+    };
+    const contract =
+      includeAnyStatus === 'true'
+        ? service.resolveContractAnyStatus(instrumentType as InstrumentType, naturalKey)
+        : service.resolveContract(instrumentType as InstrumentType, naturalKey);
     if (!contract) throw new NotFoundError('No Logical Contract exists yet for this natural key.');
     res.json(contract);
   });

@@ -15,7 +15,6 @@ import {
   ViewContainerRef,
   ViewEncapsulation,
 } from '@angular/core';
-import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import {
   BALANCE_COMPONENT_CONTRACT_VERSION,
   BalanceComponentConfig,
@@ -61,13 +60,22 @@ export class BalanceComponentElementComponent implements OnInit, AfterViewInit, 
   protected activeComponent: Type<unknown> | null = null;
   protected loading = true;
 
-  protected stylesheetResourceUrl: SafeResourceUrl = '';
   private stylesheetUrlValue = '';
 
   @Input()
   set stylesheetUrl(value: string) {
-    this.stylesheetUrlValue = value;
-    this.stylesheetResourceUrl = value ? this.sanitizer.bypassSecurityTrustResourceUrl(value) : '';
+    const candidate = value?.trim();
+    if (!candidate) {
+      this.stylesheetUrlValue = '';
+      return;
+    }
+    try {
+      const parsed = new URL(candidate, document.baseURI);
+      this.stylesheetUrlValue = parsed.protocol === 'https:' || parsed.protocol === 'http:' ? parsed.href : '';
+    } catch {
+      this.stylesheetUrlValue = '';
+    }
+    this.syncStylesheetLink();
   }
 
   get stylesheetUrl(): string {
@@ -78,8 +86,8 @@ export class BalanceComponentElementComponent implements OnInit, AfterViewInit, 
     return this.effectiveTheme;
   }
 
-  @ViewChild('viewHost', { read: ViewContainerRef }) private viewHost!: ViewContainerRef;
-  @ViewChild('componentStyles') private componentStyles?: ElementRef<HTMLLinkElement>;
+  @ViewChild('viewHost', { read: ViewContainerRef }) private readonly viewHost!: ViewContainerRef;
+  private componentStyles: HTMLLinkElement | null = null;
 
   private normalizedConfig: NormalizedBalanceComponentConfig = normalizeBalanceComponentConfig(undefined);
   private initialized = false;
@@ -89,7 +97,6 @@ export class BalanceComponentElementComponent implements OnInit, AfterViewInit, 
   constructor(
     private readonly changeDetectorRef: ChangeDetectorRef,
     private readonly elementRef: ElementRef<HTMLElement>,
-    private readonly sanitizer: DomSanitizer,
   ) {}
 
   @Input()
@@ -113,6 +120,7 @@ export class BalanceComponentElementComponent implements OnInit, AfterViewInit, 
   }
 
   ngAfterViewInit(): void {
+    this.syncStylesheetLink();
     void this.initializeView();
   }
 
@@ -162,7 +170,7 @@ export class BalanceComponentElementComponent implements OnInit, AfterViewInit, 
   }
 
   private waitForStylesheet(): Promise<void> {
-    const link = this.componentStyles?.nativeElement;
+    const link = this.componentStyles;
     if (!this.stylesheetUrl || !link || link.sheet) return Promise.resolve();
 
     return new Promise<void>((resolve, reject) => {
@@ -177,6 +185,21 @@ export class BalanceComponentElementComponent implements OnInit, AfterViewInit, 
         { once: true },
       );
     });
+  }
+
+  private syncStylesheetLink(): void {
+    const shadowRoot = this.elementRef.nativeElement.shadowRoot;
+    if (!shadowRoot) return;
+    if (!this.stylesheetUrlValue) {
+      this.componentStyles?.remove();
+      this.componentStyles = null;
+      return;
+    }
+    const link = this.componentStyles ?? document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = this.stylesheetUrlValue;
+    if (!this.componentStyles) shadowRoot.prepend(link);
+    this.componentStyles = link;
   }
 
   private applyTheme(mode: BalanceComponentTheme): void {

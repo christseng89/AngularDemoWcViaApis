@@ -251,7 +251,7 @@ describe('InquireEventsService', () => {
       svc.search();
 
       // 4 rows, not 3 — the UTILIZE's own later Release (A4) is no longer invisible.
-      expect(svc.events.length).toBe(4);
+      expect(svc.events).toHaveLength(4);
       expect(svc.events.map((e) => e.movement.movementId)).toEqual(['mv-issue', 'mv-utilize', 'mv-sg', 'mv-utilize']);
       expect(svc.events.map((e) => e.phase)).toEqual(['primary', 'create', 'primary', 'finalize']);
       // eventStatus is the movement's real current status on EVERY row, never a frozen 'PENDING' — see toEventRows().
@@ -514,7 +514,7 @@ describe('InquireEventsService', () => {
       svc.lcNumber = 'S05';
       svc.search();
 
-      expect(svc.events.length).toBe(1);
+      expect(svc.events).toHaveLength(1);
       expect(svc.events[0].phase).toBe('primary');
       expect(svc.events[0].eventStatus).toBe('REJECTED');
     });
@@ -539,7 +539,7 @@ describe('InquireEventsService', () => {
       svc.lcNumber = 'S05';
       svc.search();
 
-      expect(svc.events.length).toBe(2);
+      expect(svc.events).toHaveLength(2);
       expect(svc.events.map((e) => e.phase)).toEqual(['create', 'finalize']);
     });
 
@@ -642,7 +642,7 @@ describe('InquireEventsService', () => {
       svc.lcNumber = 'S001';
       svc.search();
 
-      expect(svc.events.length).toBe(2);
+      expect(svc.events).toHaveLength(2);
       expect(svc.events.map((e) => e.phase).sort()).toEqual(['create', 'finalize']);
       expect(svc.events.find((e) => e.phase === 'finalize')?.eventTime).toBe('2026-08-17T15:00:00.000Z');
     });
@@ -668,7 +668,7 @@ describe('InquireEventsService', () => {
       svc.lcNumber = 'S001';
       svc.search();
 
-      expect(svc.events.length).toBe(2);
+      expect(svc.events).toHaveLength(2);
       const createRow = svc.events.find((e) => e.phase === 'create')!;
       const finalizeRow = svc.events.find((e) => e.phase === 'finalize')!;
       expect(createRow.eventStatus).toBe('PENDING');
@@ -694,7 +694,7 @@ describe('InquireEventsService', () => {
       svc.lcNumber = 'S001';
       svc.search();
 
-      expect(svc.events.length).toBe(2);
+      expect(svc.events).toHaveLength(2);
       expect(svc.events.find((e) => e.phase === 'finalize')?.eventStatus).toBe('REJECTED');
     });
 
@@ -707,7 +707,7 @@ describe('InquireEventsService', () => {
       svc.lcNumber = 'S001';
       svc.search();
 
-      expect(svc.events.length).toBe(1);
+      expect(svc.events).toHaveLength(1);
       expect(svc.events[0].phase).toBe('primary');
     });
 
@@ -720,7 +720,7 @@ describe('InquireEventsService', () => {
       svc.lcNumber = 'S001';
       svc.search();
 
-      expect(svc.events.length).toBe(1);
+      expect(svc.events).toHaveLength(1);
       expect(svc.events[0].phase).toBe('primary');
       expect(svc.events[0].eventStatus).toBe('PENDING');
     });
@@ -736,7 +736,7 @@ describe('InquireEventsService', () => {
       const svc = new InquireEventsService(api);
       svc.lcNumber = 'S001';
       svc.search();
-      expect(svc.events.length).toBe(1);
+      expect(svc.events).toHaveLength(1);
     });
 
     it("a child catalog() call itself failing (e.g. network error) is swallowed (catchError -> []) — the root's own movements still come back", () => {
@@ -868,7 +868,7 @@ describe('InquireEventsService', () => {
 
       expect(svc.indexLoading).toBe(false);
       expect(svc.indexPaging.total).toBe(2);
-      expect(svc.indexRows.length).toBe(2);
+      expect(svc.indexRows).toHaveLength(2);
 
       const row1 = svc.indexRows.find((r) => r.contract.naturalKey.lcNumber === 'S001')!;
       expect(row1.lcAmount).toBe('110000'); // 100000 + 20000 - 10000; neither UTILIZE counts.
@@ -1009,7 +1009,7 @@ describe('InquireEventsService', () => {
       svc.side = 'EXPORT';
       svc.loadIndex(1);
 
-      expect(svc.indexRows.length).toBe(1);
+      expect(svc.indexRows).toHaveLength(1);
       expect(svc.indexRows[0].lcAmount).toBe('105000'); // 100000 + 20000 - 15000; PENDING AMEND excluded.
       expect(svc.indexRows[0].contract.naturalKey.lcNumber).toBe('CNF01');
       // Export labels SELLERS_USANCE as plain "Usance" (tenorTypeLabel()'s side-aware rule), not Import's "Seller's Usance".
@@ -1025,7 +1025,7 @@ describe('InquireEventsService', () => {
       });
       const svc = new InquireEventsService(api);
       svc.loadIndex(1);
-      expect(svc.indexRows.length).toBe(1);
+      expect(svc.indexRows).toHaveLength(1);
       expect(svc.indexRows[0].availableBalance).toBe('—');
       expect(svc.indexRows[0].tightLcBalance).toBe('—');
       expect(svc.indexRows[0].lcAmount).toBe('1000');
@@ -1040,7 +1040,7 @@ describe('InquireEventsService', () => {
 
       svc.loadIndex(1);
 
-      expect(svc.indexRows.length).toBe(1);
+      expect(svc.indexRows).toHaveLength(1);
       expect(svc.indexRows[0].lastEventAt).toBe(issue.createdAt);
       // Only one catalog() call — no child-catalog lookups attempted.
       expect(catalog).toHaveBeenCalledTimes(1);
@@ -1246,9 +1246,9 @@ describe('InquireEventsService', () => {
       expect(api.resolveContract).not.toHaveBeenCalled();
       expect(svc.rootContract).toBe(contract);
       expect(svc.indexView).toBe('EVENTS');
-      expect(svc.events.length).toBe(1);
+      expect(svc.events).toHaveLength(1);
       // Preserved across the round trip.
-      expect(svc.indexRows.length).toBe(1);
+      expect(svc.indexRows).toHaveLength(1);
       expect(svc.indexPaging.page).toBe(2);
       expect(svc.indexPaging.total).toBe(15);
       expect(svc.indexSearch).toBe('S0');
@@ -1276,7 +1276,7 @@ describe('InquireEventsService', () => {
       svc.backToIndex();
 
       expect(svc.indexView).toBe('INDEX');
-      expect(svc.indexRows.length).toBe(1);
+      expect(svc.indexRows).toHaveLength(1);
       expect(svc.indexPaging.page).toBe(4);
       expect(svc.indexSearch).toBe('kept');
     });
@@ -1359,11 +1359,11 @@ describe('InquireEventsService', () => {
 
     it('pagedEvents returns the first pageSize (10) events on page 1, and totalPages reflects the full events.length', () => {
       const svc = make25EventsService();
-      expect(svc.events.length).toBe(25);
+      expect(svc.events).toHaveLength(25);
       expect(svc.eventsPaging.page).toBe(1);
       expect(svc.eventsPaging.total).toBe(25);
       expect(svc.eventsPaging.totalPages).toBe(3);
-      expect(svc.pagedEvents.length).toBe(10);
+      expect(svc.pagedEvents).toHaveLength(10);
       expect(svc.pagedEvents.map((e) => e.movement.movementId)).toEqual(['mv-0', 'mv-1', 'mv-2', 'mv-3', 'mv-4', 'mv-5', 'mv-6', 'mv-7', 'mv-8', 'mv-9']);
     });
 
@@ -1386,7 +1386,7 @@ describe('InquireEventsService', () => {
 
       svc.nextEventsPage();
       expect(svc.eventsPaging.page).toBe(3);
-      expect(svc.pagedEvents.length).toBe(5);
+      expect(svc.pagedEvents).toHaveLength(5);
       expect(svc.pagedEvents.map((e) => e.movement.movementId)).toEqual(['mv-20', 'mv-21', 'mv-22', 'mv-23', 'mv-24']);
 
       // Already on the last page — nextEventsPage() is a no-op.

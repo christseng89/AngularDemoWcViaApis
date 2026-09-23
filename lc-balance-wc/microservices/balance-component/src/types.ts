@@ -69,18 +69,18 @@ export type ExposureNature = 'CONTINGENT' | 'ACTUAL' | 'MEMO';
 export type TenorType = 'SIGHT' | 'BUYERS_USANCE' | 'SELLERS_USANCE' | 'DP' | 'DA';
 
 /** v11.15 Excess concepts are deliberately separate from contract, movement and accounting state. */
-export type ExcessFunctionCode = 'A8' | 'A3' | 'A3S' | 'B3';
+export type ExcessFunctionCode = 'A3' | 'A3S' | 'B3';
 export type ExcessOwnerType = 'IMPORT_LC' | 'EXPORT_CONFIRMATION';
 export type ExcessDecisionStatus = 'NOT_REQUIRED' | 'WITHIN_ALLOWANCE' | 'LIMIT_EXCEEDED';
 export type ExcessWorkflowStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'DELETED';
 export type FxCommandFailureCode = 'FX_RATE_UNAVAILABLE' | 'FX_RATE_STALE';
-export type ExcessLedgerEventType =
-  'PENDING_RESERVATION' | 'APPROVED_UTILIZATION' | 'RESERVATION_RELEASE' | 'FORMAL_INCREASE_REGULARIZATION' | 'RETURN_REVERSAL' | 'CANCELLATION_REVERSAL';
+export type ExcessLedgerEventType = 'PENDING_RESERVATION' | 'APPROVED_UTILIZATION' | 'RESERVATION_RELEASE';
 
 export interface ExcessAccount {
   excessAccountId: string;
   ownerType: ExcessOwnerType;
   ownerId: string;
+  ownerCurrency: string;
   policyVersion: string;
   version: number;
   createdAt: string;
@@ -92,6 +92,22 @@ export interface ExcessLedgerEvent {
   excessAccountId: string;
   movementId: string | null;
   eventType: ExcessLedgerEventType;
+  ownerCurrency: string;
+  transactionAmountOwner: string;
+  coveredAmountOwner: string;
+  excessAmountOwner: string;
+  amountOwner: string;
+  policyVersion: string;
+  sourceExcessEventId: string | null;
+  createdBy: string;
+  createdAt: string;
+}
+
+/** Read-only compatibility shape for a pre-V4 cure event; excluded from every active ledger API. */
+interface LegacyPreV4ExcessEvent {
+  excessEventId: string;
+  excessAccountId: string;
+  movementId: string | null;
   transactionCurrency: string;
   transactionAmount: string;
   coveredAmount: string;
@@ -103,7 +119,17 @@ export interface ExcessLedgerEvent {
   createdAt: string;
 }
 
-export interface ExcessAllocation {
+export type LegacyFormalIncreaseEvent = LegacyPreV4ExcessEvent & {
+  eventType: 'FORMAL_INCREASE_REGULARIZATION';
+};
+
+/** Read-only compatibility shape for pre-BD-07 draft reversal rows; excluded from every active ledger API and aggregate. */
+export type LegacyExcessReversalEvent = LegacyPreV4ExcessEvent & {
+  eventType: 'RETURN_REVERSAL' | 'CANCELLATION_REVERSAL';
+};
+
+/** Read-only compatibility shape for pre-V4 allocation rows; no active write API exists. */
+export interface LegacyExcessAllocation {
   excessAllocationId: string;
   adjustmentEventId: string;
   approvedExcessEventId: string;
@@ -113,8 +139,8 @@ export interface ExcessAllocation {
 }
 
 export interface ExcessAllowanceAggregate {
-  pendingReservedUsd: string;
-  approvedUtilizedUsd: string;
+  pendingReservedOwner: string;
+  approvedUtilizedOwner: string;
 }
 
 export interface NaturalKey {

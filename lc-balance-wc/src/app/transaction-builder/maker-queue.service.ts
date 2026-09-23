@@ -312,6 +312,7 @@ export class MakerQueueService {
   fixPendingSupported(row: MakerQueueRow): boolean {
     const fn = this.functionFor(row);
     const strategy = fn ? deriveFunctionStrategy(fn) : null;
+    if (this.isArrivalWithSgCompound(row) && row.movement.acknowledgedAt) return false;
     if (this.isCompoundShape(row) && !this.isArrivalWithSgCompound(row) && strategy?.fixPendingMode !== 'REMARKS_ONLY') return false;
     return functionSupportsFixPending(strategy);
   }

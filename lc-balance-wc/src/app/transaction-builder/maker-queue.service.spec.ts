@@ -509,6 +509,15 @@ describe('MakerQueueService', () => {
       expect(svc.fixPendingSupported(row)).toBe(true);
     });
 
+    it('is false for A3S after Checker Acknowledge because Amount is no longer correctable (BD-10)', () => {
+      const svc = new MakerQueueService(makeApi());
+      const row = {
+        movement: makeMovement({ movementType: 'UTILIZE', businessEventId: 'be-acknowledged', acknowledgedAt: '2026-09-23T01:00:00.000Z' }),
+        contract: makeContract({ instrumentType: 'IPLC_LC' }),
+      };
+      expect(svc.fixPendingSupported(row)).toBe(false);
+    });
+
     // A genuinely DIFFERENT compound shape (B4's own ACCEPT+CREATE Acceptance pairing, sharing
     // businessEventId the same way A3S's own pair does) stays excluded — Phase 4 only ever scoped/
     // implemented the ONE documentArrivalWithSg cascade, not every compound shape indiscriminately.

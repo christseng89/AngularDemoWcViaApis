@@ -11,9 +11,9 @@
       Try again
     </button>
   </div>
-  <div *ngIf="loadingCases" class="alert alert-info" role="status" aria-live="polite">
+  <output *ngIf="loadingCases" class="alert alert-info d-block" aria-live="polite">
     {{ recoveringAfterCleanup ? 'Cleanup completed. Waiting for backend and Balance services to become ready…' : 'Connecting to the Business Case service…' }}
-  </div>
+  </output>
 
   <div class="card mb-4">
     <div class="card-body">
@@ -32,6 +32,27 @@
         </button>
       </div>
       <div class="alert alert-info mt-2" *ngIf="resetDatabaseMessage">{{ resetDatabaseMessage }}</div>
+      <output *ngIf="runningAll" class="alert alert-info d-block mt-2" aria-live="polite">
+        Running {{ runAllCompleted + 1 }} / {{ runAllTotal }}: {{ currentRunAllCase }}
+      </output>
+      <div *ngIf="!runningAll && (allResults.length || runFailures.length)" class="alert alert-secondary mt-2" aria-live="polite">
+        Run All completed: {{ allResults.length }} passed, {{ runFailures.length }} failed.
+        Import {{ completedCount('import-') }}, Export {{ completedCount('export-') }}, OVERDRAWN {{ completedCount('overdrawn-') }}.
+      </div>
+      <div *ngIf="runAllSkipped.length" class="alert alert-warning mt-2">
+        <div>Policy-specific cases kept for manual execution and not mixed into the default Run All:</div>
+        <ul class="mb-0">
+          <li *ngFor="let skipped of runAllSkipped">
+            {{ skipped.title }} — requires {{ skipped.requiredPolicy?.ownerType }} allowance {{ skipped.requiredPolicy?.allowancePercentage }}%
+          </li>
+        </ul>
+      </div>
+      <div *ngIf="runFailures.length" class="alert alert-danger mt-2" role="alert">
+        <div>Some cases failed; later Export and OVERDRAWN cases were still executed:</div>
+        <ul class="mb-0">
+          <li *ngFor="let failure of runFailures">{{ failure.id }} — {{ failure.message }}</li>
+        </ul>
+      </div>
     </div>
   </div>
 

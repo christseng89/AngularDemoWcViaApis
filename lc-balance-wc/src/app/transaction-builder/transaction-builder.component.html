@@ -28,7 +28,9 @@
        BA & business-directed 2026-08-27) — a dedicated, independent audit query, deliberately separate
        from Inquire Events ("只查所有曾經發生過的 Delete Pending 操作，不混入 Resubmit/Fix/Approve/
        Reject"). -->
-    <button type="button" class="tb-tab" [class.tb-tab--active]="activeMode === 'DELETE_PENDING_AUDIT'" (click)="selectMode('DELETE_PENDING_AUDIT')">Inquire Delete Pending</button>
+    <button type="button" class="tb-tab" [class.tb-tab--active]="activeMode === 'DELETE_PENDING_AUDIT'" (click)="selectMode('DELETE_PENDING_AUDIT')">
+      Inquire Delete Pending
+    </button>
   </div>
 
   <ng-container *ngIf="activeMode === 'PROCESSING'">
@@ -161,37 +163,51 @@
           </div>
 
           <div class="tb-checker-actions" *ngIf="selectedCheckerMovement">
-            <div class="tb-field tb-field--inline">
-              <label class="tb-field__label">Checker ID</label>
-              <input class="tb-input tb-input--required" [(ngModel)]="checkerId" />
-            </div>
-            <!-- Business instruction 2026-08-15 ("按Submit, Release, Reject後 Button 直接灰掉 不要重複提交
+            <p class="tb-hint" *ngIf="applicantWaiverContextLoading">Checking this event's Excess amount…</p>
+            <p class="tb-error" *ngIf="applicantWaiverContextError">{{ applicantWaiverContextError }}</p>
+            <app-checker-excess-review
+              *ngIf="showApplicantWaiverConfirmation || showB4ExportAuthorization"
+              [amount]="showB4ExportAuthorization ? exportAuthorizationExcessAmountOwner : applicantWaiverExcessAmountOwner"
+              [currency]="showB4ExportAuthorization ? exportAuthorizationOwnerCurrency : applicantWaiverOwnerCurrency"
+              [approved]="checkerExcessApproved"
+              (approvedChange)="onCheckerExcessApprovedChange($event)"
+            ></app-checker-excess-review>
+            <div class="tb-checker-action-row">
+              <div class="tb-field tb-field--inline">
+                <label class="tb-field__label" for="checker-id">Checker ID</label>
+                <input id="checker-id" class="tb-input tb-input--required" [(ngModel)]="checkerId" />
+              </div>
+              <!-- Business instruction 2026-08-15 ("按Submit, Release, Reject後 Button 直接灰掉 不要重複提交
                ... 二選一後兩個都灰掉") — both buttons now share checkerActionInFlight (component.ts),
                so clicking either immediately disables both, for every function including the
                compound ones (A3S/A6/B3-HONOUR/B4) that release()/reject() (not checkerAct() directly). -->
-            <button
-              class="tb-btn tb-btn--success"
-              (click)="checkerAct('release')"
-              [disabled]="
-                checkerActionInFlight ||
-                (selectedFunctionStrategy?.checkerRelease?.deferSettlement &&
-                  selectedCheckerMovement.movementType === (selectedFunction.deferSettlementMovementType || 'UTILIZE') &&
-                  !isCheckerCompoundOwnSubmission &&
-                  arrivalAlreadyApproved)
-              "
-            >
-              <span class="tb-spinner" aria-hidden="true" *ngIf="checkerActionInFlight"></span>{{
-                checkerActionInFlight
-                  ? 'Working…'
-                  : selectedFunctionStrategy?.checkerRelease?.deferSettlement &&
-                      selectedCheckerMovement.movementType === (selectedFunction.deferSettlementMovementType || 'UTILIZE') &&
-                      !isCheckerCompoundOwnSubmission
-                    ? 'Approve'
-                    : 'Release'
-              }}
-            </button>
-            <button class="tb-btn tb-btn--danger-outline" (click)="checkerAct('reject')" [disabled]="checkerActionInFlight">Reject</button>
-            <!-- F1 proposal §14.4 (BA code review, 2026-08-25) — the whole point of the 2026-08-25 REOPEN
+              <button
+                class="tb-btn tb-btn--success"
+                (click)="checkerAct('release')"
+                [disabled]="
+                  checkerActionInFlight ||
+                  checkerExcessApprovalRequired ||
+                  applicantWaiverContextLoading ||
+                  !!applicantWaiverContextError ||
+                  (selectedFunctionStrategy?.checkerRelease?.deferSettlement &&
+                    selectedCheckerMovement.movementType === (selectedFunction.deferSettlementMovementType || 'UTILIZE') &&
+                    !isCheckerCompoundOwnSubmission &&
+                    arrivalAlreadyApproved)
+                "
+              >
+                <span class="tb-spinner" aria-hidden="true" *ngIf="checkerActionInFlight"></span
+                >{{
+                  checkerActionInFlight
+                    ? 'Working…'
+                    : selectedFunctionStrategy?.checkerRelease?.deferSettlement &&
+                        selectedCheckerMovement.movementType === (selectedFunction.deferSettlementMovementType || 'UTILIZE') &&
+                        !isCheckerCompoundOwnSubmission
+                      ? 'Approve'
+                      : 'Release'
+                }}
+              </button>
+              <button class="tb-btn tb-btn--danger-outline" (click)="checkerAct('reject')" [disabled]="checkerActionInFlight">Reject</button>
+              <!-- F1 proposal §14.4 (BA code review, 2026-08-25) — the whole point of the 2026-08-25 REOPEN
                redesign was "Checker要看交易出的帳 再決定 APPROVE或REJECT", but the Checker's own Release/
                Reject screen had no way to actually view Account Entries before deciding — Maker's result
                panel and Inquire Events both already had this button, this screen was the one gap. Same
@@ -199,12 +215,34 @@
                component's own class doc comment for why the action layer stays here, not on
                CheckerPanelComponent), gated the same way Maker's own button is (contingentAccountEntry
                present — null for an out-of-contingent-scope instrumentType). -->
-            <button type="button" class="tb-btn tb-btn--outline" *ngIf="selectedCheckerMovement?.contingentAccountEntry" (click)="openCheckerAccountEntryDialog()">
-              Account Entries
-            </button>
+              <button
+                type="button"
+                class="tb-btn tb-btn--outline"
+                *ngIf="selectedCheckerMovement?.contingentAccountEntry"
+                (click)="openCheckerAccountEntryDialog()"
+              >
+                Account Entries
+              </button>
+            </div>
           </div>
           <app-feedback-message *ngIf="checkerFeedback as feedback" [message]="feedback"></app-feedback-message>
         </app-checker-panel>
+        <section class="tb-section mt-2" *ngIf="lastB4ExportAssetDecision as decision" aria-label="B4 Authorization and Export Asset Inquiry">
+          <h3>B4 Authorization &amp; Export Asset Inquiry</h3>
+          <p>
+            Claim: <strong>{{ decision.authorization.claimStatus }}</strong> · Result:
+            <strong>{{ decision.authorization.authorizationValidationResult }}</strong> · Excess debtor:
+            <strong>{{ decision.authorization.excessDebtor }}</strong>
+          </p>
+          <ul>
+            <li *ngFor="let asset of decision.assets">
+              {{ asset.balanceType }} — {{ asset.amountOwner }} {{ asset.ownerCurrency }} — debtor {{ asset.debtor }}
+            </li>
+          </ul>
+          <p>
+            Reconciliation: Covered + EXPORT_EXCESS_ASSET = <strong>{{ exportAssetTotal(decision) }}</strong> {{ decision.assets[0]?.ownerCurrency }}
+          </p>
+        </section>
       </div>
 
       <div class="tb-side">
@@ -247,7 +285,8 @@
                  below already auto-list every Acceptance/SG under the picked LC (selectLookupAcceptance()/
                  selectLookupSg(), auto-picking the one if there's exactly one) — no separate top-level
                  field was ever needed to narrow to a specific one. -->
-              <input class="tb-input" placeholder="LC Number" [(ngModel)]="lookUp.lookup.lcNumber" />
+              <label class="visually-hidden" for="lookup-lc-number">LC Number</label>
+              <input id="lookup-lc-number" class="tb-input" placeholder="LC Number" [(ngModel)]="lookUp.lookup.lcNumber" />
             </div>
             <button class="tb-btn tb-btn--outline mt-2" (click)="onLookUpClick()">Look Up</button>
             <div class="tb-error mt-2" role="alert" *ngIf="lookUp.lookupError">{{ lookUp.lookupError }}</div>
@@ -397,16 +436,31 @@
                      voucher pop-up) already reconstructs the full Dr/Cr detail per event; this table's
                      own job is overview/navigation, not carrying full audit-trail responsibility itself,
                      so the redundant per-row movementType badge was dropped. -->
-                    <tr *ngFor="let row of lookUp.pagedLookupMovements" (click)="openAccountEntryDialog(row.movement, row.contract.instrumentType, row.phase, row.linkedMovement)">
+                    <tr
+                      *ngFor="let row of lookUp.pagedLookupMovements"
+                      (click)="openAccountEntryDialog(row.movement, row.contract.instrumentType, row.phase, row.linkedMovement)"
+                      (keydown.enter)="openAccountEntryDialog(row.movement, row.contract.instrumentType, row.phase, row.linkedMovement)"
+                      (keydown.space)="
+                        openAccountEntryDialog(row.movement, row.contract.instrumentType, row.phase, row.linkedMovement); $event.preventDefault()
+                      "
+                      tabindex="0"
+                    >
                       <td>
                         <span class="tb-type-tag" *ngIf="lookUp.functionFor(row) as fn">{{ fn.code }} · {{ fn.label }}</span>
                         <span class="tb-muted" *ngIf="!lookUp.functionFor(row) && lookUp.systemLabelFor(row) as sysLabel">{{ sysLabel }}</span>
                         <span class="tb-muted" *ngIf="!lookUp.functionFor(row) && !lookUp.systemLabelFor(row)">—</span>
                       </td>
                       <td class="tb-table__amount">
-                        {{ displayMovementAmount(row.contract.instrumentType, row.movement.movementType, row.movement.amount) | monetaryAmount: row.movement.currency }}
+                        {{
+                          displayMovementAmount(row.contract.instrumentType, row.movement.movementType, row.movement.amount)
+                            | monetaryAmount: row.movement.currency
+                        }}
                         <span class="tb-muted" *ngIf="row.movement.ceilingAmount !== row.movement.amount"
-                          >(ceiling {{ displayMovementAmount(row.contract.instrumentType, row.movement.movementType, row.movement.ceilingAmount) | monetaryAmount: row.movement.currency }})</span
+                          >(ceiling
+                          {{
+                            displayMovementAmount(row.contract.instrumentType, row.movement.movementType, row.movement.ceilingAmount)
+                              | monetaryAmount: row.movement.currency
+                          }})</span
                         >
                       </td>
                       <td class="tb-table__ref">{{ lookUp.primaryReferenceFor(row) }}</td>
@@ -414,12 +468,34 @@
                       <td class="tb-table__status">
                         <span
                           class="tb-status-badge"
-                          [ngClass]="statusBadgeClass(row.eventStatus, row.contract.instrumentType, row.movement.movementType, row.phase, row.movement.acknowledgedAt)"
-                          ><app-tb-icon [name]="statusBadgeIcon(statusBadgeClass(row.eventStatus, row.contract.instrumentType, row.movement.movementType, row.phase, row.movement.acknowledgedAt))"></app-tb-icon
-                          >{{ displayStatus(row.eventStatus, row.contract.instrumentType, row.movement.movementType, row.phase, row.movement.acknowledgedAt) }}</span
+                          [ngClass]="
+                            statusBadgeClass(row.eventStatus, row.contract.instrumentType, row.movement.movementType, row.phase, row.movement.acknowledgedAt)
+                          "
+                          ><app-tb-icon
+                            [name]="
+                              statusBadgeIcon(
+                                statusBadgeClass(
+                                  row.eventStatus,
+                                  row.contract.instrumentType,
+                                  row.movement.movementType,
+                                  row.phase,
+                                  row.movement.acknowledgedAt
+                                )
+                              )
+                            "
+                          ></app-tb-icon
+                          >{{
+                            displayStatus(row.eventStatus, row.contract.instrumentType, row.movement.movementType, row.phase, row.movement.acknowledgedAt)
+                          }}</span
                         >
                       </td>
-                      <td class="tb-table__amount">{{ row.movement.balanceAfter === null || row.movement.balanceAfter === undefined ? '—' : (row.movement.balanceAfter | monetaryAmount: row.movement.currency) }}</td>
+                      <td class="tb-table__amount">
+                        {{
+                          row.movement.balanceAfter === null || row.movement.balanceAfter === undefined
+                            ? '—'
+                            : (row.movement.balanceAfter | monetaryAmount: row.movement.currency)
+                        }}
+                      </td>
                       <td class="tb-table__time">{{ row.eventTime | date: 'short' }}</td>
                       <!-- Submit/EC/Approve audit trail (business instruction 2026-08-20). EC/Approve are
                        mutually exclusive per row, gated on the movement's own real status — see the
@@ -537,5 +613,4 @@
     [linkedMovement]="accountEntryDialogLinkedMovement"
     (closed)="closeAccountEntryDialog()"
   ></app-account-entries-dialog>
-
 </div>

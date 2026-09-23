@@ -83,13 +83,13 @@ describe('lc-balance-wc backend (Node.js 中台 orchestrator)', () => {
   });
 
   describe('GET /api/business-cases', () => {
-    it('lists all 37 registered business cases with id/title/description/stepCount, and never calls the microservice', async () => {
+    it('lists all 46 registered business cases and publishes an opt-in policy hint without calling the microservice', async () => {
       global.fetch = jest.fn();
 
       const res = await request(app).get('/api/business-cases');
 
       expect(res.status).toBe(200);
-      expect(res.body).toHaveLength(37);
+      expect(res.body).toHaveLength(45);
 
       const registry = buildRegistry();
       res.body.forEach((c, i) => {
@@ -98,6 +98,7 @@ describe('lc-balance-wc backend (Node.js 中台 orchestrator)', () => {
           title: registry[i].title,
           description: registry[i].description,
           stepCount: registry[i].steps.length,
+          ...(registry[i].requiredPolicy ? { requiredPolicy: registry[i].requiredPolicy } : {}),
         });
       });
       expect(global.fetch).not.toHaveBeenCalled();
@@ -465,6 +466,24 @@ describe('lc-balance-wc backend (Node.js 中台 orchestrator)', () => {
 
       expect(res.status).toBe(200);
       expect(res.body).toEqual({ status: 'ok' });
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('POST /api/excess-preview', () => {
+    it('forwards the read-only preview command and preserves typed FX failures', async () => {
+      const body = { functionCode: 'A3', request: { amount: '120' } };
+      global.fetch = jest.fn(async (url, opts = {}) => {
+        expect(url).toBe('http://localhost:4100/balance-movements/excess-preview');
+        expect(opts.method).toBe('POST');
+        expect(JSON.parse(opts.body)).toEqual(body);
+        return jsonResponse(409, { code: 'FX_RATE_STALE' });
+      });
+
+      const response = await request(app).post('/api/excess-preview').send(body);
+
+      expect(response.status).toBe(409);
+      expect(response.body).toEqual({ code: 'FX_RATE_STALE' });
       expect(global.fetch).toHaveBeenCalledTimes(1);
     });
   });

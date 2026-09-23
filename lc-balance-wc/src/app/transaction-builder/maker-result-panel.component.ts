@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { BalanceMovement } from './balance-component-api.service';
+import { BalanceMovement, BalanceMovementCommandResponse } from './balance-component-api.service';
 import { InstrumentType, displayStatus } from './balance-component.model';
 import type { CompoundLegState } from './maker-panel.component';
 import { TransactionStatusPhase } from './transaction-status-badge.component';
@@ -23,7 +23,7 @@ export interface MakerAccountEntriesRequest {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MakerResultPanelComponent {
-  @Input() result: BalanceMovement | null = null;
+  @Input() result: BalanceMovementCommandResponse | null = null;
   @Input() error: string | null = null;
   @Input() errorCause: unknown = null;
   @Input() instrumentType: InstrumentType | null = null;
@@ -34,6 +34,7 @@ export class MakerResultPanelComponent {
   @Input() fixPendingMode = false;
   @Input() deletePendingReviewMode = false;
   @Input() actionBusy = false;
+  @Input() showExcessDetails = false;
 
   @Output() openAccountEntries = new EventEmitter<MakerAccountEntriesRequest>();
   @Output() fixPending = new EventEmitter<void>();
@@ -42,11 +43,14 @@ export class MakerResultPanelComponent {
   get errorFeedback(): UiMessage | null {
     if (!this.error) return null;
     if (this.errorCause === null || this.errorCause === undefined) return presentValidationError(this.error);
-    return { ...presentApiError(this.errorCause ?? { message: this.error }, 'SUBMIT'), retryable: false };
+    return {
+      ...presentApiError(this.errorCause ?? { message: this.error }, this.fixPendingMode ? 'FIX' : 'SUBMIT'),
+      retryable: false,
+    };
   }
 
   get statusLabel(): string {
-    if (!this.result?.status) return '';
+    if (!this.result?.status) return this.result?.workflowStatus ?? '';
     return displayStatus(this.result.status, this.instrumentType, this.result.movementType, this.resultPhase, this.result.acknowledgedAt);
   }
 

@@ -43,7 +43,7 @@ function setup(isCreating = true) {
     findActiveByLogicalContractId: jest.fn(),
     insert: jest.fn(),
   } as unknown as BalanceContractStore;
-  const movements = { listByContract: jest.fn(() => [issue()]) } as unknown as BalanceMovementStore;
+  const movements = { findById: jest.fn(), listByContract: jest.fn(() => [issue()]) } as unknown as BalanceMovementStore;
   const policies = {
     isCreatingMovement: jest.fn(() => isCreating),
     assertCreationSufficiency: jest.fn(),
@@ -95,6 +95,30 @@ describe('MovementContractService', () => {
     expect(() => pendingSetup.service.resolveOrCreate(request({ movementType: 'UTILIZE' }))).toThrow('has not been Checker-Released yet');
   });
 
+  it('reports a missing root ISSUE distinctly from a Pending ISSUE', () => {
+    const missingIssue = setup(false);
+    jest.mocked(missingIssue.contracts.findActiveByNaturalKey).mockReturnValue(contract());
+    jest.mocked(missingIssue.movements.listByContract).mockReturnValue([]);
+
+    expect(() => missingIssue.service.resolveOrCreate(request({ movementType: 'UTILIZE' }))).toThrow('its own ISSUE is still missing');
+  });
+
+  it('allows REVERSAL to resolve a non-ACTIVE existing contract', () => {
+    const { service, contracts } = setup(false);
+    const closed = contract('IPLC_LC', { status: 'CLOSED' });
+    jest.mocked(contracts.findById).mockReturnValue(closed);
+
+    expect(service.resolveOrCreate(request({ balanceContractId: closed.balanceContractId, naturalKey: undefined, movementType: 'REVERSAL' }))).toBe(closed);
+  });
+
+  it('allows CLOSE against an EXPIRED existing contract', () => {
+    const { service, contracts } = setup(false);
+    const expired = contract('IPLC_LC', { status: 'EXPIRED' });
+    jest.mocked(contracts.findById).mockReturnValue(expired);
+
+    expect(service.resolveOrCreate(request({ balanceContractId: expired.balanceContractId, naturalKey: undefined, movementType: 'CLOSE' }))).toBe(expired);
+  });
+
   it('rejects missing targets for non-creating movements and missing identifiers', () => {
     const { service } = setup(false);
     expect(() => service.resolveOrCreate(request({ naturalKey: undefined, balanceContractId: undefined, movementType: 'UTILIZE' }))).toThrow(
@@ -134,6 +158,49 @@ describe('MovementContractService', () => {
     expect(policies.assertCreationSufficiency).not.toHaveBeenCalled();
   });
 
+  it('accepts an acknowledged A3 reference through the same-LC natural-key fallback', () => {
+    const { service, contracts, movements } = setup(true);
+    const parent = contract('IPLC_LC', { logicalContractId: 'source-logical', tenorType: 'BUYERS_USANCE' });
+    jest.mocked(contracts.findById).mockReturnValue(parent);
+    jest.mocked(contracts.findActiveByLogicalContractId).mockReturnValue(parent);
+    jest.mocked(movements.findById).mockReturnValue({
+      ...issue('PENDING'),
+      movementId: 'a3-source',
+      balanceContractId: parent.balanceContractId,
+      movementType: 'UTILIZE',
+      acknowledgedAt: '2026-01-02T00:00:00.000Z',
+      makerSubmittedAt: null,
+    });
+
+    expect(
+      service.resolveOrCreate(
+        request({
+          instrumentType: 'IPLC_ACCEPTANCE',
+          movementType: 'CREATE',
+          naturalKey: { lcNumber: 'LC001', ibNumber: 'IB01' },
+          parentLogicalContractId: 'different-parent-id',
+          referencedTransactionId: 'a3-source',
+          tenorType: 'BUYERS_USANCE',
+        }),
+      ),
+    ).toMatchObject({ instrumentType: 'IPLC_ACCEPTANCE', parentLogicalContractId: 'different-parent-id' });
+  });
+
+  it('allows EPLC Acceptance creation without a parent through the optional-parent tenor path', () => {
+    const { service } = setup(true);
+
+    expect(
+      service.resolveOrCreate(
+        request({
+          instrumentType: 'EPLC_ACCEPTANCE',
+          movementType: 'CREATE',
+          naturalKey: { lcNumber: 'ELC001', ibNumber: 'IB01' },
+          parentLogicalContractId: undefined,
+        }),
+      ),
+    ).toMatchObject({ instrumentType: 'EPLC_ACCEPTANCE', parentLogicalContractId: null });
+  });
+
   it('creates a root contract with deterministic ids, grace defaults and frozen request fields', () => {
     const { service, contracts, policies } = setup(true);
     const created = service.resolveOrCreate(request({ tenorType: 'SIGHT', expiryDate: '2026-12-31', tolerancePct: '10', mailFloatGraceDays: 3 }));
@@ -148,5 +215,31 @@ describe('MovementContractService', () => {
       effectiveFrom: '2026-01-02T00:00:00.000Z',
     });
     expect(contracts.insert).toHaveBeenCalledWith(created);
+  });
+
+  it('stores a missing root expiry as null', () => {
+    const { service } = setup(true);
+    expect(service.resolveOrCreate(request({ expiryDate: undefined }))).toMatchObject({ expiryDate: null });
+  });
+
+  it('creates a child contract with its parent identity and without root-only expiry or grace fields', () => {
+    const { service, contracts } = setup(true);
+    jest.mocked(contracts.findActiveByLogicalContractId).mockReturnValue(contract());
+    const created = service.resolveOrCreate(
+      request({
+        instrumentType: 'SHGT',
+        movementType: 'ISSUE',
+        naturalKey: { lcNumber: 'LC001', sgNumber: 'SG01' },
+        parentLogicalContractId: 'logical-1',
+        expiryDate: '2026-12-31',
+      }),
+    );
+
+    expect(created).toMatchObject({
+      instrumentType: 'SHGT',
+      parentLogicalContractId: 'logical-1',
+      expiryDate: null,
+      mailFloatGraceDays: null,
+    });
   });
 });

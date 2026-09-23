@@ -1,6 +1,9 @@
 import { parseAmountShorthand } from './amount-shorthand';
+import type { ExcessPreviewResponse } from './balance-component-api.service';
 
 export interface MakerBalanceWarningState {
+  functionCode: string | null | undefined;
+  excessPreview: ExcessPreviewResponse | null;
   formLocked: boolean;
   amountProtected: boolean;
   amount: string | number | null | undefined;
@@ -22,6 +25,17 @@ export function deriveMakerBalanceWarnings(state: MakerBalanceWarningState): str
   // "Typed amount" and comparing it again with the current Available Balance is both misleading and,
   // for A4, wrong: the selected Document Arrival already owns the earmark being settled.
   if (state.formLocked || state.amountProtected || state.amount === null || state.amount === undefined || state.amount === '') return [];
+
+  // Excess eligibility for these three functions is server-owned. In particular, a non-USD amount
+  // must never be compared or converted in the browser: the preview already applies the approved
+  // booking rate and returns its authoritative business result.
+  if (state.functionCode === 'A3' || state.functionCode === 'A3S' || state.functionCode === 'B3') {
+    const preview = state.excessPreview;
+    if (!preview || preview.eligible || preview.businessResultCode !== 'EXCESS_LIMIT_EXCEEDED') return [];
+    return [
+      `⚠ Total Exceed Amount (${preview.totalExcessAmountTransaction}) exceeds Max Exceed Amount (${preview.maxExcessAmountTransaction}) — this will be rejected (${preview.businessResultCode}).`,
+    ];
+  }
 
   // The live warning must interpret Amount exactly like the shared A1-style input and Submit path.
   // Number('500k') is NaN, which made the old `amount <= Tight Available` guard false and displayed a

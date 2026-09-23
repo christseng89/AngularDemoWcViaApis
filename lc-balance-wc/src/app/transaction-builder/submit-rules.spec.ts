@@ -318,18 +318,16 @@ describe('submit-rules', () => {
     });
   });
 
-  describe('validateSubmit — Tight Available Balance must never become negative', () => {
+  describe('validateSubmit — legacy Tight Available backstop and server-owned Excess preview boundary', () => {
     const cases: Array<{
-      code: 'A2' | 'B2' | 'A3' | 'A8' | 'B3';
+      code: 'A2' | 'B2' | 'A8';
       movementType: string;
       instrumentType: BuilderModel['instrumentType'];
       amendDirection?: 'DECREASE';
     }> = [
       { code: 'A2', movementType: 'AMEND_DECREASE', instrumentType: 'IPLC_LC' },
       { code: 'B2', movementType: 'AMEND', instrumentType: 'EPLC_CONFIRMATION', amendDirection: 'DECREASE' },
-      { code: 'A3', movementType: 'UTILIZE', instrumentType: 'IPLC_LC' },
       { code: 'A8', movementType: 'ISSUE', instrumentType: 'SHGT' },
-      { code: 'B3', movementType: 'CREATE', instrumentType: 'EPLC_EXAMINATION' },
     ];
 
     test.each(cases)('$code blocks Submit when Amount exceeds Tight Available Balance', ({ code, movementType, instrumentType, amendDirection }) => {
@@ -337,9 +335,9 @@ describe('submit-rules', () => {
         ctx({
           selectedFunction: fn(code),
           model: { instrumentType, movementType, amount: '100.01', currency: 'USD', createdBy: 'maker1', secondaryRef: 'REF01' },
-          naturalKey: { lcNumber: 'S001', ibNumber: code === 'B3' ? 'E01' : '', sgNumber: code === 'A8' ? 'G01' : '' },
+          naturalKey: { lcNumber: 'S001', ibNumber: '', sgNumber: code === 'A8' ? 'G01' : '' },
           selectedContract: contract(),
-          selectedParent: code === 'A8' || code === 'B3' ? contract() : null,
+          selectedParent: code === 'A8' ? contract() : null,
           selectedContractSnapshot: snapshot({ tightAvailableBalance: '100' }),
           amendDirection: amendDirection ?? null,
         }),
@@ -353,9 +351,9 @@ describe('submit-rules', () => {
         ctx({
           selectedFunction: fn(code),
           model: { instrumentType, movementType, amount: '100', currency: 'USD', createdBy: 'maker1', secondaryRef: 'REF01' },
-          naturalKey: { lcNumber: 'S001', ibNumber: code === 'B3' ? 'E01' : '', sgNumber: code === 'A8' ? 'G01' : '' },
+          naturalKey: { lcNumber: 'S001', ibNumber: '', sgNumber: code === 'A8' ? 'G01' : '' },
           selectedContract: contract(),
-          selectedParent: code === 'A8' || code === 'B3' ? contract() : null,
+          selectedParent: code === 'A8' ? contract() : null,
           selectedContractSnapshot: snapshot({ tightAvailableBalance: '100' }),
           amendDirection: amendDirection ?? null,
         }),
@@ -364,27 +362,42 @@ describe('submit-rules', () => {
       expect(result.error).toBeNull();
     });
 
-    it('A3S uses Tight Available plus the selected SG Balance as its upper limit', () => {
-      const base = {
-        selectedFunction: fn('A3S'),
-        model: { instrumentType: 'IPLC_LC' as const, movementType: 'UTILIZE', amount: '130.01', currency: 'USD', createdBy: 'maker1', secondaryRef: 'IB01' },
-        selectedContract: contract(),
-        selectedContractSnapshot: snapshot({ tightAvailableBalance: '100' }),
-        selectedArrivalSg: contract({ instrumentType: 'SHGT' }),
-        arrivalSgSnapshot: snapshot({ confirmedBalance: '30' }),
-      };
-
-      expect(validateSubmit(ctx(base)).error).toBe(
-        'Amount must not exceed Tight Available Balance plus selected SG Balance (130); the transaction cannot make Tight Available Balance negative.',
+    test.each([
+      { code: 'A3', movementType: 'UTILIZE', instrumentType: 'IPLC_LC' as const },
+      { code: 'B3', movementType: 'CREATE', instrumentType: 'EPLC_EXAMINATION' as const },
+    ])('$code leaves over-Tight eligibility to the server preview', ({ code, movementType, instrumentType }) => {
+      const result = validateSubmit(
+        ctx({
+          selectedFunction: fn(code),
+          model: { instrumentType, movementType, amount: '100.01', currency: 'EUR', createdBy: 'maker1', secondaryRef: 'REF01' },
+          naturalKey: { lcNumber: 'S001', ibNumber: code === 'B3' ? 'E01' : '', sgNumber: '' },
+          selectedContract: contract(),
+          selectedParent: code === 'B3' ? contract() : null,
+          selectedContractSnapshot: snapshot({ tightAvailableBalance: '100' }),
+        }),
       );
-      expect(validateSubmit(ctx({ ...base, model: { ...base.model, amount: '130' } })).error).toBeNull();
+      expect(result.error).toBeNull();
+    });
+
+    it('A3S also leaves over-Tight eligibility to the server preview after its SG identity is valid', () => {
+      const result = validateSubmit(
+        ctx({
+          selectedFunction: fn('A3S'),
+          model: { instrumentType: 'IPLC_LC', movementType: 'UTILIZE', amount: '130.01', currency: 'EUR', createdBy: 'maker1', secondaryRef: 'IB01' },
+          selectedContract: contract(),
+          selectedContractSnapshot: snapshot({ tightAvailableBalance: '100' }),
+          selectedArrivalSg: contract({ instrumentType: 'SHGT' }),
+          arrivalSgSnapshot: snapshot({ confirmedBalance: '30' }),
+        }),
+      );
+      expect(result.error).toBeNull();
     });
 
     it('blocks Submit until the Tight Available snapshot is available', () => {
       const result = validateSubmit(
         ctx({
-          selectedFunction: fn('A3'),
-          model: { instrumentType: 'IPLC_LC', movementType: 'UTILIZE', amount: '10', currency: 'USD', createdBy: 'maker1', secondaryRef: 'IB01' },
+          selectedFunction: fn('A2'),
+          model: { instrumentType: 'IPLC_LC', movementType: 'AMEND_DECREASE', amount: '10', currency: 'USD', createdBy: 'maker1', secondaryRef: 'A01' },
           selectedContract: contract(),
           selectedContractSnapshot: null,
         }),
@@ -395,8 +408,8 @@ describe('submit-rules', () => {
     it('blocks rather than clamps an impossible negative Tight Available Balance returned by the API', () => {
       const result = validateSubmit(
         ctx({
-          selectedFunction: fn('A3'),
-          model: { instrumentType: 'IPLC_LC', movementType: 'UTILIZE', amount: '1', currency: 'USD', createdBy: 'maker1', secondaryRef: 'IB01' },
+          selectedFunction: fn('A2'),
+          model: { instrumentType: 'IPLC_LC', movementType: 'AMEND_DECREASE', amount: '1', currency: 'USD', createdBy: 'maker1', secondaryRef: 'A01' },
           selectedContract: contract(),
           selectedContractSnapshot: snapshot({ tightAvailableBalance: '-0.01' }),
         }),

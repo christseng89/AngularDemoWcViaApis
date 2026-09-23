@@ -5,6 +5,7 @@ interface ExcessAccountRow {
   excess_account_id: string;
   owner_type: ExcessOwnerType;
   owner_id: string;
+  owner_currency: string;
   policy_version: string;
   version: number;
   created_at: string;
@@ -16,6 +17,7 @@ function toAccount(row: ExcessAccountRow): ExcessAccount {
     excessAccountId: row.excess_account_id,
     ownerType: row.owner_type,
     ownerId: row.owner_id,
+    ownerCurrency: row.owner_currency,
     policyVersion: row.policy_version,
     version: row.version,
     createdAt: row.created_at,
@@ -30,13 +32,14 @@ export class ExcessAccountStore {
     this.db
       .prepare(
         `INSERT INTO excess_accounts (
-          excess_account_id, owner_type, owner_id, policy_version, version, created_at, updated_at
-        ) VALUES (@excessAccountId, @ownerType, @ownerId, @policyVersion, @version, @createdAt, @updatedAt)`,
+          excess_account_id, owner_type, owner_id, owner_currency, policy_version, version, created_at, updated_at
+        ) VALUES (@excessAccountId, @ownerType, @ownerId, @ownerCurrency, @policyVersion, @version, @createdAt, @updatedAt)`,
       )
       .run({
         excessAccountId: account.excessAccountId,
         ownerType: account.ownerType,
         ownerId: account.ownerId,
+        ownerCurrency: account.ownerCurrency,
         policyVersion: account.policyVersion,
         version: account.version,
         createdAt: account.createdAt,

@@ -197,6 +197,27 @@ export class BalanceContractStore {
     return row ? rowToContract(row) : undefined;
   }
 
+  /** Active, Checker-issued child contracts owned by one exact parent identity. */
+  listReleasedActiveChildren(parentLogicalContractId: string, instrumentType: InstrumentType): BalanceContract[] {
+    const rows = this.db
+      .prepare(
+        `SELECT c.*
+         FROM balance_contracts c
+         WHERE c.parent_logical_contract_id = ?
+           AND c.instrument_type = ?
+           AND c.status = 'ACTIVE'
+           AND EXISTS (
+             SELECT 1 FROM balance_movements m
+             WHERE m.balance_contract_id = c.balance_contract_id
+               AND m.movement_type IN ('ISSUE', 'CREATE')
+               AND m.status = 'RELEASED'
+           )
+         ORDER BY c.sg_number, c.ib_number, c.balance_contract_id`,
+      )
+      .all(parentLogicalContractId, instrumentType) as unknown as ContractRow[];
+    return rows.map(rowToContract);
+  }
+
   /** Design doc §3.3 "呼叫端的實際使用方式" — resolve the natural key to its current ACTIVE version. */
   findActiveByNaturalKey(instrumentType: InstrumentType, naturalKey: NaturalKey): BalanceContract | undefined {
     const row = this.db

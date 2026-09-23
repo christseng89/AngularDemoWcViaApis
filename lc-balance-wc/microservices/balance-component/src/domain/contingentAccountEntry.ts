@@ -127,6 +127,23 @@ function withTenorSuffix(accountName: string, family: AccountFamily, tenorType: 
   return accountName;
 }
 
+function baseDirectionFor(movementType: string, reversedDirection: 1 | -1 | undefined): 1 | -1 | undefined {
+  if (movementType !== 'REVERSAL' && movementType !== 'AMEND_EXPIRY_DATE') {
+    return MOVEMENT_DIRECTION[movementType] as 1 | -1 | undefined;
+  }
+  if (reversedDirection === undefined) return undefined;
+  return -reversedDirection as 1 | -1;
+}
+
+function isZeroValueLifecycleMovement(movementType: string): boolean {
+  return movementType === 'CLOSE' || movementType === 'EXPIRE' || movementType === 'REOPEN';
+}
+
+function directionForAmount(baseDirection: 1 | -1, isNegative: boolean): 1 | -1 {
+  if (!isNegative) return baseDirection;
+  return baseDirection === 1 ? -1 : 1;
+}
+
 export function deriveContingentAccountEntry(params: {
   instrumentType: InstrumentType;
   movementType: string;
@@ -153,12 +170,7 @@ export function deriveContingentAccountEntry(params: {
 
   // Now MOVEMENT_DIRECTION's every remaining entry is genuinely fixed at 1 or -1 — AMEND_EXPIRY_DATE (the
   // one other 0-mapped entry) already returned null above, so this cast is exact, not an approximation.
-  const baseDirection =
-    params.movementType === 'REVERSAL' || params.movementType === 'AMEND_EXPIRY_DATE'
-      ? params.reversedDirection === undefined
-        ? undefined
-        : ((-params.reversedDirection) as 1 | -1)
-      : (MOVEMENT_DIRECTION[params.movementType] as 1 | -1 | undefined);
+  const baseDirection = baseDirectionFor(params.movementType, params.reversedDirection);
   if (baseDirection === undefined) return null;
 
   const signedAmount = parseMonetaryAmount(params.amount);
@@ -172,7 +184,7 @@ export function deriveContingentAccountEntry(params: {
   // voucher carries no real accounting information — same "no real balance effect, don't generate a
   // placeholder pair" reasoning AMEND_EXPIRY_DATE/EPLC_EXAMINATION already use above, just triggered by
   // the AMOUNT being zero here rather than the movementType itself never having one.
-  if (signedAmount.isZero() && (params.movementType === 'CLOSE' || params.movementType === 'EXPIRE' || params.movementType === 'REOPEN')) {
+  if (signedAmount.isZero() && isZeroValueLifecycleMovement(params.movementType)) {
     return null;
   }
 
@@ -183,7 +195,7 @@ export function deriveContingentAccountEntry(params: {
   // pattern permits a leading '-'). Folding the amount's own sign into the direction here reproduces
   // Folio 4's own "Amendment — Increase / Decrease" pair correctly from this one movementType. Every
   // other movementType is always submitted with a positive amount, so this is a no-op for them.
-  const netDirection: 1 | -1 = signedAmount.isNegative() ? (baseDirection === 1 ? -1 : 1) : baseDirection;
+  const netDirection = directionForAmount(baseDirection, signedAmount.isNegative());
 
   const establishDr = params.accountMapping?.accountA.accountDescription ?? withTenorSuffix(family.establishDr, family, params.tenorType);
   const establishCr = params.accountMapping?.accountB.accountDescription ?? withTenorSuffix(family.establishCr, family, params.tenorType);

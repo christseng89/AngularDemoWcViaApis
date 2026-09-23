@@ -16,8 +16,11 @@
  */
 import type { DatabaseSync } from 'node:sqlite';
 import {
+  APPLICANT_WAIVER_SCHEMA_SQL,
   CONTRACT_STATUS_VALUES,
+  EXCESS_COMMAND_ATTEMPT_AUDIT_SCHEMA_SQL,
   EXCESS_SCHEMA_SQL,
+  EXPORT_ASSET_SCHEMA_SQL,
   EXPOSURE_NATURE_VALUES,
   INSTRUMENT_TYPE_VALUES,
   MOVEMENT_STATUS_VALUES,
@@ -27,6 +30,10 @@ import {
 
 function sqlInList(values: readonly string[]): string {
   return values.map((v) => `'${v}'`).join(',');
+}
+
+function columnNames(db: DatabaseSync, table: string): ReadonlySet<string> {
+  return new Set((db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map(({ name }) => name));
 }
 
 export interface Migration {
@@ -41,17 +48,17 @@ export const MIGRATIONS: Migration[] = [
     id: 1,
     description: 'Add acknowledged_by/acknowledged_at to balance_movements (2026-08-15, Present Docs Earmark acknowledgment)',
     up: (db) => {
-      const columns = (db.prepare('PRAGMA table_info(balance_movements)').all() as { name: string }[]).map((c) => c.name);
-      if (!columns.includes('acknowledged_by')) db.exec('ALTER TABLE balance_movements ADD COLUMN acknowledged_by TEXT');
-      if (!columns.includes('acknowledged_at')) db.exec('ALTER TABLE balance_movements ADD COLUMN acknowledged_at TEXT');
+      const columns = columnNames(db, 'balance_movements');
+      if (!columns.has('acknowledged_by')) db.exec('ALTER TABLE balance_movements ADD COLUMN acknowledged_by TEXT');
+      if (!columns.has('acknowledged_at')) db.exec('ALTER TABLE balance_movements ADD COLUMN acknowledged_at TEXT');
     },
   },
   {
     id: 2,
     description: 'Add contingent_account_entry to balance_movements (2026-08-16, analysis/contingent-liability-ledger.html account-entry generation)',
     up: (db) => {
-      const columns = (db.prepare('PRAGMA table_info(balance_movements)').all() as { name: string }[]).map((c) => c.name);
-      if (!columns.includes('contingent_account_entry')) db.exec('ALTER TABLE balance_movements ADD COLUMN contingent_account_entry TEXT');
+      const columns = columnNames(db, 'balance_movements');
+      if (!columns.has('contingent_account_entry')) db.exec('ALTER TABLE balance_movements ADD COLUMN contingent_account_entry TEXT');
     },
   },
   {
@@ -59,8 +66,8 @@ export const MIGRATIONS: Migration[] = [
     description:
       'Add referenced_transaction_id to balance_movements (2026-08-16, A6/B4 Checker-release cross-session fix — see types.ts BalanceMovement.referencedTransactionId)',
     up: (db) => {
-      const columns = (db.prepare('PRAGMA table_info(balance_movements)').all() as { name: string }[]).map((c) => c.name);
-      if (!columns.includes('referenced_transaction_id')) db.exec('ALTER TABLE balance_movements ADD COLUMN referenced_transaction_id TEXT');
+      const columns = columnNames(db, 'balance_movements');
+      if (!columns.has('referenced_transaction_id')) db.exec('ALTER TABLE balance_movements ADD COLUMN referenced_transaction_id TEXT');
     },
   },
   {
@@ -68,9 +75,9 @@ export const MIGRATIONS: Migration[] = [
     description:
       'Add maker_submitted_by/maker_submitted_at to balance_movements (2026-08-16, A4 real Maker Submit step — see types.ts BalanceMovement.makerSubmittedAt)',
     up: (db) => {
-      const columns = (db.prepare('PRAGMA table_info(balance_movements)').all() as { name: string }[]).map((c) => c.name);
-      if (!columns.includes('maker_submitted_by')) db.exec('ALTER TABLE balance_movements ADD COLUMN maker_submitted_by TEXT');
-      if (!columns.includes('maker_submitted_at')) db.exec('ALTER TABLE balance_movements ADD COLUMN maker_submitted_at TEXT');
+      const columns = columnNames(db, 'balance_movements');
+      if (!columns.has('maker_submitted_by')) db.exec('ALTER TABLE balance_movements ADD COLUMN maker_submitted_by TEXT');
+      if (!columns.has('maker_submitted_at')) db.exec('ALTER TABLE balance_movements ADD COLUMN maker_submitted_at TEXT');
     },
   },
   {
@@ -78,8 +85,8 @@ export const MIGRATIONS: Migration[] = [
     description:
       'Add event_snapshot to balance_movements (2026-08-17, persisted Event Snapshot captured at createMovement()/release() — see types.ts BalanceMovement.eventSnapshot)',
     up: (db) => {
-      const columns = (db.prepare('PRAGMA table_info(balance_movements)').all() as { name: string }[]).map((c) => c.name);
-      if (!columns.includes('event_snapshot')) db.exec('ALTER TABLE balance_movements ADD COLUMN event_snapshot TEXT');
+      const columns = columnNames(db, 'balance_movements');
+      if (!columns.has('event_snapshot')) db.exec('ALTER TABLE balance_movements ADD COLUMN event_snapshot TEXT');
     },
   },
   {
@@ -87,8 +94,8 @@ export const MIGRATIONS: Migration[] = [
     description:
       "Add root_event_snapshot to balance_movements (2026-08-17, Inquire Events Balance Tabs — the parent LC/Confirmation's own plain balance for a child-ledger movement — see types.ts BalanceMovement.rootEventSnapshot)",
     up: (db) => {
-      const columns = (db.prepare('PRAGMA table_info(balance_movements)').all() as { name: string }[]).map((c) => c.name);
-      if (!columns.includes('root_event_snapshot')) db.exec('ALTER TABLE balance_movements ADD COLUMN root_event_snapshot TEXT');
+      const columns = columnNames(db, 'balance_movements');
+      if (!columns.has('root_event_snapshot')) db.exec('ALTER TABLE balance_movements ADD COLUMN root_event_snapshot TEXT');
     },
   },
   {
@@ -96,9 +103,9 @@ export const MIGRATIONS: Migration[] = [
     description:
       'Add acceptance_event_snapshot/sg_event_snapshot to balance_movements (2026-08-17, "就是交易當時LC所有的BALANCE的拍照存檔" — the one unambiguous sibling Acceptance\'s/SG\'s own plain balance — see types.ts BalanceMovement.acceptanceEventSnapshot/sgEventSnapshot)',
     up: (db) => {
-      const columns = (db.prepare('PRAGMA table_info(balance_movements)').all() as { name: string }[]).map((c) => c.name);
-      if (!columns.includes('acceptance_event_snapshot')) db.exec('ALTER TABLE balance_movements ADD COLUMN acceptance_event_snapshot TEXT');
-      if (!columns.includes('sg_event_snapshot')) db.exec('ALTER TABLE balance_movements ADD COLUMN sg_event_snapshot TEXT');
+      const columns = columnNames(db, 'balance_movements');
+      if (!columns.has('acceptance_event_snapshot')) db.exec('ALTER TABLE balance_movements ADD COLUMN acceptance_event_snapshot TEXT');
+      if (!columns.has('sg_event_snapshot')) db.exec('ALTER TABLE balance_movements ADD COLUMN sg_event_snapshot TEXT');
     },
   },
   {
@@ -106,8 +113,8 @@ export const MIGRATIONS: Migration[] = [
     description:
       'Add finalize_event_snapshot to balance_movements (2026-08-18, "A4 Sight Payment" Inquire Events fix — preserves A3\'s own original Create-time eventSnapshot unchanged once A4 later finalizes it, instead of release() overwriting it — see types.ts BalanceMovement.finalizeEventSnapshot)',
     up: (db) => {
-      const columns = (db.prepare('PRAGMA table_info(balance_movements)').all() as { name: string }[]).map((c) => c.name);
-      if (!columns.includes('finalize_event_snapshot')) db.exec('ALTER TABLE balance_movements ADD COLUMN finalize_event_snapshot TEXT');
+      const columns = columnNames(db, 'balance_movements');
+      if (!columns.has('finalize_event_snapshot')) db.exec('ALTER TABLE balance_movements ADD COLUMN finalize_event_snapshot TEXT');
     },
   },
   {
@@ -115,9 +122,9 @@ export const MIGRATIONS: Migration[] = [
     description:
       'Add finalize_acceptance_event_snapshot/finalize_sg_event_snapshot to balance_movements (2026-08-18, "SNAP SHOT保留當時 LC, SG, ACCEPTANCE BALANCE 不會因為後續交易改變" — same freeze-at-transaction-time fix as migration 8, extended to the sibling snapshot fields — see types.ts BalanceMovement.finalizeAcceptanceEventSnapshot/finalizeSgEventSnapshot)',
     up: (db) => {
-      const columns = (db.prepare('PRAGMA table_info(balance_movements)').all() as { name: string }[]).map((c) => c.name);
-      if (!columns.includes('finalize_acceptance_event_snapshot')) db.exec('ALTER TABLE balance_movements ADD COLUMN finalize_acceptance_event_snapshot TEXT');
-      if (!columns.includes('finalize_sg_event_snapshot')) db.exec('ALTER TABLE balance_movements ADD COLUMN finalize_sg_event_snapshot TEXT');
+      const columns = columnNames(db, 'balance_movements');
+      if (!columns.has('finalize_acceptance_event_snapshot')) db.exec('ALTER TABLE balance_movements ADD COLUMN finalize_acceptance_event_snapshot TEXT');
+      if (!columns.has('finalize_sg_event_snapshot')) db.exec('ALTER TABLE balance_movements ADD COLUMN finalize_sg_event_snapshot TEXT');
     },
   },
   {
@@ -125,9 +132,9 @@ export const MIGRATIONS: Migration[] = [
     description:
       'Add present_docs_consumed_at/present_docs_consumed_by to balance_movements (2026-08-18, "所有交易要RELEASE過後 才能根據流程走下一個交易" — B3 now genuinely RELEASEs on its own; this is what Present Docs Earmark Approved reads instead of the now-historical acknowledged_at — see types.ts BalanceMovement.presentDocsConsumedAt)',
     up: (db) => {
-      const columns = (db.prepare('PRAGMA table_info(balance_movements)').all() as { name: string }[]).map((c) => c.name);
-      if (!columns.includes('present_docs_consumed_at')) db.exec('ALTER TABLE balance_movements ADD COLUMN present_docs_consumed_at TEXT');
-      if (!columns.includes('present_docs_consumed_by')) db.exec('ALTER TABLE balance_movements ADD COLUMN present_docs_consumed_by TEXT');
+      const columns = columnNames(db, 'balance_movements');
+      if (!columns.has('present_docs_consumed_at')) db.exec('ALTER TABLE balance_movements ADD COLUMN present_docs_consumed_at TEXT');
+      if (!columns.has('present_docs_consumed_by')) db.exec('ALTER TABLE balance_movements ADD COLUMN present_docs_consumed_by TEXT');
     },
   },
   {
@@ -135,9 +142,9 @@ export const MIGRATIONS: Migration[] = [
     description:
       'Add cancelled_by/cancelled_at to balance_movements (2026-08-20, "SUBMIT/EC/APPROVE DATETIME/USER" — cancel() no longer reuses released_by/released_at — see types.ts BalanceMovement.cancelledAt)',
     up: (db) => {
-      const columns = (db.prepare('PRAGMA table_info(balance_movements)').all() as { name: string }[]).map((c) => c.name);
-      if (!columns.includes('cancelled_by')) db.exec('ALTER TABLE balance_movements ADD COLUMN cancelled_by TEXT');
-      if (!columns.includes('cancelled_at')) db.exec('ALTER TABLE balance_movements ADD COLUMN cancelled_at TEXT');
+      const columns = columnNames(db, 'balance_movements');
+      if (!columns.has('cancelled_by')) db.exec('ALTER TABLE balance_movements ADD COLUMN cancelled_by TEXT');
+      if (!columns.has('cancelled_at')) db.exec('ALTER TABLE balance_movements ADD COLUMN cancelled_at TEXT');
     },
   },
   {
@@ -306,9 +313,9 @@ export const MIGRATIONS: Migration[] = [
     description:
       'Add expiry_date/mail_float_grace_days to balance_contracts (2026-08-25, F1 external BA review — AUTO EXPIRY) — see types.ts BalanceContract.expiryDate/mailFloatGraceDays doc comments. Simple ALTER TABLE ADD COLUMN, no CHECK constraint involved (both nullable, no enum).',
     up: (db) => {
-      const columns = (db.prepare('PRAGMA table_info(balance_contracts)').all() as { name: string }[]).map((c) => c.name);
-      if (!columns.includes('expiry_date')) db.exec('ALTER TABLE balance_contracts ADD COLUMN expiry_date TEXT');
-      if (!columns.includes('mail_float_grace_days')) db.exec('ALTER TABLE balance_contracts ADD COLUMN mail_float_grace_days INTEGER');
+      const columns = columnNames(db, 'balance_contracts');
+      if (!columns.has('expiry_date')) db.exec('ALTER TABLE balance_contracts ADD COLUMN expiry_date TEXT');
+      if (!columns.has('mail_float_grace_days')) db.exec('ALTER TABLE balance_contracts ADD COLUMN mail_float_grace_days INTEGER');
     },
   },
   {
@@ -469,8 +476,8 @@ export const MIGRATIONS: Migration[] = [
     description:
       "Add new_expiry_date to balance_movements (2026-08-25, F1 external BA review — AMEND_EXPIRY_DATE) — see schema.ts's own column comment. Runs AFTER migration 15's rebuild (must — 15's CREATE TABLE balance_movements_new has a hardcoded column list that predates this column; adding it before 15 would have it silently dropped by that rebuild). Simple ALTER TABLE ADD COLUMN, no CHECK constraint involved.",
     up: (db) => {
-      const columns = (db.prepare('PRAGMA table_info(balance_movements)').all() as { name: string }[]).map((c) => c.name);
-      if (!columns.includes('new_expiry_date')) db.exec('ALTER TABLE balance_movements ADD COLUMN new_expiry_date TEXT');
+      const columns = columnNames(db, 'balance_movements');
+      if (!columns.has('new_expiry_date')) db.exec('ALTER TABLE balance_movements ADD COLUMN new_expiry_date TEXT');
     },
   },
   {
@@ -478,10 +485,10 @@ export const MIGRATIONS: Migration[] = [
     description:
       "Add amendment_approved/amendment_effective/consent_status to balance_movements (2026-08-25, F1 proposal §13.1 item 2, BA-ratified — AMEND_EXPIRY_DATE/REOPEN upstream consent passthrough; this component accepts and shape-validates these, never judges them) — see schema.ts's own column comment. Simple ALTER TABLE ADD COLUMN, no CHECK constraint (consent_status is bounded at the zod layer, same posture as the pre-existing reason_code column).",
     up: (db) => {
-      const columns = (db.prepare('PRAGMA table_info(balance_movements)').all() as { name: string }[]).map((c) => c.name);
-      if (!columns.includes('amendment_approved')) db.exec('ALTER TABLE balance_movements ADD COLUMN amendment_approved INTEGER');
-      if (!columns.includes('amendment_effective')) db.exec('ALTER TABLE balance_movements ADD COLUMN amendment_effective TEXT');
-      if (!columns.includes('consent_status')) db.exec('ALTER TABLE balance_movements ADD COLUMN consent_status TEXT');
+      const columns = columnNames(db, 'balance_movements');
+      if (!columns.has('amendment_approved')) db.exec('ALTER TABLE balance_movements ADD COLUMN amendment_approved INTEGER');
+      if (!columns.has('amendment_effective')) db.exec('ALTER TABLE balance_movements ADD COLUMN amendment_effective TEXT');
+      if (!columns.has('consent_status')) db.exec('ALTER TABLE balance_movements ADD COLUMN consent_status TEXT');
     },
   },
   {
@@ -514,10 +521,10 @@ export const MIGRATIONS: Migration[] = [
     description:
       "Add superseded_by_movement_id/edited_by/edited_at to balance_movements (2026-08-27, Fix Pending §2.2/§15/§19 — see schema.ts's own column comment). Simple ALTER TABLE ADD COLUMN, no CHECK/REFERENCES constraint (§6.4/§15.3(d) — deliberately kept out at this stage, same posture as fresh schema.ts).",
     up: (db) => {
-      const columns = (db.prepare('PRAGMA table_info(balance_movements)').all() as { name: string }[]).map((c) => c.name);
-      if (!columns.includes('superseded_by_movement_id')) db.exec('ALTER TABLE balance_movements ADD COLUMN superseded_by_movement_id TEXT');
-      if (!columns.includes('edited_by')) db.exec('ALTER TABLE balance_movements ADD COLUMN edited_by TEXT');
-      if (!columns.includes('edited_at')) db.exec('ALTER TABLE balance_movements ADD COLUMN edited_at TEXT');
+      const columns = columnNames(db, 'balance_movements');
+      if (!columns.has('superseded_by_movement_id')) db.exec('ALTER TABLE balance_movements ADD COLUMN superseded_by_movement_id TEXT');
+      if (!columns.has('edited_by')) db.exec('ALTER TABLE balance_movements ADD COLUMN edited_by TEXT');
+      if (!columns.has('edited_at')) db.exec('ALTER TABLE balance_movements ADD COLUMN edited_at TEXT');
     },
   },
   {
@@ -691,17 +698,17 @@ export const MIGRATIONS: Migration[] = [
     description:
       'Capture the tolerance proposed by each ISSUE/monetary amendment on balance_movements so Checker Release can atomically make the latest tolerance effective and stale pending amendments can be revalidated.',
     up: (db) => {
-      const columns = (db.prepare('PRAGMA table_info(balance_movements)').all() as { name: string }[]).map((c) => c.name);
-      if (!columns.includes('tolerance_pct')) db.exec('ALTER TABLE balance_movements ADD COLUMN tolerance_pct TEXT');
+      const columns = columnNames(db, 'balance_movements');
+      if (!columns.has('tolerance_pct')) db.exec('ALTER TABLE balance_movements ADD COLUMN tolerance_pct TEXT');
     },
   },
   {
     id: 25,
     description: 'Persist amendment-only tolerance change magnitude and direction alongside the protected resulting tolerance.',
     up: (db) => {
-      const columns = (db.prepare('PRAGMA table_info(balance_movements)').all() as { name: string }[]).map((c) => c.name);
-      if (!columns.includes('tolerance_change_pct')) db.exec('ALTER TABLE balance_movements ADD COLUMN tolerance_change_pct TEXT');
-      if (!columns.includes('tolerance_change_direction'))
+      const columns = columnNames(db, 'balance_movements');
+      if (!columns.has('tolerance_change_pct')) db.exec('ALTER TABLE balance_movements ADD COLUMN tolerance_change_pct TEXT');
+      if (!columns.has('tolerance_change_direction'))
         db.exec(
           "ALTER TABLE balance_movements ADD COLUMN tolerance_change_direction TEXT CHECK (tolerance_change_direction IS NULL OR tolerance_change_direction IN ('INCREASE','DECREASE'))",
         );
@@ -748,6 +755,343 @@ export const MIGRATIONS: Migration[] = [
     description: 'Add v11.15 append-only Excess allowance, FX snapshot, SG capacity and command-idempotency persistence.',
     up: (db) => {
       db.exec(EXCESS_SCHEMA_SQL);
+    },
+  },
+  {
+    id: 28,
+    description: 'Disable pre-V4 Formal Increase cure writes while preserving any draft allocation rows as read-only legacy audit data.',
+    up: (db) => {
+      db.exec('BEGIN IMMEDIATE');
+      try {
+        const allocationTable = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'excess_allocations'").get();
+        if (allocationTable) {
+          db.exec('ALTER TABLE excess_allocations RENAME TO legacy_excess_allocations');
+          db.exec('DROP TRIGGER IF EXISTS immutable_excess_allocations_update');
+          db.exec('DROP TRIGGER IF EXISTS immutable_excess_allocations_delete');
+          db.exec(`
+            CREATE TRIGGER IF NOT EXISTS immutable_legacy_excess_allocations_insert
+            BEFORE INSERT ON legacy_excess_allocations BEGIN SELECT RAISE(ABORT, 'legacy_excess_allocations is read-only'); END;
+            CREATE TRIGGER IF NOT EXISTS immutable_legacy_excess_allocations_update
+            BEFORE UPDATE ON legacy_excess_allocations BEGIN SELECT RAISE(ABORT, 'legacy_excess_allocations is append-only'); END;
+            CREATE TRIGGER IF NOT EXISTS immutable_legacy_excess_allocations_delete
+            BEFORE DELETE ON legacy_excess_allocations BEGIN SELECT RAISE(ABORT, 'legacy_excess_allocations is append-only'); END;
+          `);
+        }
+        db.exec(`
+          CREATE TRIGGER IF NOT EXISTS reject_formal_increase_regularization_insert
+          BEFORE INSERT ON excess_ledger_events
+          WHEN NEW.event_type = 'FORMAL_INCREASE_REGULARIZATION'
+          BEGIN SELECT RAISE(ABORT, 'FORMAL_INCREASE_REGULARIZATION disabled by V4'); END;
+        `);
+        db.exec('COMMIT');
+      } catch (error) {
+        db.exec('ROLLBACK');
+        throw error;
+      }
+    },
+  },
+  {
+    id: 29,
+    description: 'Disable BD-07 Return and Cancellation reversal writes while preserving any draft rows as read-only legacy audit evidence.',
+    up: (db) => {
+      db.exec(`
+        CREATE TRIGGER IF NOT EXISTS reject_legacy_excess_reversal_insert
+        BEFORE INSERT ON excess_ledger_events
+        WHEN NEW.event_type IN ('RETURN_REVERSAL', 'CANCELLATION_REVERSAL')
+        BEGIN SELECT RAISE(ABORT, 'RETURN_REVERSAL and CANCELLATION_REVERSAL disabled by BD-07'); END;
+      `);
+    },
+  },
+  {
+    id: 30,
+    description: 'Quarantine pre-V4 USD-direction Excess facts and create canonical V4 owner-currency active persistence.',
+    up: (db) => {
+      const tableExists = (name: string): boolean => !!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(name);
+      const columns = (name: string): ReadonlySet<string> => (tableExists(name) ? columnNames(db, name) : new Set());
+
+      const canonical = columns('excess_accounts').has('owner_currency');
+      if (canonical) return;
+
+      db.exec('BEGIN IMMEDIATE');
+      try {
+        db.exec(`
+          DROP INDEX IF EXISTS idx_excess_events_account_time;
+          DROP INDEX IF EXISTS idx_excess_events_movement;
+          DROP INDEX IF EXISTS idx_fx_snapshots_movement;
+          DROP TRIGGER IF EXISTS immutable_excess_ledger_events_update;
+          DROP TRIGGER IF EXISTS immutable_excess_ledger_events_delete;
+          DROP TRIGGER IF EXISTS immutable_fx_rate_snapshots_update;
+          DROP TRIGGER IF EXISTS immutable_fx_rate_snapshots_delete;
+          DROP TRIGGER IF EXISTS immutable_command_idempotency_update;
+          DROP TRIGGER IF EXISTS immutable_command_idempotency_delete;
+          DROP TRIGGER IF EXISTS reject_formal_increase_regularization_insert;
+          DROP TRIGGER IF EXISTS reject_legacy_excess_reversal_insert;
+        `);
+
+        if (tableExists('excess_accounts')) db.exec('ALTER TABLE excess_accounts RENAME TO legacy_pre_v4_excess_accounts');
+        if (tableExists('excess_ledger_events')) db.exec('ALTER TABLE excess_ledger_events RENAME TO legacy_pre_v4_excess_ledger_events');
+        if (tableExists('fx_rate_snapshots')) db.exec('ALTER TABLE fx_rate_snapshots RENAME TO legacy_pre_v4_fx_rate_snapshots');
+        if (tableExists('command_idempotency')) db.exec('ALTER TABLE command_idempotency RENAME TO legacy_pre_v4_command_idempotency');
+
+        db.exec(EXCESS_SCHEMA_SQL);
+
+        for (const table of [
+          'legacy_pre_v4_excess_accounts',
+          'legacy_pre_v4_excess_ledger_events',
+          'legacy_pre_v4_fx_rate_snapshots',
+          'legacy_pre_v4_command_idempotency',
+        ]) {
+          if (!tableExists(table)) continue;
+          db.exec(`
+            CREATE TRIGGER immutable_${table}_insert
+            BEFORE INSERT ON ${table} BEGIN SELECT RAISE(ABORT, '${table} is read-only'); END;
+            CREATE TRIGGER immutable_${table}_update
+            BEFORE UPDATE ON ${table} BEGIN SELECT RAISE(ABORT, '${table} is read-only'); END;
+            CREATE TRIGGER immutable_${table}_delete
+            BEFORE DELETE ON ${table} BEGIN SELECT RAISE(ABORT, '${table} is read-only'); END;
+          `);
+        }
+        db.exec('COMMIT');
+      } catch (error) {
+        db.exec('ROLLBACK');
+        throw error;
+      }
+    },
+  },
+  {
+    id: 31,
+    description: 'Make Excess decision snapshots append-only across Maker, Fix, Resubmit and Checker decisions.',
+    up: (db) => {
+      const columns = columnNames(db, 'excess_decision_snapshots');
+      if (columns.has('decision_snapshot_id')) return;
+      db.exec('BEGIN IMMEDIATE');
+      try {
+        db.exec(`
+          DROP INDEX IF EXISTS idx_excess_decisions_movement_time;
+          DROP TRIGGER IF EXISTS immutable_excess_decision_snapshots_update;
+          DROP TRIGGER IF EXISTS immutable_excess_decision_snapshots_delete;
+          ALTER TABLE excess_decision_snapshots RENAME TO legacy_v30_excess_decision_snapshots;
+
+          CREATE TABLE excess_decision_snapshots (
+            decision_snapshot_id     TEXT PRIMARY KEY,
+            movement_id              TEXT NOT NULL REFERENCES balance_movements(movement_id),
+            excess_account_id        TEXT NOT NULL REFERENCES excess_accounts(excess_account_id),
+            facts_version            TEXT NOT NULL,
+            owner_currency           TEXT NOT NULL,
+            effective_limit_owner    TEXT NOT NULL,
+            excess_decision          TEXT NOT NULL CHECK (excess_decision IN ('WITHIN_ALLOWANCE','LIMIT_EXCEEDED')),
+            business_result_code     TEXT CHECK (business_result_code IS NULL OR business_result_code = 'EXCESS_LIMIT_EXCEEDED'),
+            release_eligibility      TEXT NOT NULL CHECK (release_eligibility IN ('ELIGIBLE','BLOCKED')),
+            policy_snapshot_json     TEXT NOT NULL CHECK (json_valid(policy_snapshot_json)),
+            action                   TEXT NOT NULL CHECK (action IN ('MAKER_SUBMIT','FIX_PENDING','RESUBMIT','CHECKER_RELEASE')),
+            command_idempotency_key  TEXT NOT NULL,
+            actor_context            TEXT NOT NULL,
+            decision_time            TEXT NOT NULL,
+            created_at               TEXT NOT NULL,
+            UNIQUE (movement_id, action, command_idempotency_key)
+          );
+
+          INSERT INTO excess_decision_snapshots (
+            decision_snapshot_id, movement_id, excess_account_id, facts_version, owner_currency,
+            effective_limit_owner, excess_decision, business_result_code, release_eligibility,
+            policy_snapshot_json, action, command_idempotency_key, actor_context, decision_time, created_at
+          )
+          SELECT 'v30-' || rowid, movement_id, excess_account_id, facts_version, owner_currency,
+            effective_limit_owner, excess_decision, business_result_code, release_eligibility,
+            policy_snapshot_json, action, 'v30-' || rowid, actor_context, decision_time, created_at
+          FROM legacy_v30_excess_decision_snapshots;
+
+          CREATE INDEX idx_excess_decisions_movement_time
+          ON excess_decision_snapshots(movement_id, created_at);
+          CREATE TRIGGER immutable_excess_decision_snapshots_update
+          BEFORE UPDATE ON excess_decision_snapshots BEGIN SELECT RAISE(ABORT, 'excess_decision_snapshots is append-only'); END;
+          CREATE TRIGGER immutable_excess_decision_snapshots_delete
+          BEFORE DELETE ON excess_decision_snapshots BEGIN SELECT RAISE(ABORT, 'excess_decision_snapshots is append-only'); END;
+          CREATE TRIGGER immutable_legacy_v30_excess_decision_snapshots_insert
+          BEFORE INSERT ON legacy_v30_excess_decision_snapshots BEGIN SELECT RAISE(ABORT, 'legacy_v30_excess_decision_snapshots is read-only'); END;
+          CREATE TRIGGER immutable_legacy_v30_excess_decision_snapshots_update
+          BEFORE UPDATE ON legacy_v30_excess_decision_snapshots BEGIN SELECT RAISE(ABORT, 'legacy_v30_excess_decision_snapshots is read-only'); END;
+          CREATE TRIGGER immutable_legacy_v30_excess_decision_snapshots_delete
+          BEFORE DELETE ON legacy_v30_excess_decision_snapshots BEGIN SELECT RAISE(ABORT, 'legacy_v30_excess_decision_snapshots is read-only'); END;
+        `);
+        db.exec('COMMIT');
+      } catch (error) {
+        db.exec('ROLLBACK');
+        throw error;
+      }
+    },
+  },
+  {
+    id: 32,
+    description: 'Add append-only Checker fail-closed command-attempt audit persistence.',
+    up: (db) => {
+      db.exec(EXCESS_COMMAND_ATTEMPT_AUDIT_SCHEMA_SQL);
+    },
+  },
+  {
+    id: 33,
+    description: 'Allow the approved Checker NOT_REQUIRED Excess decision when current capacity fully covers the transaction.',
+    up: (db) => {
+      const table = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'excess_decision_snapshots'").get() as
+        { sql: string } | undefined;
+      if (!table || table.sql.includes("'NOT_REQUIRED'")) return;
+      db.exec('BEGIN IMMEDIATE');
+      try {
+        db.exec(`
+          DROP INDEX IF EXISTS idx_excess_decisions_movement_time;
+          DROP TRIGGER IF EXISTS immutable_excess_decision_snapshots_update;
+          DROP TRIGGER IF EXISTS immutable_excess_decision_snapshots_delete;
+          ALTER TABLE excess_decision_snapshots RENAME TO legacy_pre_m33_excess_decision_snapshots;
+
+          CREATE TABLE excess_decision_snapshots (
+            decision_snapshot_id     TEXT PRIMARY KEY,
+            movement_id              TEXT NOT NULL REFERENCES balance_movements(movement_id),
+            excess_account_id        TEXT NOT NULL REFERENCES excess_accounts(excess_account_id),
+            facts_version            TEXT NOT NULL,
+            owner_currency           TEXT NOT NULL,
+            effective_limit_owner    TEXT NOT NULL,
+            excess_decision          TEXT NOT NULL CHECK (excess_decision IN ('NOT_REQUIRED','WITHIN_ALLOWANCE','LIMIT_EXCEEDED')),
+            business_result_code     TEXT CHECK (business_result_code IS NULL OR business_result_code = 'EXCESS_LIMIT_EXCEEDED'),
+            release_eligibility      TEXT NOT NULL CHECK (release_eligibility IN ('ELIGIBLE','BLOCKED')),
+            policy_snapshot_json     TEXT NOT NULL CHECK (json_valid(policy_snapshot_json)),
+            action                   TEXT NOT NULL CHECK (action IN ('MAKER_SUBMIT','FIX_PENDING','RESUBMIT','CHECKER_RELEASE')),
+            command_idempotency_key  TEXT NOT NULL,
+            actor_context            TEXT NOT NULL,
+            decision_time            TEXT NOT NULL,
+            created_at               TEXT NOT NULL,
+            UNIQUE (movement_id, action, command_idempotency_key)
+          );
+
+          INSERT INTO excess_decision_snapshots SELECT * FROM legacy_pre_m33_excess_decision_snapshots;
+          CREATE INDEX idx_excess_decisions_movement_time ON excess_decision_snapshots(movement_id, created_at);
+          CREATE TRIGGER immutable_excess_decision_snapshots_update
+          BEFORE UPDATE ON excess_decision_snapshots BEGIN SELECT RAISE(ABORT, 'excess_decision_snapshots is append-only'); END;
+          CREATE TRIGGER immutable_excess_decision_snapshots_delete
+          BEFORE DELETE ON excess_decision_snapshots BEGIN SELECT RAISE(ABORT, 'excess_decision_snapshots is append-only'); END;
+          CREATE TRIGGER immutable_legacy_pre_m33_excess_decision_snapshots_insert
+          BEFORE INSERT ON legacy_pre_m33_excess_decision_snapshots BEGIN SELECT RAISE(ABORT, 'legacy_pre_m33_excess_decision_snapshots is read-only'); END;
+          CREATE TRIGGER immutable_legacy_pre_m33_excess_decision_snapshots_update
+          BEFORE UPDATE ON legacy_pre_m33_excess_decision_snapshots BEGIN SELECT RAISE(ABORT, 'legacy_pre_m33_excess_decision_snapshots is read-only'); END;
+          CREATE TRIGGER immutable_legacy_pre_m33_excess_decision_snapshots_delete
+          BEFORE DELETE ON legacy_pre_m33_excess_decision_snapshots BEGIN SELECT RAISE(ABORT, 'legacy_pre_m33_excess_decision_snapshots is read-only'); END;
+        `);
+        db.exec('COMMIT');
+      } catch (error) {
+        db.exec('ROLLBACK');
+        throw error;
+      }
+    },
+  },
+  {
+    id: 34,
+    description: 'Remove the unapproved active SG Capacity RESTORE event; preserve any historical table as read-only legacy audit.',
+    up: (db) => {
+      const table = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'sg_capacity_events'").get() as { sql: string } | undefined;
+      if (!table || !table.sql.includes("'RESTORE'")) return;
+      db.exec('BEGIN IMMEDIATE');
+      try {
+        db.exec(`
+          DROP INDEX IF EXISTS idx_sg_capacity_contract_time;
+          DROP TRIGGER IF EXISTS immutable_sg_capacity_events_update;
+          DROP TRIGGER IF EXISTS immutable_sg_capacity_events_delete;
+          ALTER TABLE sg_capacity_events RENAME TO legacy_pre_m34_sg_capacity_events;
+
+          CREATE TABLE sg_capacity_events (
+            sg_capacity_event_id     TEXT PRIMARY KEY,
+            sg_balance_contract_id   TEXT NOT NULL REFERENCES balance_contracts(balance_contract_id),
+            source_movement_id       TEXT NOT NULL REFERENCES balance_movements(movement_id),
+            event_type               TEXT NOT NULL CHECK (event_type IN ('INITIALIZE','RESERVE','REDEEM','REVERSE')),
+            transaction_currency     TEXT NOT NULL,
+            capacity_amount          TEXT NOT NULL,
+            covered_amount           TEXT NOT NULL,
+            excess_amount            TEXT NOT NULL,
+            source_capacity_event_id TEXT REFERENCES sg_capacity_events(sg_capacity_event_id),
+            created_by               TEXT NOT NULL,
+            created_at               TEXT NOT NULL
+          );
+
+          INSERT INTO sg_capacity_events
+          SELECT * FROM legacy_pre_m34_sg_capacity_events
+          WHERE event_type <> 'RESTORE'
+            AND (source_capacity_event_id IS NULL OR source_capacity_event_id IN (
+              SELECT sg_capacity_event_id FROM legacy_pre_m34_sg_capacity_events WHERE event_type <> 'RESTORE'
+            ));
+
+          CREATE INDEX idx_sg_capacity_contract_time
+          ON sg_capacity_events(sg_balance_contract_id, created_at, sg_capacity_event_id);
+          CREATE TRIGGER immutable_sg_capacity_events_update
+          BEFORE UPDATE ON sg_capacity_events BEGIN SELECT RAISE(ABORT, 'sg_capacity_events is append-only'); END;
+          CREATE TRIGGER immutable_sg_capacity_events_delete
+          BEFORE DELETE ON sg_capacity_events BEGIN SELECT RAISE(ABORT, 'sg_capacity_events is append-only'); END;
+          CREATE TRIGGER immutable_legacy_pre_m34_sg_capacity_events_insert
+          BEFORE INSERT ON legacy_pre_m34_sg_capacity_events BEGIN SELECT RAISE(ABORT, 'legacy_pre_m34_sg_capacity_events is read-only'); END;
+          CREATE TRIGGER immutable_legacy_pre_m34_sg_capacity_events_update
+          BEFORE UPDATE ON legacy_pre_m34_sg_capacity_events BEGIN SELECT RAISE(ABORT, 'legacy_pre_m34_sg_capacity_events is read-only'); END;
+          CREATE TRIGGER immutable_legacy_pre_m34_sg_capacity_events_delete
+          BEFORE DELETE ON legacy_pre_m34_sg_capacity_events BEGIN SELECT RAISE(ABORT, 'legacy_pre_m34_sg_capacity_events is read-only'); END;
+        `);
+        db.exec('COMMIT');
+      } catch (error) {
+        db.exec('ROLLBACK');
+        throw error;
+      }
+    },
+  },
+  {
+    id: 35,
+    description: 'Add immutable Applicant Waiver confirmation snapshots for positive Import Excess finalisation.',
+    up: (db) => {
+      db.exec(APPLICANT_WAIVER_SCHEMA_SQL);
+    },
+  },
+  {
+    id: 36,
+    description: 'Add immutable B4 export authorization snapshots and two-leg asset vouchers.',
+    up: (db) => {
+      db.exec(EXPORT_ASSET_SCHEMA_SQL);
+    },
+  },
+  {
+    id: 37,
+    description: 'Self-heal legacy Balance Account mapping tables whose fixed instrument CHECK blocks configured Excess Asset mappings.',
+    up: (db) => {
+      const table = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'balance_account_mappings'").get() as
+        { sql: string } | undefined;
+      if (!table?.sql.includes('CHECK (instrument_type')) return;
+      db.exec('PRAGMA foreign_keys = OFF');
+      try {
+        db.exec(`
+          BEGIN IMMEDIATE;
+          CREATE TABLE balance_account_mappings_m37 (
+            mapping_key TEXT PRIMARY KEY,
+            instrument_type TEXT NOT NULL,
+            risk_class TEXT NOT NULL,
+            account_a_number TEXT NOT NULL,
+            account_a_description TEXT NOT NULL,
+            account_b_number TEXT NOT NULL,
+            account_b_description TEXT NOT NULL,
+            version INTEGER NOT NULL CHECK (version > 0),
+            updated_by TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE (instrument_type, risk_class)
+          );
+          INSERT INTO balance_account_mappings_m37 (
+            mapping_key, instrument_type, risk_class, account_a_number, account_a_description,
+            account_b_number, account_b_description, version, updated_by, updated_at
+          ) SELECT
+            mapping_key, instrument_type, risk_class, account_a_number, account_a_description,
+            account_b_number, account_b_description, version, updated_by, updated_at
+          FROM balance_account_mappings;
+          DROP TABLE balance_account_mappings;
+          ALTER TABLE balance_account_mappings_m37 RENAME TO balance_account_mappings;
+          COMMIT;
+        `);
+      } catch (error) {
+        db.exec('ROLLBACK');
+        throw error;
+      } finally {
+        db.exec('PRAGMA foreign_keys = ON');
+      }
     },
   },
 ];

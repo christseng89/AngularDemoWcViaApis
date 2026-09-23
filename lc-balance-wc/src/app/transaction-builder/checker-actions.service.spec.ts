@@ -37,6 +37,11 @@ function makeApi(overrides: Partial<Record<keyof BalanceComponentApiService, jes
   const acknowledge = overrides.acknowledge ?? jest.fn(() => of(makeMovement({ movementId: 'acknowledged', status: 'PENDING' })));
   return {
     release,
+    releaseExportAssets: jest.fn(() => of({
+      movement: makeMovement({ movementId: 'b4-released', status: 'RELEASED' }),
+      authorization: { authorizationSnapshotId: 'auth-1', claimStatus: 'ABSENT', authorizationValidationResult: 'NOT_CONFIRMED', excessDebtor: 'BENEFICIARY_OR_RECOURSE_PARTY' },
+      assets: [],
+    })),
     reject: jest.fn(() => of({ movementId: 'rejected', status: 'REJECTED' })),
     cancel: jest.fn(() => of({ movementId: 'cancelled', status: 'CANCELLED' })),
     acknowledge,
@@ -65,9 +70,29 @@ function makeContext(overrides: Partial<CheckerActionContext> = {}): CheckerActi
     arrivalSgRedeemMovementId: null,
     createdBy: 'maker1',
     selectedCheckerMovement: null,
+    applicantWaiver: undefined,
     ...overrides,
   };
 }
+
+describe('CheckerActionsService.release() — A6 ABSENT Excess approval finalisation', () => {
+  it('sends one authoritative A6 final Release without Applicant Waiver metadata', (done) => {
+    const api = makeApi();
+    const service = new CheckerActionsService(api);
+    const ctx = makeContext({
+      selectedFunction: A6,
+      selectedCheckerMovement: makeMovement({ movementId: 'a6-final', movementType: 'CREATE', referencedTransactionId: 'arrival-1' }),
+    });
+
+    service.release(ctx).subscribe((outcome) => {
+      expect(outcome).toMatchObject({ kind: 'released' });
+      expect(api.release).toHaveBeenCalledTimes(1);
+      expect(api.release).toHaveBeenCalledWith('a6-final', 'checker1');
+      expect(api.executeCompoundActions).not.toHaveBeenCalled();
+      done();
+    });
+  });
+});
 
 describe('CheckerActionsService.release() — A3S (documentArrivalWithSg) linked SG redemption resolution', () => {
   it('fast path: releases the SG redemption directly when arrivalSgRedeemMovementId is already known — never calls findByBusinessEventId', (done) => {
@@ -200,7 +225,18 @@ describe('CheckerActionsService.release() — B5 plain Acceptance settlement', (
 });
 
 describe('CheckerActionsService.release() — A6/B4 (settlesDocumentArrival) source + downstream leg resolution (bug fixed 2026-08-16, "A6/B4 也修一下")', () => {
-  it('A6, cross-session: resolves the source via referencedTransactionId (no selectedPayMovement, no findByBusinessEventId call needed) and releases source then primary via selectedCheckerMovement', (done) => {
+  it('B4 sends explicit Checker authorization once and preserves the authoritative inquiry receipt', (done) => {
+    const api = makeApi();
+    const service = new CheckerActionsService(api);
+    const exportAuthorization = { claimStatus: 'SUBMITTED' as const, authorizationReference: 'AUTH-1', authorizedAmountOwner: '200', authorizedCurrency: 'USD', authorizationValidationResult: 'CONFIRMED' as const };
+    service.release(makeContext({ selectedFunction: B4, selectedCheckerMovement: makeMovement({ movementId: 'b4-1', movementType: 'HONOUR' }), exportAuthorization })).subscribe((outcome) => {
+      expect(api.releaseExportAssets).toHaveBeenCalledWith('b4-1', 'checker1', exportAuthorization);
+      expect(outcome).toMatchObject({ kind: 'released', result: { movementId: 'b4-released' }, exportAssetDecision: { authorization: { claimStatus: 'ABSENT' } } });
+      expect(api.executeCompoundActions).not.toHaveBeenCalled();
+      done();
+    });
+  });
+  it('A6, cross-session: sends one authoritative atomic Release for the selected Acceptance', (done) => {
     const api = makeApi();
     const service = new CheckerActionsService(api);
     const ctx = makeContext({
@@ -212,22 +248,21 @@ describe('CheckerActionsService.release() — A6/B4 (settlesDocumentArrival) sou
 
     service.release(ctx).subscribe((outcome) => {
       expect(outcome.kind).toBe('released');
-      expect(api.release).toHaveBeenNthCalledWith(1, 'source-1', 'checker1');
-      expect(api.release).toHaveBeenNthCalledWith(2, 'acceptance-1', 'checker1');
+      expect(api.release).toHaveBeenCalledWith('acceptance-1', 'checker1');
+      expect(api.release).toHaveBeenCalledTimes(1);
       expect(api.findByBusinessEventId).not.toHaveBeenCalled();
       done();
     });
   });
 
-  it('A6: no source resolvable at all (no selectedPayMovement, no referencedTransactionId) — fails cleanly, never calls release', (done) => {
+  it('A6: the atomic endpoint does not require the UI to resolve a separate source movement', (done) => {
     const api = makeApi();
     const service = new CheckerActionsService(api);
     const ctx = makeContext({ selectedFunction: A6, selectedCheckerMovement: makeMovement({ movementType: 'CREATE', referencedTransactionId: null }) });
 
     service.release(ctx).subscribe((outcome) => {
-      expect(outcome.kind).toBe('failed');
-      if (outcome.kind === 'failed') expect(outcome.message).toContain('no referencedTransactionId correlation found');
-      expect(api.release).not.toHaveBeenCalled();
+      expect(outcome.kind).toBe('released');
+      expect(api.release).toHaveBeenCalledTimes(1);
       done();
     });
   });
@@ -303,7 +338,7 @@ describe('CheckerActionsService.release() — A6/B4 (settlesDocumentArrival) sou
     });
   });
 
-  it('A6: releasing the resolved source record itself fails — surfaces its own compound error, never attempts the primary', (done) => {
+  it('A6: atomic final Release failure is surfaced without a second mutation', (done) => {
     const api = makeApi({ release: jest.fn(() => throwError(() => ({ error: { message: 'ILLEGAL_STATE_TRANSITION' } }))) });
     const service = new CheckerActionsService(api);
     const ctx = makeContext({
@@ -315,22 +350,17 @@ describe('CheckerActionsService.release() — A6/B4 (settlesDocumentArrival) sou
     service.release(ctx).subscribe((outcome) => {
       expect(outcome.kind).toBe('failed');
       if (outcome.kind === 'failed') {
-        expect(outcome.message).toContain('failed to release atomically');
         expect(outcome.message).toContain('ILLEGAL_STATE_TRANSITION');
       }
-      // The HTTP adapter sends one compound command; this test double subscribes both inner
-      // observables, while the real SQLite endpoint rolls the whole transaction back.
-      expect(api.release).toHaveBeenCalledTimes(2);
+      expect(api.release).toHaveBeenCalledWith('acceptance-fail', 'checker1');
+      expect(api.release).toHaveBeenCalledTimes(1);
       done();
     });
   });
 
-  it("A6: source releases fine, but the primary Acceptance CREATE fails — surfaces releaseAcceptance's own compound error", (done) => {
+  it('A6: selected Acceptance failure is returned by the one authoritative command', (done) => {
     const api = makeApi({
-      release: jest
-        .fn()
-        .mockReturnValueOnce(of({ movementId: 'source-2', status: 'RELEASED' }))
-        .mockReturnValueOnce(throwError(() => ({ error: { message: 'ILLEGAL_STATE_TRANSITION' } }))),
+      release: jest.fn(() => throwError(() => ({ error: { message: 'ILLEGAL_STATE_TRANSITION' } }))),
     });
     const service = new CheckerActionsService(api);
     const ctx = makeContext({
@@ -341,8 +371,9 @@ describe('CheckerActionsService.release() — A6/B4 (settlesDocumentArrival) sou
 
     service.release(ctx).subscribe((outcome) => {
       expect(outcome.kind).toBe('failed');
-      if (outcome.kind === 'failed') expect(outcome.message).toContain('failed to release');
-      expect(api.release).toHaveBeenCalledTimes(2);
+      if (outcome.kind === 'failed') expect(outcome.message).toContain('ILLEGAL_STATE_TRANSITION');
+      expect(api.release).toHaveBeenCalledWith('acceptance-2', 'checker1');
+      expect(api.release).toHaveBeenCalledTimes(1);
       done();
     });
   });

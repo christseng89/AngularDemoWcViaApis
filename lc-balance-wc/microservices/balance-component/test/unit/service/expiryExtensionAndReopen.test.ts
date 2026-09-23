@@ -9,7 +9,11 @@ import { IllegalStateTransitionError, InsufficientBalanceError, RequestValidatio
 import { BATCH_CHECKER_ACTOR, BATCH_MAKER_ACTOR } from '../../../src/config';
 import type { TenorType } from '../../../src/types';
 
-function issueImportLc(service: BalanceService, lcNumber: string, opts: { amount?: string; expiryDate?: string; mailFloatGraceDays?: number; tenorType?: TenorType } = {}) {
+function issueImportLc(
+  service: BalanceService,
+  lcNumber: string,
+  opts: { amount?: string; expiryDate?: string; mailFloatGraceDays?: number; tenorType?: TenorType } = {},
+) {
   const issue = service.createMovement({
     instrumentType: 'IPLC_LC',
     naturalKey: { lcNumber },
@@ -80,9 +84,7 @@ describe('AMEND_EXPIRY_DATE — plain amendment against an ACTIVE contract', () 
   test('rejects a newExpiryDate not strictly later than the Business Date', () => {
     const service = new BalanceService(createDb(':memory:'));
     const lc = issueImportLc(service, 'AMEND-EXP-003', { expiryDate: '2026-06-01' });
-    expect(() => submitAmendExpiryDate(service, lc.balanceContractId, 2, '2026-01-01', '2026-06-01')).toThrow(
-      /must be strictly later than the Business Date/,
-    );
+    expect(() => submitAmendExpiryDate(service, lc.balanceContractId, 2, '2026-01-01', '2026-06-01')).toThrow(/must be strictly later than the Business Date/);
   });
 
   test('rejects a non-zero amount', () => {
@@ -109,7 +111,7 @@ describe('AMEND_EXPIRY_DATE / REOPEN — natural-key resolution against a non-AC
     const service = new BalanceService(createDb(':memory:'));
     const lc = issueImportLc(service, 'NK-EXT-001', { expiryDate: '2025-12-30', mailFloatGraceDays: 5 });
     service.runAutoExpirySweep(new Date('2026-01-08'));
-    expect(service.resolveContract('IPLC_LC', { lcNumber: 'NK-EXT-001' }, true)?.status).toBe('EXPIRED');
+    expect(service.resolveContractAnyStatus('IPLC_LC', { lcNumber: 'NK-EXT-001' })?.status).toBe('EXPIRED');
 
     const amend = service.createMovement({
       instrumentType: 'IPLC_LC',
@@ -147,7 +149,7 @@ describe('AMEND_EXPIRY_DATE / REOPEN — natural-key resolution against a non-AC
     });
     if (!close.created) throw new Error('expected a new movement');
     service.release(close.movement.movementId, 'checker1');
-    expect(service.resolveContract('IPLC_LC', { lcNumber: 'NK-REOPEN-001' }, true)?.status).toBe('CLOSED');
+    expect(service.resolveContractAnyStatus('IPLC_LC', { lcNumber: 'NK-REOPEN-001' })?.status).toBe('CLOSED');
 
     const reopen = service.createMovement({
       instrumentType: 'IPLC_LC',
@@ -194,7 +196,7 @@ describe('Expiry Extension Amendment — AMEND_EXPIRY_DATE against an EXPIRED co
     const lc = issueImportLc(service, lcNumber, { expiryDate: '2025-12-30', mailFloatGraceDays: 5 });
     const results = service.runAutoExpirySweep(new Date('2026-01-08'));
     expect(results).toContainEqual({ balanceContractId: lc.balanceContractId, ok: true });
-    return service.resolveContract('IPLC_LC', { lcNumber }, true)!;
+    return service.resolveContractAnyStatus('IPLC_LC', { lcNumber })!;
   }
 
   test('happy path: reverses the EXPIRE, restores Confirmed Balance, reactivates to ACTIVE with the new expiryDate', () => {
@@ -268,9 +270,7 @@ describe('Expiry Extension Amendment — AMEND_EXPIRY_DATE against an EXPIRED co
     // administrative repair to prove Checker re-validates the protected restoration basis.
     db.exec(`UPDATE balance_movements SET status = 'CANCELLED' WHERE movement_id = '${expire.movementId}'`);
 
-    expect(() => service.release(amend.movement.movementId, 'checker1')).toThrow(
-      /EXPIRE restoration basis has changed since Submit/,
-    );
+    expect(() => service.release(amend.movement.movementId, 'checker1')).toThrow(/EXPIRE restoration basis has changed since Submit/);
   });
 
   test('rejects Submit when there is an open (PENDING) Event anywhere in the tree — a second, concurrent Extension Submit sees the first Extension itself as an open Event', () => {
@@ -283,9 +283,7 @@ describe('Expiry Extension Amendment — AMEND_EXPIRY_DATE against an EXPIRED co
     const first = submitAmendExpiryDate(service, expired.balanceContractId, 3, '2027-01-01', '2026-01-15');
     if (!first.created) throw new Error('expected a new movement');
 
-    expect(() => submitAmendExpiryDate(service, expired.balanceContractId, 4, '2027-06-01', '2026-01-15')).toThrow(
-      /not yet fully resolved/,
-    );
+    expect(() => submitAmendExpiryDate(service, expired.balanceContractId, 4, '2027-06-01', '2026-01-15')).toThrow(/not yet fully resolved/);
   });
 
   test('rejects a contract that is neither ACTIVE nor EXPIRED (e.g. CLOSED)', () => {
@@ -306,7 +304,7 @@ describe('Expiry Extension Amendment — AMEND_EXPIRY_DATE against an EXPIRED co
     });
     if (!close.created) throw new Error('expected a new movement');
     service.release(close.movement.movementId, 'checker1');
-    const closed = service.resolveContract('IPLC_LC', { lcNumber: 'EXT-003' }, true)!;
+    const closed = service.resolveContractAnyStatus('IPLC_LC', { lcNumber: 'EXT-003' })!;
     expect(closed.status).toBe('CLOSED');
 
     expect(() => submitAmendExpiryDate(service, expired.balanceContractId, 4, '2027-01-01', '2026-01-15')).toThrow(
@@ -342,7 +340,7 @@ describe('A11/B7 Reopen — REOPEN against a CLOSED contract (F1 §9)', () => {
     });
     if (!close.created) throw new Error('expected a new movement');
     service.release(close.movement.movementId, 'checker1');
-    expect(service.resolveContract('IPLC_LC', { lcNumber: 'REOPEN-A-001' }, true)?.status).toBe('CLOSED');
+    expect(service.resolveContractAnyStatus('IPLC_LC', { lcNumber: 'REOPEN-A-001' })?.status).toBe('CLOSED');
 
     // F1, redesigned 2026-08-25 (see domain/reopenRestoration.ts) — REOPEN's own `amount` is never
     // caller-typed; the server overwrites whatever is submitted here with the computed restore-chain
@@ -417,7 +415,7 @@ describe('A11/B7 Reopen — REOPEN against a CLOSED contract (F1 §9)', () => {
     if (!close.created) throw new Error('expected a new movement');
     expect(close.movement.contingentAccountEntry).toBeNull();
     service.release(close.movement.movementId, 'checker1');
-    expect(service.resolveContract('IPLC_LC', { lcNumber: 'REOPEN-ZERO-001' }, true)?.status).toBe('CLOSED');
+    expect(service.resolveContractAnyStatus('IPLC_LC', { lcNumber: 'REOPEN-ZERO-001' })?.status).toBe('CLOSED');
 
     const reopen = service.createMovement({
       instrumentType: 'IPLC_LC',
@@ -471,7 +469,11 @@ describe('A11/B7 Reopen — REOPEN against a CLOSED contract (F1 §9)', () => {
     });
     if (!reopen.created) throw new Error('expected a new movement');
 
-    const replacement = service.editPending(reopen.movement.movementId, { amount: reopen.movement.amount, reasonCode: 'CORRECTED_REOPEN_REASON', editedBy: 'maker1' });
+    const replacement = service.editPending(reopen.movement.movementId, {
+      amount: reopen.movement.amount,
+      reasonCode: 'CORRECTED_REOPEN_REASON',
+      editedBy: 'maker1',
+    });
     expect(replacement.status).toBe('PENDING');
     expect(replacement.reasonCode).toBe('CORRECTED_REOPEN_REASON');
     expect(replacement.ceilingAmount).toBe('10000'); // re-derived from the same restore-chain computation, unaffected by the edit
@@ -490,7 +492,7 @@ describe('A11/B7 Reopen — REOPEN against a CLOSED contract (F1 §9)', () => {
     const asOf = new Date('2026-01-08');
     service.runAutoExpirySweep(asOf);
     service.runAutoCloseSweep(new Date('2026-01-18'));
-    expect(service.resolveContract('IPLC_LC', { lcNumber: 'REOPEN-B-001' }, true)?.status).toBe('CLOSED');
+    expect(service.resolveContractAnyStatus('IPLC_LC', { lcNumber: 'REOPEN-B-001' })?.status).toBe('CLOSED');
 
     const movementsBefore = service.listMovements(lc.balanceContractId);
     const expireMovement = movementsBefore.find((m) => m.movementType === 'EXPIRE')!;
@@ -523,7 +525,7 @@ describe('A11/B7 Reopen — REOPEN against a CLOSED contract (F1 §9)', () => {
     expect(movementsAfter.filter((m) => m.movementType === 'REVERSAL')).toHaveLength(0);
 
     // Original expiryDate (2025-12-30) is well in the past relative to the release date -> EXPIRED, not ACTIVE.
-    expect(service.resolveContract('IPLC_LC', { lcNumber: 'REOPEN-B-001' }, true)?.status).toBe('EXPIRED');
+    expect(service.resolveContractAnyStatus('IPLC_LC', { lcNumber: 'REOPEN-B-001' })?.status).toBe('EXPIRED');
   });
 
   test('reactivates straight to ACTIVE when the original expiryDate is still in the future', () => {
@@ -620,7 +622,7 @@ describe('A11/B7 Reopen — REOPEN against a CLOSED contract (F1 §9)', () => {
     });
     if (!close.created) throw new Error('expected a new movement');
     service.release(close.movement.movementId, 'checker1');
-    expect(service.resolveContract('IPLC_LC', { lcNumber: 'REOPEN-REASONCODE-001' }, true)?.status).toBe('CLOSED');
+    expect(service.resolveContractAnyStatus('IPLC_LC', { lcNumber: 'REOPEN-REASONCODE-001' })?.status).toBe('CLOSED');
 
     expect(() =>
       service.createMovement({
@@ -770,7 +772,7 @@ describe('REVERSAL — internal-only sufficiency checks (F1)', () => {
     const expired = (() => {
       const lc = issueImportLc(service, 'REV-003', { expiryDate: '2025-12-30', mailFloatGraceDays: 5 });
       service.runAutoExpirySweep(new Date('2026-01-08'));
-      return service.resolveContract('IPLC_LC', { lcNumber: 'REV-003' }, true)!;
+      return service.resolveContractAnyStatus('IPLC_LC', { lcNumber: 'REV-003' })!;
     })();
     const amend = submitAmendExpiryDate(service, expired.balanceContractId, 3, '2027-01-01', '2026-01-15');
     if (!amend.created) throw new Error('expected a new movement');
@@ -823,9 +825,7 @@ describe('AMEND_EXPIRY_DATE / REOPEN Release-time re-checks (F1) — state can m
     const amend = submitAmendExpiryDate(service, lc.balanceContractId, 2, '2027-01-01', '2026-01-01');
     if (!amend.created) throw new Error('expected a new movement');
 
-    expect(() => service.release(amend.movement.movementId, 'checker1')).toThrow(
-      /no longer strictly later than the Business Date/,
-    );
+    expect(() => service.release(amend.movement.movementId, 'checker1')).toThrow(/no longer strictly later than the Business Date/);
   });
 
   test('AMEND_EXPIRY_DATE: contract status changed to something else between Submit and Release (defense-in-depth, DB-bypass simulated)', () => {
@@ -839,9 +839,7 @@ describe('AMEND_EXPIRY_DATE / REOPEN Release-time re-checks (F1) — state can m
     // test) to prove the defense-in-depth branch actually fires.
     db.exec(`UPDATE balance_contracts SET status = 'CANCELLED' WHERE balance_contract_id = '${lc.balanceContractId}'`);
 
-    expect(() => service.release(amend.movement.movementId, 'checker1')).toThrow(
-      /no longer ACTIVE or EXPIRED/,
-    );
+    expect(() => service.release(amend.movement.movementId, 'checker1')).toThrow(/no longer ACTIVE or EXPIRED/);
   });
 
   test('Expiry Extension Amendment: hasOpenEvents becomes true between Submit and Release (DB-bypass simulated)', () => {
@@ -849,7 +847,7 @@ describe('AMEND_EXPIRY_DATE / REOPEN Release-time re-checks (F1) — state can m
     const service = new BalanceService(db);
     const lc = issueImportLc(service, 'RECHECK-AMEND-003', { expiryDate: '2025-12-30', mailFloatGraceDays: 5 });
     service.runAutoExpirySweep(new Date('2026-01-08'));
-    const expired = service.resolveContract('IPLC_LC', { lcNumber: 'RECHECK-AMEND-003' }, true)!;
+    const expired = service.resolveContractAnyStatus('IPLC_LC', { lcNumber: 'RECHECK-AMEND-003' })!;
     const amend = submitAmendExpiryDate(service, expired.balanceContractId, 3, '2027-01-01', '2026-01-15');
     if (!amend.created) throw new Error('expected a new movement');
     // §7.8 blocks every normal path from creating a new PENDING event under an EXPIRED contract —
@@ -859,9 +857,7 @@ describe('AMEND_EXPIRY_DATE / REOPEN Release-time re-checks (F1) — state can m
        VALUES ('bypass-mv-1', '${expired.balanceContractId}', 999, 'AMEND_INCREASE', 'CONTINGENT', '1', '1', 'USD', 'PENDING', 'maker1', '2026-01-15T00:00:00Z')`,
     );
 
-    expect(() => service.release(amend.movement.movementId, 'checker1')).toThrow(
-      /not yet fully resolved/,
-    );
+    expect(() => service.release(amend.movement.movementId, 'checker1')).toThrow(/not yet fully resolved/);
   });
 
   // F1, redesigned 2026-08-25 (see release()'s own AMEND_EXPIRY_DATE doc comment for the full bug this
@@ -895,7 +891,7 @@ describe('AMEND_EXPIRY_DATE / REOPEN Release-time re-checks (F1) — state can m
     const lc = issueImportLc(service, 'RECHECK-AMEND-005', { expiryDate: '2025-12-30', mailFloatGraceDays: 5 });
     service.runAutoExpirySweep(new Date('2026-01-08'));
     service.runAutoCloseSweep(new Date('2026-01-18'));
-    expect(service.resolveContract('IPLC_LC', { lcNumber: 'RECHECK-AMEND-005' }, true)?.status).toBe('CLOSED');
+    expect(service.resolveContractAnyStatus('IPLC_LC', { lcNumber: 'RECHECK-AMEND-005' })?.status).toBe('CLOSED');
 
     const reopen = service.createMovement({
       instrumentType: 'IPLC_LC',
@@ -909,7 +905,7 @@ describe('AMEND_EXPIRY_DATE / REOPEN Release-time re-checks (F1) — state can m
     });
     if (!reopen.created) throw new Error('expected a new movement');
     service.release(reopen.movement.movementId, 'checker1');
-    expect(service.resolveContract('IPLC_LC', { lcNumber: 'RECHECK-AMEND-005' }, true)?.status).toBe('EXPIRED'); // original expiryDate (2025-12-30) is still in the past.
+    expect(service.resolveContractAnyStatus('IPLC_LC', { lcNumber: 'RECHECK-AMEND-005' })?.status).toBe('EXPIRED'); // original expiryDate (2025-12-30) is still in the past.
     expect(service.getBalanceSnapshot(lc.balanceContractId).confirmedBalance).toBe('10000'); // REOPEN's own direct restoration.
 
     const amend = submitAmendExpiryDate(service, lc.balanceContractId, 4, '2027-01-01', '2026-01-15');
@@ -952,9 +948,7 @@ describe('AMEND_EXPIRY_DATE / REOPEN Release-time re-checks (F1) — state can m
     if (!reopen.created) throw new Error('expected a new movement');
     db.exec(`UPDATE balance_contracts SET status = 'CANCELLED' WHERE balance_contract_id = '${lc.balanceContractId}'`);
 
-    expect(() => service.release(reopen.movement.movementId, 'checker2')).toThrow(
-      /no longer CLOSED/,
-    );
+    expect(() => service.release(reopen.movement.movementId, 'checker2')).toThrow(/no longer CLOSED/);
   });
 
   test('REOPEN: hasOpenEvents becomes true between Submit and Release (DB-bypass simulated)', () => {
@@ -989,9 +983,7 @@ describe('AMEND_EXPIRY_DATE / REOPEN Release-time re-checks (F1) — state can m
        VALUES ('bypass-mv-2', '${lc.balanceContractId}', 998, 'AMEND_INCREASE', 'CONTINGENT', '1', '1', 'USD', 'PENDING', 'maker1', '2026-01-15T00:00:00Z')`,
     );
 
-    expect(() => service.release(reopen.movement.movementId, 'checker2')).toThrow(
-      /not yet fully resolved/,
-    );
+    expect(() => service.release(reopen.movement.movementId, 'checker2')).toThrow(/not yet fully resolved/);
   });
 
   // F1, redesigned 2026-08-25 — with no separate REVERSAL leg(s) to fail to find, a CLOSED contract with
@@ -1026,7 +1018,7 @@ describe('AMEND_EXPIRY_DATE / REOPEN Release-time re-checks (F1) — state can m
     // issueImportLc() here never set an expiryDate — release()'s own reactivation logic (unchanged by
     // this redesign) falls back to EXPIRED, not ACTIVE, when there is no future expiryDate to reactivate
     // into (same as any other REOPEN against a contract with no recorded expiryDate).
-    expect(service.resolveContract('IPLC_LC', { lcNumber: 'RECHECK-REOPEN-003' }, true)?.status).toBe('EXPIRED');
+    expect(service.resolveContractAnyStatus('IPLC_LC', { lcNumber: 'RECHECK-REOPEN-003' })?.status).toBe('EXPIRED');
     // The raw status bypass above never actually wrote off the ISSUE's own 10000 (no real CLOSE ever
     // ran) — REOPEN itself correctly contributes 0 (nothing in the chain to restore), leaving the
     // pre-existing ISSUE balance untouched, not zeroed.
@@ -1073,14 +1065,14 @@ describe('AUTO EXPIRY/AUTO CLOSE skip a recently-Reopened contract for one sweep
     });
     if (!reopen.created) throw new Error('expected a new movement');
     service.release(reopen.movement.movementId, 'checker2');
-    const reactivated = service.resolveContract('IPLC_LC', { lcNumber: 'GRACE-CLOSE-001' }, true)!;
+    const reactivated = service.resolveContractAnyStatus('IPLC_LC', { lcNumber: 'GRACE-CLOSE-001' })!;
     expect(reactivated.status).toBe('EXPIRED');
     const reopenedAt = new Date(service.listMovements(lc.balanceContractId).find((m) => m.movementType === 'REOPEN')!.releasedAt!);
 
     // Immediately after (well within the grace window) — AUTO CLOSE must skip it.
     const skipped = service.runAutoCloseSweep(new Date(reopenedAt.getTime() + 1_000));
     expect(skipped).toHaveLength(0);
-    expect(service.resolveContract('IPLC_LC', { lcNumber: 'GRACE-CLOSE-001' }, true)?.status).toBe('EXPIRED');
+    expect(service.resolveContractAnyStatus('IPLC_LC', { lcNumber: 'GRACE-CLOSE-001' })?.status).toBe('EXPIRED');
 
     // Well past one full sweep interval later — AUTO CLOSE now processes it normally. Must also clear
     // F1 §13.5's own Auto Close Grace Period (2 BUSINESS days off effectiveTo, which reactivate() stamped
@@ -1089,10 +1081,10 @@ describe('AUTO EXPIRY/AUTO CLOSE skip a recently-Reopened contract for one sweep
     const processed = service.runAutoCloseSweep(new Date(reopenedAt.getTime() + 8 * 24 * 60 * 60 * 1000));
     expect(processed).toHaveLength(1);
     expect(processed[0]!.ok).toBe(true);
-    expect(service.resolveContract('IPLC_LC', { lcNumber: 'GRACE-CLOSE-001' }, true)?.status).toBe('CLOSED');
+    expect(service.resolveContractAnyStatus('IPLC_LC', { lcNumber: 'GRACE-CLOSE-001' })?.status).toBe('CLOSED');
   });
 
-  test('AUTO EXPIRY skips a contract whose latest movement is a REOPEN still within the grace window, even if expiryDate+grace has already elapsed (defense-in-depth — REOPEN itself never reactivates to ACTIVE with an already-past expiryDate, so this is exercised via a direct DB bypass of expiryDate, same convention as this file\'s other DB-bypass re-check tests)', () => {
+  test("AUTO EXPIRY skips a contract whose latest movement is a REOPEN still within the grace window, even if expiryDate+grace has already elapsed (defense-in-depth — REOPEN itself never reactivates to ACTIVE with an already-past expiryDate, so this is exercised via a direct DB bypass of expiryDate, same convention as this file's other DB-bypass re-check tests)", () => {
     const db = createDb(':memory:');
     const service = new BalanceService(db);
     const lc = issueImportLc(service, 'GRACE-EXPIRE-001', { expiryDate: '2099-12-31' }); // overwritten below via raw SQL regardless
@@ -1138,7 +1130,7 @@ describe('AUTO EXPIRY/AUTO CLOSE skip a recently-Reopened contract for one sweep
     const processed = service.runAutoExpirySweep(new Date(reopenedAt.getTime() + 24 * 60 * 60 * 1000));
     expect(processed).toHaveLength(1);
     expect(processed[0]!.ok).toBe(true);
-    expect(service.resolveContract('IPLC_LC', { lcNumber: 'GRACE-EXPIRE-001' }, true)?.status).toBe('EXPIRED');
+    expect(service.resolveContractAnyStatus('IPLC_LC', { lcNumber: 'GRACE-EXPIRE-001' })?.status).toBe('EXPIRED');
   });
 });
 

@@ -72,7 +72,9 @@ export class LookUpPanelService {
   readonly lookupMovementsPaging = new PagedListState(10);
 
   get activeLookupMovements(): InquiredEvent[] {
-    const events = this.lookupTab === 'ACCEPTANCE' ? this.acceptanceMovements : this.lookupTab === 'SG' ? this.sgMovements : this.lookupMovements;
+    let events = this.lookupMovements;
+    if (this.lookupTab === 'ACCEPTANCE') events = this.acceptanceMovements;
+    if (this.lookupTab === 'SG') events = this.sgMovements;
     if (events !== this.lastLookupMovementsRef) {
       this.lastLookupMovementsRef = events;
       this.lookupMovementsPaging.total = events.length;
@@ -119,7 +121,8 @@ export class LookUpPanelService {
     const all = this.activeLookupMovements.filter((event) => ['AMEND_INCREASE', 'AMEND_DECREASE', 'AMEND'].includes(event.movement.movementType));
     const pending = all.filter((event) => event.eventStatus === 'PENDING');
     const latestReleased = [...all].reverse().find((event) => event.eventStatus === 'RELEASED');
-    const displayed = pending.length ? pending : latestReleased ? [latestReleased] : [];
+    let displayed = pending;
+    if (!displayed.length && latestReleased) displayed = [latestReleased];
     return displayed.map((event) => {
         const movement = event.movement;
         let toleranceBeforePct = '0';
@@ -130,12 +133,10 @@ export class LookUpPanelService {
             toleranceBeforePct = candidate.movement.tolerancePct ?? toleranceBeforePct;
           }
         }
-        const balanceEffect =
-          movement.movementType === 'AMEND_DECREASE' && Number(movement.ceilingAmount) !== 0
-            ? movement.ceilingAmount.startsWith('-')
-              ? movement.ceilingAmount.slice(1)
-              : `-${movement.ceilingAmount}`
-            : movement.ceilingAmount;
+        let balanceEffect = movement.ceilingAmount;
+        if (movement.movementType === 'AMEND_DECREASE' && Number(movement.ceilingAmount) !== 0) {
+          balanceEffect = movement.ceilingAmount.startsWith('-') ? movement.ceilingAmount.slice(1) : `-${movement.ceilingAmount}`;
+        }
         const pendingResult = resultingTolerancePct(
           movement.tolerancePct ?? toleranceBeforePct,
           movement.toleranceChangePct ?? '0',
