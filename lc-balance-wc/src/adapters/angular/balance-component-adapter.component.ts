@@ -24,7 +24,7 @@ export class BalanceComponentAdapterComponent implements OnChanges, AfterViewIni
   @Output() readonly navigation = new EventEmitter<BalanceComponentEventMap['balance-navigation']>();
   @Output() readonly refreshed = new EventEmitter<BalanceComponentEventMap['balance-refresh']>();
   @Output() readonly failed = new EventEmitter<BalanceComponentEventMap['balance-error']>();
-  @ViewChild('element', { static: true }) private elementRef!: ElementRef<BalanceComponentElement>;
+  @ViewChild('element', { static: true }) private readonly elementRef!: ElementRef<BalanceComponentElement>;
 
   ngOnChanges(): void {
     if (this.elementRef) this.elementRef.nativeElement.config = this.config;

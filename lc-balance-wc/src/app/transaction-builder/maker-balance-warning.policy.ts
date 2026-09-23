@@ -1,6 +1,8 @@
 import { parseAmountShorthand } from './amount-shorthand';
 import type { ExcessPreviewResponse } from './balance-component-api.service';
 
+type BalanceValue = string | number | null;
+
 export interface MakerBalanceWarningState {
   functionCode: string | null | undefined;
   excessPreview: ExcessPreviewResponse | null;
@@ -9,7 +11,7 @@ export interface MakerBalanceWarningState {
   amount: string | number | null | undefined;
   movementType: string | null | undefined;
   availableBalance: string | number;
-  tightAvailableBalance: string | number | null;
+  tightAvailableBalance: BalanceValue;
   checksAgainstPlainAvailable: boolean;
   checksAgainstTightAvailable: boolean;
   contractInstrumentType: string | null | undefined;
@@ -19,17 +21,52 @@ export interface MakerBalanceWarningState {
   referencedPresentationAmount: string | number | null;
 }
 
+function isServerOwnedExcessFunction(functionCode: string | null | undefined): boolean {
+  return functionCode === 'A3' || functionCode === 'A3S' || functionCode === 'B3';
+}
+
+function cannotEvaluateTypedAmount(state: MakerBalanceWarningState): boolean {
+  return state.formLocked || state.amountProtected || state.amount === null || state.amount === undefined || state.amount === '';
+}
+
+function deriveTightAvailableWarning(state: MakerBalanceWarningState, amount: number, available: number): string[] {
+  if (
+    !state.checksAgainstTightAvailable ||
+    state.tightAvailableBalance === null ||
+    (state.checksAgainstPlainAvailable && amount > available) ||
+    amount <= Number(state.tightAvailableBalance)
+  ) {
+    return [];
+  }
+
+  const capacitySource = state.contractInstrumentType === 'EPLC_CONFIRMATION'
+    ? 'Present Docs Earmark'
+    : `off-balance-sheet (SHGT) exposure ${state.offBalanceExposure ?? '—'}`;
+  let netting = '';
+  if (state.usesDocumentArrivalWithSg && state.arrivalSgOutstanding !== null) {
+    netting = `, netted against the selected SG's own Outstanding (${state.arrivalSgOutstanding})`;
+  } else if ((state.movementType === 'HONOUR' || state.movementType === 'ACCEPT') && state.referencedPresentationAmount !== null) {
+    netting = `, netted against the referenced presentation's own amount (${state.referencedPresentationAmount})`;
+  }
+  const suggestion = state.movementType === 'UTILIZE' && !state.usesDocumentArrivalWithSg
+    ? ` If this Document Arrival is meant to consume a specific outstanding Shipping Guarantee's reserved capacity, use "Document Arrival w/ Shipping Gtee" instead — it nets that SG's own exposure out of this check.`
+    : '';
+  return [
+    `⚠ Typed amount (${state.amount}) exceeds Tight Available Balance (${state.tightAvailableBalance}) — this will be rejected (Design doc §6.1/§6.2: Confirmed Balance minus still-PENDING decreases minus outstanding ${capacitySource}${netting} — only APPROVED amounts count as usable capacity).${suggestion}`,
+  ];
+}
+
 /** Produces mutually exclusive pre-submit capacity warnings from already-derived Maker state. */
 export function deriveMakerBalanceWarnings(state: MakerBalanceWarningState): string[] {
   // These are input-time warnings. A protected amount is carried or system-derived, so calling it a
   // "Typed amount" and comparing it again with the current Available Balance is both misleading and,
   // for A4, wrong: the selected Document Arrival already owns the earmark being settled.
-  if (state.formLocked || state.amountProtected || state.amount === null || state.amount === undefined || state.amount === '') return [];
+  if (cannotEvaluateTypedAmount(state)) return [];
 
   // Excess eligibility for these three functions is server-owned. In particular, a non-USD amount
   // must never be compared or converted in the browser: the preview already applies the approved
   // booking rate and returns its authoritative business result.
-  if (state.functionCode === 'A3' || state.functionCode === 'A3S' || state.functionCode === 'B3') {
+  if (isServerOwnedExcessFunction(state.functionCode)) {
     const preview = state.excessPreview;
     if (!preview || preview.eligible || preview.businessResultCode !== 'EXCESS_LIMIT_EXCEEDED') return [];
     return [
@@ -49,31 +86,5 @@ export function deriveMakerBalanceWarnings(state: MakerBalanceWarningState): str
     return [`⚠ Typed amount (${state.amount}) exceeds Available Balance — this will be rejected (Design doc §6).`];
   }
 
-  if (
-    !state.checksAgainstTightAvailable ||
-    state.tightAvailableBalance === null ||
-    (state.checksAgainstPlainAvailable && amount > available) ||
-    amount <= Number(state.tightAvailableBalance)
-  ) {
-    return [];
-  }
-
-  const capacitySource =
-    state.contractInstrumentType === 'EPLC_CONFIRMATION'
-      ? 'Present Docs Earmark'
-      : `off-balance-sheet (SHGT) exposure ${state.offBalanceExposure ?? '—'}`;
-  let netting = '';
-  if (state.usesDocumentArrivalWithSg && state.arrivalSgOutstanding !== null) {
-    netting = `, netted against the selected SG's own Outstanding (${state.arrivalSgOutstanding})`;
-  } else if ((state.movementType === 'HONOUR' || state.movementType === 'ACCEPT') && state.referencedPresentationAmount !== null) {
-    netting = `, netted against the referenced presentation's own amount (${state.referencedPresentationAmount})`;
-  }
-  const suggestion =
-    state.movementType === 'UTILIZE' && !state.usesDocumentArrivalWithSg
-      ? ` If this Document Arrival is meant to consume a specific outstanding Shipping Guarantee's reserved capacity, use "Document Arrival w/ Shipping Gtee" instead — it nets that SG's own exposure out of this check.`
-      : '';
-
-  return [
-    `⚠ Typed amount (${state.amount}) exceeds Tight Available Balance (${state.tightAvailableBalance}) — this will be rejected (Design doc §6.1/§6.2: Confirmed Balance minus still-PENDING decreases minus outstanding ${capacitySource}${netting} — only APPROVED amounts count as usable capacity).${suggestion}`,
-  ];
+  return deriveTightAvailableWarning(state, amount, available);
 }

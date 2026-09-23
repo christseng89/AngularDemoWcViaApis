@@ -32,7 +32,7 @@ describe('CatalogPickerService — load() status/requireIssueReleased override (
 
     svc.load({ guardFails: false, instrumentType: 'IPLC_LC' });
 
-    expect(catalogSpy).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', undefined, 1, 100, undefined, undefined, true);
+    expect(catalogSpy).toHaveBeenCalledWith('IPLC_LC', { status: 'ACTIVE', q: undefined, page: 1, pageSize: 100, lcNumber: undefined, tenorFamily: undefined, requireIssueReleased: true });
   });
 
   it('passes an explicit status string through unchanged', () => {
@@ -42,7 +42,7 @@ describe('CatalogPickerService — load() status/requireIssueReleased override (
 
     svc.load({ guardFails: false, instrumentType: 'IPLC_LC', status: 'CLOSED' });
 
-    expect(catalogSpy).toHaveBeenCalledWith('IPLC_LC', 'CLOSED', undefined, 1, 100, undefined, undefined, true);
+    expect(catalogSpy).toHaveBeenCalledWith('IPLC_LC', { status: 'CLOSED', q: undefined, page: 1, pageSize: 100, lcNumber: undefined, tenorFamily: undefined, requireIssueReleased: true });
   });
 
   it('passes a multi-status filter for actions that legitimately target more than one lifecycle state', () => {
@@ -52,7 +52,7 @@ describe('CatalogPickerService — load() status/requireIssueReleased override (
 
     svc.load({ guardFails: false, instrumentType: 'IPLC_LC', status: null, statuses: ['ACTIVE', 'EXPIRED'] });
 
-    expect(catalogSpy).toHaveBeenCalledWith('IPLC_LC', undefined, undefined, 1, 100, undefined, undefined, true, undefined, ['ACTIVE', 'EXPIRED']);
+    expect(catalogSpy).toHaveBeenCalledWith('IPLC_LC', { q: undefined, page: 1, pageSize: 100, lcNumber: undefined, tenorFamily: undefined, requireIssueReleased: true, statuses: ['ACTIVE', 'EXPIRED'] });
   });
 
   it('honors an explicit query override alongside a multi-status filter', () => {
@@ -63,7 +63,7 @@ describe('CatalogPickerService — load() status/requireIssueReleased override (
 
     svc.load({ guardFails: false, instrumentType: 'IPLC_LC', status: null, statuses: ['ACTIVE', 'EXPIRED'], query: 'LC-Q' });
 
-    expect(catalogSpy).toHaveBeenCalledWith('IPLC_LC', undefined, 'LC-Q', 1, 100, undefined, undefined, true, undefined, ['ACTIVE', 'EXPIRED']);
+    expect(catalogSpy).toHaveBeenCalledWith('IPLC_LC', { q: 'LC-Q', page: 1, pageSize: 100, lcNumber: undefined, tenorFamily: undefined, requireIssueReleased: true, statuses: ['ACTIVE', 'EXPIRED'] });
   });
 
   it('supports a null query override for a client-side multi-column index', () => {
@@ -74,7 +74,7 @@ describe('CatalogPickerService — load() status/requireIssueReleased override (
 
     svc.load({ guardFails: false, instrumentType: 'IPLC_ACCEPTANCE', query: null });
 
-    expect(catalogSpy).toHaveBeenCalledWith('IPLC_ACCEPTANCE', 'ACTIVE', undefined, 1, 100, undefined, undefined, true);
+    expect(catalogSpy).toHaveBeenCalledWith('IPLC_ACCEPTANCE', { status: 'ACTIVE', q: undefined, page: 1, pageSize: 100, lcNumber: undefined, tenorFamily: undefined, requireIssueReleased: true });
   });
 
   it('requests NO status filter (undefined, every status a legitimate candidate) when status is explicitly null — the read-only-inquiry case F-09 was written for', () => {
@@ -84,7 +84,7 @@ describe('CatalogPickerService — load() status/requireIssueReleased override (
 
     svc.load({ guardFails: false, instrumentType: 'IPLC_LC', status: null, requireIssueReleased: false });
 
-    expect(catalogSpy).toHaveBeenCalledWith('IPLC_LC', undefined, undefined, 1, 100, undefined, undefined, false);
+    expect(catalogSpy).toHaveBeenCalledWith('IPLC_LC', { status: undefined, q: undefined, page: 1, pageSize: 100, lcNumber: undefined, tenorFamily: undefined, requireIssueReleased: false });
     expect(svc.contracts).toEqual([contract()]);
   });
 
@@ -95,7 +95,7 @@ describe('CatalogPickerService — load() status/requireIssueReleased override (
 
     svc.load({ guardFails: false, instrumentType: 'IPLC_LC', requireIssueReleased: false });
 
-    expect(catalogSpy).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', undefined, 1, 100, undefined, undefined, false);
+    expect(catalogSpy).toHaveBeenCalledWith('IPLC_LC', { status: 'ACTIVE', q: undefined, page: 1, pageSize: 100, lcNumber: undefined, tenorFamily: undefined, requireIssueReleased: false });
   });
 });
 

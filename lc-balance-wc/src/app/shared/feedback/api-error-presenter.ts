@@ -178,6 +178,41 @@ export function presentValidationError(message: string): UiMessage {
   };
 }
 
+function presentBusinessCodeError(
+  code: string | undefined,
+  context: ApiActionContext,
+  technicalCode: string | undefined,
+  guidance: { outcome?: string; minimumRequiredIncreaseOwner?: string } | undefined,
+  eligibleAlternatives: { sgNumber?: string }[] | undefined,
+): UiMessage | null {
+  if (code === 'A3S_RESELECT_ELIGIBLE_SG') {
+    const alternatives = eligibleAlternatives?.map((candidate) => candidate.sgNumber).filter(Boolean).join(', ');
+    return {
+      severity: 'WARNING',
+      title: 'Re-select Eligible SG',
+      message: alternatives
+        ? `The selected Shipping Guarantee cannot cover this arrival. Eligible alternatives: ${alternatives}.`
+        : 'The selected Shipping Guarantee cannot cover this arrival.',
+      nextAction: 'Re-select an Eligible SG and recalculate the Effective Presentation Capacity before submitting again.',
+      retryable: false,
+      supportCode: code,
+      technicalCode: code,
+    };
+  }
+  if (code === 'EXCESS_LIMIT_EXCEEDED') return presentExcessLimitError(context, technicalCode, guidance);
+  if (code === 'FX_RATE_UNAVAILABLE' || code === 'FX_RATE_STALE') return presentFxRateError(code, context);
+  if (code !== 'APPLICANT_WAIVER_REQUIRED') return null;
+  return {
+    severity: 'WARNING',
+    title: 'Applicant waiver confirmation required',
+    message: 'Applicant Waiver has not been explicitly confirmed. The pending transaction and Excess reservation were retained.',
+    nextAction: 'Confirm Applicant Waiver and, if available, add its audit reference before releasing again.',
+    retryable: false,
+    supportCode: code,
+    technicalCode,
+  };
+}
+
 /** Pure transport/backend-error to user-feedback policy. Raw technical details are never primary UI copy. */
 export function presentApiError(error: unknown, context: ApiActionContext, query?: string): UiMessage {
   const { status, code, rawMessage, guidance, eligibleAlternatives } = errorDetails(error);
@@ -206,40 +241,8 @@ export function presentApiError(error: unknown, context: ApiActionContext, query
     };
   }
 
-  if (code === 'A3S_RESELECT_ELIGIBLE_SG') {
-    const alternatives = eligibleAlternatives?.map((candidate) => candidate.sgNumber).filter(Boolean).join(', ');
-    return {
-      severity: 'WARNING',
-      title: 'Re-select Eligible SG',
-      message: alternatives
-        ? `The selected Shipping Guarantee cannot cover this arrival. Eligible alternatives: ${alternatives}.`
-        : 'The selected Shipping Guarantee cannot cover this arrival.',
-      nextAction: 'Re-select an Eligible SG and recalculate the Effective Presentation Capacity before submitting again.',
-      retryable: false,
-      supportCode: code,
-      technicalCode: code,
-    };
-  }
-
-  if (code === 'EXCESS_LIMIT_EXCEEDED') {
-    return presentExcessLimitError(context, technicalCode, guidance);
-  }
-
-  if (code === 'FX_RATE_UNAVAILABLE' || code === 'FX_RATE_STALE') {
-    return presentFxRateError(code, context);
-  }
-
-  if (code === 'APPLICANT_WAIVER_REQUIRED') {
-    return {
-      severity: 'WARNING',
-      title: 'Applicant waiver confirmation required',
-      message: 'Applicant Waiver has not been explicitly confirmed. The pending transaction and Excess reservation were retained.',
-      nextAction: 'Confirm Applicant Waiver and, if available, add its audit reference before releasing again.',
-      retryable: false,
-      supportCode: code,
-      technicalCode,
-    };
-  }
+  const businessCodeError = presentBusinessCodeError(code, context, technicalCode, guidance, eligibleAlternatives);
+  if (businessCodeError) return businessCodeError;
 
   if (status !== undefined && status >= 400 && status < 500) {
     return presentHttpClientError(status, context, code, rawMessage, technicalCode);

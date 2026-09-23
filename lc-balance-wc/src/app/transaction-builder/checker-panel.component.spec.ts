@@ -322,7 +322,7 @@ describe('CheckerPanelComponent', () => {
 
       c.searchCheckerLc();
 
-      expect(api.catalog).toHaveBeenCalledWith('IPLC_ACCEPTANCE', 'ACTIVE', undefined, 1, 100, 'LC1');
+      expect(api.catalog).toHaveBeenCalledWith('IPLC_ACCEPTANCE', { status: 'ACTIVE', page: 1, pageSize: 100, lcNumber: 'LC1' });
       expect(api.resolveContract).not.toHaveBeenCalled();
     });
 

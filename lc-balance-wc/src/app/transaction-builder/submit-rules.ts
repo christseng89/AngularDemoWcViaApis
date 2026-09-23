@@ -61,85 +61,81 @@ export interface SubmitValidation {
  * validateSubmit() (2026-08-26, SonarQube-scan-report.md — that function had grown to Cognitive
  * Complexity 60) — verbatim logic/messages/order preserved; returns the first failing message or `null`.
  */
-function validateMandatoryFields(ctx: SubmitRulesContext, isAmendExpiryDate: boolean): string | null {
+type EnterableValue = string | number | null | undefined;
+
+function hasEntered(value: EnterableValue): boolean {
+  return value != null && String(value).trim() !== '';
+}
+
+function isMonetaryAmendment(model: BuilderModel): boolean {
+  return ['AMEND_INCREASE', 'AMEND_DECREASE', 'AMEND'].includes(model.movementType ?? '');
+}
+
+function validateRequiredAndDates(
+  ctx: SubmitRulesContext,
+  isAmendExpiryDate: boolean,
+  monetaryAmendment: boolean,
+  amountWasEntered: boolean,
+): string | null {
   const { model, selectedFunction } = ctx;
-  const isMonetaryAmendment = ['AMEND_INCREASE', 'AMEND_DECREASE', 'AMEND'].includes(model.movementType ?? '');
-  const toleranceDirection = amendmentDirection(model.movementType, ctx.amendDirection);
-  const amountWasEntered = model.amount != null && String(model.amount).trim() !== '';
-  if (!model.instrumentType || !model.movementType || (!isAmendExpiryDate && !isMonetaryAmendment && !amountWasEntered) || !model.currency || !model.createdBy) {
+  if (!model.instrumentType || !model.movementType || (!isAmendExpiryDate && !monetaryAmendment && !amountWasEntered) || !model.currency || !model.createdBy) {
     return 'Fill in amount, currency, createdBy.';
   }
-  if (isAmendExpiryDate && !model.newExpiryDate) {
-    return 'New Expiry Date is mandatory.';
-  }
-  // F1 proposal §13.1 item 4 (CLOSE)/item 3(a) (REOPEN), BA-ratified 2026-08-25 — A10/B6 and A11/B7 both
-  // require a caller-supplied Reason Code; the microservice rejects a bare Submit with none (see
-  // BalanceService.assertReasonCodeRequired). AUTO CLOSE never reaches this client-side path at all
-  // (it auto-fills its own fixed reasonCode server-side), so no exemption is needed here.
+  if (isAmendExpiryDate && !model.newExpiryDate) return 'New Expiry Date is mandatory.';
   if ((selectedFunction?.requiresCloseEligibility || selectedFunction?.requiresReopenEligibility) && !model.reasonCode) {
     return `Reason Code is mandatory for ${selectedFunction?.code}.`;
   }
-  // User-directed 2026-08-26 ("A1 B1 Expiry Date 是必輸欄位... 不然AUTO EXPIRY無法處理") — mirrors the
-  // microservice's own BalanceService.assertExpiryDateRequired(); without it, a contract ISSUEd with no
-  // expiryDate could never be picked up by runAutoExpirySweep()'s own candidate query.
-  if ((selectedFunction?.code === 'A1' || selectedFunction?.code === 'B1') && !model.expiryDate) {
-    return `Expiry Date is mandatory for ${selectedFunction?.code}.`;
-  }
-  // User-directed 2026-08-26 ("Expiry Date也不可以是本國的假日或周末... FOR A1 B1... UI API都需要") —
-  // mirrors the microservice's own BalanceService.assertExpiryDateIsBusinessDay(); this client-side guard
-  // is a convenience only, the server-side check is the authoritative enforcement.
-  if ((selectedFunction?.code === 'A1' || selectedFunction?.code === 'B1') && model.expiryDate) {
-    const reason = domesticNonBusinessDayReason(model.expiryDate);
-    if (reason) {
-      return `Expiry Date ${model.expiryDate} falls on a domestic non-business day (${reason}) — pick a genuine business day.`;
-    }
-  }
+  const isIssue = selectedFunction?.code === 'A1' || selectedFunction?.code === 'B1';
+  if (isIssue && !model.expiryDate) return `Expiry Date is mandatory for ${selectedFunction?.code}.`;
+  if (!isIssue || !model.expiryDate) return null;
+  const reason = domesticNonBusinessDayReason(model.expiryDate);
+  return reason ? `Expiry Date ${model.expiryDate} falls on a domestic non-business day (${reason}) — pick a genuine business day.` : null;
+}
+
+function validateAmountRules(model: BuilderModel, isAmendExpiryDate: boolean, monetaryAmendment: boolean, amountWasEntered: boolean): string | null {
   if (!isAmendExpiryDate && amountWasEntered && amountExceedsCurrencyDecimals(model.amount, model.currency)) {
-    return `Amount ${model.amount} has more decimal places than ${model.currency.toUpperCase()} allows (${decimalPlacesForCurrency(model.currency)}).`;
+    return `Amount ${model.amount} has more decimal places than ${model.currency!.toUpperCase()} allows (${decimalPlacesForCurrency(model.currency!)}).`;
   }
-  // Applies uniformly, including B2 (which used to accept a negative Amount to express Decrease — now
-  // always positive; see the amendDirection guard below). Checked before that guard's own transform
-  // runs, so this always validates the RAW typed value.
-  //
-  // A10/B6 (Close) exempted — its own Amount is system-derived from the current Confirmed Balance
-  // (never user-typed, see builder-fields.ts's own amountFromClose), and 0 is a legitimate, common write-
-  // off figure for an already fully-utilized LC (nothing left to reserve). A11/B7 (Reopen, F1) and
-  // AMEND_EXPIRY_DATE (F1) exempted too — both are always exactly 0 by construction (see
-  // builder-fields.ts's own amountFromFixed/isAmendExpiryDate). Every OTHER function still means "0 isn't
-  // a real transaction" here.
-  if (model.movementType !== 'CLOSE' && model.movementType !== 'REOPEN' && !isAmendExpiryDate && !isMonetaryAmendment && Number(model.amount) <= 0) {
-    return 'Amount must be greater than 0.';
-  }
-  if (isMonetaryAmendment && amountWasEntered && Number(model.amount) < 0) {
+  const zeroAllowed = model.movementType === 'CLOSE' || model.movementType === 'REOPEN' || isAmendExpiryDate || monetaryAmendment;
+  if (!zeroAllowed && Number(model.amount) <= 0) return 'Amount must be greater than 0.';
+  if (monetaryAmendment && amountWasEntered && Number(model.amount) < 0) {
     return 'Amount must not be negative; use Increase or Decrease to choose the direction.';
   }
-  // User-directed 2026-08-28 ("Tolerance MUST >= 0") — mirrors the microservice's own
-  // BalanceService.assertToleranceNonNegative(); empty/absent is untouched (Tolerance stays optional even
-  // where applicable, see builder-fields.ts's own tolerancePct field) — this only rejects a typed negative.
-  if (toleranceApplicable(model) && model.tolerancePct != null && model.tolerancePct !== '' && Number(model.tolerancePct) < 0) {
-    return 'Tolerance % must not be negative.';
-  }
-  if (toleranceApplicable(model) && model.tolerancePct != null && model.tolerancePct !== '' && !/^\d+$/.test(String(model.tolerancePct))) {
-    return 'Tolerance % must be a whole number.';
-  }
-  if (isMonetaryAmendment && model.toleranceChangePct != null && model.toleranceChangePct !== '' && Number(model.toleranceChangePct) < 0) {
-    return 'Tolerance Change % must not be negative.';
-  }
-  if (isMonetaryAmendment && model.toleranceChangePct != null && model.toleranceChangePct !== '' && !/^\d+$/.test(String(model.toleranceChangePct))) {
-    return 'Tolerance Change % must be a whole number.';
-  }
-  if (isMonetaryAmendment && toleranceDirection === 'DECREASE' && model.toleranceChangePct != null && model.toleranceChangePct !== '' && !resultingTolerancePct(ctx.selectedContract?.tolerancePct ?? '0', model.toleranceChangePct, toleranceDirection).ok) {
+  return null;
+}
+
+function validateToleranceRules(ctx: SubmitRulesContext, monetaryAmendment: boolean): string | null {
+  const { model } = ctx;
+  const toleranceEntered = model.tolerancePct != null && model.tolerancePct !== '';
+  if (toleranceApplicable(model) && toleranceEntered && Number(model.tolerancePct) < 0) return 'Tolerance % must not be negative.';
+  if (toleranceApplicable(model) && toleranceEntered && !/^\d+$/.test(String(model.tolerancePct))) return 'Tolerance % must be a whole number.';
+
+  const changeEntered = model.toleranceChangePct != null && model.toleranceChangePct !== '';
+  if (monetaryAmendment && changeEntered && Number(model.toleranceChangePct) < 0) return 'Tolerance Change % must not be negative.';
+  if (monetaryAmendment && changeEntered && !/^\d+$/.test(String(model.toleranceChangePct))) return 'Tolerance Change % must be a whole number.';
+  if (!monetaryAmendment || !changeEntered) return null;
+
+  const direction = amendmentDirection(model.movementType, ctx.amendDirection);
+  if (direction === 'DECREASE' && !resultingTolerancePct(ctx.selectedContract?.tolerancePct ?? '0', model.toleranceChangePct!, direction).ok) {
     return `Decrease Tolerance cannot exceed the current Tolerance of ${ctx.selectedContract?.tolerancePct ?? '0'}%.`;
   }
-  if (isMonetaryAmendment) {
-    const amountChanged = amountWasEntered && Number(model.amount) !== 0;
-    const toleranceWasEntered = model.toleranceChangePct != null && String(model.toleranceChangePct).trim() !== '';
-    const toleranceChanged = toleranceWasEntered && Number(model.toleranceChangePct) !== 0;
-    if (!amountChanged && !toleranceChanged) {
-      return 'Enter an Amount change, a Tolerance change, or both.';
-    }
-  }
   return null;
+}
+
+function validateAmendmentChange(model: BuilderModel, monetaryAmendment: boolean, amountWasEntered: boolean): string | null {
+  if (!monetaryAmendment) return null;
+  const amountChanged = amountWasEntered && Number(model.amount) !== 0;
+  const toleranceChanged = hasEntered(model.toleranceChangePct) && Number(model.toleranceChangePct) !== 0;
+  return amountChanged || toleranceChanged ? null : 'Enter an Amount change, a Tolerance change, or both.';
+}
+
+function validateMandatoryFields(ctx: SubmitRulesContext, isAmendExpiryDate: boolean): string | null {
+  const monetaryAmendment = isMonetaryAmendment(ctx.model);
+  const amountWasEntered = hasEntered(ctx.model.amount);
+  return validateRequiredAndDates(ctx, isAmendExpiryDate, monetaryAmendment, amountWasEntered)
+    ?? validateAmountRules(ctx.model, isAmendExpiryDate, monetaryAmendment, amountWasEntered)
+    ?? validateToleranceRules(ctx, monetaryAmendment)
+    ?? validateAmendmentChange(ctx.model, monetaryAmendment, amountWasEntered);
 }
 
 /**
@@ -181,81 +177,76 @@ function validateNaturalKeyFields(ctx: SubmitRulesContext): string | null {
  * messages/order preserved; mutates `patch` in place (same object validateSubmit() returns), returns the
  * first failing message or `null`.
  */
+function validateTenorRules(ctx: SubmitRulesContext, patch: Partial<BuilderModel>): string | null {
+  const { model, selectedFunction } = ctx;
+  if (selectedFunction?.code !== 'A1') return null;
+  if (model.tenorType === 'SIGHT') {
+    patch.tenorDays = 0;
+    return null;
+  }
+  return !model.tenorDays || Number(model.tenorDays) <= 0
+    ? "Tenor Days must be greater than 0 for Seller's/Buyer's Usance."
+    : null;
+}
+
+function validateSourceSelection(ctx: SubmitRulesContext, strategy: ReturnType<typeof deriveFunctionStrategy> | null): string | null {
+  const { model, selectedFunction } = ctx;
+  if (strategy?.checkerRelease.settlesDocumentArrival && !ctx.selectedPayMovement) {
+    return `Pick the still-PENDING ${selectedFunction?.pendingItemLabel ?? 'Document Arrival'} (2ndary Index) to convert first.`;
+  }
+  const arrivalWithSg = strategy?.compoundSubmission.possibleShapes.includes('documentArrivalWithSg') ?? false;
+  if (arrivalWithSg && (!ctx.selectedArrivalSg || !ctx.arrivalSgSnapshot)) {
+    return 'Pick the Shipping Guarantee this Document Arrival is against first.';
+  }
+  if (arrivalWithSg && ctx.arrivalSgSnapshot && Number(model.amount) < Number(ctx.arrivalSgSnapshot.confirmedBalance)) {
+    return `Bill Amount must be greater than or equal to the Shipping Guarantee Balance (${ctx.arrivalSgSnapshot.confirmedBalance}).`;
+  }
+  return null;
+}
+
+function applyRedeemDerivation(
+  ctx: SubmitRulesContext,
+  strategy: ReturnType<typeof deriveFunctionStrategy> | null,
+  patch: Partial<BuilderModel>,
+): string | null {
+  if (strategy?.movementDerivation.amountVsAvailableDerivation !== 'REDEEM') return null;
+  if (!ctx.selectedContractSnapshot) return 'Search for the Shipping Guarantee to redeem first.';
+  const available = ctx.selectedContractSnapshot.availableBalance;
+  if (Number(ctx.model.amount) !== Number(available)) {
+    return `A Shipping Guarantee Redemption (A9) must be for the FULL Available Balance (${available}) — Partial Redeem is no longer supported here.`;
+  }
+  patch.movementType = 'FULL_REDEEM';
+  return null;
+}
+
+function applySettleDerivation(
+  ctx: SubmitRulesContext,
+  strategy: ReturnType<typeof deriveFunctionStrategy> | null,
+  patch: Partial<BuilderModel>,
+): string | null {
+  if (strategy?.movementDerivation.amountVsAvailableDerivation !== 'SETTLE' || ctx.model.instrumentType !== 'EPLC_ACCEPTANCE') return null;
+  if (!ctx.selectedContractSnapshot) return 'Search for the Acceptance to settle first.';
+  const available = ctx.selectedContractSnapshot.availableBalance;
+  if (Number(ctx.model.amount) > Number(available)) return `Amount must not exceed the Acceptance's Available Balance (${available}).`;
+  patch.movementType = Number(ctx.model.amount) === Number(available) ? 'FULL_SETTLE' : 'PARTIAL_SETTLE';
+  return null;
+}
+
+function validateAmendDirection(ctx: SubmitRulesContext): string | null {
+  const requiresDirection = ctx.selectedFunction?.subChoice?.key === 'amendDirection' && ctx.model.movementType !== 'AMEND_EXPIRY_DATE';
+  return requiresDirection && !ctx.amendDirection ? 'Pick Increase or Decrease for this Amendment.' : null;
+}
+
 function validateFunctionSpecificRules(
   ctx: SubmitRulesContext,
   strategy: ReturnType<typeof deriveFunctionStrategy> | null,
   patch: Partial<BuilderModel>,
 ): string | null {
-  const { model, selectedFunction } = ctx;
-  // A1: Sight => Tenor Days = 0 (protected); not Sight => must be > 0. buildFields() already enforces
-  // this reactively; this is the submit-time backstop (submit() never gates on form.valid).
-  if (selectedFunction?.code === 'A1') {
-    if (model.tenorType === 'SIGHT') {
-      patch.tenorDays = 0;
-    } else if (!model.tenorDays || Number(model.tenorDays) <= 0) {
-      return "Tenor Days must be greater than 0 for Seller's/Buyer's Usance.";
-    }
-  }
-  // A6/B4 must convert a SPECIFIC still-PENDING record, not create an Acceptance untethered from one.
-  if (strategy?.checkerRelease.settlesDocumentArrival && !ctx.selectedPayMovement) {
-    return `Pick the still-PENDING ${selectedFunction?.pendingItemLabel ?? 'Document Arrival'} (2ndary Index) to convert first.`;
-  }
-  // A3S must be tied to a SPECIFIC Shipping Guarantee — same reasoning as A6 above, just against an
-  // outstanding SG record instead of an existing PENDING Document Arrival.
-  if (strategy?.compoundSubmission.possibleShapes.includes('documentArrivalWithSg') && (!ctx.selectedArrivalSg || !ctx.arrivalSgSnapshot)) {
-    return 'Pick the Shipping Guarantee this Document Arrival is against first.';
-  }
-  if (
-    strategy?.compoundSubmission.possibleShapes.includes('documentArrivalWithSg') &&
-    ctx.arrivalSgSnapshot &&
-    Number(model.amount) < Number(ctx.arrivalSgSnapshot.confirmedBalance)
-  ) {
-    return `Bill Amount must be greater than or equal to the Shipping Guarantee Balance (${ctx.arrivalSgSnapshot.confirmedBalance}).`;
-  }
-  // A9 only. BA-confirmed 2026-08-21 (TF_Balance_Component_Mapping Rule #1, "SG discharge is
-  // instrument-based, not amount-based" — SG_RELEASE is always the FULL amount, no residual): movementType
-  // is now hardcoded FULL_REDEEM, never derived/picked — Partial Redeem is no longer reachable through
-  // this function. Checked against Available (not Confirmed), same distinction as shgtRedeem.ts's own
-  // commitment-control fix. This is a defense-in-depth backstop for builder-fields.ts's own field lock
-  // (amountFromSgRedeem, now disabled) — a mismatch here should only ever happen if the SG's own Available
-  // Balance moved between snapshot-resolve and Submit (e.g. a concurrent transaction), not from ordinary
-  // UI use. A3S's own matched SG redemption leg (documentArrivalWithSg) is a completely separate code
-  // path — genuinely MIN(Bill Amount, SG Available)-capped and tied to a real Document Arrival via
-  // businessEventId — and never routes through this branch at all.
-  if (strategy?.movementDerivation.amountVsAvailableDerivation === 'REDEEM') {
-    if (!ctx.selectedContractSnapshot) {
-      return 'Search for the Shipping Guarantee to redeem first.';
-    }
-    const available = ctx.selectedContractSnapshot.availableBalance;
-    if (Number(model.amount) !== Number(available)) {
-      return `A Shipping Guarantee Redemption (A9) must be for the FULL Available Balance (${available}) — Partial Redeem is no longer supported here.`;
-    }
-    patch.movementType = 'FULL_REDEEM';
-  }
-  // B5 only, same "derive Full/Partial from amount vs Available" shape as A9 above, targeting the
-  // selected Acceptance. No Reimbursement Receivable lookup or companion movement is part of B5.
-  if (strategy?.movementDerivation.amountVsAvailableDerivation === 'SETTLE' && model.instrumentType === 'EPLC_ACCEPTANCE') {
-    if (!ctx.selectedContractSnapshot) {
-      return 'Search for the Acceptance to settle first.';
-    }
-    const available = ctx.selectedContractSnapshot.availableBalance;
-    if (Number(model.amount) > Number(available)) {
-      return `Amount must not exceed the Acceptance's Available Balance (${available}).`;
-    }
-    patch.movementType = Number(model.amount) === Number(available) ? 'FULL_SETTLE' : 'PARTIAL_SETTLE';
-  }
-  // Driven by SubChoice.key, not a hardcoded function code — applies to whatever function declares
-  // `subChoice.key: 'amendDirection'` (today only B2). Deliberately does NOT patch `model.amount` here:
-  // `model` is the same object the Formly form renders, so patching it would flip the visible Amount
-  // negative right after Submit. The sign transform happens in buildSubmitRequest() instead, purely for
-  // the outgoing wire request — `model.amount` always stays what the Maker typed.
-  // B2's Expiry Date option deliberately overrides the ordinary AMEND movement with
-  // AMEND_EXPIRY_DATE. It has no Increase/Decrease direction, so applying B2's direction guard to
-  // that distinct operation would leave an otherwise-valid form permanently disabled.
-  if (selectedFunction?.subChoice?.key === 'amendDirection' && model.movementType !== 'AMEND_EXPIRY_DATE' && !ctx.amendDirection) {
-    return 'Pick Increase or Decrease for this Amendment.';
-  }
-  return null;
+  return validateTenorRules(ctx, patch)
+    ?? validateSourceSelection(ctx, strategy)
+    ?? applyRedeemDerivation(ctx, strategy, patch)
+    ?? applySettleDerivation(ctx, strategy, patch)
+    ?? validateAmendDirection(ctx);
 }
 
 /**
@@ -330,39 +321,31 @@ export function validateSubmit(ctx: SubmitRulesContext): SubmitValidation {
  * the signed wire value is derived here from `ctx.amendDirection` — `model.amount` itself stays
  * whatever the Maker typed (positive, never mutated), since it's rendered back into the form.
  */
-export function buildSubmitRequest(ctx: SubmitRulesContext): { request: CreateMovementRequest | null; error: string | null } {
+function wireAmountFor(ctx: SubmitRulesContext, typedAmount: number): string {
   const { model, selectedFunction } = ctx;
-  const isMonetaryAmendment = ['AMEND_INCREASE', 'AMEND_DECREASE', 'AMEND'].includes(model.movementType ?? '');
+  if (model.movementType === 'AMEND_EXPIRY_DATE') return '0';
+  if (selectedFunction?.subChoice?.key === 'amendDirection') {
+    return ctx.amendDirection === 'DECREASE' ? String(-Math.abs(typedAmount)) : String(Math.abs(typedAmount));
+  }
+  if (['AMEND_INCREASE', 'AMEND_DECREASE'].includes(model.movementType ?? '')) return String(typedAmount);
+  return String(model.amount);
+}
+
+function applyToleranceRequestFields(request: CreateMovementRequest, ctx: SubmitRulesContext): void {
+  const { model } = ctx;
+  const monetaryAmendment = isMonetaryAmendment(model);
   const toleranceDirection = amendmentDirection(model.movementType, ctx.amendDirection);
-  const strategy = selectedFunction ? deriveFunctionStrategy(selectedFunction) : null;
-  // F1 — AMEND_EXPIRY_DATE's own Amount is always '0' by construction, regardless of whatever
-  // model.amount currently holds (the field is hidden — see builder-fields.ts's own isAmendExpiryDate).
-  const typedAmount = model.amount == null || String(model.amount).trim() === '' ? 0 : Number(model.amount);
-  const wireAmount =
-    model.movementType === 'AMEND_EXPIRY_DATE'
-      ? '0'
-      : selectedFunction?.subChoice?.key === 'amendDirection'
-        ? ctx.amendDirection === 'DECREASE'
-          ? String(-Math.abs(typedAmount))
-          : String(Math.abs(typedAmount))
-        : ['AMEND_INCREASE', 'AMEND_DECREASE'].includes(model.movementType ?? '')
-          ? String(typedAmount)
-          : String(model.amount);
-  const request: CreateMovementRequest = {
-    instrumentType: model.instrumentType!,
-    movementType: model.movementType!,
-    eventSeq: model.eventSeq ?? Date.now(),
-    amount: wireAmount,
-    currency: model.currency!,
-    createdBy: model.createdBy!,
-  };
-  if (!isMonetaryAmendment && toleranceApplicable(model) && model.tolerancePct != null && String(model.tolerancePct).trim() !== '') {
+  if (!monetaryAmendment && toleranceApplicable(model) && hasEntered(model.tolerancePct)) {
     request.tolerancePct = String(model.tolerancePct);
   }
-  if (isMonetaryAmendment && model.toleranceChangePct != null && String(model.toleranceChangePct).trim() !== '') {
+  if (monetaryAmendment && hasEntered(model.toleranceChangePct)) {
     request.toleranceChangePct = String(model.toleranceChangePct);
     request.toleranceChangeDirection = toleranceDirection;
   }
+}
+
+function applyTenorAndLifecycleFields(request: CreateMovementRequest, ctx: SubmitRulesContext): void {
+  const { model, selectedFunction } = ctx;
   if (model.secondaryRef) request.sourceTransactionRef = model.secondaryRef;
   if (selectedFunction?.tenorTypeOptions?.length) {
     request.tenorType = model.tenorType;
@@ -378,19 +361,14 @@ export function buildSubmitRequest(ctx: SubmitRulesContext): { request: CreateMo
   }
   // F1 proposal §13.1 — A10/B6/A11/B7 only (validateSubmit() above already made it mandatory for them).
   if (model.reasonCode) request.reasonCode = model.reasonCode;
+}
 
-  if (isCreatingMovement(model)) {
-    request.naturalKey = {
-      lcNumber: ctx.naturalKey.lcNumber,
-      ibNumber: ctx.naturalKey.ibNumber || null,
-      sgNumber: ctx.naturalKey.sgNumber || null,
-    };
-  } else if (ctx.selectedContract) {
-    request.balanceContractId = ctx.selectedContract.balanceContractId;
-  } else {
-    return { request: null, error: 'Pick a contract from the Catalog below.' };
-  }
-
+function applyRelationshipFields(
+  request: CreateMovementRequest,
+  ctx: SubmitRulesContext,
+  strategy: ReturnType<typeof deriveFunctionStrategy> | null,
+): void {
+  const { model } = ctx;
   if (hasParent(model) && ctx.selectedParent) {
     request.parentLogicalContractId = ctx.selectedParent.logicalContractId;
   }
@@ -403,6 +381,48 @@ export function buildSubmitRequest(ctx: SubmitRulesContext): { request: CreateMo
   if (strategy?.checkerRelease.settlesDocumentArrival && ctx.selectedPayMovement) {
     request.referencedTransactionId = ctx.selectedPayMovement.movementId;
   }
+}
+
+function applyOptionalRequestFields(
+  request: CreateMovementRequest,
+  ctx: SubmitRulesContext,
+  strategy: ReturnType<typeof deriveFunctionStrategy> | null,
+): void {
+  applyToleranceRequestFields(request, ctx);
+  applyTenorAndLifecycleFields(request, ctx);
+  applyRelationshipFields(request, ctx, strategy);
+}
+
+function bindRequestTarget(request: CreateMovementRequest, ctx: SubmitRulesContext): string | null {
+  if (isCreatingMovement(ctx.model)) {
+    request.naturalKey = {
+      lcNumber: ctx.naturalKey.lcNumber,
+      ibNumber: ctx.naturalKey.ibNumber || null,
+      sgNumber: ctx.naturalKey.sgNumber || null,
+    };
+    return null;
+  }
+  if (!ctx.selectedContract) return 'Pick a contract from the Catalog below.';
+  request.balanceContractId = ctx.selectedContract.balanceContractId;
+  return null;
+}
+
+export function buildSubmitRequest(ctx: SubmitRulesContext): { request: CreateMovementRequest | null; error: string | null } {
+  const { model, selectedFunction } = ctx;
+  const strategy = selectedFunction ? deriveFunctionStrategy(selectedFunction) : null;
+  const typedAmount = hasEntered(model.amount) ? Number(model.amount) : 0;
+  const request: CreateMovementRequest = {
+    instrumentType: model.instrumentType!,
+    movementType: model.movementType!,
+    eventSeq: model.eventSeq ?? Date.now(),
+    amount: wireAmountFor(ctx, typedAmount),
+    currency: model.currency!,
+    createdBy: model.createdBy!,
+  };
+
+  const targetError = bindRequestTarget(request, ctx);
+  if (targetError) return { request: null, error: targetError };
+  applyOptionalRequestFields(request, ctx, strategy);
   return { request, error: null };
 }
 

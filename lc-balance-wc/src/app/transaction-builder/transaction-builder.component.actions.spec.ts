@@ -1705,8 +1705,8 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
       comp.lookUp.runLookup();
 
-      expect(api.catalog).toHaveBeenCalledWith('IPLC_ACCEPTANCE', undefined, undefined, 1, 50, 'LC001', undefined, undefined, true);
-      expect(api.catalog).toHaveBeenCalledWith('SHGT', undefined, undefined, 1, 50, 'LC001', undefined, undefined, true);
+      expect(api.catalog).toHaveBeenCalledWith('IPLC_ACCEPTANCE', { page: 1, pageSize: 50, lcNumber: 'LC001', excludeCancelled: true });
+      expect(api.catalog).toHaveBeenCalledWith('SHGT', { page: 1, pageSize: 50, lcNumber: 'LC001', excludeCancelled: true });
       expect(comp.lookUp.acceptancesUnderLookup.map((c) => c.balanceContractId)).toEqual(['bc-acc-1']);
       expect(comp.lookUp.sgsUnderLookup.map((c) => c.balanceContractId)).toEqual(['bc-sg-1']);
       // Sole candidate on each tab auto-selects.
@@ -1721,8 +1721,8 @@ describe('TransactionBuilderComponent — Maker/Checker action flow', () => {
 
       comp.lookUp.runLookup();
 
-      expect(api.catalog).toHaveBeenCalledWith('EPLC_ACCEPTANCE', undefined, undefined, 1, 50, 'LC001', undefined, undefined, true);
-      expect(api.catalog).not.toHaveBeenCalledWith('SHGT', undefined, undefined, 1, 50, 'LC001', undefined, undefined, true);
+      expect(api.catalog).toHaveBeenCalledWith('EPLC_ACCEPTANCE', { page: 1, pageSize: 50, lcNumber: 'LC001', excludeCancelled: true });
+      expect(api.catalog).not.toHaveBeenCalledWith('SHGT', { page: 1, pageSize: 50, lcNumber: 'LC001', excludeCancelled: true });
     });
 
     // Tab 1's Event Timeline used to fetch only the LC's own contract, so each B3/EPLC_EXAMINATION

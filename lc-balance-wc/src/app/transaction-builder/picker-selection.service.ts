@@ -104,7 +104,7 @@ export class PickerSelectionService {
     this.arrivalSgPaging.reset();
     if (!lcNumber) return;
     this.sgsForArrivalLoading = true;
-    this.api.catalog('SHGT', 'ACTIVE', undefined, 1, 50, lcNumber, undefined, true).subscribe({
+    this.api.catalog('SHGT', { status: 'ACTIVE', page: 1, pageSize: 50, lcNumber, requireIssueReleased: true }).subscribe({
       next: (result) => {
         if (!result.items.length) {
           this.sgsForArrivalLoading = false;
@@ -207,7 +207,7 @@ export class PickerSelectionService {
     }
     this.settleableBalancesLoading = true;
     forkJoin([
-      this.api.catalog(instrumentType, 'ACTIVE', undefined, 1, 50, lcNumber, undefined, true).pipe(
+      this.api.catalog(instrumentType, { status: 'ACTIVE', page: 1, pageSize: 50, lcNumber, requireIssueReleased: true }).pipe(
         map((result) => result.items.map((c) => ({ contract: c, instrumentType }))),
         catchError(() => of([] as { contract: BalanceContract; instrumentType: InstrumentType }[])),
       ),
@@ -396,7 +396,7 @@ export class PickerSelectionService {
     const wantedMovementType = selectedFunction?.payableMovementType ?? 'UTILIZE';
     this.payableMovementsLoading = true;
     forkJoin({
-      children: this.api.catalog(childInstrumentType, 'ACTIVE', undefined, 1, 50, lcNumber),
+      children: this.api.catalog(childInstrumentType, { status: 'ACTIVE', page: 1, pageSize: 50, lcNumber }),
       parentMovements: contractId ? this.api.listMovements(contractId).pipe(catchError(() => of([] as BalanceMovement[]))) : of([] as BalanceMovement[]),
     }).subscribe({
       next: ({ children, parentMovements }) => {

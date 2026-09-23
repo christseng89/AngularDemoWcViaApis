@@ -1,5 +1,5 @@
 /** Coordinates domain policies and persistence for HTTP use cases. Business math stays in `domain/`. */
-import { createHash, randomUUID } from 'crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import Decimal from 'decimal.js';
 import { describeAmountScaleViolation, formatMonetaryAmount, parseMonetaryAmount } from '../money';
 import type { Db } from '../db';
@@ -845,7 +845,7 @@ export class BalanceService {
     const target = this.movementContracts.resolveExistingAndValidate(req);
     const source = this.movements.findById(req.referencedTransactionId);
     const sourceContract = source ? this.contracts.findById(source.balanceContractId) : undefined;
-    if (!source || !sourceContract || sourceContract.parentLogicalContractId !== target.logicalContractId) {
+    if (!source || sourceContract?.parentLogicalContractId !== target.logicalContractId) {
       throw new RequestValidationError('B4 must reference a B3 owned by the same Export Confirmation.');
     }
     const approved = new ExcessLedgerStore(this.db).findApprovedUtilizationByMovement(source.movementId);
@@ -997,11 +997,13 @@ export class BalanceService {
       pendingReservedOwner: formatMonetaryAmount(new Decimal(0), precision),
       approvedUtilizedOwner: formatMonetaryAmount(new Decimal(0), precision),
     };
-    const aggregate = account
-      ? input.excludeMovementId
-        ? new ExcessLedgerStore(this.db).aggregateForAccountExcludingMovement(account.excessAccountId, input.excludeMovementId, precision)
-        : new ExcessLedgerStore(this.db).aggregateForAccount(account.excessAccountId, precision)
-      : emptyAggregate;
+    let aggregate = emptyAggregate;
+    if (account) {
+      const ledger = new ExcessLedgerStore(this.db);
+      aggregate = input.excludeMovementId
+        ? ledger.aggregateForAccountExcludingMovement(account.excessAccountId, input.excludeMovementId, precision)
+        : ledger.aggregateForAccount(account.excessAccountId, precision);
+    }
     const previous = new Decimal(aggregate.pendingReservedOwner).plus(aggregate.approvedUtilizedOwner);
     const proposed = new Decimal(split.proposedExcessOwner);
 
@@ -1162,7 +1164,7 @@ export class BalanceService {
 
     const parent = this.contracts.findActiveByLogicalContractId(req.parentLogicalContractId);
     const expectedParentType = 'EPLC_CONFIRMATION';
-    if (!parent || parent.instrumentType !== expectedParentType) {
+    if (parent?.instrumentType !== expectedParentType) {
       throw new RequestValidationError(`${functionCode} requires an ACTIVE ${expectedParentType} allowance owner.`);
     }
     const ownerType = 'EXPORT_CONFIRMATION' as const;
@@ -1185,7 +1187,7 @@ export class BalanceService {
     if (!prepared.created) throw new MakerExcessConcurrencyError('Movement identity already exists before Maker Excess persistence.');
     const loadFacts = (): MakerExcessCurrentFacts => {
       const currentParent = this.contracts.findActiveByLogicalContractId(req.parentLogicalContractId!);
-      if (!currentParent || currentParent.balanceContractId !== parent.balanceContractId) {
+      if (currentParent?.balanceContractId !== parent.balanceContractId) {
         throw new MakerExcessConcurrencyError(`${functionCode} allowance owner changed before persistence.`);
       }
       const parentMovements = this.movements.listByContract(currentParent.balanceContractId);
@@ -1303,7 +1305,7 @@ export class BalanceService {
     }
     const loadFacts = (): MakerExcessCurrentFacts => {
       const currentLc = this.contracts.findById(lc.balanceContractId);
-      if (!currentLc || currentLc.status !== 'ACTIVE') throw new MakerExcessConcurrencyError('A3S Import LC owner changed before persistence.');
+      if (currentLc?.status !== 'ACTIVE') throw new MakerExcessConcurrencyError('A3S Import LC owner changed before persistence.');
       const lcMovements = this.movements.listByContract(currentLc.balanceContractId);
       const shgtMovements = this.movements.listShgtMovementsForParent(currentLc.logicalContractId);
       const confirmed = computeConfirmedBalance(lcMovements);
@@ -1557,7 +1559,7 @@ export class BalanceService {
     const movement = this.movements.findById(movementId);
     if (!movement) throw new NotFoundError(`No BalanceMovement ${movementId}`);
     const contract = this.contracts.findById(movement.balanceContractId);
-    if (!contract || contract.instrumentType !== 'EPLC_CONFIRMATION' || !['HONOUR', 'ACCEPT'].includes(movement.movementType)) {
+    if (contract?.instrumentType !== 'EPLC_CONFIRMATION' || !['HONOUR', 'ACCEPT'].includes(movement.movementType)) {
       throw new RequestValidationError('B4 Export Asset posting requires a pending Confirmation HONOUR or ACCEPT movement.');
     }
     const sourceB3MovementId = movement.referencedTransactionId;
@@ -1566,8 +1568,7 @@ export class BalanceService {
     const sourceContract = source ? this.contracts.findById(source.balanceContractId) : undefined;
     if (
       !source ||
-      !sourceContract ||
-      sourceContract.instrumentType !== 'EPLC_EXAMINATION' ||
+      sourceContract?.instrumentType !== 'EPLC_EXAMINATION' ||
       sourceContract.parentLogicalContractId !== contract.logicalContractId ||
       source.movementType !== 'CREATE' ||
       source.status !== 'RELEASED'
@@ -1607,8 +1608,7 @@ export class BalanceService {
       const current = this.movements.findById(movementId);
       const currentApproved = new ExcessLedgerStore(this.db).findApprovedUtilizationByMovement(sourceB3MovementId);
       if (
-        !current ||
-        current.status !== 'PENDING' ||
+        current?.status !== 'PENDING' ||
         !currentApproved ||
         canonicalHash(currentApproved) !== canonicalHash(approved) ||
         current.createdBy !== movement.createdBy ||
@@ -1776,7 +1776,7 @@ export class BalanceService {
     });
   }
 
-  private prepareMovement(req: CreateMovementRequest, options: PrepareMovementOptions = {}): PreparedMovementResult {
+  private validateMovementRequest(req: CreateMovementRequest): void {
     if (req.movementType !== 'REOPEN') {
       this.requestValidator.assertValidAmount(req.movementType, req.amount);
     }
@@ -1789,6 +1789,48 @@ export class BalanceService {
     this.requestValidator.assertToleranceNonNegative(req.tolerancePct);
     this.requestValidator.assertToleranceAllowed(req.movementType, req.tolerancePct);
     this.requestValidator.assertToleranceChangeAllowed(req.movementType, req.tolerancePct, req.toleranceChangePct, req.toleranceChangeDirection);
+  }
+
+  private normalizePreparedRequest(
+    req: CreateMovementRequest,
+    contract: BalanceContract,
+    existingMovements: BalanceMovement[],
+  ): CreateMovementRequest {
+    if (req.movementType === 'REOPEN') {
+      const restoreAmount = computeReopenRestoreAmount(existingMovements);
+      const reopened = { ...req, amount: restoreAmount.toFixed() };
+      this.requestValidator.assertValidAmount(reopened.movementType, reopened.amount);
+      return reopened;
+    }
+    if (req.movementType !== 'AMEND_EXPIRY_DATE' || contract.status !== 'EXPIRED') return req;
+    const trailing = existingMovements
+      .filter((movement) => movement.status === 'RELEASED')
+      .sort((left, right) => left.eventSeq - right.eventSeq)
+      .pop();
+    return trailing?.movementType === 'EXPIRE'
+      ? { ...req, amount: trailing.ceilingAmount, reversalOfMovementId: trailing.movementId }
+      : req;
+  }
+
+  private assertUniqueSourceTransactionRef(req: CreateMovementRequest, existingMovements: BalanceMovement[]): void {
+    if (!req.sourceTransactionRef) return;
+    const duplicateRef = existingMovements.find((movement) => movement.sourceTransactionRef === req.sourceTransactionRef && movement.status !== 'CANCELLED');
+    if (!duplicateRef) return;
+    throw new RequestValidationError(
+      `sourceTransactionRef "${req.sourceTransactionRef}" is already used by movement ${duplicateRef.movementId} ` +
+        `(eventSeq ${duplicateRef.eventSeq}) against this same contract — secondary reference numbers must be unique per contract.`,
+    );
+  }
+
+  private reversedDirectionFor(req: CreateMovementRequest): 1 | -1 | undefined {
+    if ((req.movementType !== 'REVERSAL' && req.movementType !== 'AMEND_EXPIRY_DATE') || !req.reversalOfMovementId) return undefined;
+    const original = this.movements.findById(req.reversalOfMovementId);
+    const direction = original ? MOVEMENT_DIRECTION[original.movementType] : undefined;
+    return direction === 1 || direction === -1 ? direction : undefined;
+  }
+
+  private prepareMovement(req: CreateMovementRequest, options: PrepareMovementOptions = {}): PreparedMovementResult {
+    this.validateMovementRequest(req);
 
     const contract =
       options.contractOverride ??
@@ -1801,39 +1843,13 @@ export class BalanceService {
 
     const existingMovements = this.movements.listByContract(contract.balanceContractId);
 
-    if (req.movementType === 'REOPEN') {
-      const restoreAmount = computeReopenRestoreAmount(this.movements.listByContract(contract.balanceContractId));
-      req = { ...req, amount: restoreAmount.toFixed() };
-      this.requestValidator.assertValidAmount(req.movementType, req.amount);
-    }
-
-    if (req.movementType === 'AMEND_EXPIRY_DATE' && contract.status === 'EXPIRED') {
-      // Cancelled/rejected Extension attempts are audit history, not balance history. Use the latest
-      // effective RELEASED movement so a retry still finds the EXPIRE whose Tight Balance must be
-      // restored. Looking at the last row of any status incorrectly produced a zero-value Extension
-      // whenever the Maker had cancelled an earlier attempt (live S01 reproduction, 2026-09-03).
-      const trailing = existingMovements
-        .filter((movement) => movement.status === 'RELEASED')
-        .sort((left, right) => left.eventSeq - right.eventSeq)
-        .pop();
-      if (trailing?.status === 'RELEASED' && trailing.movementType === 'EXPIRE') {
-        req = { ...req, amount: trailing.ceilingAmount, reversalOfMovementId: trailing.movementId };
-      }
-    }
+    req = this.normalizePreparedRequest(req, contract, existingMovements);
 
     const ceilingAmount = options.ceilingAmountOverride
       ? parseMonetaryAmount(options.ceilingAmountOverride)
       : this.deriveMovementCeilingAmount(req, contract, existingMovements);
 
-    if (req.sourceTransactionRef) {
-      const duplicateRef = existingMovements.find((m) => m.sourceTransactionRef === req.sourceTransactionRef && m.status !== 'CANCELLED');
-      if (duplicateRef) {
-        throw new RequestValidationError(
-          `sourceTransactionRef "${req.sourceTransactionRef}" is already used by movement ${duplicateRef.movementId} ` +
-            `(eventSeq ${duplicateRef.eventSeq}) against this same contract — secondary reference numbers must be unique per contract.`,
-        );
-      }
-    }
+    this.assertUniqueSourceTransactionRef(req, existingMovements);
 
     const confirmed = computeConfirmedBalance(existingMovements);
     const available = computeAvailableBalance(confirmed, existingMovements);
@@ -1855,12 +1871,7 @@ export class BalanceService {
     const preparedSufficiency: PreparedMovementSufficiency =
       sufficiency && !sufficiency.ok ? { kind: 'INSUFFICIENT_AVAILABLE_BALANCE', message: sufficiency.error } : { kind: 'SUFFICIENT' };
 
-    let reversedDirection: 1 | -1 | undefined;
-    if ((req.movementType === 'REVERSAL' || req.movementType === 'AMEND_EXPIRY_DATE') && req.reversalOfMovementId) {
-      const original = this.movements.findById(req.reversalOfMovementId);
-      const originalDirection = original ? MOVEMENT_DIRECTION[original.movementType] : undefined;
-      if (originalDirection === 1 || originalDirection === -1) reversedDirection = originalDirection;
-    }
+    const reversedDirection = this.reversedDirectionFor(req);
 
     const contingentAccountEntry = deriveContingentAccountEntry({
       instrumentType: req.instrumentType,
@@ -1970,13 +1981,13 @@ export class BalanceService {
       throw new RequestValidationError('B3 Excess Preview requires an EPLC_EXAMINATION CREATE request with parentLogicalContractId.');
     }
     const parent = this.contracts.findActiveByLogicalContractId(req.parentLogicalContractId);
-    if (!parent || parent.instrumentType !== 'EPLC_CONFIRMATION') {
+    if (parent?.instrumentType !== 'EPLC_CONFIRMATION') {
       throw new RequestValidationError('B3 requires an ACTIVE EPLC_CONFIRMATION allowance owner.');
     }
     if (input.excludeMovementId) {
       const old = this.requirePreviewExcludedMovement(input.excludeMovementId);
       const contract = this.contracts.findById(old.balanceContractId);
-      if (!contract || contract.instrumentType !== 'EPLC_EXAMINATION' || contract.parentLogicalContractId !== parent.logicalContractId) {
+      if (contract?.instrumentType !== 'EPLC_EXAMINATION' || contract.parentLogicalContractId !== parent.logicalContractId) {
         throw new RequestValidationError('excludeMovementId does not identify the B3 movement being previewed.');
       }
       return this.deriveCheckerExcessFacts(this.copyPreviewAmount(old, req), contract);
@@ -2142,7 +2153,7 @@ export class BalanceService {
     }
     const parent = this.contracts.findActiveByLogicalContractId(contract.parentLogicalContractId);
     const expectedParentType = 'EPLC_CONFIRMATION';
-    if (!parent || parent.instrumentType !== expectedParentType) {
+    if (parent?.instrumentType !== expectedParentType) {
       throw new MakerExcessConcurrencyError(`${functionCode} allowance owner is no longer an ACTIVE ${expectedParentType}.`);
     }
     const parentMovements = this.movements.listByContract(parent.balanceContractId);
@@ -2263,6 +2274,58 @@ export class BalanceService {
     return this.releaseMovement(movementId, releasedBy, false);
   }
 
+  private assertA3SReleaseLink(movement: BalanceMovement, contract: BalanceContract): void {
+    const isLinkedSgRedemption = contract.instrumentType === 'SHGT'
+      && (movement.movementType === 'FULL_REDEEM' || movement.movementType === 'PARTIAL_REDEEM')
+      && Boolean(movement.businessEventId);
+    if (!isLinkedSgRedemption) return;
+    const arrivals = this.movements.findByBusinessEventId(movement.businessEventId!).filter((linked) => linked.movementType === 'UTILIZE');
+    if (arrivals.length !== 1) throw new RequestValidationError(`A3S event ${movement.businessEventId} must reference exactly one Document Arrival.`);
+    this.requestValidator.assertA3SBillCoversShippingGuarantee(movement.businessEventId!, arrivals[0]!.amount);
+  }
+
+  private movementRequestForRelease(movement: BalanceMovement, contract: BalanceContract): CreateMovementRequest {
+    return {
+      instrumentType: contract.instrumentType,
+      balanceContractId: contract.balanceContractId,
+      movementType: movement.movementType,
+      eventSeq: movement.eventSeq,
+      amount: movement.amount,
+      currency: movement.currency,
+      toleranceChangePct: movement.toleranceChangePct,
+      toleranceChangeDirection: movement.toleranceChangeDirection,
+      createdBy: movement.createdBy,
+    };
+  }
+
+  private assertMonetaryAmendmentFresh(movement: BalanceMovement, contract: BalanceContract): void {
+    if (!MONETARY_AMENDMENT_TYPES.has(movement.movementType)) return;
+    this.requestValidator.assertMonetaryAmendmentChangesTerms(movement.movementType, movement.amount, movement.toleranceChangePct, contract.tolerancePct);
+    const withoutCurrent = this.movements.listByContract(contract.balanceContractId).filter((candidate) => candidate.movementId !== movement.movementId);
+    const expected = this.deriveMovementCeilingAmount(this.movementRequestForRelease(movement, contract), contract, withoutCurrent);
+    if (expected.equals(parseMonetaryAmount(movement.ceilingAmount))) return;
+    throw new IllegalStateTransitionError(
+      `Cannot release monetary amendment ${movement.movementId} — the LC amount or tolerance has changed since Submit ` +
+        `(stored balance effect ${movement.ceilingAmount}, now ${expected.toFixed()}). Cancel it and re-submit against the latest approved LC terms.`,
+    );
+  }
+
+  private releaseTolerancePct(movement: BalanceMovement, contract: BalanceContract): string | null {
+    return MONETARY_AMENDMENT_TYPES.has(movement.movementType)
+      ? this.resultingTolerancePct(this.movementRequestForRelease(movement, contract), contract)
+      : (movement.tolerancePct ?? null);
+  }
+
+  private confirmedAfterRelease(movement: BalanceMovement, contract: BalanceContract, before: Decimal): Decimal {
+    const recomputeAll = movement.movementType === 'REVERSAL'
+      || (movement.movementType === 'AMEND_EXPIRY_DATE' && Boolean(movement.reversalOfMovementId));
+    if (!recomputeAll) return before.plus(computeConfirmedBalance([{ ...movement, status: 'RELEASED' }]));
+    const releasedMovements = this.movements
+      .listByContract(contract.balanceContractId)
+      .map((candidate) => (candidate.movementId === movement.movementId ? { ...candidate, status: 'RELEASED' as const } : candidate));
+    return computeConfirmedBalance(releasedMovements);
+  }
+
   private releaseMovement(movementId: string, releasedBy: string, b4ExportAssetGateSatisfied: boolean): BalanceMovement {
     const movement = this.movements.findById(movementId);
     if (!movement) throw new NotFoundError(`No BalanceMovement ${movementId}`);
@@ -2274,71 +2337,18 @@ export class BalanceService {
     applyStatusTransition({ currentStatus: movement.status, action: 'RELEASE', createdBy: movement.createdBy, actingUser: releasedBy });
 
     const contract = this.contracts.findById(movement.balanceContractId)!;
-    if (
-      contract.instrumentType === 'SHGT' &&
-      (movement.movementType === 'FULL_REDEEM' || movement.movementType === 'PARTIAL_REDEEM') &&
-      movement.businessEventId
-    ) {
-      const arrivals = this.movements.findByBusinessEventId(movement.businessEventId).filter((linked) => linked.movementType === 'UTILIZE');
-      if (arrivals.length !== 1) throw new RequestValidationError(`A3S event ${movement.businessEventId} must reference exactly one Document Arrival.`);
-      this.requestValidator.assertA3SBillCoversShippingGuarantee(movement.businessEventId, arrivals[0]!.amount);
-    }
+    this.assertA3SReleaseLink(movement, contract);
     const isUtilizeFinalize = movement.movementType === 'UTILIZE' && contract.instrumentType === 'IPLC_LC' && contract.tenorType != null;
 
     this.releasePolicy.assertSubmitGuards(movement, contract, isUtilizeFinalize);
 
     const before = computeConfirmedBalance(this.movements.listByContract(contract.balanceContractId));
-    if (MONETARY_AMENDMENT_TYPES.has(movement.movementType)) {
-      this.requestValidator.assertMonetaryAmendmentChangesTerms(movement.movementType, movement.amount, movement.toleranceChangePct, contract.tolerancePct);
-      const withoutCurrent = this.movements.listByContract(contract.balanceContractId).filter((candidate) => candidate.movementId !== movement.movementId);
-      const expected = this.deriveMovementCeilingAmount(
-        {
-          instrumentType: contract.instrumentType,
-          balanceContractId: contract.balanceContractId,
-          movementType: movement.movementType,
-          eventSeq: movement.eventSeq,
-          amount: movement.amount,
-          currency: movement.currency,
-          toleranceChangePct: movement.toleranceChangePct,
-          toleranceChangeDirection: movement.toleranceChangeDirection,
-          createdBy: movement.createdBy,
-        },
-        contract,
-        withoutCurrent,
-      );
-      if (!expected.equals(parseMonetaryAmount(movement.ceilingAmount))) {
-        throw new IllegalStateTransitionError(
-          `Cannot release monetary amendment ${movement.movementId} — the LC amount or tolerance has changed since Submit ` +
-            `(stored balance effect ${movement.ceilingAmount}, now ${expected.toFixed()}). Cancel it and re-submit against the latest approved LC terms.`,
-        );
-      }
-    }
+    this.assertMonetaryAmendmentFresh(movement, contract);
     this.releasePolicy.assertEligibility(movement, contract, before);
 
     const releasedAt = this.now();
-    const releasedTolerancePct = MONETARY_AMENDMENT_TYPES.has(movement.movementType)
-      ? this.resultingTolerancePct(
-          {
-            instrumentType: contract.instrumentType,
-            movementType: movement.movementType,
-            eventSeq: movement.eventSeq,
-            amount: movement.amount,
-            currency: movement.currency,
-            toleranceChangePct: movement.toleranceChangePct,
-            toleranceChangeDirection: movement.toleranceChangeDirection,
-            createdBy: movement.createdBy,
-          },
-          contract,
-        )
-      : movement.tolerancePct;
-    const after =
-      movement.movementType === 'REVERSAL' || (movement.movementType === 'AMEND_EXPIRY_DATE' && movement.reversalOfMovementId)
-        ? computeConfirmedBalance(
-            this.movements
-              .listByContract(contract.balanceContractId)
-              .map((m) => (m.movementId === movement.movementId ? { ...m, status: 'RELEASED' as const } : m)),
-          )
-        : before.plus(computeConfirmedBalance([{ ...movement, status: 'RELEASED' }]));
+    const releasedTolerancePct = this.releaseTolerancePct(movement, contract);
+    const after = this.confirmedAfterRelease(movement, contract, before);
 
     const releasedSelf = { ...movement, status: 'RELEASED' as const, tolerancePct: releasedTolerancePct };
     const ownMovements = this.movements.listByContract(contract.balanceContractId).map((m) => (m.movementId === movementId ? releasedSelf : m));
@@ -2544,6 +2554,34 @@ export class BalanceService {
     return this.movements.findById(movementId)!;
   }
 
+  private findFixPendingReplay(
+    movementId: string,
+    actorContext: string,
+    idempotencyKey: string,
+    requestHash: string,
+  ): MakerExcessFixResult | null {
+    const replay = this.db
+      .prepare(
+        `SELECT request_hash, response_body FROM command_idempotency
+         WHERE command_type = 'FIX_PENDING' AND owner_id = ? AND actor_context = ? AND idempotency_key = ?`,
+      )
+      .get(movementId, actorContext, idempotencyKey) as { request_hash: string; response_body: string } | undefined;
+    if (!replay) return null;
+    return replay.request_hash === requestHash
+      ? (JSON.parse(replay.response_body) as MakerExcessFixResult)
+      : { ok: false, code: 'IDEMPOTENCY_CONFLICT' };
+  }
+
+  private validateExcessFixRequest(old: BalanceMovement, patch: EditMovementRequest, actorContext: string): void {
+    applyStatusTransition({ currentStatus: old.status, action: 'EDIT', createdBy: old.createdBy, actingUser: patch.editedBy });
+    if (patch.editedBy !== actorContext) throw new RequestValidationError('Maker actor must match Fix Pending editedBy.');
+    if (patch.editMode === 'REMARKS_ONLY') throw new RequestValidationError('Remarks-only correction does not use the Excess Amount Fix boundary.');
+    const allowedKeys = new Set(['amount', 'editedBy', 'remarks']);
+    if (Object.keys(patch).some((key) => !allowedKeys.has(key))) {
+      throw new RequestValidationError('Excess Amount Fix may change amount and remarks only; identity, reference, currency and linked fields are protected.');
+    }
+  }
+
   async editPendingExcessByMaker(
     movementId: string,
     patch: EditMovementRequest,
@@ -2551,24 +2589,11 @@ export class BalanceService {
   ): Promise<MakerExcessFixResult> {
     if (!this.makerExcessRuntime) throw new RequestValidationError('Maker Excess runtime is not configured.');
     const requestHash = canonicalHash({ movementId, patch });
-    const replay = this.db
-      .prepare(
-        `SELECT request_hash, response_body FROM command_idempotency
-         WHERE command_type = 'FIX_PENDING' AND owner_id = ? AND actor_context = ? AND idempotency_key = ?`,
-      )
-      .get(movementId, control.actorContext, control.idempotencyKey) as { request_hash: string; response_body: string } | undefined;
-    if (replay) {
-      return replay.request_hash === requestHash ? (JSON.parse(replay.response_body) as MakerExcessFixResult) : { ok: false, code: 'IDEMPOTENCY_CONFLICT' };
-    }
+    const replay = this.findFixPendingReplay(movementId, control.actorContext, control.idempotencyKey, requestHash);
+    if (replay) return replay;
     const old = this.movements.findById(movementId);
     if (!old) throw new NotFoundError(`No BalanceMovement ${movementId}`);
-    applyStatusTransition({ currentStatus: old.status, action: 'EDIT', createdBy: old.createdBy, actingUser: patch.editedBy });
-    if (patch.editedBy !== control.actorContext) throw new RequestValidationError('Maker actor must match Fix Pending editedBy.');
-    if (patch.editMode === 'REMARKS_ONLY') throw new RequestValidationError('Remarks-only correction does not use the Excess Amount Fix boundary.');
-    const allowedKeys = new Set(['amount', 'editedBy', 'remarks']);
-    if (Object.keys(patch).some((key) => !allowedKeys.has(key))) {
-      throw new RequestValidationError('Excess Amount Fix may change amount and remarks only; identity, reference, currency and linked fields are protected.');
-    }
+    this.validateExcessFixRequest(old, patch, control.actorContext);
     const contract = this.contracts.findById(old.balanceContractId);
     if (!contract) throw new NotFoundError(`No BalanceContract ${old.balanceContractId}`);
     if (this.isA3SCompoundMovement(old, contract) && old.acknowledgedAt) {
@@ -2826,6 +2851,41 @@ export class BalanceService {
     });
   }
 
+  private applyRemarksOnlyEdit(old: BalanceMovement, patch: EditMovementRequest): BalanceMovement {
+    const suppliedKeys = Object.keys(patch);
+    const allowedKeys = new Set(['amount', 'editedBy', 'editMode', 'remarks']);
+    if (suppliedKeys.some((key) => !allowedKeys.has(key))) throw new RequestValidationError('Remarks-only Fix Pending may change remarks only.');
+    if (patch.amount !== old.amount) throw new RequestValidationError('Amount cannot be changed in Remarks-only Fix Pending.');
+    const remarks = patch.remarks?.trim();
+    if (!remarks) throw new RequestValidationError('Remarks is required for Remarks-only Fix Pending.');
+    const editedAt = this.now();
+    const after = { ...old, status: 'PENDING' as const, remarks, editedBy: patch.editedBy, editedAt };
+    this.db.exec('SAVEPOINT edit_pending');
+    try {
+      this.fixPendingAudit.insert({
+        auditId: randomUUID(),
+        editSeq: this.fixPendingAudit.nextEditSeq(old.movementId),
+        movementId: old.movementId,
+        balanceContractId: old.balanceContractId,
+        eventSeq: old.eventSeq,
+        originalCreatedBy: old.createdBy,
+        originalCreatedAt: old.createdAt,
+        statusBefore: old.status as 'PENDING' | 'REJECTED',
+        beforeSnapshot: old as unknown as Record<string, unknown>,
+        afterSnapshot: after as unknown as Record<string, unknown>,
+        editedBy: patch.editedBy,
+        editedAt,
+      });
+      this.movements.applyRemarksOnlyCorrection({ movementId: old.movementId, remarks, editedBy: patch.editedBy, editedAt });
+      this.db.exec('RELEASE SAVEPOINT edit_pending');
+      return this.movements.findById(old.movementId)!;
+    } catch (error) {
+      this.db.exec('ROLLBACK TO SAVEPOINT edit_pending');
+      this.db.exec('RELEASE SAVEPOINT edit_pending');
+      throw error;
+    }
+  }
+
   editPending(movementId: string, patch: EditMovementRequest, options: { allowExcessOverdrawn?: boolean } = {}): BalanceMovement {
     const old = this.movements.findById(movementId);
     if (!old) throw new NotFoundError(`No BalanceMovement ${movementId}`);
@@ -2845,43 +2905,7 @@ export class BalanceService {
     }
 
     if (patch.editMode === 'REMARKS_ONLY') {
-      const suppliedKeys = Object.keys(patch);
-      const allowedKeys = new Set(['amount', 'editedBy', 'editMode', 'remarks']);
-      if (suppliedKeys.some((key) => !allowedKeys.has(key))) {
-        throw new RequestValidationError('Remarks-only Fix Pending may change remarks only.');
-      }
-      if (patch.amount !== old.amount) throw new RequestValidationError('Amount cannot be changed in Remarks-only Fix Pending.');
-      const remarks = patch.remarks?.trim();
-      if (!remarks) throw new RequestValidationError('Remarks is required for Remarks-only Fix Pending.');
-      const editedAt = this.now();
-      // A Fix Pending save is a resubmission boundary. The audit's after image must match the live
-      // movement written below, including REJECTED -> PENDING, so Checker review can resume and the
-      // immutable audit never describes a state that did not actually result from this correction.
-      const after = { ...old, status: 'PENDING' as const, remarks, editedBy: patch.editedBy, editedAt };
-      this.db.exec('SAVEPOINT edit_pending');
-      try {
-        this.fixPendingAudit.insert({
-          auditId: randomUUID(),
-          editSeq: this.fixPendingAudit.nextEditSeq(old.movementId),
-          movementId: old.movementId,
-          balanceContractId: old.balanceContractId,
-          eventSeq: old.eventSeq,
-          originalCreatedBy: old.createdBy,
-          originalCreatedAt: old.createdAt,
-          statusBefore: old.status as 'PENDING' | 'REJECTED',
-          beforeSnapshot: old as unknown as Record<string, unknown>,
-          afterSnapshot: after as unknown as Record<string, unknown>,
-          editedBy: patch.editedBy,
-          editedAt,
-        });
-        this.movements.applyRemarksOnlyCorrection({ movementId: old.movementId, remarks, editedBy: patch.editedBy, editedAt });
-        this.db.exec('RELEASE SAVEPOINT edit_pending');
-        return this.movements.findById(old.movementId)!;
-      } catch (err) {
-        this.db.exec('ROLLBACK TO SAVEPOINT edit_pending');
-        this.db.exec('RELEASE SAVEPOINT edit_pending');
-        throw err;
-      }
+      return this.applyRemarksOnlyEdit(old, patch);
     }
 
     const isCreatingEdit = !!this.movementTypeRegistry[old.movementType]?.isCreating;
@@ -3254,7 +3278,7 @@ export class BalanceService {
       presentTense: 'acknowledge',
       pastTense: 'acknowledged',
       validate: (contract, movement) => {
-        if (!contract || contract.instrumentType !== 'IPLC_LC' || movement.movementType !== 'UTILIZE') {
+        if (contract?.instrumentType !== 'IPLC_LC' || movement.movementType !== 'UTILIZE') {
           throw new RequestValidationError(
             `acknowledgeArrival() only applies to an IPLC_LC UTILIZE movement (A3/A3S Document Arrival) — ` +
               `movement ${movementId} is ${contract?.instrumentType ?? 'unknown'}/${movement.movementType}.`,
@@ -3277,7 +3301,7 @@ export class BalanceService {
       presentTense: 'submit',
       pastTense: 'submitted',
       validate: (contract, movement) => {
-        if (!contract || contract.instrumentType !== 'IPLC_LC' || movement.movementType !== 'UTILIZE') {
+        if (contract?.instrumentType !== 'IPLC_LC' || movement.movementType !== 'UTILIZE') {
           throw new RequestValidationError(
             `submitByMaker() only applies to an IPLC_LC UTILIZE movement (A4 Sight Settlement) — ` +
               `movement ${movementId} is ${contract?.instrumentType ?? 'unknown'}/${movement.movementType}.`,
@@ -3297,7 +3321,7 @@ export class BalanceService {
     const movement = this.movements.findById(movementId);
     if (!movement) throw new NotFoundError(`No BalanceMovement ${movementId}`);
     const contract = this.contracts.findById(movement.balanceContractId);
-    if (!contract || contract.instrumentType !== 'IPLC_LC' || movement.movementType !== 'UTILIZE') {
+    if (contract?.instrumentType !== 'IPLC_LC' || movement.movementType !== 'UTILIZE') {
       throw new RequestValidationError(
         `withdrawMakerSubmit() only applies to an IPLC_LC UTILIZE movement (A4 Sight Settlement) — ` +
           `movement ${movementId} is ${contract?.instrumentType ?? 'unknown'}/${movement.movementType}.`,

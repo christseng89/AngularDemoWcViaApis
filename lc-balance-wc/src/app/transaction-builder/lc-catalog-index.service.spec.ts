@@ -34,7 +34,7 @@ describe('LcCatalogIndexService', () => {
 
       svc.load();
 
-      expect(catalog).toHaveBeenCalledWith('IPLC_LC', undefined, undefined, 1, 10, undefined, undefined, undefined, false);
+      expect(catalog).toHaveBeenCalledWith('IPLC_LC', { q: undefined, page: 1, pageSize: 10, excludeCancelled: false });
       expect(svc.rows).toEqual([contract]);
       expect(svc.paging.total).toBe(1);
       expect(svc.loading).toBe(false);
@@ -46,7 +46,7 @@ describe('LcCatalogIndexService', () => {
 
       svc.load();
 
-      expect(catalog).toHaveBeenCalledWith('IPLC_LC', undefined, undefined, 1, 10, undefined, undefined, undefined, true);
+      expect(catalog).toHaveBeenCalledWith('IPLC_LC', { q: undefined, page: 1, pageSize: 10, excludeCancelled: true });
     });
 
     it('EPLC_CONFIRMATION is used for the EXPORT side', () => {
@@ -56,7 +56,7 @@ describe('LcCatalogIndexService', () => {
 
       svc.load();
 
-      expect(catalog).toHaveBeenCalledWith('EPLC_CONFIRMATION', undefined, undefined, 1, 10, undefined, undefined, undefined, false);
+      expect(catalog).toHaveBeenCalledWith('EPLC_CONFIRMATION', { q: undefined, page: 1, pageSize: 10, excludeCancelled: false });
     });
 
     it('short-circuits to an empty rows array without calling decorate when the page has zero items', () => {
@@ -78,7 +78,7 @@ describe('LcCatalogIndexService', () => {
 
       svc.load();
 
-      expect(catalog).toHaveBeenCalledWith('IPLC_LC', undefined, 'S0', 1, 10, undefined, undefined, undefined, false);
+      expect(catalog).toHaveBeenCalledWith('IPLC_LC', { q: 'S0', page: 1, pageSize: 10, excludeCancelled: false });
     });
 
     it('on error, sets a describable error and clears rows/total', () => {
@@ -173,7 +173,7 @@ describe('LcCatalogIndexService', () => {
 
       expect(svc.side).toBe('EXPORT');
       expect(svc.search).toBe('');
-      expect(catalog).toHaveBeenLastCalledWith('EPLC_CONFIRMATION', undefined, undefined, 1, 10, undefined, undefined, undefined, false);
+      expect(catalog).toHaveBeenLastCalledWith('EPLC_CONFIRMATION', { q: undefined, page: 1, pageSize: 10, excludeCancelled: false });
     });
   });
 
@@ -185,20 +185,20 @@ describe('LcCatalogIndexService', () => {
 
       svc.searchNow();
 
-      expect(catalog).toHaveBeenLastCalledWith('IPLC_LC', undefined, undefined, 1, 10, undefined, undefined, undefined, false);
+      expect(catalog).toHaveBeenLastCalledWith('IPLC_LC', { q: undefined, page: 1, pageSize: 10, excludeCancelled: false });
     });
 
     it('nextPage()/prevPage() re-fetch the target page and are no-ops at the boundaries', () => {
-      const catalog = jest.fn((_a: string, _b?: string, _c?: string, page = 1) => of(makePage({ total: 25, page })));
+      const catalog = jest.fn((_instrumentType: string, options?: { page?: number }) => of(makePage({ total: 25, page: options?.page ?? 1 })));
       const svc = new LcCatalogIndexService(makeApi({ catalog }));
       svc.load(1);
       catalog.mockClear();
 
       svc.nextPage();
-      expect(catalog).toHaveBeenLastCalledWith('IPLC_LC', undefined, undefined, 2, 10, undefined, undefined, undefined, false);
+      expect(catalog).toHaveBeenLastCalledWith('IPLC_LC', { q: undefined, page: 2, pageSize: 10, excludeCancelled: false });
 
       svc.prevPage();
-      expect(catalog).toHaveBeenLastCalledWith('IPLC_LC', undefined, undefined, 1, 10, undefined, undefined, undefined, false);
+      expect(catalog).toHaveBeenLastCalledWith('IPLC_LC', { q: undefined, page: 1, pageSize: 10, excludeCancelled: false });
 
       catalog.mockClear();
       svc.prevPage();

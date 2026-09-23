@@ -987,7 +987,7 @@ export const MIGRATIONS: Migration[] = [
     description: 'Remove the unapproved active SG Capacity RESTORE event; preserve any historical table as read-only legacy audit.',
     up: (db) => {
       const table = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'sg_capacity_events'").get() as { sql: string } | undefined;
-      if (!table || !table.sql.includes("'RESTORE'")) return;
+      if (!table?.sql.includes("'RESTORE'")) return;
       db.exec('BEGIN IMMEDIATE');
       try {
         db.exec(`

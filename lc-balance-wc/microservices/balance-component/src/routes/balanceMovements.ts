@@ -1,8 +1,7 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
-import type { BalanceService } from '../service/balanceService';
+import type { BalanceService, CreateMovementRequest, EditMovementRequest } from '../service/balanceService';
 import type { CompoundMovementService } from '../service/compoundMovementService';
 import { RequestValidationError } from '../errors';
-import type { CreateMovementRequest, EditMovementRequest } from '../service/balanceService';
 import type { MovementStatus } from '../types';
 import { createMovementRequestSchema, editMovementRequestSchema, firstValidationMessage } from '../validation/requestSchema';
 import type { ExportAuthorizationClaim } from '../domain/exportAssetPosting';

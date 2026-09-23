@@ -1,4 +1,4 @@
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { MAIL_FLOAT_GRACE_DAYS } from '../config';
 import { checkAcceptanceTenorConsistency } from '../domain/tenorRouting';
 import { CurrencyMismatchError, IllegalStateTransitionError, NaturalKeyAlreadyExistsError, NotFoundError, RequestValidationError } from '../errors';
@@ -215,7 +215,7 @@ export class MovementContractService {
 
   private assertRootIssueReleased(root: BalanceContract, actionDescription: string): void {
     const issue = this.movements.listByContract(root.balanceContractId).find((movement) => movement.movementType === 'ISSUE');
-    if (!issue || issue.status !== 'RELEASED') {
+    if (issue?.status !== 'RELEASED') {
       throw new IllegalStateTransitionError(
         `Cannot ${actionDescription} — ${root.instrumentType} ${root.naturalKey.lcNumber} ` +
           `(balanceContractId ${root.balanceContractId}) has not been Checker-Released yet ` +

@@ -261,42 +261,42 @@ describe('BalanceComponentApiService', () => {
     });
 
     it('adds status when present', () => {
-      service.catalog('IPLC_LC', 'ACTIVE');
+      service.catalog('IPLC_LC', { status: 'ACTIVE' });
       expect(http.get).toHaveBeenCalledWith('/balance-component/balance-contracts/catalog', {
         params: { instrumentType: 'IPLC_LC', page: 1, pageSize: 10, status: 'ACTIVE' },
       });
     });
 
     it('adds q when present', () => {
-      service.catalog('IPLC_LC', undefined, 'S00');
+      service.catalog('IPLC_LC', { q: 'S00' });
       expect(http.get).toHaveBeenCalledWith('/balance-component/balance-contracts/catalog', {
         params: { instrumentType: 'IPLC_LC', page: 1, pageSize: 10, q: 'S00' },
       });
     });
 
     it('respects explicit page/pageSize', () => {
-      service.catalog('IPLC_LC', undefined, undefined, 3, 25);
+      service.catalog('IPLC_LC', { page: 3, pageSize: 25 });
       expect(http.get).toHaveBeenCalledWith('/balance-component/balance-contracts/catalog', {
         params: { instrumentType: 'IPLC_LC', page: 3, pageSize: 25 },
       });
     });
 
     it('adds lcNumber when present (exact-match drill-down)', () => {
-      service.catalog('IPLC_ACCEPTANCE', undefined, undefined, 1, 10, 'S001');
+      service.catalog('IPLC_ACCEPTANCE', { lcNumber: 'S001' });
       expect(http.get).toHaveBeenCalledWith('/balance-component/balance-contracts/catalog', {
         params: { instrumentType: 'IPLC_ACCEPTANCE', page: 1, pageSize: 10, lcNumber: 'S001' },
       });
     });
 
     it('adds tenorFamily when present', () => {
-      service.catalog('IPLC_LC', undefined, undefined, 1, 10, undefined, 'USANCE');
+      service.catalog('IPLC_LC', { tenorFamily: 'USANCE' });
       expect(http.get).toHaveBeenCalledWith('/balance-component/balance-contracts/catalog', {
         params: { instrumentType: 'IPLC_LC', page: 1, pageSize: 10, tenorFamily: 'USANCE' },
       });
     });
 
     it('adds all optional filters together when all present', () => {
-      service.catalog('IPLC_LC', 'ACTIVE', 'S00', 2, 20, 'S001', 'SIGHT');
+      service.catalog('IPLC_LC', { status: 'ACTIVE', q: 'S00', page: 2, pageSize: 20, lcNumber: 'S001', tenorFamily: 'SIGHT' });
       expect(http.get).toHaveBeenCalledWith('/balance-component/balance-contracts/catalog', {
         params: { instrumentType: 'IPLC_LC', page: 2, pageSize: 20, status: 'ACTIVE', q: 'S00', lcNumber: 'S001', tenorFamily: 'SIGHT' },
       });
@@ -305,28 +305,28 @@ describe('BalanceComponentApiService', () => {
     // Bug fixed 2026-08-18 ("S10 still shown in A4 function which is wrong") — see this method's own
     // doc comment for the full rule.
     it('adds requireIssueReleased=true when passed true', () => {
-      service.catalog('IPLC_LC', 'ACTIVE', undefined, 1, 10, undefined, undefined, true);
+      service.catalog('IPLC_LC', { status: 'ACTIVE', requireIssueReleased: true });
       expect(http.get).toHaveBeenCalledWith('/balance-component/balance-contracts/catalog', {
         params: { instrumentType: 'IPLC_LC', page: 1, pageSize: 10, status: 'ACTIVE', requireIssueReleased: 'true' },
       });
     });
 
     it('omits requireIssueReleased when false/omitted — the exclusion is opt-in, not the default', () => {
-      service.catalog('IPLC_LC', 'ACTIVE', undefined, 1, 10, undefined, undefined, false);
+      service.catalog('IPLC_LC', { status: 'ACTIVE', requireIssueReleased: false });
       expect(http.get).toHaveBeenCalledWith('/balance-component/balance-contracts/catalog', {
         params: { instrumentType: 'IPLC_LC', page: 1, pageSize: 10, status: 'ACTIVE' },
       });
     });
 
     it('adds statuses as a comma-separated query value for the A2/B2 Expiry Date picker', () => {
-      service.catalog('IPLC_LC', undefined, undefined, 1, 10, undefined, undefined, true, undefined, ['ACTIVE', 'EXPIRED']);
+      service.catalog('IPLC_LC', { requireIssueReleased: true, statuses: ['ACTIVE', 'EXPIRED'] });
       expect(http.get).toHaveBeenCalledWith('/balance-component/balance-contracts/catalog', {
         params: { instrumentType: 'IPLC_LC', page: 1, pageSize: 10, requireIssueReleased: 'true', statuses: 'ACTIVE,EXPIRED' },
       });
     });
 
     it('adds excludeCancelled for the inquiry catalog', () => {
-      service.catalog('IPLC_LC', undefined, undefined, 1, 10, undefined, undefined, undefined, true);
+      service.catalog('IPLC_LC', { excludeCancelled: true });
       expect(http.get).toHaveBeenCalledWith('/balance-component/balance-contracts/catalog', {
         params: { instrumentType: 'IPLC_LC', page: 1, pageSize: 10, excludeCancelled: 'true' },
       });

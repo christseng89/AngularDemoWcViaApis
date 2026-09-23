@@ -152,7 +152,8 @@ describe('HTTP integration — Import Case 1 (Sight, no SHGT)', () => {
   });
 
   test('unknown Logical Contract 404s', async () => {
-    await request(app).get('/balance-contracts').query({ instrumentType: 'IPLC_LC', lcNumber: 'DOES-NOT-EXIST' }).expect(404);
+    const response = await request(app).get('/balance-contracts').query({ instrumentType: 'IPLC_LC', lcNumber: 'DOES-NOT-EXIST' }).expect(404);
+    expect(response.body.code).toBe('NOT_FOUND');
   });
 });
 
@@ -584,6 +585,7 @@ describe('HTTP integration — AMEND_DECREASE now checked against Tight Availabl
       })
       .expect(201);
     lcId = lc.body.balanceContractId;
+    expect(lcId).toEqual(expect.any(String));
     await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
 
     const lcContract = await request(app).get('/balance-contracts').query({ instrumentType: 'IPLC_LC', lcNumber: 'LC0002B' }).expect(200);
@@ -761,7 +763,7 @@ describe('HTTP integration — a still-PENDING (not yet Checker-approved) SG red
   });
 
   test('the SAME 900,000 SG Issue now succeeds -- capacity was genuinely freed this time', async () => {
-    await request(app)
+    const created = await request(app)
       .post('/balance-movements')
       .send({
         instrumentType: 'SHGT',
@@ -774,6 +776,7 @@ describe('HTTP integration — a still-PENDING (not yet Checker-approved) SG red
         createdBy: 'maker1',
       })
       .expect(201);
+    expect(created.body).toMatchObject({ movementType: 'ISSUE', amount: '900000', status: 'PENDING' });
   });
 });
 
@@ -1004,6 +1007,7 @@ describe('HTTP integration — SG redemption commitment control: two concurrent 
       })
       .expect(201);
     lcId = lc.body.balanceContractId;
+    expect(lcId).toEqual(expect.any(String));
     await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
 
     const lcContract = await request(app).get('/balance-contracts').query({ instrumentType: 'IPLC_LC', lcNumber: 'LC0004' }).expect(200);
@@ -1115,6 +1119,7 @@ describe('HTTP integration — A9 Full-Redeem-only server-side guard (business-c
       })
       .expect(201);
     lcId = lc.body.balanceContractId;
+    expect(lcId).toEqual(expect.any(String));
     await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
 
     const lcContract = await request(app).get('/balance-contracts').query({ instrumentType: 'IPLC_LC', lcNumber: 'LC-A9G' }).expect(200);
@@ -1171,6 +1176,8 @@ describe('HTTP integration — A9 Full-Redeem-only server-side guard (business-c
         createdBy: 'maker1',
       })
       .expect(201);
+
+    expect(full.body).toMatchObject({ movementType: 'FULL_REDEEM', status: 'PENDING' });
 
     // Clean up so it doesn't linger PENDING and affect the next test's own snapshot assertions.
     await request(app).post(`/balance-movements/${full.body.movementId}/reject`).send({ releasedBy: 'checker1', reasonCode: 'TEST_CLEANUP' }).expect(200);
@@ -1331,6 +1338,7 @@ describe('HTTP integration — event timeline (business instruction 2026-08-14)'
     await request(app).post(`/balance-movements/${utilizeMovementId}/maker-submit`).send({ makerSubmittedBy: 'maker1' }).expect(200);
     await request(app).post(`/balance-movements/${utilizeMovementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
     // Confirmed now 50,000 -- this final state is NOT what we're checking below.
+    expect(new Set([issueMovementId, amendMovementId, utilizeMovementId]).size).toBe(3);
   });
 
   test('GET /balance-contracts/:id/movements lists all 3 events in eventSeq (time) order', async () => {
@@ -1627,7 +1635,7 @@ describe('HTTP integration — cannot re-ISSUE an already-ACTIVE natural key (bu
   });
 
   test('a DIFFERENT LC Number is unaffected — this guard is per natural key, not global', async () => {
-    await request(app)
+    const first = await request(app)
       .post('/balance-movements')
       .send({
         instrumentType: 'IPLC_LC',
@@ -1641,7 +1649,7 @@ describe('HTTP integration — cannot re-ISSUE an already-ACTIVE natural key (bu
         createdBy: 'maker1',
       })
       .expect(201);
-    await request(app)
+    const second = await request(app)
       .post('/balance-movements')
       .send({
         instrumentType: 'IPLC_LC',
@@ -1655,6 +1663,7 @@ describe('HTTP integration — cannot re-ISSUE an already-ACTIVE natural key (bu
         createdBy: 'maker1',
       })
       .expect(201);
+    expect(first.body.balanceContractId).not.toBe(second.body.balanceContractId);
   });
 });
 
@@ -1678,6 +1687,7 @@ describe('HTTP integration — secondary reference (sourceTransactionRef) must b
       })
       .expect(201);
     lcId = issue.body.balanceContractId;
+    expect(lcId).toEqual(expect.any(String));
     await request(app).post(`/balance-movements/${issue.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
   });
 
@@ -1722,7 +1732,7 @@ describe('HTTP integration — secondary reference (sourceTransactionRef) must b
   });
 
   test('a DIFFERENT reference "001-02" on the same contract succeeds', async () => {
-    await request(app)
+    const created = await request(app)
       .post('/balance-movements')
       .send({
         instrumentType: 'IPLC_LC',
@@ -1735,6 +1745,7 @@ describe('HTTP integration — secondary reference (sourceTransactionRef) must b
         createdBy: 'maker1',
       })
       .expect(201);
+    expect(created.body).toMatchObject({ balanceContractId: lcId, sourceTransactionRef: '001-02' });
   });
 
   test('the SAME reference "001-01" is fine on a DIFFERENT contract — uniqueness is per contract, not global', async () => {
@@ -1753,7 +1764,7 @@ describe('HTTP integration — secondary reference (sourceTransactionRef) must b
       })
       .expect(201);
     await request(app).post(`/balance-movements/${otherLc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
-    await request(app)
+    const amendment = await request(app)
       .post('/balance-movements')
       .send({
         instrumentType: 'IPLC_LC',
@@ -1766,6 +1777,7 @@ describe('HTTP integration — secondary reference (sourceTransactionRef) must b
         createdBy: 'maker1',
       })
       .expect(201);
+    expect(amendment.body).toMatchObject({ balanceContractId: otherLc.body.balanceContractId, sourceTransactionRef: '001-01' });
   });
 });
 
@@ -1865,7 +1877,7 @@ describe('HTTP integration — LC Issue requires Tenor Type, and Acceptance flow
     await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
     const lcContract = await request(app).get('/balance-contracts').query({ instrumentType: 'IPLC_LC', lcNumber: 'FLOW-BUYERS' }).expect(200);
 
-    await request(app)
+    const acceptance = await request(app)
       .post('/balance-movements')
       .send({
         instrumentType: 'IPLC_ACCEPTANCE',
@@ -1879,6 +1891,7 @@ describe('HTTP integration — LC Issue requires Tenor Type, and Acceptance flow
         createdBy: 'maker1',
       })
       .expect(201);
+    expect(acceptance.body).toMatchObject({ movementType: 'CREATE', amount: '50000', status: 'PENDING' });
   });
 });
 
@@ -1902,6 +1915,7 @@ describe('HTTP integration — Maker EC (Delete Pending), business instruction 2
       })
       .expect(201);
     lcId = lc.body.balanceContractId;
+    expect(lcId).toEqual(expect.any(String));
     await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
   });
 
@@ -1969,7 +1983,8 @@ describe('HTTP integration — Maker EC (Delete Pending), business instruction 2
         createdBy: 'maker1',
       })
       .expect(201);
-    await request(app).post(`/balance-movements/${amend.body.movementId}/cancel`).send({}).expect(400);
+    const invalid = await request(app).post(`/balance-movements/${amend.body.movementId}/cancel`).send({}).expect(400);
+    expect(invalid.body.message).toMatch(/cancelledBy/);
     // Clean up so it doesn't linger PENDING and pollute later tests' balance assertions on this same LC.
     await request(app).post(`/balance-movements/${amend.body.movementId}/cancel`).send({ cancelledBy: 'maker1' }).expect(200);
   });
@@ -2047,6 +2062,7 @@ describe('HTTP integration — Export Confirmation asset-side instruments (busin
     await request(app).post(`/balance-movements/${cnf.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
     const cnfContract = await request(app).get('/balance-contracts').query({ instrumentType: 'EPLC_CONFIRMATION', lcNumber: 'E001' }).expect(200);
     cnfLogicalId = cnfContract.body.logicalContractId;
+    expect(cnfLogicalId).toEqual(expect.any(String));
   });
 
   test('CNF_HONOUR_SIGHT proxy: create EPLC_DUE_FROM_ISSUING_BANK for 40,000, released', async () => {
@@ -2457,7 +2473,6 @@ describe('POST /admin/reset-database — dev-only Business Case Runner "Cleanup 
         createdBy: 'maker1',
       })
       .expect(201);
-
     db.prepare(
       `INSERT INTO excess_accounts
        (excess_account_id, owner_type, owner_id, owner_currency, policy_version, version, created_at, updated_at)
@@ -2793,6 +2808,7 @@ describe('HTTP integration — REJECT flow (Checker 4-eyes decline), business.re
       })
       .expect(201);
     lcId = lc.body.balanceContractId;
+    expect(lcId).toEqual(expect.any(String));
     await request(app).post(`/balance-movements/${lc.body.movementId}/release`).send({ releasedBy: 'checker1' }).expect(200);
   });
 
@@ -3066,18 +3082,12 @@ describe('HTTP integration — balanceService.ts createMovement() error branches
 describe('HTTP integration — coverage-closing pass (raising the branch floor from 90% to 95%)', () => {
   const app = createApp(createDb(':memory:'));
 
-  test("GET /balance-contracts/:balanceContractId/balance with an unknown id -> 404 (getBalanceSnapshot's own NotFoundError, not otherwise exercised — every other test in this suite always uses a real id)", async () => {
-    const res = await request(app).get('/balance-contracts/does-not-exist/balance').expect(404);
-    expect(res.body.code).toBe('NOT_FOUND');
-  });
-
-  test("GET /balance-contracts/:balanceContractId/movements with an unknown id -> 404 (listMovements' own NotFoundError)", async () => {
-    const res = await request(app).get('/balance-contracts/does-not-exist/movements').expect(404);
-    expect(res.body.code).toBe('NOT_FOUND');
-  });
-
-  test("GET /balance-movements/:movementId/balance-as-of with an unknown movementId -> 404 (getBalanceSnapshotAsOfMovement's own NotFoundError)", async () => {
-    const res = await request(app).get('/balance-movements/does-not-exist/balance-as-of').expect(404);
+  test.each([
+    '/balance-contracts/does-not-exist/balance',
+    '/balance-contracts/does-not-exist/movements',
+    '/balance-movements/does-not-exist/balance-as-of',
+  ])('GET %s with an unknown id -> 404', async (path) => {
+    const res = await request(app).get(path).expect(404);
     expect(res.body.code).toBe('NOT_FOUND');
   });
 
@@ -3173,8 +3183,12 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
     expect(movements.body[0].accountEntries).toEqual([{ accountRef: 'CUST-ACC', drCr: 'D', amount: '1000' }]);
   });
 
-  test("GET /balance-contracts/catalog without instrumentType -> 400 (the catalog route's own check, distinct from GET /balance-contracts' — that one is already covered above)", async () => {
-    const res = await request(app).get('/balance-contracts/catalog').expect(400);
+  test.each([
+    '/balance-contracts/catalog',
+    '/balance-contracts/close-eligible',
+    '/balance-contracts/reopen-eligible',
+  ])('GET %s without instrumentType -> 400', async (path) => {
+    const res = await request(app).get(path).expect(400);
     expect(res.body.code).toBe('REQUEST_VALIDATION_FAILED');
     expect(res.body.message).toMatch(/instrumentType is required/);
   });
@@ -3238,12 +3252,6 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
     expect(afterRelease.body.items[0].naturalKey.lcNumber).toBe('LC-ISSUEPENDING');
   });
 
-  test('GET /balance-contracts/close-eligible without instrumentType -> 400', async () => {
-    const res = await request(app).get('/balance-contracts/close-eligible').expect(400);
-    expect(res.body.code).toBe('REQUEST_VALIDATION_FAILED');
-    expect(res.body.message).toMatch(/instrumentType is required/);
-  });
-
   test('GET /balance-contracts/close-eligible (A10/B6 Step-1 picker hint) returns a Closeable LC and excludes one with a non-zero SG Balance', async () => {
     const eligible = await request(app)
       .post('/balance-movements')
@@ -3296,12 +3304,6 @@ describe('HTTP integration — coverage-closing pass (raising the branch floor f
     const lcNumbers = (res.body.items as Array<{ naturalKey: { lcNumber: string } }>).map((c) => c.naturalKey.lcNumber);
     expect(lcNumbers).toContain('LC-CLOSEHINT-OK');
     expect(lcNumbers).not.toContain('LC-CLOSEHINT-SG');
-  });
-
-  test('GET /balance-contracts/reopen-eligible without instrumentType -> 400', async () => {
-    const res = await request(app).get('/balance-contracts/reopen-eligible').expect(400);
-    expect(res.body.code).toBe('REQUEST_VALIDATION_FAILED');
-    expect(res.body.message).toMatch(/instrumentType is required/);
   });
 
   test('GET /balance-contracts/reopen-eligible (F1, A11/B7 Step-1 picker hint) returns a CLOSED LC with no open Events and excludes an ACTIVE one', async () => {
@@ -5346,9 +5348,10 @@ describe('HTTP integration — GET /balance-contracts/:balanceContractId (Inquir
   // Regression: this catch-all single-segment route is registered AFTER /catalog, /close-eligible,
   // /reopen-eligible specifically so it can never shadow them (Express matches route registration order).
   test('does not shadow the more specific /balance-contracts/catalog|close-eligible|reopen-eligible routes', async () => {
-    await request(app).get('/balance-contracts/catalog').query({ instrumentType: 'IPLC_LC' }).expect(200);
-    await request(app).get('/balance-contracts/close-eligible').query({ instrumentType: 'IPLC_LC' }).expect(200);
-    await request(app).get('/balance-contracts/reopen-eligible').query({ instrumentType: 'IPLC_LC' }).expect(200);
+    const catalog = await request(app).get('/balance-contracts/catalog').query({ instrumentType: 'IPLC_LC' }).expect(200);
+    const closeEligible = await request(app).get('/balance-contracts/close-eligible').query({ instrumentType: 'IPLC_LC' }).expect(200);
+    const reopenEligible = await request(app).get('/balance-contracts/reopen-eligible').query({ instrumentType: 'IPLC_LC' }).expect(200);
+    expect([catalog.status, closeEligible.status, reopenEligible.status]).toEqual([200, 200, 200]);
   });
 });
 
@@ -5775,8 +5778,9 @@ describe('POST /balance-movements/:movementId/edit — Fix Pending', () => {
     const app = createApp(createDb(':memory:'));
     const issue = await issueSightLc(app, 'FIXP-HTTP-004');
 
-    await request(app).post(`/balance-movements/${issue.movementId}/edit`).send({ editedBy: 'maker2' }).expect(400);
-    await request(app).post(`/balance-movements/${issue.movementId}/edit`).send({ amount: '130000' }).expect(400);
+    const missingAmount = await request(app).post(`/balance-movements/${issue.movementId}/edit`).send({ editedBy: 'maker2' }).expect(400);
+    const missingEditedBy = await request(app).post(`/balance-movements/${issue.movementId}/edit`).send({ amount: '130000' }).expect(400);
+    expect([missingAmount.status, missingEditedBy.status]).toEqual([400, 400]);
   });
 
   test('REMARKS_ONLY requires a non-blank Remark and persists a trimmed value', async () => {

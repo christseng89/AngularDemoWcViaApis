@@ -33,6 +33,8 @@ import {
 import { AccountEntriesDialogComponent } from './account-entries-dialog.component';
 import { CheckerPanelComponent, CheckerSyncSignal } from './checker-panel.component';
 import { MakerCheckerContext, MakerPanelComponent, MakerSyncRequest } from './maker-panel.component';
+
+type AccountEntryDialogPhase = 'primary' | 'create' | 'finalize' | null;
 import { deriveFunctionStrategy } from './function-strategy';
 import { FeedbackMessageComponent } from '../shared/feedback/feedback-message.component';
 import { UiMessage } from '../shared/feedback/ui-message.model';
@@ -81,7 +83,7 @@ export class TransactionBuilderComponent {
    * `alsoSyncLookup` signal that already means "a genuine Submit/Fix Pending Save/Release/Reject just
    * succeeded", not on a mere selection pick.
    */
-  @ViewChild('checkerPanelEl') private checkerPanelEl?: ElementRef<HTMLElement>;
+  @ViewChild('checkerPanelEl') private readonly checkerPanelEl?: ElementRef<HTMLElement>;
 
   activeFunctionSide: 'IMPORT' | 'EXPORT' = 'IMPORT';
   activeMode: 'PROCESSING' | 'INQUIRE' | 'MAKER_QUEUE' | 'DELETE_PENDING_AUDIT' = 'PROCESSING';
@@ -258,7 +260,7 @@ export class TransactionBuilderComponent {
 
   accountEntryDialogMovement: BalanceMovement | null = null;
   accountEntryDialogInstrumentType: InstrumentType | null = null;
-  accountEntryDialogPhase: 'primary' | 'create' | 'finalize' | null = null;
+  accountEntryDialogPhase: AccountEntryDialogPhase = null;
   /** See `InquiredEvent.linkedMovement`'s own doc comment — A6's own cascade-linked second Account Entries set, only ever non-null via `onInquireOpenAccountEntries()`. */
   accountEntryDialogLinkedMovement: BalanceMovement | null = null;
 
@@ -533,7 +535,7 @@ export class TransactionBuilderComponent {
    * `e.movement` is the raw `createMovement()` response, never a merged `InquiredEvent`. Delegates to the
    * same shared `openAccountEntryDialogWithLinkedResolution()`.
    */
-  onMakerOpenAccountEntries(e: { movement: BalanceMovement; instrumentType: InstrumentType | null; phase?: 'primary' | 'create' | 'finalize' | null }): void {
+  onMakerOpenAccountEntries(e: { movement: BalanceMovement; instrumentType: InstrumentType | null; phase?: AccountEntryDialogPhase }): void {
     this.openAccountEntryDialogWithLinkedResolution(e.movement, e.instrumentType, e.phase ?? undefined);
   }
 
@@ -548,7 +550,7 @@ export class TransactionBuilderComponent {
 
   displayStatus(
     status: string,
-    instrumentType?: InstrumentType | string | null,
+    instrumentType?: string | null,
     movementType?: string | null,
     phase?: 'primary' | 'create' | 'finalize' | null,
     acknowledgedAt?: string | null,
@@ -558,7 +560,7 @@ export class TransactionBuilderComponent {
 
   statusBadgeClass(
     status: string,
-    instrumentType?: InstrumentType | string | null,
+    instrumentType?: string | null,
     movementType?: string | null,
     phase?: 'primary' | 'create' | 'finalize' | null,
     acknowledgedAt?: string | null,
@@ -583,7 +585,7 @@ export class TransactionBuilderComponent {
 
   /** Thin delegation, same convention as `displayStatus()`/`statusBadgeClass()`. */
   displayMovementType(
-    instrumentType: InstrumentType | string | null | undefined,
+    instrumentType: string | null | undefined,
     movementType: string | null | undefined,
     amount: string | number | null | undefined,
   ): string {
@@ -591,7 +593,7 @@ export class TransactionBuilderComponent {
   }
 
   displayMovementAmount(
-    instrumentType: InstrumentType | string | null | undefined,
+    instrumentType: string | null | undefined,
     movementType: string | null | undefined,
     amount: string | null | undefined,
   ): string {
@@ -953,12 +955,12 @@ export class TransactionBuilderComponent {
     this.checkerBusy = true;
     this.clearCheckerFailure();
     const waiver = this.applicantWaiverPayload();
-    const obs =
-      action === 'release'
-        ? waiver
-          ? this.api.release(movementId, this.checkerId, waiver)
-          : this.api.release(movementId, this.checkerId)
-        : this.api.reject(movementId, this.checkerId, 'MANUAL_QUEUE_REJECT');
+    let obs;
+    if (action === 'release') {
+      obs = waiver ? this.api.release(movementId, this.checkerId, waiver) : this.api.release(movementId, this.checkerId);
+    } else {
+      obs = this.api.reject(movementId, this.checkerId, 'MANUAL_QUEUE_REJECT');
+    }
     obs.subscribe({
       next: (result) => {
         this.checkerBusy = false;

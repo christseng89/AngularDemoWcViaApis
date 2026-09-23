@@ -20,6 +20,16 @@ import { BuilderModel } from './function-policy';
 import { describeApiError, notFoundMessage } from './api-error';
 import { PagedListState } from './paged-list-state';
 
+function latestTimestamp(left: string | null, right: string | null): string | null {
+  if (!left || !right) return left ?? right;
+  return new Date(left).getTime() >= new Date(right).getTime() ? left : right;
+}
+
+function eventBalanceTabKey(isSgEvent: boolean, isAcceptanceEvent: boolean): EventBalanceTab['key'] {
+  if (isSgEvent) return 'SG';
+  return isAcceptanceEvent ? 'ACCEPTANCE' : 'LC';
+}
+
 /**
  * Adapter: pairs a raw BalanceMovement with its owning BalanceContract, since a movement alone carries
  * neither instrumentType nor naturalKey.
@@ -57,6 +67,8 @@ export interface InquiredEvent {
    */
   functionOverride?: TransactionFunction;
 }
+
+type EventBalanceTabKey = 'LC' | 'ACCEPTANCE' | 'SG';
 
 /**
  * Splits one BalanceMovement into one or two rows. Exactly two only for a finalized (`status !==
@@ -336,7 +348,7 @@ export function movementsOf$(api: BalanceComponentApiService, contract: BalanceC
  * contracts the Confirmed LC's own timeline would otherwise miss.
  */
 export function childMovementsOf$(api: BalanceComponentApiService, instrumentType: InstrumentType, lcNumber: string): Observable<InquiredEvent[]> {
-  return api.catalog(instrumentType, undefined, undefined, 1, 50, lcNumber).pipe(
+  return api.catalog(instrumentType, { page: 1, pageSize: 50, lcNumber }).pipe(
     switchMap((page) => (page.items.length ? forkJoin(page.items.map((c) => movementsOf$(api, c))) : of([] as InquiredEvent[][]))),
     map((groups) => groups.flat()),
     catchError(() => of([] as InquiredEvent[])),
@@ -468,12 +480,7 @@ export function computeLcIndexRow(
             rootMovements[0]!.cancelledAt ?? rootMovements[0]!.releasedAt ?? rootMovements[0]!.createdAt,
           )
         : null;
-      const lastEventAt =
-        displayLastEventAt && rawLastEventAt
-          ? new Date(displayLastEventAt).getTime() >= new Date(rawLastEventAt).getTime()
-            ? displayLastEventAt
-            : rawLastEventAt
-          : (displayLastEventAt ?? rawLastEventAt);
+      const lastEventAt = latestTimestamp(displayLastEventAt, rawLastEventAt);
       // A10/B6 Close is always a ROOT-level movement (see closeEligibility.ts — only IPLC_LC/EPLC_LC/
       // EPLC_CONFIRMATION are eligible) — checking `root` alone, not `allEvents`, is correct and cheaper.
       const closingPending = root.some((e) => e.movement.movementType === 'CLOSE' && e.eventStatus === 'PENDING');
@@ -494,7 +501,7 @@ export function computeLcIndexRow(
 
 /** One Balance Tab (LC/Confirmed LC, Acceptance, or Shipping Guarantee) — see InquireEventsService's own doc comment. */
 export interface EventBalanceTab {
-  key: 'LC' | 'ACCEPTANCE' | 'SG';
+  key: EventBalanceTabKey;
   /** Static per-side tab-strip label, e.g. "LC Balance" — never includes the LC Number. */
   label: string;
   /** "{label} — LC {lc}[/ SG {sg}]". */
@@ -502,6 +509,77 @@ export interface EventBalanceTab {
   snapshot: BalanceSnapshot | null;
   /** movement.balanceBefore/balanceAfter — set only when `snapshot` is the event's own ledger, never a redirected parent (see selectEvent()). */
   impact: { before: string | null | undefined; after: string | null | undefined } | null;
+}
+
+interface EventTabContext {
+  event: InquiredEvent;
+  rootContract: BalanceContract | null;
+  lcNumber: string;
+  side: 'IMPORT' | 'EXPORT';
+  includeAcceptance: boolean;
+  includeSg: boolean;
+}
+
+interface EventTabFacts {
+  movement: BalanceMovement;
+  contract: BalanceContract;
+  isRootEvent: boolean;
+  isAcceptanceEvent: boolean;
+  isSgEvent: boolean;
+  ownImpact: EventBalanceTab['impact'];
+  ownSnapshot: BalanceSnapshot | null;
+  siblingAcceptanceSnapshot: BalanceSnapshot | null;
+  siblingSgSnapshot: BalanceSnapshot | null;
+}
+
+function eventTabFacts(ctx: EventTabContext): EventTabFacts {
+  const { movement, contract } = ctx.event;
+  const finalizing = ctx.event.phase === 'finalize';
+  return {
+    movement,
+    contract,
+    isRootEvent: contract.instrumentType === ctx.rootContract?.instrumentType,
+    isAcceptanceEvent: contract.instrumentType === 'IPLC_ACCEPTANCE' || contract.instrumentType === 'EPLC_ACCEPTANCE',
+    isSgEvent: contract.instrumentType === 'SHGT',
+    ownImpact: { before: movement.balanceBefore, after: movement.balanceAfter },
+    ownSnapshot: finalizing ? (movement.finalizeEventSnapshot ?? movement.eventSnapshot ?? null) : (movement.eventSnapshot ?? null),
+    siblingAcceptanceSnapshot: finalizing
+      ? (movement.finalizeAcceptanceEventSnapshot ?? movement.acceptanceEventSnapshot ?? null)
+      : (movement.acceptanceEventSnapshot ?? null),
+    siblingSgSnapshot: finalizing ? (movement.finalizeSgEventSnapshot ?? movement.sgEventSnapshot ?? null) : (movement.sgEventSnapshot ?? null),
+  };
+}
+
+function acceptanceTab(ctx: EventTabContext, facts: EventTabFacts): EventBalanceTab {
+  const label = ctx.side === 'IMPORT' ? 'Acceptance Balance' : 'Confirmed LC Acceptance Balance';
+  const suffix = facts.isAcceptanceEvent && facts.contract.naturalKey.ibNumber ? ` / IB ${facts.contract.naturalKey.ibNumber}` : '';
+  return {
+    key: 'ACCEPTANCE', label, title: `${label} — LC ${ctx.lcNumber}${suffix}`,
+    snapshot: facts.isAcceptanceEvent ? facts.ownSnapshot : facts.siblingAcceptanceSnapshot,
+    impact: facts.isAcceptanceEvent ? facts.ownImpact : null,
+  };
+}
+
+function shippingGuaranteeTab(ctx: EventTabContext, facts: EventTabFacts): EventBalanceTab {
+  const suffix = facts.isSgEvent && facts.contract.naturalKey.sgNumber ? ` / SG ${facts.contract.naturalKey.sgNumber}` : '';
+  return {
+    key: 'SG', label: 'Shipping Guarantee Balance', title: `Shipping Guarantee Balance — LC ${ctx.lcNumber}${suffix}`,
+    snapshot: facts.isSgEvent ? facts.ownSnapshot : facts.siblingSgSnapshot,
+    impact: facts.isSgEvent ? facts.ownImpact : null,
+  };
+}
+
+function buildEventTabs(ctx: EventTabContext): { tabs: EventBalanceTab[]; ownTabKey: EventBalanceTabKey; ownSnapshot: BalanceSnapshot | null } {
+  const facts = eventTabFacts(ctx);
+  const rootLabel = ctx.rootContract ? (BALANCE_SNAPSHOT_LABEL[ctx.rootContract.instrumentType] ?? ctx.rootContract.instrumentType) : 'Balance';
+  const tabs: EventBalanceTab[] = [{
+    key: 'LC', label: rootLabel, title: `${rootLabel} — LC ${ctx.lcNumber}`,
+    snapshot: facts.isRootEvent ? facts.ownSnapshot : (facts.movement.rootEventSnapshot ?? null),
+    impact: facts.isRootEvent ? facts.ownImpact : null,
+  }];
+  if (ctx.includeAcceptance) tabs.push(acceptanceTab(ctx, facts));
+  if (ctx.includeSg) tabs.push(shippingGuaranteeTab(ctx, facts));
+  return { tabs, ownTabKey: eventBalanceTabKey(facts.isSgEvent, facts.isAcceptanceEvent), ownSnapshot: facts.ownSnapshot };
 }
 
 /**
@@ -572,7 +650,7 @@ export class InquireEventsService {
   indexLoading = false;
   indexError: string | null = null;
   /** Raw transport error for semantic feedback; `indexError` remains the stable display string. */
-  indexErrorCause: unknown | null = null;
+  indexErrorCause: unknown = null;
 
   /** Side-aware entity label for the Index's own heading/hint text. */
   get indexEntityLabel(): string {
@@ -608,7 +686,7 @@ export class InquireEventsService {
 
   /** Up to 3 Balance Tabs, in fixed order (LC, then Acceptance if applicable, then SG if applicable) — see this class's own doc comment. */
   selectedEventTabs: EventBalanceTab[] = [];
-  selectedEventTab: 'LC' | 'ACCEPTANCE' | 'SG' = 'LC';
+  selectedEventTab: EventBalanceTabKey = 'LC';
 
   get activeEventTab(): EventBalanceTab | null {
     return this.selectedEventTabs.find((t) => t.key === this.selectedEventTab) ?? null;
@@ -714,17 +792,12 @@ export class InquireEventsService {
     this.indexError = null;
     this.indexErrorCause = null;
     this.api
-      .catalog(
-        defaultLcInstrumentTypeForSide(this.side),
-        undefined,
-        this.indexSearch.trim() || undefined,
+      .catalog(defaultLcInstrumentTypeForSide(this.side), {
+        q: this.indexSearch.trim() || undefined,
         page,
-        this.indexPaging.pageSize,
-        undefined,
-        undefined,
-        undefined,
-        true,
-      )
+        pageSize: this.indexPaging.pageSize,
+        excludeCancelled: true,
+      })
       .subscribe({
         next: (result) => {
           this.indexPaging.total = result.total;
@@ -814,11 +887,10 @@ export class InquireEventsService {
    */
   tightenLcBalanceFor(event: InquiredEvent): string {
     const isRootEvent = event.contract.balanceContractId === this.rootContract?.balanceContractId;
-    const snapshot = isRootEvent
-      ? event.phase === 'finalize'
-        ? (event.movement.finalizeEventSnapshot ?? event.movement.eventSnapshot ?? null)
-        : (event.movement.eventSnapshot ?? null)
-      : (event.movement.rootEventSnapshot ?? null);
+    let snapshot = event.movement.rootEventSnapshot ?? null;
+    if (isRootEvent) {
+      snapshot = event.phase === 'finalize' ? (event.movement.finalizeEventSnapshot ?? event.movement.eventSnapshot ?? null) : (event.movement.eventSnapshot ?? null);
+    }
 
     return snapshot?.tightAvailableBalance ?? '—';
   }
@@ -850,58 +922,19 @@ export class InquireEventsService {
     this.selectedEventFields = toReadOnlyFields(buildFields(ctx));
     this.selectedEventForm = new FormGroup({});
 
-    const isRootEvent = contract.instrumentType === this.rootContract?.instrumentType;
-    const isAcceptanceEvent = contract.instrumentType === 'IPLC_ACCEPTANCE' || contract.instrumentType === 'EPLC_ACCEPTANCE';
-    const isSgEvent = contract.instrumentType === 'SHGT';
-    // Real before/after on both rows — a 'create' row only exists for an already-finalized movement.
-    const ownImpact = { before: movement.balanceBefore, after: movement.balanceAfter };
-    // 'finalize' reads finalizeEventSnapshot (falls back to eventSnapshot pre-migration); 'create'/'primary' read eventSnapshot directly.
-    const ownSnapshot = event.phase === 'finalize' ? (movement.finalizeEventSnapshot ?? movement.eventSnapshot ?? null) : (movement.eventSnapshot ?? null);
-    // Same finalize/create split as ownSnapshot, applied to the SIBLING snapshots.
-    const siblingAcceptanceSnapshot =
-      event.phase === 'finalize'
-        ? (movement.finalizeAcceptanceEventSnapshot ?? movement.acceptanceEventSnapshot ?? null)
-        : (movement.acceptanceEventSnapshot ?? null);
-    const siblingSgSnapshot =
-      event.phase === 'finalize' ? (movement.finalizeSgEventSnapshot ?? movement.sgEventSnapshot ?? null) : (movement.sgEventSnapshot ?? null);
     const lcNumber = this.rootContract?.naturalKey.lcNumber ?? this.lcNumber;
-    const rootLabel = this.rootContract ? (BALANCE_SNAPSHOT_LABEL[this.rootContract.instrumentType] ?? this.rootContract.instrumentType) : 'Balance';
-
-    const tabs: EventBalanceTab[] = [
-      {
-        key: 'LC',
-        label: rootLabel,
-        title: `${rootLabel} — LC ${lcNumber}`,
-        snapshot: isRootEvent ? ownSnapshot : (movement.rootEventSnapshot ?? null),
-        impact: isRootEvent ? ownImpact : null,
-      },
-    ];
-    if (this.selectedEventIsUsanceLc) {
-      const acceptanceLabel = this.side === 'IMPORT' ? 'Acceptance Balance' : 'Confirmed LC Acceptance Balance';
-      const suffix = isAcceptanceEvent && contract.naturalKey.ibNumber ? ` / IB ${contract.naturalKey.ibNumber}` : '';
-      tabs.push({
-        key: 'ACCEPTANCE',
-        label: acceptanceLabel,
-        title: `${acceptanceLabel} — LC ${lcNumber}${suffix}`,
-        snapshot: isAcceptanceEvent ? ownSnapshot : siblingAcceptanceSnapshot,
-        impact: isAcceptanceEvent ? ownImpact : null,
-      });
-    }
-    if (this.selectedEventHasSg) {
-      const suffix = isSgEvent && contract.naturalKey.sgNumber ? ` / SG ${contract.naturalKey.sgNumber}` : '';
-      tabs.push({
-        key: 'SG',
-        label: 'Shipping Guarantee Balance',
-        title: `Shipping Guarantee Balance — LC ${lcNumber}${suffix}`,
-        snapshot: isSgEvent ? ownSnapshot : siblingSgSnapshot,
-        impact: isSgEvent ? ownImpact : null,
-      });
-    }
+    const { tabs, ownTabKey, ownSnapshot } = buildEventTabs({
+      event,
+      rootContract: this.rootContract,
+      lcNumber,
+      side: this.side,
+      includeAcceptance: this.selectedEventIsUsanceLc,
+      includeSg: this.selectedEventHasSg,
+    });
     this.selectedEventTabs = tabs;
-    this.selectedEventTab = isSgEvent ? 'SG' : isAcceptanceEvent ? 'ACCEPTANCE' : 'LC';
+    this.selectedEventTab = ownTabKey;
 
     if (!ownSnapshot) {
-      const ownTabKey: 'LC' | 'ACCEPTANCE' | 'SG' = isSgEvent ? 'SG' : isAcceptanceEvent ? 'ACCEPTANCE' : 'LC';
       this.api.getBalanceAsOfMovement(movement.movementId).subscribe({
         next: (snapshot) => this.applyFallbackSnapshot(event, ownTabKey, snapshot),
         error: () => {},

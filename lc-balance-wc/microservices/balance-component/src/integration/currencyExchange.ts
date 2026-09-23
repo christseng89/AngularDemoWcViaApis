@@ -63,6 +63,8 @@ export type FxDecision = { ok: true; quote: CurrencyExchangeQuote } | { ok: fals
 export type PbdFallbackAuthorizationEvidence =
   Readonly<{ authorized: false }> | Readonly<{ authorized: true; fallbackPolicyId: string; fallbackPolicyVersion: string }>;
 
+const NO_PBD_FALLBACK_AUTHORIZATION: PbdFallbackAuthorizationEvidence = Object.freeze({ authorized: false });
+
 export interface CurrencyExchangeAdapterConfig {
   environment: CurrencyExchangeEnvironment;
   adapter: CurrencyExchangeAdapter;
@@ -219,7 +221,7 @@ export function evaluateCurrencyExchangeQuote(
   quote: CurrencyExchangeQuote,
   maxStalenessSeconds: number,
   environment: CurrencyExchangeEnvironment,
-  pbdAuthorization: PbdFallbackAuthorizationEvidence = { authorized: false },
+  pbdAuthorization: PbdFallbackAuthorizationEvidence = NO_PBD_FALLBACK_AUTHORIZATION,
   expectedRequestAttemptId?: string,
 ): FxDecision {
   if (!validIdentity(request, quote, expectedRequestAttemptId) || quote.approvalStatus !== 'APPROVED' || !hasAllowedOrigin(quote.rateOrigin, environment))

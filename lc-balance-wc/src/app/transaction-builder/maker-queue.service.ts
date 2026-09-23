@@ -67,7 +67,7 @@ export class MakerQueueService {
   loading = false;
   error: string | null = null;
   /** Raw transport error for shared feedback classification; `error` remains the compatible display text. */
-  errorCause: unknown | null = null;
+  errorCause: unknown = null;
   /** Client-side windowing over the CURRENT side's own already-loaded, already-sorted rows (`sideFilteredItems` below) — not a re-fetch per page; `load()` already fetches/groups/sorts everything (both sides) at once. */
   readonly paging = new PagedListState(10);
 
@@ -109,9 +109,9 @@ export class MakerQueueService {
    */
   get emptyStateMessage(): string {
     const query = this.lcNumberSearch.trim();
-    return query
-      ? notFoundMessage(query)
-      : `Nothing PENDING or REJECTED under this Maker on the ${this.side === 'IMPORT' ? 'Import LC' : 'Export Confirmed'} side right now.`;
+    if (query) return notFoundMessage(query);
+    const sideLabel = this.side === 'IMPORT' ? 'Import LC' : 'Export Confirmed';
+    return `Nothing PENDING or REJECTED under this Maker on the ${sideLabel} side right now.`;
   }
 
   /**

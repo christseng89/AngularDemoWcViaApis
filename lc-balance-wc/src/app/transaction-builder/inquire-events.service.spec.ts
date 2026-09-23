@@ -836,9 +836,9 @@ describe('InquireEventsService', () => {
       });
 
       const api = makeApi({
-        catalog: jest.fn((instrumentType: string, _status?: string, _q?: string, _page?: number, _pageSize?: number, lcNumber?: string) => {
+        catalog: jest.fn((instrumentType: string, options?: { lcNumber?: string }) => {
           if (instrumentType === 'IPLC_LC') return of({ items: [s001(), s002()], total: 2, page: 1, pageSize: 10 });
-          if (instrumentType === 'SHGT' && lcNumber === 'S001') return of({ items: [sgUnderS001()], total: 1, page: 1, pageSize: 50 });
+          if (instrumentType === 'SHGT' && options?.lcNumber === 'S001') return of({ items: [sgUnderS001()], total: 1, page: 1, pageSize: 50 });
           return of(emptyCatalog());
         }),
         listMovements: jest.fn((contractId: string) =>
@@ -1198,21 +1198,21 @@ describe('InquireEventsService', () => {
 
       svc.searchIndex();
 
-      expect(catalog).toHaveBeenCalledWith('IPLC_LC', undefined, 'S0', 1, 10, undefined, undefined, undefined, true);
+      expect(catalog).toHaveBeenCalledWith('IPLC_LC', { q: 'S0', page: 1, pageSize: 10, excludeCancelled: true });
     });
 
     it('nextIndexPage()/prevIndexPage() re-fetch the target page (server-paginated, unlike eventsPaging) and are no-ops at the boundaries', () => {
-      const catalog = jest.fn((_instrumentType: string, _status?: string, _q?: string, page = 1) => of({ items: [], total: 25, page, pageSize: 10 }));
+      const catalog = jest.fn((_instrumentType: string, options?: { page?: number }) => of({ items: [], total: 25, page: options?.page ?? 1, pageSize: 10 }));
       const api = makeApi({ catalog });
       const svc = new InquireEventsService(api);
       svc.loadIndex(1);
       catalog.mockClear();
 
       svc.nextIndexPage();
-      expect(catalog).toHaveBeenCalledWith('IPLC_LC', undefined, undefined, 2, 10, undefined, undefined, undefined, true);
+      expect(catalog).toHaveBeenCalledWith('IPLC_LC', { q: undefined, page: 2, pageSize: 10, excludeCancelled: true });
 
       svc.prevIndexPage();
-      expect(catalog).toHaveBeenLastCalledWith('IPLC_LC', undefined, undefined, 1, 10, undefined, undefined, undefined, true);
+      expect(catalog).toHaveBeenLastCalledWith('IPLC_LC', { q: undefined, page: 1, pageSize: 10, excludeCancelled: true });
 
       catalog.mockClear();
       svc.prevIndexPage(); // already on page 1 — no-op, no extra fetch
@@ -1291,7 +1291,7 @@ describe('InquireEventsService', () => {
       svc.selectSide('EXPORT');
       expect(svc.indexView).toBe('INDEX');
       expect(svc.indexSearch).toBe('');
-      expect(catalog).toHaveBeenCalledWith('EPLC_CONFIRMATION', undefined, undefined, 1, 10, undefined, undefined, undefined, true);
+      expect(catalog).toHaveBeenCalledWith('EPLC_CONFIRMATION', { q: undefined, page: 1, pageSize: 10, excludeCancelled: true });
 
       catalog.mockClear();
       svc.indexView = 'EVENTS';
@@ -1300,7 +1300,7 @@ describe('InquireEventsService', () => {
       svc.selectSide('IMPORT');
       expect(svc.indexView).toBe('INDEX');
       expect(svc.indexSearch).toBe('');
-      expect(catalog).toHaveBeenCalledWith('IPLC_LC', undefined, undefined, 1, 10, undefined, undefined, undefined, true);
+      expect(catalog).toHaveBeenCalledWith('IPLC_LC', { q: undefined, page: 1, pageSize: 10, excludeCancelled: true });
     });
 
     it('indexEntityLabel reflects the current side ("Import LC" / "Export Confirmed LC") — drives the Index/heading/hint text', () => {

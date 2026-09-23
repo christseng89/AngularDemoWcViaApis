@@ -113,7 +113,7 @@ export class BalanceAccountMappingStore {
     try {
       for (const item of updates) {
         const current = this.findByKey(item.mappingKey);
-        if (!current || current.version !== item.expectedVersion) {
+        if (current?.version !== item.expectedVersion) {
           this.db.exec('ROLLBACK');
           return null;
         }

@@ -122,7 +122,7 @@ export class DocumentArrivalHintsService {
   }
 
   private loadChildPayables(contract: BalanceContract, childInstrumentType: InstrumentType, wantedMovementType: string): Observable<BalanceMovement[]> {
-    return this.api.catalog(childInstrumentType, 'ACTIVE', undefined, 1, 50, contract.naturalKey.lcNumber).pipe(
+    return this.api.catalog(childInstrumentType, { status: 'ACTIVE', page: 1, pageSize: 50, lcNumber: contract.naturalKey.lcNumber }).pipe(
       switchMap((result) => {
         if (!result.items.length) return of([] as BalanceMovement[]);
         return forkJoin(result.items.map((child) => this.loadPayablesForChild(child, wantedMovementType))).pipe(map((lists) => lists.flat()));
@@ -155,7 +155,7 @@ export class DocumentArrivalHintsService {
     }
     forkJoin(
       list.map((lc) =>
-        this.api.catalog('SHGT', 'ACTIVE', undefined, 1, 50, lc.naturalKey.lcNumber, undefined, true).pipe(
+        this.api.catalog('SHGT', { status: 'ACTIVE', page: 1, pageSize: 50, lcNumber: lc.naturalKey.lcNumber, requireIssueReleased: true }).pipe(
           switchMap((result) => {
             if (!result.items.length) return of([] as { contract: BalanceContract; snapshot: BalanceSnapshot }[]);
             return forkJoin(
@@ -247,7 +247,7 @@ export class DocumentArrivalHintsService {
     }
     forkJoin(
       list.map((c) =>
-        this.api.catalog(childInstrumentType, 'ACTIVE', undefined, 1, 50, c.naturalKey.lcNumber).pipe(
+        this.api.catalog(childInstrumentType, { status: 'ACTIVE', page: 1, pageSize: 50, lcNumber: c.naturalKey.lcNumber }).pipe(
           switchMap((result) => {
             if (!result.items.length) return of(false);
             return forkJoin(result.items.map((child) => this.api.getSnapshot(child.balanceContractId).pipe(catchError(() => of(null))))).pipe(

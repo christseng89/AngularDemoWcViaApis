@@ -23,9 +23,9 @@ describe('IndexPickerComponent', () => {
     expect(component.total).toBe(0);
   });
 
-  it('exposes searchValueChange/search/prevPage/nextPage/pick as EventEmitters', () => {
+  it('exposes searchValueChange/searchRequested/prevPage/nextPage/pick as EventEmitters', () => {
     expect(component.searchValueChange.emit).toBeInstanceOf(Function);
-    expect(component.search.emit).toBeInstanceOf(Function);
+    expect(component.searchRequested.emit).toBeInstanceOf(Function);
     expect(component.prevPage.emit).toBeInstanceOf(Function);
     expect(component.nextPage.emit).toBeInstanceOf(Function);
     expect(component.pick.emit).toBeInstanceOf(Function);
@@ -80,9 +80,13 @@ describe('IndexPickerComponent', () => {
   // "{query} not found", never the caller's generic emptyText (that stays reserved for the
   // genuinely-nothing-to-search-yet case).
   describe('displayedEmptyText', () => {
-    it('falls back to emptyText when no query has been typed', () => {
-      component.searchable = true;
-      component.searchValue = '';
+    it.each([
+      ['no query has been typed', true, ''],
+      ['the picker is not searchable', false, 'AAA'],
+      ['the query is only whitespace', true, '   '],
+    ])('falls back to emptyText when %s', (_case, searchable, searchValue) => {
+      component.searchable = searchable;
+      component.searchValue = searchValue;
       component.emptyText = 'Nothing to pick.';
       expect(component.displayedEmptyText).toBe('Nothing to pick.');
     });
@@ -93,19 +97,6 @@ describe('IndexPickerComponent', () => {
       expect(component.displayedEmptyText).toBe('AAA not found');
     });
 
-    it('falls back to emptyText for a non-searchable picker even if searchValue happens to be set', () => {
-      component.searchable = false;
-      component.searchValue = 'AAA';
-      component.emptyText = 'Nothing to pick.';
-      expect(component.displayedEmptyText).toBe('Nothing to pick.');
-    });
-
-    it('falls back to emptyText when the query is only whitespace', () => {
-      component.searchable = true;
-      component.searchValue = '   ';
-      component.emptyText = 'Nothing to pick.';
-      expect(component.displayedEmptyText).toBe('Nothing to pick.');
-    });
   });
 
   // Stylesheet unification rule (business-directed, "顯示STYLESHEET 應該統一 參考CHECKER")

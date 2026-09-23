@@ -24,6 +24,10 @@ export type InstrumentType =
   | 'EPLC_EXPORT_BILLS_DISCOUNTED'
   | 'EPLC_EXAMINATION';
 
+type OptionalText = string | null | undefined;
+type OptionalAmount = string | number | null | undefined;
+type EventPhase = 'primary' | 'create' | 'finalize' | null;
+
 export const INSTRUMENT_TYPE_OPTIONS: { value: InstrumentType; label: string }[] = [
   { value: 'IPLC_LC', label: 'IPLC_LC — Import LC Balance' },
   { value: 'EPLC_LC', label: 'EPLC_LC — Export LC (reference only, no liability)' },
@@ -178,7 +182,7 @@ export const CURRENCY_OPTIONS: { value: string; label: string }[] = ['USD', 'EUR
  * True if `amount`'s decimal places exceed what `currency` allows (Design doc §6.2). Coerces via
  * `String(amount)` first — Formly's number input delivers a real JS `number` despite the `string` type.
  */
-export function amountExceedsCurrencyDecimals(amount: string | number | null | undefined, currency: string | null | undefined): boolean {
+export function amountExceedsCurrencyDecimals(amount: OptionalAmount, currency: OptionalText): boolean {
   if (amount === null || amount === undefined || amount === '') return false;
   const frac = String(amount).split('.')[1];
   return !!frac && frac.length > decimalPlacesForCurrency(currency);
@@ -625,9 +629,9 @@ export const EXPORT_FUNCTIONS: TransactionFunction[] = [
  * `'finalize'`-phase row is never an earmark function regardless of instrumentType/movementType.
  */
 export function isEarmarkFunction(
-  instrumentType: InstrumentType | string | null | undefined,
-  movementType: string | null | undefined,
-  phase?: 'primary' | 'create' | 'finalize' | null,
+  instrumentType: OptionalText,
+  movementType: OptionalText,
+  phase?: EventPhase,
 ): boolean {
   if (phase === 'finalize') return false;
   return (instrumentType === 'IPLC_LC' && movementType === 'UTILIZE') || (instrumentType === 'EPLC_EXAMINATION' && movementType === 'CREATE');
@@ -644,12 +648,14 @@ function pendingEarmarkStatus(earmark: boolean, acknowledgedAt?: string | null):
   return acknowledgedAt ? 'EARMARKED' : 'EARMARKING';
 }
 
+type TransactionPhase = 'primary' | 'create' | 'finalize' | null;
+
 /** PENDING/RELEASED/etc. display label per `isEarmarkFunction()`'s own mapping above. Shared by TransactionBuilderComponent and AccountEntriesDialogComponent so neither re-derives the rule independently. */
 export function displayStatus(
   status: string,
-  instrumentType?: InstrumentType | string | null,
+  instrumentType?: string | null,
   movementType?: string | null,
-  phase?: 'primary' | 'create' | 'finalize' | null,
+  phase?: TransactionPhase,
   acknowledgedAt?: string | null,
 ): string {
   // 2026-08-22 ("Highlight LC Close Event") — a red badge still reading "APPROVED" for a genuinely closed
@@ -790,9 +796,9 @@ export function isBatchActor(actor: string | null | undefined): boolean {
 /** Status badge CSS class — shares `displayStatus()`'s own mapping. */
 export function statusBadgeClass(
   status: string,
-  instrumentType?: InstrumentType | string | null,
+  instrumentType?: string | null,
   movementType?: string | null,
-  phase?: 'primary' | 'create' | 'finalize' | null,
+  phase?: TransactionPhase,
   acknowledgedAt?: string | null,
 ): string {
   if ((isCloseMovement(movementType) || isExpireMovement(movementType)) && (status === 'PENDING' || status === 'RELEASED')) return 'tb-status-badge--negative';
@@ -839,9 +845,9 @@ export function contractStatusLabel(status: string, closingPending?: boolean): s
 
 /** Display-only pair (with `displayMovementAmount()` below): EPLC_CONFIRMATION's shared `AMEND` movementType, whose direction rides the sign of the wire `amount`, reads like A2's distinct AMEND_INCREASE/AMEND_DECREASE in list views. Never written back to `model`; every other pair passes through unchanged. */
 export function displayMovementType(
-  instrumentType: InstrumentType | string | null | undefined,
-  movementType: string | null | undefined,
-  amount: string | number | null | undefined,
+  instrumentType: OptionalText,
+  movementType: OptionalText,
+  amount: OptionalAmount,
 ): string {
   if (instrumentType === 'EPLC_CONFIRMATION' && movementType === 'AMEND') {
     return Number(amount) < 0 ? 'AMEND_DECREASE' : 'AMEND_INCREASE';
@@ -851,9 +857,9 @@ export function displayMovementType(
 
 /** The magnitude half of `displayMovementType()`'s pair. Also callable on `ceilingAmount` — Tolerance conversion scales but never flips sign, so this de-signs either consistently. */
 export function displayMovementAmount(
-  instrumentType: InstrumentType | string | null | undefined,
-  movementType: string | null | undefined,
-  amount: string | null | undefined,
+  instrumentType: OptionalText,
+  movementType: OptionalText,
+  amount: OptionalText,
 ): string {
   if (instrumentType === 'EPLC_CONFIRMATION' && movementType === 'AMEND' && amount != null) {
     return String(Math.abs(Number(amount)));

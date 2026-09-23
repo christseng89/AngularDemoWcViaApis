@@ -4,10 +4,25 @@ import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import type { InstrumentType } from './balance-component.model';
 
+type ToleranceChangeDirection = 'INCREASE' | 'DECREASE' | null;
+type TransactionTenorType = 'SIGHT' | 'SELLERS_USANCE' | 'BUYERS_USANCE' | null;
+
 export interface NaturalKey {
   lcNumber: string;
   ibNumber?: string | null;
   sgNumber?: string | null;
+}
+
+export interface CatalogOptions {
+  status?: string;
+  q?: string;
+  page?: number;
+  pageSize?: number;
+  lcNumber?: string;
+  tenorFamily?: 'SIGHT' | 'USANCE';
+  requireIssueReleased?: boolean;
+  excludeCancelled?: boolean;
+  statuses?: string[];
 }
 
 export interface CreateMovementRequest {
@@ -20,7 +35,7 @@ export interface CreateMovementRequest {
   currency: string;
   tolerancePct?: string | null;
   toleranceChangePct?: string | null;
-  toleranceChangeDirection?: 'INCREASE' | 'DECREASE' | null;
+  toleranceChangeDirection?: ToleranceChangeDirection;
   parentLogicalContractId?: string | null;
   exposureNature?: 'CONTINGENT' | 'ACTUAL' | 'MEMO';
   /** Carries the Amendment No./Times or the Document Arrival's IB Number, per function (Design doc §3.3 audit reference field). */
@@ -34,7 +49,7 @@ export interface CreateMovementRequest {
    */
   referencedTransactionId?: string | null;
   /** Design doc §7 Tenor Type Routing (v0.7) — only for Acceptance (A6/B4). SELLERS_USANCE/BUYERS_USANCE share identical Balance mechanics; this is audit/reporting only. */
-  tenorType?: 'SIGHT' | 'SELLERS_USANCE' | 'BUYERS_USANCE' | null;
+  tenorType?: TransactionTenorType;
   tenorDays?: number | null;
   /** F1 (external BA review, v1.19.0) — A1/B1 (ISSUE) only, optional. The LC's own UCP 600 Art.6(d) expiry/validity date; the microservice captures mailFloatGraceDays onto the contract server-side from config, never client-supplied. */
   expiryDate?: string | null;
@@ -450,18 +465,11 @@ export class BalanceComponentApiService {
    *   it CANCELLED). `InquireEventsService.loadIndex()` passes `true`; every other caller omits it
    *   (Maker-action pickers already imply this via their own default `status: 'ACTIVE'`).
    */
-  catalog(
-    instrumentType: InstrumentType,
-    status?: string,
-    q?: string,
-    page = 1,
-    pageSize = 10,
-    lcNumber?: string,
-    tenorFamily?: 'SIGHT' | 'USANCE',
-    requireIssueReleased?: boolean,
-    excludeCancelled?: boolean,
-    statuses?: string[],
-  ): Observable<CatalogPage> {
+  catalog(instrumentType: InstrumentType, options: CatalogOptions = {}): Observable<CatalogPage> {
+    const {
+      status, q, page = 1, pageSize = 10, lcNumber, tenorFamily,
+      requireIssueReleased, excludeCancelled, statuses,
+    } = options;
     const params: Record<string, string | number> = { instrumentType, page, pageSize };
     if (status) params['status'] = status;
     if (q) params['q'] = q;

@@ -65,7 +65,7 @@ export class LifecycleSweepService {
   private isRecentlyReopened(contract: BalanceContract, asOf: Date): boolean {
     const sorted = [...this.movements.listByContract(contract.balanceContractId)].sort((left, right) => left.eventSeq - right.eventSeq);
     const latest = sorted[sorted.length - 1];
-    if (!latest || latest.movementType !== 'REOPEN' || latest.status !== 'RELEASED' || !latest.releasedAt) return false;
+    if (latest?.movementType !== 'REOPEN' || latest.status !== 'RELEASED' || !latest.releasedAt) return false;
     return asOf.getTime() - new Date(latest.releasedAt).getTime() < toIntervalMs(EXPIRY_SWEEP_INTERVAL);
   }
 

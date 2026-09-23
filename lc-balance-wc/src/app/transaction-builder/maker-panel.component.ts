@@ -211,7 +211,7 @@ export interface MakerSyncRequest {
   ],
 })
 export class MakerPanelComponent implements OnChanges, OnDestroy {
-  @ViewChild('makerResultHost', { read: ElementRef }) private makerResultHost?: ElementRef<HTMLElement>;
+  @ViewChild('makerResultHost', { read: ElementRef }) private readonly makerResultHost?: ElementRef<HTMLElement>;
   @Input() selectedFunction: TransactionFunction | null = null;
   @Input() activeFunctionSide: 'IMPORT' | 'EXPORT' = 'IMPORT';
   /** Same counter-based reset signal as `CheckerPanelComponent.resetTrigger` — one shared counter, bound to both children, incremented every `selectFunction()` call. */
@@ -729,7 +729,7 @@ export class MakerPanelComponent implements OnChanges, OnDestroy {
   }
 
   /** `displayStatus()` thin delegation — duplicated on this component the same way `AccountEntriesDialogComponent` carries its own copy, since Emulated view encapsulation scopes a template's binding surface to its own component. */
-  displayStatus(status: string, instrumentType?: InstrumentType | string | null, movementType?: string | null, acknowledgedAt?: string | null): string {
+  displayStatus(status: string, instrumentType?: string | null, movementType?: string | null, acknowledgedAt?: string | null): string {
     return displayStatusShared(status, instrumentType, movementType, this.resultPhase, acknowledgedAt);
   }
 
@@ -931,6 +931,11 @@ export class MakerPanelComponent implements OnChanges, OnDestroy {
     else if (this.parentInstrumentType) this.onParentInstrumentTypeChange();
   }
 
+  private catalogStatusFilter(): 'CLOSED' | null | undefined {
+    if (this.selectedFunction?.requiresReopenEligibility) return 'CLOSED';
+    return this.model.movementType === 'AMEND_EXPIRY_DATE' ? null : undefined;
+  }
+
   reloadCatalog(): void {
     this.catalogPicker.load({
       guardFails: !this.model.instrumentType || this.isCreatingMovement,
@@ -939,7 +944,7 @@ export class MakerPanelComponent implements OnChanges, OnDestroy {
       query: this.selectedFunctionStrategy?.checkerRelease.releasesExistingMovementInPlace ? null : undefined,
       // A11/B7 targets CLOSED. AMEND_EXPIRY_DATE deliberately spans ACTIVE (ordinary amendment) and
       // EXPIRED (Expiry Extension); every other flat action keeps the ACTIVE default.
-      status: this.selectedFunction?.requiresReopenEligibility ? 'CLOSED' : this.model.movementType === 'AMEND_EXPIRY_DATE' ? null : undefined,
+      status: this.catalogStatusFilter(),
       statuses: this.model.movementType === 'AMEND_EXPIRY_DATE' ? ['ACTIVE', 'EXPIRED'] : undefined,
       qualifies: () => this.filteredCatalogContracts.length,
       onLoaded: (items) => {
@@ -1852,12 +1857,13 @@ export class MakerPanelComponent implements OnChanges, OnDestroy {
       return false;
     }
     if (this.showExcessPreview && this.excessPreview?.eligible !== true) {
-      this.submitError =
-        this.excessPreview?.businessResultCode === 'EXCESS_LIMIT_EXCEEDED'
-          ? `Total Exceed Amount (${this.excessPreview.totalExcessAmountTransaction}) exceeds Max Exceed Amount (${this.excessPreview.maxExcessAmountTransaction}).`
-          : this.excessPreviewError
-            ? `Excess Preview failed: ${this.excessPreviewError}.`
-            : 'Wait for the Excess Preview to confirm eligibility before submitting.';
+      if (this.excessPreview?.businessResultCode === 'EXCESS_LIMIT_EXCEEDED') {
+        this.submitError = `Total Exceed Amount (${this.excessPreview.totalExcessAmountTransaction}) exceeds Max Exceed Amount (${this.excessPreview.maxExcessAmountTransaction}).`;
+      } else if (this.excessPreviewError) {
+        this.submitError = `Excess Preview failed: ${this.excessPreviewError}.`;
+      } else {
+        this.submitError = 'Wait for the Excess Preview to confirm eligibility before submitting.';
+      }
       this.submitErrorCause = null;
       return false;
     }

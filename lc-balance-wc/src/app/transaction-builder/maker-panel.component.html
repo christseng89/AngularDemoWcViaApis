@@ -97,7 +97,7 @@
           [searchable]="true"
           [(searchValue)]="transactionIndexSearch"
           searchPlaceholder="Search LC Number or {{ selectedFunction?.transactionIndexSecondaryRefLabel }}…"
-          (search)="onTransactionIndexSearch()"
+          (searchRequested)="onTransactionIndexSearch()"
           emptyText="No eligible transaction found."
           [page]="transactionIndexPage"
           [totalPages]="transactionIndexTotalPages"
@@ -149,7 +149,7 @@
                 [searchable]="true"
                 [(searchValue)]="parentPicker.search"
                 searchPlaceholder="Search LC Number…"
-                (search)="onParentSearch()"
+                (searchRequested)="onParentSearch()"
                 emptyText="No eligible parent {{ parentInstrumentType }} contracts (Tenor Type / 0-balance filtered)."
                 [page]="parentPicker.page"
                 [totalPages]="parentPicker.totalPages"
@@ -185,7 +185,7 @@
               [searchable]="true"
               [(searchValue)]="parentPicker.search"
               searchPlaceholder="Search LC Number…"
-              (search)="onParentSearch()"
+              (searchRequested)="onParentSearch()"
               emptyText="No eligible parent {{ parentInstrumentType }} contracts on this page (Tenor Type / 0-balance filtered)."
               [page]="parentPicker.page"
               [totalPages]="parentPicker.totalPages"
@@ -446,7 +446,7 @@
                   [searchable]="true"
                   [(searchValue)]="ibIndexPicker.search"
                   searchPlaceholder="Search LC Number or 2nd Ref…"
-                  (search)="onCombinedIndexSearch()"
+                  (searchRequested)="onCombinedIndexSearch()"
                   emptyText="{{
                     ibIndexPicker.contracts.length
                       ? 'All ' + ibIndexPicker.contracts.length + ' candidate(s) under this LC are 0-balance (already fully settled/redeemed).'
@@ -511,7 +511,7 @@
               [searchable]="true"
               [(searchValue)]="catalogPicker.search"
               searchPlaceholder="Search LC Number or {{ selectedFunction?.transactionIndexSecondaryRefLabel || '2nd Ref' }}…"
-              (search)="onCatalogSearch()"
+              (searchRequested)="onCatalogSearch()"
               emptyText="No eligible pending transaction found."
               [page]="catalogPicker.page"
               [totalPages]="catalogPicker.totalPages"
@@ -543,7 +543,7 @@
               [searchable]="true"
               [(searchValue)]="catalogPicker.search"
               searchPlaceholder="Search LC Number…"
-              (search)="onCatalogSearch()"
+              (searchRequested)="onCatalogSearch()"
               emptyText="{{
                 catalogPicker.contracts.length
                   ? 'All ' + catalogPicker.contracts.length + ' candidate(s) under this filter are 0-balance — nothing left to act on.'
@@ -826,7 +826,7 @@
             <ng-template #excessPreviewPending><span class="tb-protected-natural-key__value">—</span></ng-template>
           </div>
         </ng-container>
-        <div class="tb-hint mt-1" role="status" *ngIf="excessPreviewLoading">Calculating excess eligibility…</div>
+        <output class="tb-hint mt-1" *ngIf="excessPreviewLoading">Calculating excess eligibility…</output>
         <div class="tb-error mt-1" role="alert" *ngIf="excessPreviewError">Excess Preview failed: {{ excessPreviewError }}. Submit is not allowed.</div>
         <div class="tb-hint mt-1" *ngIf="showExcessPreviewDetails && excessPreview?.eligible">Within allowance ({{ excessPreview?.businessResultCode }})</div>
         <div

@@ -127,19 +127,21 @@ function withTenorSuffix(accountName: string, family: AccountFamily, tenorType: 
   return accountName;
 }
 
-function baseDirectionFor(movementType: string, reversedDirection: 1 | -1 | undefined): 1 | -1 | undefined {
+type MovementDirection = 1 | -1;
+
+function baseDirectionFor(movementType: string, reversedDirection: MovementDirection | undefined): MovementDirection | undefined {
   if (movementType !== 'REVERSAL' && movementType !== 'AMEND_EXPIRY_DATE') {
-    return MOVEMENT_DIRECTION[movementType] as 1 | -1 | undefined;
+    return MOVEMENT_DIRECTION[movementType] as MovementDirection | undefined;
   }
   if (reversedDirection === undefined) return undefined;
-  return -reversedDirection as 1 | -1;
+  return -reversedDirection as MovementDirection;
 }
 
 function isZeroValueLifecycleMovement(movementType: string): boolean {
   return movementType === 'CLOSE' || movementType === 'EXPIRE' || movementType === 'REOPEN';
 }
 
-function directionForAmount(baseDirection: 1 | -1, isNegative: boolean): 1 | -1 {
+function directionForAmount(baseDirection: MovementDirection, isNegative: boolean): MovementDirection {
   if (!isNegative) return baseDirection;
   return baseDirection === 1 ? -1 : 1;
 }

@@ -46,7 +46,7 @@ export class IndexPickerComponent {
   @Input() searchable = false;
   @Input() searchValue = '';
   @Output() searchValueChange = new EventEmitter<string>();
-  @Output() search = new EventEmitter<void>();
+  @Output() searchRequested = new EventEmitter<void>();
   @Input() searchPlaceholder = 'Search…';
 
   /** Omit (leave at the default 0) to hide pagination entirely — used by the smaller, unpaginated pickers (A3S's SG Index, Look Up's Acceptance/SG pickers). */

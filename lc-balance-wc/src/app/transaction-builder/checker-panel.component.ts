@@ -250,7 +250,7 @@ export class CheckerPanelComponent implements OnChanges {
     const selectedFunction = this.selectedFunction;
     this.checkerSearching = true;
     this.api
-      .catalog(selectedFunction.instrumentType, 'ACTIVE', undefined, 1, 100, this.checkerLcNumber)
+      .catalog(selectedFunction.instrumentType, { status: 'ACTIVE', page: 1, pageSize: 100, lcNumber: this.checkerLcNumber })
       .pipe(
         switchMap((result) => {
           if (!result.items.length) return of([] as BalanceContract[]);

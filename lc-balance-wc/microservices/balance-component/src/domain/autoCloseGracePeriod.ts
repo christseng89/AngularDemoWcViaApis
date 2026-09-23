@@ -22,7 +22,7 @@
 
 /** Adds `days` BUSINESS days (Mon-Fri) to `date`, skipping Saturday/Sunday. `days` must be >= 0. */
 export function addBusinessDays(date: Date, days: number): Date {
-  const result = new Date(date.getTime());
+  const result = new Date(date);
   let remaining = days;
   while (remaining > 0) {
     result.setUTCDate(result.getUTCDate() + 1);

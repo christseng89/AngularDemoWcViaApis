@@ -183,6 +183,16 @@ function deriveAmountLockFlags(ctx: BuilderFieldsContext, strategy: ReturnType<t
   return { amountFromFullSettle, amountFromSgRedeem, amountCappedAtAcceptance, amountFromClose, amountFromFixed, amountLocked };
 }
 
+function firstMatchingLabel(candidates: ReadonlyArray<readonly [boolean, string]>, fallback: string): string {
+  return candidates.find(([matches]) => matches)?.[1] ?? fallback;
+}
+
+function tenorOptionsFor(model: BuilderModel, selectedFunction: TransactionFunction | null) {
+  if (selectedFunction?.tenorTypeOptions?.length) return selectedFunction.tenorTypeOptions;
+  if (!model.tenorType) return [];
+  return [{ value: model.tenorType, label: tenorTypeLabel(model.tenorType, selectedFunction?.side ?? 'IMPORT') }];
+}
+
 /**
  * Shares the Amount field's own lock derivation with callers that must distinguish a Maker-entered
  * amount from a carried/system-derived amount. Capacity warnings must never describe a carried amount
@@ -228,9 +238,40 @@ function toleranceIsWholeNumber(control: AbstractControl): boolean {
   return value === null || value === undefined || value === '' || /^\d+$/.test(String(value));
 }
 
+function choose<T, U>(condition: boolean, whenTrue: T, whenFalse: U): T | U {
+  return condition ? whenTrue : whenFalse;
+}
+
+function when<T>(condition: boolean, value: T): T | undefined {
+  return condition ? value : undefined;
+}
+
+function tolerancePreviewValue(preview: ReturnType<typeof resultingTolerancePct>): string {
+  return preview.ok ? preview.value : 'Invalid';
+}
+
+function strategyFor(selectedFunction: TransactionFunction | null): ReturnType<typeof deriveFunctionStrategy> | null {
+  return selectedFunction ? deriveFunctionStrategy(selectedFunction) : null;
+}
+
+function currencyLockedFor(ctx: BuilderFieldsContext): boolean {
+  if (!ctx.readOnlyReconstruction) return Boolean(carriedCurrency(ctx.selectedParent, ctx.selectedContract));
+  return ctx.selectedFunction?.code !== 'A1' && ctx.selectedFunction?.code !== 'B1';
+}
+
+function finalizeFields(ctx: BuilderFieldsContext, strategy: ReturnType<typeof deriveFunctionStrategy> | null, fields: FormlyFieldConfig[]): FormlyFieldConfig[] {
+  const applicableFields = strategy?.fixPendingMode === 'REMARKS_ONLY' && ctx.fixPendingMode
+    ? fields
+    : fields.filter((field) => field.key !== 'remarks');
+  for (const field of applicableFields) {
+    if (field.props?.required) field.className = [field.className, 'tb-field--required'].filter(Boolean).join(' ');
+  }
+  return applicableFields;
+}
+
 export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
   const { model, selectedFunction, selectedContractSnapshot } = ctx;
-  const strategy = selectedFunction ? deriveFunctionStrategy(selectedFunction) : null;
+  const strategy = strategyFor(selectedFunction);
   const { amountFromFullSettle, amountFromSgRedeem, amountCappedAtAcceptance, amountFromClose, amountFromFixed, amountLocked } = deriveAmountLockFlags(
     ctx,
     strategy,
@@ -256,9 +297,7 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
   // sites carriedCurrency already fires from — this function just reads it, same as Currency).
   const tenorTypeCarried = !tenorLocked && !selectedFunction?.tenorTypeOptions?.length && !!model.tenorType;
   // A1/B1 = Input; every other function = carry from A1/B1 + protected — see carriedCurrency (function-policy.ts).
-  const currencyLocked = ctx.readOnlyReconstruction
-    ? selectedFunction?.code !== 'A1' && selectedFunction?.code !== 'B1'
-    : !!carriedCurrency(ctx.selectedParent, ctx.selectedContract);
+  const currencyLocked = currencyLockedFor(ctx);
   // A1/B1 only — the only functions where Currency is actually being chosen (currencyLocked is always false for them).
   const currencyIsDropdown = selectedFunction?.code === 'A1' || selectedFunction?.code === 'B1';
   // secondaryRef/currency are unconditionally locked whenever Fix Pending is active, regardless of which
@@ -297,9 +336,9 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
       // during Fix/Delete Pending review" posture A1/B1's own LC Number input already has. Config-driven
       // (`ctx.dynamicSecondaryRefLabel` alone, not per-function), so every Function sharing this field
       // (A2/A3/A3S/B2/B4/etc.) gets it uniformly.
-      className: ctx.dynamicSecondaryRefLabel ? 'tb-natural-key--emphasized' : undefined,
+      className: when(Boolean(ctx.dynamicSecondaryRefLabel), 'tb-natural-key--emphasized'),
       props: {
-        label: fixPendingLocked ? `${ctx.dynamicSecondaryRefLabel ?? 'Reference No.'} (locked — Fix Pending cannot change the 2ndary Key)` : (ctx.dynamicSecondaryRefLabel ?? 'Reference No.'),
+        label: choose(fixPendingLocked, `${ctx.dynamicSecondaryRefLabel ?? 'Reference No.'} (locked — Fix Pending cannot change the 2ndary Key)`, ctx.dynamicSecondaryRefLabel ?? 'Reference No.'),
         required: !!ctx.dynamicSecondaryRefLabel,
         disabled: fixPendingLocked,
       },
@@ -307,34 +346,38 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
     },
     {
       key: 'amount',
-      type: amountLocked || amountFixPendingLocked ? 'protected-monetary' : 'formatted-amount',
+      type: choose(amountLocked || amountFixPendingLocked, 'protected-monetary', 'formatted-amount'),
       props: {
-        label: amountFixPendingLocked
-          ? 'Amount (not editable via Fix Pending for this Function)'
-          : isMonetaryAmendment
-            ? 'Amount (optional — enter Amount, Tolerance, or both)'
-            : amountFieldLabel({ amountFromFullSettle, amountFromSgRedeem, amountCappedAtAcceptance, amountFromClose, amountLocked }, strategy),
+        label: firstMatchingLabel(
+          [
+            [amountFixPendingLocked, 'Amount (not editable via Fix Pending for this Function)'],
+            [isMonetaryAmendment, 'Amount (optional — enter Amount, Tolerance, or both)'],
+          ],
+          amountFieldLabel({ amountFromFullSettle, amountFromSgRedeem, amountCappedAtAcceptance, amountFromClose, amountLocked }, strategy),
+        ),
         required: !isAmendExpiryDate && !amountFromFixed && !isMonetaryAmendment,
         // The shared Amount field shows live thousands separators for plain digits while keeping the
         // FormControl/API value comma-free. Exact h/k/m shorthand remains raw until blur expands it.
-        type: amountEditable ? 'text' : 'number',
-        attributes: amountEditable ? { inputmode: 'decimal', autocomplete: 'off', spellcheck: 'false' } : undefined,
+        type: choose(amountEditable, 'text', 'number'),
+        attributes: when(amountEditable, { inputmode: 'decimal', autocomplete: 'off', spellcheck: 'false' }),
         disabled: amountLocked || amountFixPendingLocked,
-        max: amountCappedAtAcceptance && selectedContractSnapshot ? Number(selectedContractSnapshot.availableBalance) : undefined,
+        max: when(amountCappedAtAcceptance && Boolean(selectedContractSnapshot), Number(selectedContractSnapshot?.availableBalance)),
         // Smallest representable positive value for the typed Currency — refuses 0/negative before the
         // real submit-time backstop (validateSubmit()'s "Amount must be greater than 0.").
-        min: isMonetaryAmendment ? 0 : Math.pow(10, -decimalPlacesForCurrency(model.currency)),
+        min: choose(isMonetaryAmendment, 0, Math.pow(10, -decimalPlacesForCurrency(model.currency))),
         // Keeps the spinner/step granularity in sync with the typed Currency (e.g. JPY -> step 1).
         step: Math.pow(10, -decimalPlacesForCurrency(model.currency)),
       },
-      validators: amountEditable
-        ? {
+      validators: choose(
+        amountEditable,
+        {
             amountShorthand: {
               expression: amountShorthandIsValid,
               message: AMOUNT_SHORTHAND_ERROR,
             },
-          }
-        : undefined,
+        },
+        undefined,
+      ),
       // Hidden outright for A2/B2's third subChoice option (AMEND_EXPIRY_DATE — swapped for newExpiryDate
       // below) and for A11/B7 (amountFromFixed — see that flag's own doc comment above: nothing for a
       // Maker to see or type, the real amount is entirely server-computed at Submit).
@@ -358,7 +401,7 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
       key: 'newExpiryDate',
       type: 'input',
       props: {
-        label: newExpiryDateFixPendingLocked ? 'New Expiry Date (not editable via Fix Pending for this Function)' : 'New Expiry Date',
+        label: choose(newExpiryDateFixPendingLocked, 'New Expiry Date (not editable via Fix Pending for this Function)', 'New Expiry Date'),
         type: 'date',
         required: isAmendExpiryDate,
         disabled: newExpiryDateFixPendingLocked,
@@ -375,7 +418,7 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
       key: 'expiryDate',
       type: 'input',
       props: {
-        label: expiryDateFixPendingLocked ? 'Expiry Date (not editable via Fix Pending for this Function)' : 'Expiry Date (UCP 600 Art.6(d))',
+        label: choose(expiryDateFixPendingLocked, 'Expiry Date (not editable via Fix Pending for this Function)', 'Expiry Date (UCP 600 Art.6(d))'),
         type: 'date',
         required: showsExpiryDateInput,
         disabled: expiryDateFixPendingLocked,
@@ -391,7 +434,7 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
       key: 'reasonCode',
       type: 'input',
       props: {
-        label: reasonCodeFixPendingLocked ? 'Reason Code (not editable via Fix Pending for this Function)' : 'Reason Code',
+        label: choose(reasonCodeFixPendingLocked, 'Reason Code (not editable via Fix Pending for this Function)', 'Reason Code'),
         required: requiresReasonCode,
         disabled: reasonCodeFixPendingLocked,
       },
@@ -413,25 +456,25 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
     {
       key: 'currency',
       // Reuses the same Formly `type: 'select'` pattern the Tenor Type field uses below.
-      type: currencyIsDropdown ? 'select' : 'input',
+      type: choose(currencyIsDropdown, 'select', 'input'),
       props: {
-        label: fixPendingLocked
-          ? 'Currency (locked — Fix Pending can never change Currency, see §15)'
-          : currencyLocked
-            ? 'Currency (carried from the existing record, protected)'
-            : 'Currency',
+        label: firstMatchingLabel(
+          [
+            [fixPendingLocked, 'Currency (locked — Fix Pending can never change Currency, see §15)'],
+            [currencyLocked, 'Currency (carried from the existing record, protected)'],
+          ],
+          'Currency',
+        ),
         required: true,
         disabled: currencyLocked || fixPendingLocked,
-        ...(currencyIsDropdown ? { options: CURRENCY_OPTIONS } : {}),
+        ...choose(currencyIsDropdown, { options: CURRENCY_OPTIONS }, {}),
       },
     },
     {
       key: 'tolerancePct',
       type: 'input',
       props: {
-        label: tolerancePctFixPendingLocked
-          ? 'Tolerance % (not editable via Fix Pending for this Function)'
-          : 'Tolerance % (Maximum Exposure Basis, ISSUE only)',
+        label: choose(tolerancePctFixPendingLocked, 'Tolerance % (not editable via Fix Pending for this Function)', 'Tolerance % (Maximum Exposure Basis, ISSUE only)'),
         type: 'number',
         min: 0,
         step: 1,
@@ -449,18 +492,18 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
       key: 'toleranceChangePct',
       type: 'input',
       props: {
-        label: toleranceDirection === 'DECREASE' ? 'Decrease Tolerance By %' : 'Increase Tolerance By %',
+        label: choose(toleranceDirection === 'DECREASE', 'Decrease Tolerance By %', 'Increase Tolerance By %'),
         type: 'number',
         min: 0,
         step: 1,
-        max: toleranceDirection === 'DECREASE' ? Number(currentTolerance) : undefined,
+        max: when(toleranceDirection === 'DECREASE', Number(currentTolerance)),
         description: `Current Tolerance: ${currentTolerance}% · Resulting Tolerance: ${currentTolerance}% (protected)`,
         disabled: toleranceChangePctFixPendingLocked,
       },
       expressions: {
         'props.description': (field: FormlyFieldConfig) => {
           const preview = resultingTolerancePct(currentTolerance, field.model?.toleranceChangePct || '0', toleranceDirection);
-          return `Current Tolerance: ${currentTolerance}% · Resulting Tolerance: ${preview.ok ? preview.value : 'Invalid'}% (protected)`;
+          return `Current Tolerance: ${currentTolerance}% · Resulting Tolerance: ${tolerancePreviewValue(preview)}% (protected)`;
         },
       },
       validators: {
@@ -483,19 +526,16 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
       // ISO codes already are; a single-option select shows the real formatted label instead.
       type: 'select',
       props: {
-        label: tenorTypeFixPendingLocked
-          ? 'Tenor Type (not editable via Fix Pending for this Function)'
-          : tenorLocked
-            ? 'Tenor Type (carried from the parent LC, protected)'
-            : tenorTypeCarried
-              ? 'Tenor Type (carried from the existing record, protected)'
-              : 'Tenor Type (Design doc §7 Tenor Type Routing)',
+        label: firstMatchingLabel(
+          [
+            [tenorTypeFixPendingLocked, 'Tenor Type (not editable via Fix Pending for this Function)'],
+            [tenorLocked, 'Tenor Type (carried from the parent LC, protected)'],
+            [tenorTypeCarried, 'Tenor Type (carried from the existing record, protected)'],
+          ],
+          'Tenor Type (Design doc §7 Tenor Type Routing)',
+        ),
         required: !!selectedFunction?.tenorTypeOptions?.length,
-        options: selectedFunction?.tenorTypeOptions?.length
-          ? selectedFunction.tenorTypeOptions
-          : model.tenorType
-            ? [{ value: model.tenorType, label: tenorTypeLabel(model.tenorType, selectedFunction?.side ?? 'IMPORT') }]
-            : [],
+        options: tenorOptionsFor(model, selectedFunction),
         disabled: tenorLocked || tenorTypeFixPendingLocked || tenorTypeCarried,
       },
       hide: !selectedFunction?.tenorTypeOptions?.length && !tenorTypeCarried,
@@ -504,11 +544,13 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
       key: 'tenorDays',
       type: 'input',
       props: {
-        label: tenorDaysFixPendingLocked
-          ? 'Tenor Days (not editable via Fix Pending for this Function)'
-          : tenorLocked
-            ? 'Tenor Days (carried from the parent LC, protected)'
-            : 'Tenor Days',
+        label: firstMatchingLabel(
+          [
+            [tenorDaysFixPendingLocked, 'Tenor Days (not editable via Fix Pending for this Function)'],
+            [tenorLocked, 'Tenor Days (carried from the parent LC, protected)'],
+          ],
+          'Tenor Days',
+        ),
         type: 'number',
         disabled: tenorLocked || tenorDaysFixPendingLocked,
       },
@@ -518,18 +560,20 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
       // the existing !tenorLocked guard) when tenorDaysFixPendingLocked — a live `props.disabled`
       // expression re-evaluates every change-detection cycle and would otherwise fight/override the
       // static `disabled: true` set above.
-      ...((selectedFunction?.code === 'A1' || selectedFunction?.code === 'B1') && !tenorLocked && !tenorDaysFixPendingLocked
-        ? {
+      ...choose(
+        (selectedFunction?.code === 'A1' || selectedFunction?.code === 'B1') && !tenorLocked && !tenorDaysFixPendingLocked,
+        {
             expressions: {
               'props.disabled': (f: any) => f.model?.tenorType === 'SIGHT',
               'props.required': (f: any) => !!f.model?.tenorType && f.model.tenorType !== 'SIGHT',
-              'props.min': (f: any) => (f.model?.tenorType && f.model.tenorType !== 'SIGHT' ? 1 : null),
-              'props.label': (f: any) => (f.model?.tenorType === 'SIGHT' ? 'Tenor Days (Sight — always 0, protected)' : 'Tenor Days'),
-              className: (f: any) => (f.model?.tenorType && f.model.tenorType !== 'SIGHT' ? 'tb-field--required' : ''),
-              'model.tenorDays': (f: any) => (f.model?.tenorType === 'SIGHT' ? 0 : f.model?.tenorDays),
+              'props.min': (f: any) => choose(Boolean(f.model?.tenorType && f.model.tenorType !== 'SIGHT'), 1, null),
+              'props.label': (f: any) => choose(f.model?.tenorType === 'SIGHT', 'Tenor Days (Sight — always 0, protected)', 'Tenor Days'),
+              className: (f: any) => choose(Boolean(f.model?.tenorType && f.model.tenorType !== 'SIGHT'), 'tb-field--required', ''),
+              'model.tenorDays': (f: any) => choose(f.model?.tenorType === 'SIGHT', 0, f.model?.tenorDays),
             },
-          }
-        : {}),
+        },
+        {},
+      ),
     },
     // Event Seq and Created By are system-derived and read-only on every screen — already populated
     // onto `model` before buildFields() runs; `disabled: true` only blocks editing, not derivation.
@@ -544,13 +588,7 @@ export function buildFields(ctx: BuilderFieldsContext): FormlyFieldConfig[] {
   // Mandatory-field visual distinction (UI/UX best practice: don't rely on the tiny asterisk
   // alone) — applies uniformly to every function (A1-A9/B1-B5) since it reads props.required
   // rather than hardcoding field keys. See .tb-field--required in the stylesheet.
-  const applicableFields = strategy?.fixPendingMode === 'REMARKS_ONLY' && ctx.fixPendingMode
-    ? fields
-    : fields.filter((field) => field.key !== 'remarks');
-  for (const f of applicableFields) {
-    if (f.props?.required) f.className = [f.className, 'tb-field--required'].filter(Boolean).join(' ');
-  }
-  return applicableFields;
+  return finalizeFields(ctx, strategy, fields);
 }
 
 /**

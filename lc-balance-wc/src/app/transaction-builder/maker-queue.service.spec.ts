@@ -486,15 +486,14 @@ describe('MakerQueueService', () => {
   });
 
   describe('fixPendingSupported (2026-08-28, "Maker Queue Need to provide Fix Pending button as well")', () => {
-    it('is true for a plain A1 ISSUE row (fixPendingEnabled, non-compound)', () => {
+    it.each([
+      ['ISSUE', 'IPLC_LC'],
+      ['UTILIZE', 'IPLC_LC'],
+      ['AMEND_INCREASE', 'IPLC_LC'],
+      ['CREATE', 'IPLC_ACCEPTANCE'],
+    ] as const)('is true for a plain %s/%s row', (movementType, instrumentType) => {
       const svc = new MakerQueueService(makeApi());
-      const row = { movement: makeMovement({ movementType: 'ISSUE', businessEventId: null }), contract: makeContract({ instrumentType: 'IPLC_LC' }) };
-      expect(svc.fixPendingSupported(row)).toBe(true);
-    });
-
-    it('is true for a plain A3 UTILIZE row (fixPendingEnabled, non-compound, not yet makerSubmittedAt)', () => {
-      const svc = new MakerQueueService(makeApi());
-      const row = { movement: makeMovement({ movementType: 'UTILIZE', businessEventId: null, makerSubmittedAt: null }), contract: makeContract({ instrumentType: 'IPLC_LC' }) };
+      const row = { movement: makeMovement({ movementType, businessEventId: null, makerSubmittedAt: null }), contract: makeContract({ instrumentType }) };
       expect(svc.fixPendingSupported(row)).toBe(true);
     });
 
@@ -538,18 +537,6 @@ describe('MakerQueueService', () => {
 
     // A2 was widened INTO the trial scope 2026-08-28 ("把這A1 A3 修改要求放置B1 A2試試看") — see the
     // now-true case just above this describe block's own A1/A3 tests. A6 remains outside it.
-    it('is true for A2 AMEND_INCREASE (widened trial scope, 2026-08-28)', () => {
-      const svc = new MakerQueueService(makeApi());
-      const row = { movement: makeMovement({ movementType: 'AMEND_INCREASE', businessEventId: null }), contract: makeContract({ instrumentType: 'IPLC_LC' }) };
-      expect(svc.fixPendingSupported(row)).toBe(true);
-    });
-
-    it('is true for A6 CREATE in Remarks-only mode', () => {
-      const svc = new MakerQueueService(makeApi());
-      const row = { movement: makeMovement({ movementType: 'CREATE', businessEventId: null }), contract: makeContract({ instrumentType: 'IPLC_ACCEPTANCE' }) };
-      expect(svc.fixPendingSupported(row)).toBe(true);
-    });
-
     it('is false when functionFor() resolves to nothing at all (an unrecognized movementType)', () => {
       const svc = new MakerQueueService(makeApi());
       const row = { movement: makeMovement({ movementType: 'SOME_UNKNOWN_TYPE', businessEventId: null }), contract: makeContract({ instrumentType: 'IPLC_LC' }) };

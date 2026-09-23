@@ -110,7 +110,7 @@ export function planA6LockedAcceptance(input: A6LockedAcceptancePlanInput): A6Lo
   if (!resolved.ok) return resolved;
 
   const requestedAmount = parseAmount(input.requestedLegalAmountOwner);
-  if (!requestedAmount || !requestedAmount.greaterThan(0)) return { ok: false, code: 'INVALID_ACCEPTANCE_AMOUNT' };
+  if (!requestedAmount?.greaterThan(0)) return { ok: false, code: 'INVALID_ACCEPTANCE_AMOUNT' };
   const requestedCurrency = canonicalCurrency(input.requestedCurrency);
   if (!requestedCurrency) return { ok: false, code: 'INVALID_ACCEPTANCE_CURRENCY' };
   if (requestedCurrency !== resolved.attribution.ownerCurrency) return { ok: false, code: 'ACCEPTANCE_CURRENCY_MISMATCH' };
@@ -134,7 +134,7 @@ export function planA7LegalSettlement(input: A7LegalSettlementPlanInput): A7Lega
   const legalOutstanding = parseAmount(input.legalOutstandingOwner);
   if (!legalOutstanding || legalOutstanding.isNegative()) return { ok: false, code: 'INVALID_LEGAL_OUTSTANDING' };
   const settlement = parseAmount(input.settlementAmountOwner);
-  if (!settlement || !settlement.greaterThan(0)) return { ok: false, code: 'INVALID_SETTLEMENT_AMOUNT' };
+  if (!settlement?.greaterThan(0)) return { ok: false, code: 'INVALID_SETTLEMENT_AMOUNT' };
   if (settlement.greaterThan(legalOutstanding)) return { ok: false, code: 'SETTLEMENT_EXCEEDS_LEGAL_OUTSTANDING' };
   const approvedExcess = parseAmount(input.approvedExcessOwner);
   if (!approvedExcess || approvedExcess.isNegative()) return { ok: false, code: 'INVALID_APPROVED_EXCESS' };

@@ -35,7 +35,7 @@ export class LcCatalogIndexService<TRow = BalanceContract> {
     /** Passed through to the default `fetchPage`'s own `excludeCancelled` — see `catalog()`'s doc comment. Ignored entirely when `fetchPage` is overridden. Default false: most catalog browsers (this class's original use case) want every status. */
     excludeCancelled = false,
     private readonly fetchPage: (side: 'IMPORT' | 'EXPORT', search: string | undefined, page: number, pageSize: number) => Observable<CatalogPage> = (side, search, page, pageSize) =>
-      api.catalog(defaultLcInstrumentTypeForSide(side), undefined, search, page, pageSize, undefined, undefined, undefined, excludeCancelled),
+      api.catalog(defaultLcInstrumentTypeForSide(side), { q: search, page, pageSize, excludeCancelled }),
   ) {}
 
   side: 'IMPORT' | 'EXPORT' = 'IMPORT';
@@ -44,7 +44,7 @@ export class LcCatalogIndexService<TRow = BalanceContract> {
   loading = false;
   error: string | null = null;
   /** Raw transport error retained for semantic UI classification; `error` remains the compatible display string. */
-  errorCause: unknown | null = null;
+  errorCause: unknown = null;
   readonly paging = new PagedListState(10);
 
   get entityLabel(): string {

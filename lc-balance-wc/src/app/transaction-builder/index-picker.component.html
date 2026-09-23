@@ -8,9 +8,9 @@
       class="index-picker__search-input"
       [ngModel]="searchValue"
       (ngModelChange)="searchValueChange.emit($event)"
-      (keyup.enter)="search.emit()"
+      (keyup.enter)="searchRequested.emit()"
       [placeholder]="searchPlaceholder" />
-    <button type="button" class="index-picker__search-btn" (click)="search.emit()">Search</button>
+    <button type="button" class="index-picker__search-btn" (click)="searchRequested.emit()">Search</button>
   </div>
 
   <output class="index-picker__loading" *ngIf="loading" aria-live="polite" aria-busy="true">

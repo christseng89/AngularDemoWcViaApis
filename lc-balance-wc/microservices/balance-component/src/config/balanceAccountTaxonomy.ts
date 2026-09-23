@@ -146,7 +146,7 @@ export class BalanceAccountTaxonomy implements BalanceAccountTaxonomyReader {
   private indexMappings(): void {
     for (const mapping of this.config.mappings) {
       const family = this.familiesByKey.get(mapping.familyKey);
-      if (!family || family.instrumentType !== mapping.instrumentType || !family.tenorKeys.includes(mapping.tenorKey)) {
+      if (family?.instrumentType !== mapping.instrumentType || !family.tenorKeys.includes(mapping.tenorKey)) {
         throw new Error(`Invalid family/Tenor route for mapping ${mapping.mappingKey}.`);
       }
       if (mapping.mappingKey !== `${mapping.instrumentType}:${mapping.riskClass}`) {

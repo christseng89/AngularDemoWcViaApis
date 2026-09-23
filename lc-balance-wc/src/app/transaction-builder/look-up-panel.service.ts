@@ -381,7 +381,7 @@ export class LookUpPanelService {
     setCandidates: (items: BalanceContract[]) => void,
     autoSelect: (contractId: string) => void,
   ): void {
-    this.api.catalog(instrumentType, undefined, undefined, 1, 50, lcNumber, undefined, undefined, true).subscribe({
+    this.api.catalog(instrumentType, { page: 1, pageSize: 50, lcNumber, excludeCancelled: true }).subscribe({
       next: (result) => {
         setCandidates(result.items);
         if (result.items.length === 1) autoSelect(result.items[0].balanceContractId);

@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { TbIconComponent } from '../tb-icon.component';
-import { InstrumentType, displayStatus, statusBadgeClass, statusBadgeIcon } from './balance-component.model';
+import { displayStatus, statusBadgeClass, statusBadgeIcon } from './balance-component.model';
 
 export type TransactionStatusPhase = 'primary' | 'create' | 'finalize' | null;
 
@@ -15,7 +15,7 @@ export type TransactionStatusPhase = 'primary' | 'create' | 'finalize' | null;
 })
 export class TransactionStatusBadgeComponent {
   @Input({ required: true }) status = '';
-  @Input() instrumentType: InstrumentType | string | null = null;
+  @Input() instrumentType: string | null = null;
   @Input() movementType: string | null = null;
   @Input() phase: TransactionStatusPhase = null;
   @Input() acknowledgedAt: string | null | undefined = null;

@@ -309,18 +309,27 @@ function deriveGlPart(mappings: readonly BalanceAccountMappingDto[], side: Accou
 }
 
 function removeTenor(value: string, tenorKey: string, tenorLabel: string): string {
-  return [tenorLabel, tenorKey]
-    .reduce((current, token) => current.replace(new RegExp(`\\s*[—-]?\\s*${escapeRegExp(token)}\\s*[—-]?\\s*`, 'i'), ' — '), value)
-    .replace(/^\s*—\s*|\s*—\s*$/g, '')
-    .trim();
+  const withoutTenor = [tenorLabel, tenorKey].reduce((current, token) => removeAccountToken(current, token), value);
+  return trimAccountBoundary(withoutTenor);
+}
+
+function removeAccountToken(value: string, token: string): string {
+  const index = value.toLocaleLowerCase().indexOf(token.toLocaleLowerCase());
+  if (index < 0) return value;
+  const left = trimAccountBoundary(value.slice(0, index));
+  const right = trimAccountBoundary(value.slice(index + token.length));
+  return joinAccountParts(left, right);
+}
+
+function trimAccountBoundary(value: string): string {
+  let result = value.trim();
+  while (result.startsWith('—') || result.startsWith('-')) result = result.slice(1).trimStart();
+  while (result.endsWith('—') || result.endsWith('-')) result = result.slice(0, -1).trimEnd();
+  return result;
 }
 
 function joinAccountParts(gl: string, sl: string): string {
   return [gl.trim(), sl.trim()].filter(Boolean).join(ACCOUNT_PART_SEPARATOR);
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function defaultSlPart(mapping: BalanceAccountMappingDto, field: AccountField): string {

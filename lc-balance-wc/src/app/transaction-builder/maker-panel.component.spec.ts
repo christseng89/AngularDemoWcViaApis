@@ -456,7 +456,7 @@ describe('MakerPanelComponent', () => {
 
       expect(comp.parentInstrumentType).toBe('IPLC_LC');
       // afterResolved() -> onParentInstrumentTypeChange() -> loadParentPage(1) -> api.catalog
-      expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', undefined, 1, comp.parentPageSize, undefined, 'USANCE', true);
+      expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', { status: 'ACTIVE', q: undefined, page: 1, pageSize: comp.parentPageSize, lcNumber: undefined, tenorFamily: 'USANCE', requireIssueReleased: true });
     });
 
     it('leaves parentInstrumentType empty when the function has no defaultParentInstrumentType (A1)', () => {
@@ -575,7 +575,7 @@ describe('MakerPanelComponent', () => {
       // afterResolved -> rebuildFields (fields populated) and, since AMEND_INCREASE is not a creating
       // movementType and IPLC_LC needs no two-field search, reloadCatalog() fires.
       expect(comp.fields.length).toBeGreaterThan(0);
-      expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', undefined, 1, comp.catalogPageSize, undefined, undefined, true);
+      expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', { status: 'ACTIVE', q: undefined, page: 1, pageSize: comp.catalogPageSize, lcNumber: undefined, tenorFamily: undefined, requireIssueReleased: true });
     });
 
     it('resolves a different sub-choice value to a different movementType (AMEND_DECREASE)', () => {
@@ -672,7 +672,7 @@ describe('MakerPanelComponent', () => {
 
       comp.reloadCatalog();
 
-      expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', undefined, 1, comp.catalogPageSize, undefined, 'SIGHT', true);
+      expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', { status: 'ACTIVE', q: undefined, page: 1, pageSize: comp.catalogPageSize, lcNumber: undefined, tenorFamily: 'SIGHT', requireIssueReleased: true });
       expect(comp.catalogPicker.contracts).toEqual([c1, c2]);
       expect(comp.catalogPicker.total).toBe(2);
       expect(comp.catalogPicker.page).toBe(1);
@@ -689,7 +689,7 @@ describe('MakerPanelComponent', () => {
 
       comp.reloadCatalog();
 
-      expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', 'S001', 1, comp.catalogPageSize, undefined, undefined, true);
+      expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', { status: 'ACTIVE', q: 'S001', page: 1, pageSize: comp.catalogPageSize, lcNumber: undefined, tenorFamily: undefined, requireIssueReleased: true });
     });
 
     it('loads payable IB hints (catalogPayableIbs/catalogPayableMovements) when the function has payExistingUtilize', () => {
@@ -1112,7 +1112,7 @@ describe('MakerPanelComponent', () => {
       comp.onCatalogSearch();
 
       expect(comp.catalogPicker.page).toBe(1);
-      expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', 'U003', 1, comp.catalogPageSize, undefined, undefined, true);
+      expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', { status: 'ACTIVE', q: 'U003', page: 1, pageSize: comp.catalogPageSize, lcNumber: undefined, tenorFamily: undefined, requireIssueReleased: true });
     });
 
     it('A4 filters the combined LC Number + IB Number index locally and does not refetch a partial server page', () => {
@@ -1339,7 +1339,7 @@ describe('MakerPanelComponent', () => {
       expect(comp.selectedParent).toBeNull();
       expect(comp.exposureNature).toBe('ACTUAL');
       expect(comp.parentPicker.page).toBe(1);
-      expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', undefined, 1, comp.parentPageSize, undefined, 'USANCE', true);
+      expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', { status: 'ACTIVE', q: undefined, page: 1, pageSize: comp.parentPageSize, lcNumber: undefined, tenorFamily: 'USANCE', requireIssueReleased: true });
       expect(comp.parentPicker.contracts).toEqual([p1]);
       expect(comp.parentPicker.total).toBe(1);
     });
@@ -1381,7 +1381,7 @@ describe('MakerPanelComponent', () => {
       comp.onParentSearch();
 
       expect(comp.parentPicker.page).toBe(1);
-      expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', 'U002', 1, comp.parentPageSize, undefined, undefined, true);
+      expect(mockApi.catalog).toHaveBeenCalledWith('IPLC_LC', { status: 'ACTIVE', q: 'U002', page: 1, pageSize: comp.parentPageSize, lcNumber: undefined, tenorFamily: undefined, requireIssueReleased: true });
     });
   });
 
@@ -1785,7 +1785,7 @@ describe('MakerPanelComponent', () => {
       // Deliberately NOT passed here, unlike every other action-picker call site: B3's CREATE stays
       // PENDING until B4's compound Release finalizes it, so filtering by "already Released" would
       // exclude every real candidate B4 needs to find.
-      expect(api.catalog).toHaveBeenCalledWith('EPLC_EXAMINATION', 'ACTIVE', undefined, 1, 50, 'EXP1');
+      expect(api.catalog).toHaveBeenCalledWith('EPLC_EXAMINATION', { status: 'ACTIVE', page: 1, pageSize: 50, lcNumber: 'EXP1' });
     });
 
     it('B4: derives ACCEPT for a Usance Confirmation, and excludes a still-PENDING (not yet genuinely Released) B3 record (payableMovementRequiresRelease)', () => {
@@ -1875,7 +1875,7 @@ describe('MakerPanelComponent', () => {
       expect(comp.pickerSelection.arrivalSgSnapshots.get('SG1')?.availableBalance).toBe('3000');
       expect(comp.arrivalSgIndexAmount(sgContract)).toBe('3,000.00 USD');
       // An SG whose own A8 Issue isn't Released yet shouldn't be offered as a redemption target.
-      expect(api.catalog).toHaveBeenCalledWith('SHGT', 'ACTIVE', undefined, 1, 50, 'LC1', undefined, true);
+      expect(api.catalog).toHaveBeenCalledWith('SHGT', { status: 'ACTIVE', page: 1, pageSize: 50, lcNumber: 'LC1', requireIssueReleased: true });
     });
   });
 
@@ -2542,7 +2542,7 @@ describe('MakerPanelComponent', () => {
         { balanceContractId: 'ACC1', instrumentType: 'EPLC_ACCEPTANCE', ibNumber: 'EB01', availableBalance: '4000', currency: 'USD' },
       ]);
       // An Acceptance whose own CREATE isn't Released yet shouldn't be offered as a settlement target.
-      expect(api.catalog).toHaveBeenCalledWith('EPLC_ACCEPTANCE', 'ACTIVE', undefined, 1, 50, 'EXP1', undefined, true);
+      expect(api.catalog).toHaveBeenCalledWith('EPLC_ACCEPTANCE', { status: 'ACTIVE', page: 1, pageSize: 50, lcNumber: 'EXP1', requireIssueReleased: true });
     });
 
     it('B5 (settleableBalanceIndex): a catalog error for the candidate type is swallowed (catchError) and leaves settleableBalances empty', () => {
@@ -2806,7 +2806,7 @@ describe('MakerPanelComponent', () => {
     it('loads all eligible child contracts without requiring a parent-LC pick first', () => {
       const api = makeApi();
       const comp = makeComponentB(getFn('A7'), api, 'FULL_SETTLE');
-      expect(api.catalog).toHaveBeenCalledWith('IPLC_ACCEPTANCE', 'ACTIVE', undefined, 1, comp.ibIndexPageSize, undefined, undefined, true);
+      expect(api.catalog).toHaveBeenCalledWith('IPLC_ACCEPTANCE', { status: 'ACTIVE', q: undefined, page: 1, pageSize: comp.ibIndexPageSize, lcNumber: undefined, tenorFamily: undefined, requireIssueReleased: true });
     });
 
     it('searches LC Number and 2nd Ref in the same index and one pick carries both values', () => {
@@ -4292,7 +4292,7 @@ describe('MakerPanelComponent', () => {
       const c = new MakerPanelComponent(api);
       triggerSelectFunction(c, fn('A11'));
 
-      expect(api.catalog).toHaveBeenCalledWith('IPLC_LC', 'CLOSED', undefined, 1, c.catalogPageSize, undefined, undefined, true);
+      expect(api.catalog).toHaveBeenCalledWith('IPLC_LC', { status: 'CLOSED', q: undefined, page: 1, pageSize: c.catalogPageSize, lcNumber: undefined, tenorFamily: undefined, requireIssueReleased: true });
       expect(api.reopenEligible).toHaveBeenCalledTimes(1);
       expect(api.reopenEligible).toHaveBeenCalledWith('IPLC_LC');
       expect(c.documentArrivalHints.catalogReopenEligible).toEqual(new Set(['c1']));
@@ -4306,10 +4306,10 @@ describe('MakerPanelComponent', () => {
 
       c.onSubChoice();
 
-      expect(api.catalog).toHaveBeenLastCalledWith('IPLC_LC', undefined, undefined, 1, c.catalogPageSize, undefined, undefined, true, undefined, [
-        'ACTIVE',
-        'EXPIRED',
-      ]);
+      expect(api.catalog).toHaveBeenLastCalledWith('IPLC_LC', {
+        q: undefined, page: 1, pageSize: c.catalogPageSize, lcNumber: undefined, tenorFamily: undefined,
+        requireIssueReleased: true, statuses: ['ACTIVE', 'EXPIRED'],
+      });
     });
 
     it('B2 Expiry Date applies the same ACTIVE plus EXPIRED catalog rule to Confirmations', () => {
@@ -4320,10 +4320,10 @@ describe('MakerPanelComponent', () => {
 
       c.onSubChoice();
 
-      expect(api.catalog).toHaveBeenLastCalledWith('EPLC_CONFIRMATION', undefined, undefined, 1, c.catalogPageSize, undefined, undefined, true, undefined, [
-        'ACTIVE',
-        'EXPIRED',
-      ]);
+      expect(api.catalog).toHaveBeenLastCalledWith('EPLC_CONFIRMATION', {
+        q: undefined, page: 1, pageSize: c.catalogPageSize, lcNumber: undefined, tenorFamily: undefined,
+        requireIssueReleased: true, statuses: ['ACTIVE', 'EXPIRED'],
+      });
     });
 
     it("F1: A10 (Close) still queries the default ACTIVE status — the CLOSED override applies only to A11/B7's own requiresReopenEligibility", () => {
@@ -4331,7 +4331,7 @@ describe('MakerPanelComponent', () => {
       const c = new MakerPanelComponent(api);
       triggerSelectFunction(c, fn('A10'));
 
-      expect(api.catalog).toHaveBeenCalledWith('IPLC_LC', 'ACTIVE', undefined, 1, c.catalogPageSize, undefined, undefined, true);
+      expect(api.catalog).toHaveBeenCalledWith('IPLC_LC', { status: 'ACTIVE', q: undefined, page: 1, pageSize: c.catalogPageSize, lcNumber: undefined, tenorFamily: undefined, requireIssueReleased: true });
     });
 
     it("F1: onSelectContract (A11) locks model.amount to the fixed literal '0' immediately, with no snapshot fetch needed — unlike A10's own Confirmed-Balance-derived amount above", () => {
@@ -4634,16 +4634,14 @@ describe('MakerPanelComponent', () => {
   });
 
   describe('isAmendDecreaseDirection (business instruction 2026-08-20, "A2 Decrease 輸入金額控制規則 B2 Decrease... 都適用")', () => {
-    it("is true for A2's own genuine AMEND_DECREASE movementType", () => {
+    it.each([
+      ['AMEND_DECREASE', true],
+      ['AMEND_INCREASE', false],
+      ['UTILIZE', false],
+    ])('returns %s => %s for a direct movement type', (movementType, expected) => {
       const c = new MakerPanelComponent(mockApiD());
-      c.model.movementType = 'AMEND_DECREASE';
-      expect(c.isAmendDecreaseDirection).toBe(true);
-    });
-
-    it("is false for A2's own AMEND_INCREASE", () => {
-      const c = new MakerPanelComponent(mockApiD());
-      c.model.movementType = 'AMEND_INCREASE';
-      expect(c.isAmendDecreaseDirection).toBe(false);
+      c.model.movementType = movementType;
+      expect(c.isAmendDecreaseDirection).toBe(expected);
     });
 
     it("is true for B2's own AMEND with amendDirection DECREASE — model.movementType is always 'AMEND', never a distinct decrease movementType", () => {
@@ -4667,11 +4665,6 @@ describe('MakerPanelComponent', () => {
       expect(c.isAmendDecreaseDirection).toBe(false);
     });
 
-    it('is false for an unrelated movementType (e.g. UTILIZE)', () => {
-      const c = new MakerPanelComponent(mockApiD());
-      c.model.movementType = 'UTILIZE';
-      expect(c.isAmendDecreaseDirection).toBe(false);
-    });
   });
 
   describe('checksAgainstPlainAvailable (bug found live 2026-08-20 — "B3 20000" against an LC already fully earmarked showed no warning at all)', () => {
@@ -4704,30 +4697,21 @@ describe('MakerPanelComponent', () => {
   });
 
   describe('checksAgainstTightAvailable (business instruction 2026-08-20, "B3金額輸入檢查與B2 Decrease相同 <= Tight Available Balance")', () => {
-    it('is true for UTILIZE (A3/A3S)', () => {
+    it.each(['UTILIZE', 'AMEND_DECREASE', 'HONOUR', 'ACCEPT'])('is true for %s', (movementType) => {
       const c = new MakerPanelComponent(mockApiD());
-      c.model.movementType = 'UTILIZE';
+      c.model.movementType = movementType;
       expect(c.checksAgainstTightAvailable).toBe(true);
     });
 
-    it('is true for an AMEND_DECREASE (A2)', () => {
+    it.each([
+      ['CREATE', 'EPLC_CONFIRMATION', true],
+      ['CREATE', 'IPLC_ACCEPTANCE', false],
+      ['PARTIAL_REDEEM', 'SHGT', false],
+    ] as const)('returns %s/%s => %s', (movementType, instrumentType, expected) => {
       const c = new MakerPanelComponent(mockApiD());
-      c.model.movementType = 'AMEND_DECREASE';
-      expect(c.checksAgainstTightAvailable).toBe(true);
-    });
-
-    it('is true for CREATE against an aliased parent EPLC_CONFIRMATION (B3)', () => {
-      const c = new MakerPanelComponent(mockApiD());
-      c.model.movementType = 'CREATE';
-      c.selectedContract = contract({ instrumentType: 'EPLC_CONFIRMATION' });
-      expect(c.checksAgainstTightAvailable).toBe(true);
-    });
-
-    it("is false for CREATE against a non-EPLC_CONFIRMATION contract (e.g. A6's own IPLC_ACCEPTANCE)", () => {
-      const c = new MakerPanelComponent(mockApiD());
-      c.model.movementType = 'CREATE';
-      c.selectedContract = contract({ instrumentType: 'IPLC_ACCEPTANCE' });
-      expect(c.checksAgainstTightAvailable).toBe(false);
+      c.model.movementType = movementType;
+      c.selectedContract = contract({ instrumentType });
+      expect(c.checksAgainstTightAvailable).toBe(expected);
     });
 
     it('is true for ISSUE with hasParent (A8) — false for a root ISSUE with no parent (A1/B1)', () => {
@@ -4740,24 +4724,6 @@ describe('MakerPanelComponent', () => {
       expect(c.checksAgainstTightAvailable).toBe(false);
     });
 
-    it('is true for HONOUR (B4 Sight)', () => {
-      const c = new MakerPanelComponent(mockApiD());
-      c.model.movementType = 'HONOUR';
-      expect(c.checksAgainstTightAvailable).toBe(true);
-    });
-
-    it('is true for ACCEPT (B4 Usance)', () => {
-      const c = new MakerPanelComponent(mockApiD());
-      c.model.movementType = 'ACCEPT';
-      expect(c.checksAgainstTightAvailable).toBe(true);
-    });
-
-    it('is false for an unrelated movementType/instrumentType combination', () => {
-      const c = new MakerPanelComponent(mockApiD());
-      c.model.movementType = 'PARTIAL_REDEEM';
-      c.selectedContract = contract({ instrumentType: 'SHGT' });
-      expect(c.checksAgainstTightAvailable).toBe(false);
-    });
   });
 
   describe('IB Index / context getters', () => {

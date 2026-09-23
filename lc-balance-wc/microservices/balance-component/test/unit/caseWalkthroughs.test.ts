@@ -57,6 +57,7 @@ describe('Case 2 — USD Usance 120 days after sight, no SHGT', () => {
     lc.credit('ISSUE', '100000');
     lc.credit('AMEND_INCREASE', '10000');
     expect(lc.confirmed().toFixed()).toBe('121000');
+    expect(lc.confirmed().toFixed()).toBe('121000');
   });
 
   test('3. Document Arrival 50,000 -> OK, PENDING earmark', () => {
@@ -89,6 +90,7 @@ describe('Case 3 — USD Sight + Shipping Guarantee 50,000 (matches document arr
   test('1-2. Issue + Amendment -> LC Ceiling 121,000', () => {
     lc.credit('ISSUE', '100000');
     lc.credit('AMEND_INCREASE', '10000');
+    expect(lc.confirmed().toFixed()).toBe('121000');
   });
 
   test('3. Shipping Guarantee 50,000 -> SHGT Confirmed 50,000; LC untouched (no linkage, §5/§11)', () => {
@@ -128,6 +130,7 @@ describe('Case 4 — USD Sight + Shipping Guarantee 100,000 (covers full LC) + I
   test('1-2. Issue + Amendment -> LC Ceiling 121,000', () => {
     lc.credit('ISSUE', '100000');
     lc.credit('AMEND_INCREASE', '10000');
+    expect(lc.confirmed().toFixed()).toBe('121000');
   });
 
   test('3. Shipping Guarantee 100,000 -> SHGT Confirmed 100,000', () => {

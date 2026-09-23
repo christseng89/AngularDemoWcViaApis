@@ -128,28 +128,14 @@ export class CatalogPickerService {
     const requireIssueReleased = args.requireIssueReleased ?? true;
     const query = args.query === undefined ? this.search || undefined : (args.query ?? undefined);
     const request = args.statuses?.length
-      ? this.api.catalog(
-          args.instrumentType,
-          undefined,
-          query,
-          1,
-          this.fetchSize,
-          args.lcNumber,
-          args.tenorFamily,
-          requireIssueReleased,
-          undefined,
-          args.statuses,
-        )
-      : this.api.catalog(
-        args.instrumentType,
-        status,
-        query,
-        1,
-        this.fetchSize,
-        args.lcNumber,
-        args.tenorFamily,
-        requireIssueReleased,
-      );
+      ? this.api.catalog(args.instrumentType, {
+          q: query, page: 1, pageSize: this.fetchSize, lcNumber: args.lcNumber,
+          tenorFamily: args.tenorFamily, requireIssueReleased, statuses: args.statuses,
+        })
+      : this.api.catalog(args.instrumentType, {
+          status, q: query, page: 1, pageSize: this.fetchSize, lcNumber: args.lcNumber,
+          tenorFamily: args.tenorFamily, requireIssueReleased,
+        });
     request.subscribe({
         next: (result) => {
           this.contracts = result.items;
