@@ -12,3 +12,6 @@ lc-balance-src.tar*.*
 _to_delete/
 test-results/
 playwright-report/
+pandoc.exe
+*.log
+coverage-current/
