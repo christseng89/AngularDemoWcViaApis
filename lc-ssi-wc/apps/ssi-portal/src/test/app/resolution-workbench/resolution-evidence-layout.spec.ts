@@ -47,6 +47,12 @@ describe("resolution evidence layout", () => {
     expect(primarySummary).not.toContain("Repair queue created");
   });
 
+  it("renders the independent MT1 SSI applicability and resolution outcome", () => {
+    expect(component).toContain("result().ssiApplicability");
+    expect(component).toContain("result().resolutionOutcome");
+    expect(component).toContain("result().routeBindingId");
+  });
+
   it("avoids repeating the selected sequence in the result table", () => {
     const resultTable = readFileSync(
       join(directory, "resolution-result-table.component.html"),
@@ -62,7 +68,9 @@ describe("resolution evidence layout", () => {
       join(directory, "resolution-result-table.component.html"),
       "utf8",
     );
-    expect(resultTable).toContain('<strong>{{ row.displayFieldName || "—" }}</strong>');
+    expect(resultTable).toContain(
+      '<strong>{{ row.displayFieldName || "—" }}</strong>',
+    );
     expect(resultTable).not.toContain("row.role ||");
   });
 

@@ -54,6 +54,26 @@ import { ResolutionResultTableComponent } from "./resolution-result-table.compon
             <dt>Outcome</dt>
             <dd>{{ result().outcome }}</dd>
           </div>
+          @if (result().ssiApplicability) {
+            <div>
+              <dt>SSI applicability</dt>
+              <dd>{{ result().ssiApplicability }}</dd>
+            </div>
+          }
+          @if (result().resolutionOutcome) {
+            <div>
+              <dt>Resolution outcome</dt>
+              <dd>{{ result().resolutionOutcome }}</dd>
+            </div>
+          }
+          @if (result().routeBindingId) {
+            <div>
+              <dt>Route binding</dt>
+              <dd>
+                <code>{{ result().routeBindingId }}</code>
+              </dd>
+            </div>
+          }
           <div>
             <dt>Scenario ID</dt>
             <dd>{{ result().scenarioId }}</dd>

@@ -43,6 +43,10 @@ import { FinControlledFixtureService } from "./fin-controlled-fixture.service";
 import { FinControlledResolutionService } from "./fin-controlled-resolution.service";
 import { MappingResolutionPageDefinitionSource } from "./page-parameters/mapping-resolution-page-definition.source";
 import { PaymentResolutionPageDefinitionSource } from "./page-parameters/payment-resolution-page-definition.source";
+import { Mt1SsiResolutionPageDefinitionSource } from "./page-parameters/mt1-ssi-resolution-page-definition.source";
+import { Mt1SsiProfileRegistry } from "./mt1-ssi-profile.registry";
+import { Mt1SsiResolutionPageSubmissionAdapter } from "./page-parameters/mt1-ssi-resolution-page-submission.adapter";
+import { Mt1SsiDemoRouteRepository } from "./mt1-ssi-demo-route.repository";
 import { PaymentGovernedApplicabilityService } from "./page-parameters/payment-governed-applicability.service";
 import { CompositeResolutionPageDefinitionSource } from "./page-parameters/composite-resolution-page-definition.source";
 import { PageParameterEnvironmentPolicy } from "./page-parameters/page-parameter-environment.policy";
@@ -125,7 +129,9 @@ import {
       provide: PAYMENT_SETTLEMENT_RESOLUTION_PORT,
       useFactory: (moduleRef: ModuleRef) => ({
         resolve: (request: Parameters<SettlementController["resolve"]>[0]) =>
-          moduleRef.get(SettlementController, { strict: false }).resolve(request),
+          moduleRef
+            .get(SettlementController, { strict: false })
+            .resolve(request),
       }),
       inject: [ModuleRef],
     },
@@ -135,16 +141,22 @@ import {
     FinControlledResolutionService,
     MappingResolutionPageDefinitionSource,
     PaymentResolutionPageDefinitionSource,
+    Mt1SsiProfileRegistry,
+    Mt1SsiResolutionPageDefinitionSource,
+    Mt1SsiResolutionPageSubmissionAdapter,
+    Mt1SsiDemoRouteRepository,
     PaymentGovernedApplicabilityService,
     {
       provide: RESOLUTION_PAGE_DEFINITION_SOURCE,
       useFactory: (
         mapping: MappingResolutionPageDefinitionSource,
         payment: PaymentResolutionPageDefinitionSource,
-      ) => new CompositeResolutionPageDefinitionSource([mapping, payment]),
+        mt1: Mt1SsiResolutionPageDefinitionSource,
+      ) => new CompositeResolutionPageDefinitionSource([mapping, payment, mt1]),
       inject: [
         MappingResolutionPageDefinitionSource,
         PaymentResolutionPageDefinitionSource,
+        Mt1SsiResolutionPageDefinitionSource,
       ],
     },
     PageParameterEnvironmentPolicy,

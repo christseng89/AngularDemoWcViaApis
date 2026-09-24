@@ -5,6 +5,7 @@ import { SettlementController } from "../../../app/settlement.controller";
 import { CompositeResolutionPageDefinitionSource } from "../../../app/page-parameters/composite-resolution-page-definition.source";
 import { MappingResolutionPageDefinitionSource } from "../../../app/page-parameters/mapping-resolution-page-definition.source";
 import { PaymentResolutionPageDefinitionSource } from "../../../app/page-parameters/payment-resolution-page-definition.source";
+import { Mt1SsiResolutionPageDefinitionSource } from "../../../app/page-parameters/mt1-ssi-resolution-page-definition.source";
 import { PAYMENT_SETTLEMENT_RESOLUTION_PORT } from "../../../app/page-parameters/payment-resolution-page-submission.adapter";
 import { RESOLUTION_PAGE_DEFINITION_SOURCE } from "../../../app/page-parameters/resolution-page-definition.source";
 import {
@@ -118,14 +119,28 @@ describe("Page parameter business-date dependency injection", () => {
       strict: false,
     });
 
-    const mapping = {} as MappingResolutionPageDefinitionSource;
-    const payment = {} as PaymentResolutionPageDefinitionSource;
-    expect(
-      provider(RESOLUTION_PAGE_DEFINITION_SOURCE).useFactory!(
-        mapping as never,
-        payment as never,
-      ),
-    ).toBeInstanceOf(CompositeResolutionPageDefinitionSource);
+    const source = (definitionId: string) => ({
+      all: jest.fn(() => [{ definitionId }]),
+      find: jest.fn(() => [{ definitionId }]),
+    });
+    const mapping = source(
+      "MAPPING",
+    ) as never as MappingResolutionPageDefinitionSource;
+    const payment = source(
+      "MT2",
+    ) as never as PaymentResolutionPageDefinitionSource;
+    const mt1 = source("MT1") as never as Mt1SsiResolutionPageDefinitionSource;
+    const composite = provider(RESOLUTION_PAGE_DEFINITION_SOURCE).useFactory!(
+      mapping as never,
+      payment as never,
+      mt1 as never,
+    ) as never as CompositeResolutionPageDefinitionSource;
+    expect(composite).toBeInstanceOf(CompositeResolutionPageDefinitionSource);
+    expect(composite.all().map(({ definitionId }) => definitionId)).toEqual([
+      "MAPPING",
+      "MT2",
+      "MT1",
+    ]);
 
     const audit = {} as AuditRetentionPolicy;
     const factory = jest

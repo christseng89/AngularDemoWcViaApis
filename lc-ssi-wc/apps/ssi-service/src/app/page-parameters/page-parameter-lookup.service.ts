@@ -25,6 +25,8 @@ import type {
   ResolutionPageScenarioDefinition,
 } from "./resolution-page-scenario-catalogue.service";
 import { hashCanonical } from "../canonical-json";
+import { Mt1SsiResolutionPageDefinitionSource } from "./mt1-ssi-resolution-page-definition.source";
+import { Mt1SsiDemoRouteRepository } from "../mt1-ssi-demo-route.repository";
 
 interface SsiCounterpartyLookupQuery {
   readonly scenarioId: string;
@@ -107,6 +109,10 @@ export class PageParameterLookupService {
     private readonly paymentApplicability?: PaymentGovernedApplicabilityService,
     @Optional()
     private readonly nostros?: NostroApplicationService,
+    @Optional()
+    private readonly mt1Source?: Mt1SsiResolutionPageDefinitionSource,
+    @Optional()
+    private readonly mt1Routes?: Mt1SsiDemoRouteRepository,
   ) {}
 
   bankService(bankServiceId: string | undefined): PageParameterLookupResult {
@@ -282,6 +288,8 @@ export class PageParameterLookupService {
   ): PageParameterLookupEnvelope {
     requireCounterpartyContext(input);
     const term = input.query?.trim().toUpperCase() ?? "";
+    if (input.scenarioId.includes(":MT1-"))
+      return this.mt1Counterparties(input);
     if (PAYMENT_MESSAGES.has(input.messageType))
       return this.paymentCounterparties(input, term);
     const governed = this.scenarios.get();
@@ -337,6 +345,29 @@ export class PageParameterLookupService {
           }
         : {}),
     };
+  }
+
+  private mt1Counterparties(
+    input: SsiCounterpartyLookupQuery,
+  ): PageParameterLookupEnvelope {
+    const definition = this.mt1Source
+      ?.all("SR2026")
+      .find(({ scenarios }) =>
+        scenarios.some(({ scenarioId }) => scenarioId === input.scenarioId),
+      );
+    const scenario = definition?.scenarios.find(
+      ({ scenarioId }) => scenarioId === input.scenarioId,
+    );
+    if (!definition || !scenario || !this.mt1Routes)
+      throw new BadRequestException({
+        code: "SSI_COUNTERPARTY_SCENARIO_MISMATCH",
+      });
+    return this.mt1Routes.lookup({
+      ...input,
+      definitionId: definition.definitionId,
+      definitionVersion: definition.definitionVersion,
+      fixtureBindingId: scenario.fixture.bindingId,
+    });
   }
 
   private paymentCounterparties(

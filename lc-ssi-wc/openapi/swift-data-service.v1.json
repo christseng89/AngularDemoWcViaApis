@@ -15,9 +15,16 @@
       "id": "resolution-currency",
       "endpoint": "settings/resolution-currencies",
       "mode": "INDEX_ONLY",
-      "search": { "label": "Search Business Currency index", "placeholder": "Search configured index fields" },
+      "search": {
+        "label": "Search Business Currency index",
+        "placeholder": "Search configured index fields"
+      },
       "columns": [
-        { "path": "businessDomain", "label": "Business Domain", "presentation": "strong" },
+        {
+          "path": "businessDomain",
+          "label": "Business Domain",
+          "presentation": "strong"
+        },
         { "path": "currency", "label": "Currency", "presentation": "strong" },
         { "path": "status", "label": "Status", "presentation": "status" },
         { "path": "source", "label": "Source" },
@@ -30,6 +37,137 @@
     "bicStandard": "ISO 9362",
     "currencyStandard": "ISO 4217",
     "dataClassification": "SYNTHETIC_DEMO"
+  },
+  "x-mt1-ssi-resolution": {
+    "schemaVersion": "1.0",
+    "standardsRelease": "SR2026",
+    "scope": "OUTWARD_SSI_ONLY",
+    "profiles": [
+      {
+        "profileId": "MT103-BASE-SR2026",
+        "messageType": "MT103",
+        "businessService": "FIN-MT103-BASE",
+        "allowedOptions": {
+          "53": ["A", "B", "D"],
+          "54": ["A", "B", "D"],
+          "55": ["A", "B", "D"],
+          "56": ["A", "C", "D"],
+          "57": ["A", "B", "C", "D"]
+        }
+      },
+      {
+        "profileId": "MT103-REMIT-SR2026",
+        "messageType": "MT103",
+        "businessService": "FIN-MT103-REMIT",
+        "allowedOptions": {
+          "53": ["A", "B", "D"],
+          "54": ["A", "B", "D"],
+          "55": ["A", "B", "D"],
+          "56": ["A", "C", "D"],
+          "57": ["A", "B", "C", "D"]
+        }
+      },
+      {
+        "profileId": "MT103-STP-SR2026",
+        "messageType": "MT103",
+        "businessService": "FIN-MT103-STP",
+        "allowedOptions": {
+          "53": ["A", "B"],
+          "54": ["A"],
+          "55": ["A"],
+          "56": ["A"],
+          "57": ["A"]
+        }
+      },
+      {
+        "profileId": "PACS008-PLAIN-SR2026",
+        "messageType": "pacs.008.001.08",
+        "messageDefinitionId": "pacs.008.001.08",
+        "businessService": "swift.cbprplus.04",
+        "allowedOptions": {}
+      },
+      {
+        "profileId": "PACS008-STP-SR2026",
+        "messageType": "pacs.008.001.08",
+        "messageDefinitionId": "pacs.008.001.08",
+        "businessService": "swift.cbprplus.stp.04",
+        "allowedOptions": {}
+      }
+    ],
+    "inputParameters": [
+      {
+        "fieldId": "context.currency",
+        "path": "currency",
+        "label": "Currency",
+        "control": "SELECT",
+        "dataType": "ISO_CURRENCY",
+        "options": [
+          "AUD",
+          "CAD",
+          "CHF",
+          "CNY",
+          "EUR",
+          "GBP",
+          "HKD",
+          "JPY",
+          "SGD",
+          "USD"
+        ],
+        "defaultValue": "USD",
+        "displayOrder": 10
+      },
+      {
+        "fieldId": "context.bookingEntity",
+        "path": "bookingEntity",
+        "label": "Booking Entity",
+        "control": "SELECT",
+        "dataType": "STRING",
+        "options": ["HK01"],
+        "defaultValue": "HK01",
+        "displayOrder": 20
+      },
+      {
+        "fieldId": "context.valueDate",
+        "path": "valueDate",
+        "label": "Value Date",
+        "control": "DATE",
+        "dataType": "DATE",
+        "defaultValue": "2026-09-24",
+        "displayOrder": 30
+      },
+      {
+        "fieldId": "context.counterpartyBankServiceId",
+        "path": "upstreamValidatedDestination.id",
+        "label": "Destination Bank",
+        "control": "SELECT",
+        "dataType": "SWIFT_BIC",
+        "lookup": "SSI_COUNTERPARTY",
+        "displayOrder": 40
+      }
+    ],
+    "scenarios": [
+      {
+        "scenarioId": "MT1-INDA-SSI",
+        "label": "Serial INDA — SSI required",
+        "transferMethod": "SERIAL",
+        "settlementContext": "INDA",
+        "fixtureBindingId": "FIXTURE-MT1-INDA-SSI"
+      },
+      {
+        "scenarioId": "MT1-INGA-SSI",
+        "label": "Serial INGA — SSI required",
+        "transferMethod": "SERIAL",
+        "settlementContext": "INGA",
+        "fixtureBindingId": "FIXTURE-MT1-INGA-SSI"
+      },
+      {
+        "scenarioId": "MT1-COVE-SSI",
+        "label": "Cover COVE — reimbursement SSI",
+        "transferMethod": "COVER",
+        "settlementContext": "COVE",
+        "fixtureBindingId": "FIXTURE-MT1-COVE-SSI"
+      }
+    ]
   },
   "x-resolution-page-field-policy": {
     "schemaVersion": "1.0",
@@ -1684,16 +1822,60 @@
         "summary": "Inquire governed resolution currency coverage",
         "operationId": "inquireResolutionCurrencies",
         "parameters": [
-          { "name": "page", "in": "query", "schema": { "type": "integer", "minimum": 1, "default": 1 } },
-          { "name": "pageSize", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100 } },
-          { "name": "businessDomain", "in": "query", "schema": { "$ref": "#/components/schemas/PageParameterBusinessDomain" } },
-          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] } },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": { "type": "integer", "minimum": 1, "default": 1 }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": { "type": "integer", "minimum": 1, "maximum": 100 }
+          },
+          {
+            "name": "businessDomain",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/PageParameterBusinessDomain"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] }
+          },
           { "name": "search", "in": "query", "schema": { "type": "string" } },
-          { "name": "sortBy", "in": "query", "schema": { "type": "string", "enum": ["businessDomain", "currency", "status", "source", "lastResyncAt"] } },
-          { "name": "sortDirection", "in": "query", "schema": { "type": "string", "enum": ["asc", "desc"] } }
+          {
+            "name": "sortBy",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "businessDomain",
+                "currency",
+                "status",
+                "source",
+                "lastResyncAt"
+              ]
+            }
+          },
+          {
+            "name": "sortDirection",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["asc", "desc"] }
+          }
         ],
         "responses": {
-          "200": { "description": "Paged resolution currency coverage", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ResolutionCurrencyInquiryPage" } } } },
+          "200": {
+            "description": "Paged resolution currency coverage",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolutionCurrencyInquiryPage"
+                }
+              }
+            }
+          },
           "400": { "description": "Invalid inquiry parameters" }
         }
       }
@@ -1703,7 +1885,16 @@
         "summary": "Manually reconcile Demo resolution currency coverage",
         "operationId": "resyncResolutionCurrencies",
         "responses": {
-          "200": { "description": "Coverage reconciliation counts", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ResolutionCurrencyResyncResult" } } } },
+          "200": {
+            "description": "Coverage reconciliation counts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolutionCurrencyResyncResult"
+                }
+              }
+            }
+          },
           "403": { "description": "Development mode required" }
         }
       }
@@ -2056,10 +2247,20 @@
       "ResolutionCurrencyInquiryRow": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["standardsRelease", "businessDomain", "currency", "status", "source", "updatedAt", "lastResyncAt"],
+        "required": [
+          "standardsRelease",
+          "businessDomain",
+          "currency",
+          "status",
+          "source",
+          "updatedAt",
+          "lastResyncAt"
+        ],
         "properties": {
           "standardsRelease": { "type": "string" },
-          "businessDomain": { "$ref": "#/components/schemas/PageParameterBusinessDomain" },
+          "businessDomain": {
+            "$ref": "#/components/schemas/PageParameterBusinessDomain"
+          },
           "currency": { "$ref": "#/components/schemas/Currency" },
           "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] },
           "source": { "type": "string" },
@@ -2070,9 +2271,22 @@
       "ResolutionCurrencyInquiryPage": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["items", "page", "pageSize", "totalItems", "totalPages", "hasPrevious", "hasNext"],
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "totalItems",
+          "totalPages",
+          "hasPrevious",
+          "hasNext"
+        ],
         "properties": {
-          "items": { "type": "array", "items": { "$ref": "#/components/schemas/ResolutionCurrencyInquiryRow" } },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResolutionCurrencyInquiryRow"
+            }
+          },
           "page": { "type": "integer", "minimum": 1 },
           "pageSize": { "type": "integer", "minimum": 1, "maximum": 100 },
           "totalItems": { "type": "integer", "minimum": 0 },
@@ -2084,7 +2298,13 @@
       "ResolutionCurrencyResyncResult": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["discovered", "inserted", "unchanged", "activated", "inactivated"],
+        "required": [
+          "discovered",
+          "inserted",
+          "unchanged",
+          "activated",
+          "inactivated"
+        ],
         "properties": {
           "discovered": { "type": "integer", "minimum": 0 },
           "inserted": { "type": "integer", "minimum": 0 },

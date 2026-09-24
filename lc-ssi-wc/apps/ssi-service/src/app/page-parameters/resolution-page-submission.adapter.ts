@@ -29,6 +29,7 @@ import { ResolutionPageScenarioCatalogueService } from "./resolution-page-scenar
 import { ResolutionPageCrossTagValidator } from "./resolution-page-cross-tag.validator";
 import { ResolutionPageFixtureManifestService } from "./resolution-page-fixture-manifest.service";
 import { PaymentResolutionPageSubmissionAdapter } from "./payment-resolution-page-submission.adapter";
+import { Mt1SsiResolutionPageSubmissionAdapter } from "./mt1-ssi-resolution-page-submission.adapter";
 import { scenarioNvrOutcome } from "./page-parameter-validation-disposition";
 import { DatabaseSnapshotIdentityService } from "../database-snapshot-identity.service";
 import { PaymentGovernedApplicabilityService } from "./payment-governed-applicability.service";
@@ -114,6 +115,8 @@ export class ResolutionPageSubmissionAdapter {
     private readonly paymentRoutes?: PaymentGovernedApplicabilityService,
     @Optional()
     private readonly mappingCatalogues?: MappingCatalogueService,
+    @Optional()
+    private readonly mt1?: Mt1SsiResolutionPageSubmissionAdapter,
   ) {}
 
   execute(input: unknown): ResolutionPageExecutionResult {
@@ -147,6 +150,17 @@ export class ResolutionPageSubmissionAdapter {
     this.rejectBoundaryScenario(definition, scenario);
     this.rejectUnhandledNegativeScenario(scenario);
     if (definition.businessDomain === "PAYMENT") {
+      if (definition.messageFamily === "MT1_PACS008") {
+        if (!this.mt1)
+          throw new ServiceUnavailableException({
+            code: "MT1_SSI_PAGE_EXECUTOR_UNAVAILABLE",
+          });
+        return this.mt1.execute({
+          definition,
+          scenario,
+          submission: governed.submission,
+        });
+      }
       if (!this.payment)
         throw new ServiceUnavailableException({
           code: "PAYMENT_PAGE_EXECUTOR_UNAVAILABLE",
@@ -422,7 +436,8 @@ export class ResolutionPageSubmissionAdapter {
       route.fixtureBindingId !== scenario.fixture.bindingId ||
       route.contextSha256 !== snapshot.contextSha256 ||
       route.contextSha256 !== contextSha256 ||
-      (this.snapshots !== undefined &&
+      (definition.messageFamily !== "MT1_PACS008" &&
+        this.snapshots !== undefined &&
         snapshot.snapshotId !== this.snapshots.current().sha256)
     )
       throw new ConflictException({
@@ -431,7 +446,12 @@ export class ResolutionPageSubmissionAdapter {
         confirmedResolutionCreated: false,
         repairQueueCreated: false,
       });
-    if (definition.businessDomain !== "PAYMENT" || !this.paymentRoutes) return;
+    if (
+      definition.messageFamily === "MT1_PACS008" ||
+      definition.businessDomain !== "PAYMENT" ||
+      !this.paymentRoutes
+    )
+      return;
     const candidates = this.paymentRoutes.atomicCandidates({
       messageType: definition.messageType,
       currency: textValue(submission.values, "context.currency"),

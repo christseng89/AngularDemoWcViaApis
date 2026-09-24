@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "1.0",
+  "fixtureVersion": "MT1-SSI-DEMO-V1",
+  "standardsRelease": "SR2026",
+  "routes": [
+    {
+      "bankServiceId": "BANK-SVC-CITIUS33",
+      "bic": "CITIUS33",
+      "bankName": "Citibank Demo",
+      "bookingEntity": "HK01",
+      "currencies": [
+        "AUD",
+        "CAD",
+        "CHF",
+        "CNY",
+        "EUR",
+        "GBP",
+        "HKD",
+        "JPY",
+        "SGD",
+        "USD"
+      ],
+      "validFrom": "2026-01-01",
+      "validTo": "2027-12-31",
+      "ssi": { "id": "MT1-SSI-CITI", "version": 1 },
+      "applicability": { "id": "MT1-APP-CITI", "version": 1 },
+      "nostro": { "id": "MT1-NOSTRO-CITI", "version": 1 },
+      "rma": { "id": "MT1-RMA-CITI", "version": 1 }
+    }
+  ]
+}

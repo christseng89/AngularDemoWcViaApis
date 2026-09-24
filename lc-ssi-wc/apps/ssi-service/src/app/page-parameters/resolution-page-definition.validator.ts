@@ -58,12 +58,16 @@ const validateProfile = (
   )
     throw new Error("PAGE_PROFILE_SCENARIO_MISMATCH");
 
-  if (profile.profileKind === "MT_TO_MX") {
+  if (
+    profile.profileKind === "MT_TO_MX" ||
+    profile.profileKind === "SSI_RESOLUTION_ONLY"
+  ) {
     requireText(profile.businessService ?? "", "PAGE_PROFILE_BIZSVC_REQUIRED");
-    requireText(
-      profile.messageDefinitionId ?? "",
-      "PAGE_PROFILE_MESSAGE_DEFINITION_REQUIRED",
-    );
+    if (profile.profileKind === "MT_TO_MX")
+      requireText(
+        profile.messageDefinitionId ?? "",
+        "PAGE_PROFILE_MESSAGE_DEFINITION_REQUIRED",
+      );
     if (
       !query.businessScenarioId ||
       !query.businessService ||

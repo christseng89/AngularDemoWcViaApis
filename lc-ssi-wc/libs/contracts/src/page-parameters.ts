@@ -75,7 +75,8 @@ export interface PageParameterSourceIdentity {
 
 export interface PageParameterProfile {
   readonly profileId: string;
-  readonly profileKind: "MT_TO_MX" | "FIN_REFERENCE_ONLY";
+  readonly profileKind:
+    "MT_TO_MX" | "SSI_RESOLUTION_ONLY" | "FIN_REFERENCE_ONLY";
   readonly businessService?: string;
   readonly messageDefinitionId?: string;
   readonly paymentExecutable: boolean;
@@ -147,7 +148,10 @@ export interface PageParameterField {
   readonly options?: readonly PageParameterOption[];
   readonly lookup?: PageParameterLookupMetadata;
   readonly optionSource?: PageParameterDependencyMetadata & {
-    readonly source: "GOVERNED_APPLICABILITY" | "RESOLUTION_CURRENCY_COVERAGE" | "CONTROLLED_ENTITY_REFERENCE";
+    readonly source:
+      | "GOVERNED_APPLICABILITY"
+      | "RESOLUTION_CURRENCY_COVERAGE"
+      | "CONTROLLED_ENTITY_REFERENCE";
   };
   readonly constraints: readonly PageParameterConstraint[];
   readonly sequenceId?: string;
@@ -533,6 +537,21 @@ export interface ResolutionPageExecutionResult {
   readonly confirmedResolutionCreated: boolean;
   readonly repairQueueCreated: boolean;
   readonly nvrOutcome: PageParameterCompatibleNvrOutcome;
+  /** Present for MT1/pacs.008 SSI-resolution-only responses. */
+  readonly ssiApplicability?: "NOT_EVALUATED" | "REQUIRED" | "NOT_REQUIRED";
+  /** Kept independent from applicability so REQUIRED is never mistaken for success. */
+  readonly resolutionOutcome?:
+    | "BILATERAL_RELATIONSHIP_CONFIRMED"
+    | "ELIGIBLE_COMPLETE_ROUTE"
+    | "NO_ELIGIBLE_SSI"
+    | "AMBIGUOUS_ROUTE"
+    | "STALE"
+    | "INVALID_CONTEXT_TOPOLOGY"
+    | "INVALID_UPSTREAM_CONTEXT"
+    | "PROFILE_INCOMPLETE"
+    | "UNSUPPORTED_DIRECTION"
+    | "UNSUPPORTED_PROFILE";
+  readonly routeBindingId?: string;
   readonly fields: readonly ResolutionPageFieldResult[];
   readonly outputs: readonly ResolutionPageGeneratedOutput[];
   readonly evidence: ResolutionPageExecutionEvidence;
