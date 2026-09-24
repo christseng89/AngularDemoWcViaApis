@@ -391,12 +391,12 @@ export abstract class SqliteGovernedRepository<
     const search = request.search?.trim();
     if (search) {
       clauses.push(String.raw`payload LIKE ? ESCAPE '\'`);
-      parameters.push(
-        `%${search
-          .replaceAll(/\\/g, String.raw`\\`)
-          .replaceAll("%", String.raw`\%`)
-          .replaceAll("_", String.raw`\_`)}%`,
-      );
+      const escapeCharacter = String.fromCodePoint(92);
+      const escapedSearch = search
+        .replaceAll(escapeCharacter, escapeCharacter.repeat(2))
+        .replaceAll("%", escapeCharacter + "%")
+        .replaceAll("_", escapeCharacter + "_");
+      parameters.push(`%${escapedSearch}%`);
     }
     const where = clauses.length ? ` WHERE ${clauses.join(" AND ")}` : "";
     const totalItems = Number(
