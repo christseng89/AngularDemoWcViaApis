@@ -40,7 +40,8 @@ describe("payment message index interaction contract", () => {
     expect(template).not.toContain("MT TYPE");
     expect(template).not.toContain("group.familyLabel");
     expect(template).toContain('colspan="6"');
-    expect(template).toContain("group.profileCount");
+    expect(template).toContain("group.profileCount > 1");
+    expect(template).not.toContain('group.profileCount === 1 ? "profile"');
     expect(template).toContain("PROFILE / BIZSVC");
     expect(template).toContain("row.profileLabel");
     expect(template).toContain("SSI GENERATED TAGS");

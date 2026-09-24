@@ -80,6 +80,7 @@ describe("Mt1SsiResolutionPageSubmissionAdapter", () => {
       const result = executeProfile(profileId);
 
       expect(result.payloadGenerated).toBe(false);
+      expect(result.nvrOutcome).toBe("PASS");
       expect(result.outputs.map(({ format }) => format)).toEqual([
         "SWIFT_MT",
         "ISO_20022",
@@ -97,10 +98,14 @@ describe("Mt1SsiResolutionPageSubmissionAdapter", () => {
             renderingDecisions: expect.objectContaining({
               "53A": expect.objectContaining({
                 outcome: "INCLUDE",
+                ruleId: "POL-MT1-PROFILE-OPTION-001",
                 tagAndOption: "53A",
                 role: "INDA_SETTLEMENT_ACCOUNT_RELATIONSHIP",
               }),
-              "54a": expect.objectContaining({ outcome: "NOT_APPLICABLE" }),
+              "54a": expect.objectContaining({
+                outcome: "NOT_APPLICABLE",
+                ruleId: "POL-MT1-PROFILE-OPTION-001",
+              }),
               "55a": expect.objectContaining({ outcome: "NOT_APPLICABLE" }),
               "56a": expect.objectContaining({ outcome: "NOT_APPLICABLE" }),
               "57a": expect.objectContaining({ outcome: "NOT_APPLICABLE" }),
@@ -135,6 +140,20 @@ describe("Mt1SsiResolutionPageSubmissionAdapter", () => {
         tags: { "53A": "/DEMO-USD-CITI-INDA\nCITIUS33" },
         omitted: [],
         renderingDecisions: expect.any(Object),
+      },
+    });
+  });
+
+  it("renders only governed option A MT fields in the prototype", () => {
+    const result = executeProfile("MT103-BASE-SR2026");
+    const mt = result.outputs.find(({ format }) => format === "SWIFT_MT");
+
+    expect(mt?.document).toMatchObject({
+      tags: { "53A": "/DEMO-USD-CITI-INDA\nCITIUS33" },
+      renderingDecisions: {
+        "53A": expect.objectContaining({
+          ruleId: "POL-MT1-PROFILE-OPTION-001",
+        }),
       },
     });
   });

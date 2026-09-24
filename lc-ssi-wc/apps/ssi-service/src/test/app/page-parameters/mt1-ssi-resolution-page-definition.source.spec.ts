@@ -82,7 +82,10 @@ describe("MT1/pacs.008 OAS-driven Payment SSI page definitions", () => {
         expect.objectContaining({
           profileId: "MT103-REMIT-SR2026",
           index: expect.objectContaining({ visible: true, order: 3 }),
-          resolutionEvidence: { formats: ["SWIFT_MT"] },
+          resolutionEvidence: {
+            formats: ["SWIFT_MT"],
+            swiftMtRenderableOptions: ["A"],
+          },
         }),
         expect.objectContaining({
           profileId: "PACS008-PLAIN-SR2026",
@@ -116,39 +119,21 @@ describe("MT1/pacs.008 OAS-driven Payment SSI page definitions", () => {
         groupId: "PAYMENT:MT103:BASE",
         label: "MT103 — Base",
         order: 1,
-        generatedFields: [
-          "MT 53a",
-          "MT 54a",
-          "MT 55a",
-          "MT 56a",
-          "MT 57a",
-          "MX SttlmMtd",
-          "MX SttlmAcct",
-          "MX RmbrsmntAgt(+Acct)",
-        ],
+        generatedFields: ["53a", "54a", "55a", "56a", "57a"],
         scenarios: 3,
       },
       {
         groupId: "PAYMENT:MT103:STP",
         label: "MT103 — STP",
         order: 2,
-        generatedFields: [
-          "MT 53a",
-          "MT 54A",
-          "MT 55A",
-          "MT 56A",
-          "MT 57A",
-          "MX SttlmMtd",
-          "MX SttlmAcct",
-          "MX RmbrsmntAgt(+Acct)",
-        ],
+        generatedFields: ["53a", "54A", "55A", "56A", "57A"],
         scenarios: 3,
       },
       {
         groupId: "PAYMENT:MT103:REMIT",
         label: "MT103 — REMIT",
         order: 3,
-        generatedFields: ["MT 53a", "MT 54a", "MT 55a", "MT 56a", "MT 57a"],
+        generatedFields: ["53a", "54a", "55a", "56a", "57a"],
         scenarios: 3,
       },
     ]);
@@ -156,6 +141,7 @@ describe("MT1/pacs.008 OAS-driven Payment SSI page definitions", () => {
 
   it("exposes only routing-changing inputs and keeps governed context hidden", () => {
     for (const definition of definitions()) {
+      expect(definition.profile.paymentExecutable).toBe(false);
       const visible = definition.fields
         .filter(({ visibility }) => visibility === "USER_INPUT")
         .map(({ fieldId }) => fieldId);

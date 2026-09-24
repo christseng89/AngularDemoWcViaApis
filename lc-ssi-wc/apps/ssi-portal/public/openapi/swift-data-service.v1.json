@@ -52,19 +52,11 @@
           "groupId": "PAYMENT:MT103:BASE",
           "label": "MT103 — Base",
           "order": 1,
-          "generatedFields": [
-            "MT 53a",
-            "MT 54a",
-            "MT 55a",
-            "MT 56a",
-            "MT 57a",
-            "MX SttlmMtd",
-            "MX SttlmAcct",
-            "MX RmbrsmntAgt(+Acct)"
-          ]
+          "generatedFields": ["53a", "54a", "55a", "56a", "57a"]
         },
         "resolutionEvidence": {
           "formats": ["SWIFT_MT", "ISO_20022"],
+          "swiftMtRenderableOptions": ["A"],
           "counterpartProfileId": "PACS008-PLAIN-SR2026",
           "counterpartBusinessService": "swift.cbprplus.04"
         },
@@ -85,19 +77,11 @@
           "groupId": "PAYMENT:MT103:STP",
           "label": "MT103 — STP",
           "order": 2,
-          "generatedFields": [
-            "MT 53a",
-            "MT 54A",
-            "MT 55A",
-            "MT 56A",
-            "MT 57A",
-            "MX SttlmMtd",
-            "MX SttlmAcct",
-            "MX RmbrsmntAgt(+Acct)"
-          ]
+          "generatedFields": ["53a", "54A", "55A", "56A", "57A"]
         },
         "resolutionEvidence": {
           "formats": ["SWIFT_MT", "ISO_20022"],
+          "swiftMtRenderableOptions": ["A"],
           "counterpartProfileId": "PACS008-STP-SR2026",
           "counterpartBusinessService": "swift.cbprplus.stp.04"
         },
@@ -118,10 +102,20 @@
           "groupId": "PAYMENT:MT103:REMIT",
           "label": "MT103 — REMIT",
           "order": 3,
-          "generatedFields": ["MT 53a", "MT 54a", "MT 55a", "MT 56a", "MT 57a"]
+          "generatedFields": ["53a", "54a", "55a", "56a", "57a"]
         },
         "resolutionEvidence": {
-          "formats": ["SWIFT_MT"]
+          "formats": ["SWIFT_MT"],
+          "swiftMtRenderableOptions": ["A"]
+        },
+        "approval": {
+          "status": "APPROVED",
+          "product": "FIN",
+          "service": "MT103_REMIT",
+          "community": "CBPR_PLUS",
+          "mug": "MT103_REMIT_SR2026",
+          "effectiveFrom": "2026-01-01",
+          "effectiveTo": "9999-12-31"
         },
         "allowedOptions": {
           "53": ["A", "B", "D"],
@@ -2824,7 +2818,7 @@
       "ResolutionPageGeneratedOutput": {
         "type": "object",
         "additionalProperties": false,
-        "description": "A server-generated representation of one confirmed canonical SSI resolution. Clients render the document and must not translate between formats.",
+        "description": "A server-generated evidence representation of one canonical SSI resolution. Clients render the document and must not translate between formats.",
         "required": [
           "outputId",
           "format",
@@ -2871,7 +2865,6 @@
           "ssi",
           "applicability",
           "nostro",
-          "rma",
           "roles",
           "legs",
           "projections"

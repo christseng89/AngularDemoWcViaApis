@@ -95,8 +95,18 @@ export interface PageParameterProfile {
   /** Evidence projections of one SSI route; never authorizes message conversion. */
   readonly resolutionEvidence?: {
     readonly formats: readonly ("SWIFT_MT" | "ISO_20022")[];
+    readonly swiftMtRenderableOptions?: readonly string[];
     readonly counterpartProfileId?: string;
     readonly counterpartBusinessService?: string;
+  };
+  readonly approval?: {
+    readonly status: "APPROVED";
+    readonly product: string;
+    readonly service: string;
+    readonly community: string;
+    readonly mug: string;
+    readonly effectiveFrom: string;
+    readonly effectiveTo: string;
   };
 }
 

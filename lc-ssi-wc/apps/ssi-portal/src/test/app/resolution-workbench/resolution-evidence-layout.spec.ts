@@ -14,6 +14,10 @@ describe("resolution evidence layout", () => {
     join(directory, "resolution-workbench.css"),
     "utf8",
   );
+  const generatedOutputs = readFileSync(
+    join(directory, "resolution-generated-outputs.component.ts"),
+    "utf8",
+  );
 
   it("places the compact outcome summary above the full-width result table", () => {
     expect(component).toContain('class="outcome-summary"');
@@ -84,5 +88,13 @@ describe("resolution evidence layout", () => {
     expect(resultTable).not.toContain('<th scope="col">Rendered value</th>');
     expect(resultTable).not.toContain("row.renderedValue");
     expect(resultTable).toContain('<th scope="col">BIC</th>');
+  });
+
+  it("labels a single evidence output from its actual MT or MX format", () => {
+    expect(generatedOutputs).toContain('singleEvidenceHeading()');
+    expect(generatedOutputs).toContain('format === "SWIFT_MT"');
+    expect(generatedOutputs).toContain('"MT SSI evidence"');
+    expect(generatedOutputs).toContain('"ISO 20022 SSI evidence"');
+    expect(generatedOutputs).not.toContain('"ISO 20022 SSI resolution"');
   });
 });

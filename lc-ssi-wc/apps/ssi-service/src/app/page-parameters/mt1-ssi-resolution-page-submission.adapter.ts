@@ -94,7 +94,10 @@ export class Mt1SsiResolutionPageSubmissionAdapter {
       payloadGenerated: false,
       confirmedResolutionCreated: false,
       repairQueueCreated: false,
-      nvrOutcome: "NOT_EVALUATED",
+      nvrOutcome:
+        resolved.resolutionOutcome === "ELIGIBLE_COMPLETE_ROUTE"
+          ? "PASS"
+          : "NOT_EVALUATED",
       ssiApplicability: resolved.ssiApplicability,
       resolutionOutcome: resolved.resolutionOutcome,
       ...(resolved.route
@@ -162,7 +165,11 @@ export class Mt1SsiResolutionPageSubmissionAdapter {
             settlementContext: request.settlementContext,
             settlementRoute: route,
           }
-        : this.swiftMtEvidenceDocument(settlementRoute, request);
+        : this.swiftMtEvidenceDocument(
+            settlementRoute,
+            request,
+            policy.swiftMtRenderableOptions ?? [],
+          );
       return [
         {
           outputId: iso
@@ -181,6 +188,7 @@ export class Mt1SsiResolutionPageSubmissionAdapter {
   private swiftMtEvidenceDocument(
     settlementRoute: ResolutionPageSettlementRoute,
     request: Mt1SsiResolutionRequest,
+    renderableOptions: readonly string[],
   ): Readonly<Record<string, unknown>> {
     const projections = settlementRoute.projections.filter(
       ({ kind }) => kind === "SWIFT_MT_FIELD",
@@ -189,6 +197,11 @@ export class Mt1SsiResolutionPageSubmissionAdapter {
     const renderingDecisions: Record<string, unknown> = {};
     const includedFamilies = new Set<string>();
     for (const projection of projections) {
+      if (
+        !projection.option ||
+        !renderableOptions.includes(projection.option)
+      )
+        throw new Error("PROFILE_INCOMPLETE");
       const tagAndOption = `${projection.identifier}${projection.option ?? ""}`;
       includedFamilies.add(projection.identifier);
       tags[tagAndOption] = projection.accountReference
@@ -196,7 +209,8 @@ export class Mt1SsiResolutionPageSubmissionAdapter {
         : String(projection.value);
       renderingDecisions[tagAndOption] = {
         outcome: "INCLUDE",
-        ruleId: "POL-MT1-ATOMIC-001",
+        ruleId: "POL-MT1-PROFILE-OPTION-001",
+        profileId: request.profileId,
         role: projection.role,
         tagAndOption,
         reason: `Resolved by the selected atomic ${request.settlementContext} SSI route`,
@@ -217,7 +231,8 @@ export class Mt1SsiResolutionPageSubmissionAdapter {
       if (includedFamilies.has(family)) continue;
       renderingDecisions[`${family}a`] = {
         outcome: "NOT_APPLICABLE",
-        ruleId: "POL-MT1-ATOMIC-001",
+        ruleId: "POL-MT1-PROFILE-OPTION-001",
+        profileId: request.profileId,
         role,
         reason: `No applicable ${role} role in the selected atomic ${request.settlementContext} SSI route`,
         provenance: {

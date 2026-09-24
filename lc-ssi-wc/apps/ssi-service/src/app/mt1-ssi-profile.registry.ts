@@ -17,8 +17,18 @@ export interface Mt1SsiProfile {
   };
   readonly resolutionEvidence: {
     readonly formats: readonly ("SWIFT_MT" | "ISO_20022")[];
+    readonly swiftMtRenderableOptions?: readonly string[];
     readonly counterpartProfileId?: string;
     readonly counterpartBusinessService?: string;
+  };
+  readonly approval?: {
+    readonly status: "APPROVED";
+    readonly product: string;
+    readonly service: string;
+    readonly community: string;
+    readonly mug: string;
+    readonly effectiveFrom: string;
+    readonly effectiveTo: string;
   };
 }
 
@@ -53,13 +63,16 @@ interface Mt1SsiOasContract {
 
 export interface Mt1SsiProfileRegistryOptions {
   readonly oasPath?: string;
+  readonly asOfDate?: string;
 }
 
 @Injectable()
 export class Mt1SsiProfileRegistry {
   private readonly contract: Mt1SsiOasContract;
+  private readonly asOfDate: string;
 
   constructor(@Optional() options?: Mt1SsiProfileRegistryOptions) {
+    this.asOfDate = options?.asOfDate ?? new Date().toISOString().slice(0, 10);
     const path =
       options?.oasPath ??
       join(process.cwd(), "openapi", "swift-data-service.v1.json");
@@ -137,10 +150,31 @@ export class Mt1SsiProfileRegistry {
         evidence["formats"].every((format) =>
           ["SWIFT_MT", "ISO_20022"].includes(String(format)),
         ) &&
+        (evidence["swiftMtRenderableOptions"] === undefined ||
+          (Array.isArray(evidence["swiftMtRenderableOptions"]) &&
+            evidence["swiftMtRenderableOptions"].every(
+              (option) => typeof option === "string" && option.trim(),
+            ))) &&
         (evidence["counterpartProfileId"] === undefined ||
           typeof evidence["counterpartProfileId"] === "string") &&
         (evidence["counterpartBusinessService"] === undefined ||
           typeof evidence["counterpartBusinessService"] === "string"),
+      );
+    };
+    const validApproval = (profile: Record<string, unknown>): boolean => {
+      if (profile["profileId"] !== "MT103-REMIT-SR2026") return true;
+      const approval = profile["approval"] as
+        | Record<string, unknown>
+        | undefined;
+      return Boolean(
+        approval?.["status"] === "APPROVED" &&
+          ["product", "service", "community", "mug"].every(
+            (key) => typeof approval[key] === "string" && approval[key],
+          ) &&
+          typeof approval?.["effectiveFrom"] === "string" &&
+          approval["effectiveFrom"] <= this.asOfDate &&
+          typeof approval?.["effectiveTo"] === "string" &&
+          approval["effectiveTo"] >= this.asOfDate,
       );
     };
     const profilesById = new Map(
@@ -181,6 +215,7 @@ export class Mt1SsiProfileRegistry {
           typeof profile["allowedOptions"] === "object" &&
           validIndex(profile) &&
           validEvidence(profile) &&
+          validApproval(profile) &&
           validCounterpart(profile),
       )
     );

@@ -170,8 +170,9 @@
                         $event.stopPropagation(); activateGroup(group, $event)
                       "
                     >
-                      {{ group.profileCount }}
-                      {{ group.profileCount === 1 ? "profile" : "profiles" }} ·
+                      @if (group.profileCount > 1) {
+                        {{ group.profileCount }} profiles ·
+                      }
                       {{ group.operationalScenarioCount }} operational ·
                       {{ group.qaScenarioCount }} QA
                       <span class="sr-only">
@@ -280,8 +281,10 @@
       <header class="scenario-drawer-header">
         <div>
           <span class="eyebrow"
-            >{{ group.messageCode }} · {{ group.profileCount }}
-            {{ group.profileCount === 1 ? "profile" : "profiles" }} ·
+            >{{ group.messageCode }} ·
+            @if (group.profileCount > 1) {
+              {{ group.profileCount }} profiles ·
+            }
             {{ group.scenarioCount }} scenarios</span
           >
           <h2 [id]="'scenario-drawer-title-' + group.id">Select a scenario</h2>

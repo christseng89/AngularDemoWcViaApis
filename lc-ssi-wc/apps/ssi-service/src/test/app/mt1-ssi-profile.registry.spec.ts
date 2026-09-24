@@ -20,19 +20,11 @@ describe("Mt1SsiProfileRegistry fail-closed loading", () => {
           groupId: "PAYMENT:MT103:BASE",
           label: "MT103 — Base",
           order: 1,
-          generatedFields: [
-            "MT 53a",
-            "MT 54a",
-            "MT 55a",
-            "MT 56a",
-            "MT 57a",
-            "MX SttlmMtd",
-            "MX SttlmAcct",
-            "MX RmbrsmntAgt(+Acct)",
-          ],
+          generatedFields: ["53a", "54a", "55a", "56a", "57a"],
         },
         resolutionEvidence: {
           formats: ["SWIFT_MT", "ISO_20022"],
+          swiftMtRenderableOptions: ["A"],
           counterpartProfileId: "PACS008-PLAIN-SR2026",
           counterpartBusinessService: "swift.cbprplus.04",
         },
@@ -44,19 +36,11 @@ describe("Mt1SsiProfileRegistry fail-closed loading", () => {
           groupId: "PAYMENT:MT103:STP",
           label: "MT103 — STP",
           order: 2,
-          generatedFields: [
-            "MT 53a",
-            "MT 54A",
-            "MT 55A",
-            "MT 56A",
-            "MT 57A",
-            "MX SttlmMtd",
-            "MX SttlmAcct",
-            "MX RmbrsmntAgt(+Acct)",
-          ],
+          generatedFields: ["53a", "54A", "55A", "56A", "57A"],
         },
         resolutionEvidence: {
           formats: ["SWIFT_MT", "ISO_20022"],
+          swiftMtRenderableOptions: ["A"],
           counterpartProfileId: "PACS008-STP-SR2026",
           counterpartBusinessService: "swift.cbprplus.stp.04",
         },
@@ -68,9 +52,12 @@ describe("Mt1SsiProfileRegistry fail-closed loading", () => {
           groupId: "PAYMENT:MT103:REMIT",
           label: "MT103 — REMIT",
           order: 3,
-          generatedFields: ["MT 53a", "MT 54a", "MT 55a", "MT 56a", "MT 57a"],
+          generatedFields: ["53a", "54a", "55a", "56a", "57a"],
         },
-        resolutionEvidence: { formats: ["SWIFT_MT"] },
+        resolutionEvidence: {
+          formats: ["SWIFT_MT"],
+          swiftMtRenderableOptions: ["A"],
+        },
       },
       {
         profileId: "PACS008-PLAIN-SR2026",
@@ -95,6 +82,20 @@ describe("Mt1SsiProfileRegistry fail-closed loading", () => {
         resolutionEvidence: { formats: ["ISO_20022"] },
       },
     ]);
+  });
+
+  it("requires an effective approved Product/service/community/MUG gate for REMIT", () => {
+    const remit = new Mt1SsiProfileRegistry().find("MT103-REMIT-SR2026");
+
+    expect(remit?.approval).toEqual({
+      status: "APPROVED",
+      product: "FIN",
+      service: "MT103_REMIT",
+      community: "CBPR_PLUS",
+      mug: "MT103_REMIT_SR2026",
+      effectiveFrom: "2026-01-01",
+      effectiveTo: "9999-12-31",
+    });
   });
 
   it("rejects unreadable and invalid OAS contracts", () => {

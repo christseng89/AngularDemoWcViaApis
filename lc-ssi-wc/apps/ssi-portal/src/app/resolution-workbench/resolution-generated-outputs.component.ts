@@ -25,7 +25,7 @@ import type { ResolutionPageGeneratedOutput } from "@ssi/contracts";
                   ? "MT and ISO 20022 outputs"
                   : outputs().length > 1
                     ? "MT and ISO 20022 SSI evidence"
-                    : "ISO 20022 SSI resolution"
+                    : singleEvidenceHeading()
               }}
             </h3>
           </div>
@@ -57,6 +57,12 @@ import type { ResolutionPageGeneratedOutput } from "@ssi/contracts";
 export class ResolutionGeneratedOutputsComponent {
   readonly outputs = input.required<readonly ResolutionPageGeneratedOutput[]>();
   readonly payloadGenerated = input(false);
+
+  singleEvidenceHeading(): string {
+    return this.outputs()[0]?.format === "SWIFT_MT"
+      ? "MT SSI evidence"
+      : "ISO 20022 SSI evidence";
+  }
 
   serialise(output: ResolutionPageGeneratedOutput): string {
     return JSON.stringify(output.document, null, 2);
