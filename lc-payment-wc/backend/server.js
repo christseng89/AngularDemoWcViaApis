@@ -1,9 +1,12 @@
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
+const path = require('node:path');
 
 const app = express();
-app.use(cors());
+app.disable('x-powered-by');
+app.use(cors({
+  origin: ['http://localhost:4200', 'http://127.0.0.1:4200'],
+}));
 app.use(express.json());
 
 // Serve the standalone Web Components bundle (npm run build:wc) so the
@@ -333,7 +336,7 @@ app.post('/api/import/settlement/calc', (req, res) => {
     const netPayCcy = chargeSelections.net ?? billCurrency;
 
     const netPayAmt = netPayCcy === 'TWD' ? netCaTwd : netBillCcy;
-    const netPayTwd = netPayCcy === 'TWD' ? netCaTwd : netCaTwd;
+    const netPayTwd = netCaTwd;
 
     const entries = [
       // Release margin in foreign ccy
@@ -943,7 +946,8 @@ app.post('/api/export/collection/calc', (req, res) => {
 // so `require('./server')` from a test (server.test.js, via supertest) can exercise `app` without
 // also trying to listen on :3001, which would collide with an already-running dev instance.
 const PORT = 3001;
-if (require.main === module) {
+const isDirectRun = process.argv[1] && path.resolve(process.argv[1]) === __filename;
+if (isDirectRun) {
   app.listen(PORT, () => {
     console.log(`\nlc-payment-wc backend running on port ${PORT}\n`);
     console.log('Endpoints:');

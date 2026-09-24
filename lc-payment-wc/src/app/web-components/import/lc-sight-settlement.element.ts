@@ -1,7 +1,7 @@
 import {
   JournalResult, fmt, escapeHtml,
   ChargeItem, renderChargeSection, groupChargesByCcy,
-  CUSTOMERS, CCYS,
+  CUSTOMERS, CCYS, THEME_STYLES,
 } from '../shared';
 
 // A4 — Import LC Sight Settlement (IBL → Customer)
@@ -68,7 +68,7 @@ export class LcSightSettlementElement extends HTMLElement {
     const rates = (this._result?.rates ?? {}) as Record<string, number>;
     this._initCharges();
 
-    this._shadow.innerHTML = `<style>${STYLES}</style>
+    this._shadow.innerHTML = `<style>${STYLES}${THEME_STYLES}</style>
     <div class="card">
       <div class="card-title">A4 — Import LC Sight Settlement (IBL → Customer)</div>
       <form id="form">

@@ -25,7 +25,6 @@ module.exports = {
     // larger follow-up for both.
     '!src/app/payment-component/business-case-runner.component.html',
     '!src/app/web-components/**',
-    '!src/app/features/lc-payment/lc-payment.component.ts',
     // Pure Angular bootstrap wiring (DI providers, route config, <router-outlet>
     // shell) — no logic, same category as the microservice's excluded server.ts.
     '!src/app/app.component.ts',

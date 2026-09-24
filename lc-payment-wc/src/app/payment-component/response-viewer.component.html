@@ -87,7 +87,7 @@
         </colgroup>
         <thead>
           <tr class="settlement-group-header"><td colspan="6">Debit FX Conversion Pair</td></tr>
-          <tr><th>Dr/Cr</th><th>GL Account</th><th>Currency</th><th>Amount</th><th>Exchange Rate</th><th>Description</th></tr>
+          <tr><th scope="col">Dr/Cr</th><th scope="col">GL Account</th><th scope="col">Currency</th><th scope="col">Amount</th><th scope="col">Exchange Rate</th><th scope="col">Description</th></tr>
         </thead>
         <tbody>
           <tr *ngFor="let p of debitFxPairs" [class.dr]="p.drCr === 'D'" [class.cr]="p.drCr === 'C'">
@@ -104,7 +104,7 @@
         </colgroup>
         <thead>
           <tr class="settlement-group-header"><td colspan="6">Credit FX Conversion Pair</td></tr>
-          <tr><th>Dr/Cr</th><th>GL Account</th><th>Currency</th><th>Amount</th><th>Exchange Rate</th><th>Description</th></tr>
+          <tr><th scope="col">Dr/Cr</th><th scope="col">GL Account</th><th scope="col">Currency</th><th scope="col">Amount</th><th scope="col">Exchange Rate</th><th scope="col">Description</th></tr>
         </thead>
         <tbody>
           <tr *ngFor="let p of creditFxPairs" [class.dr]="p.drCr === 'D'" [class.cr]="p.drCr === 'C'">

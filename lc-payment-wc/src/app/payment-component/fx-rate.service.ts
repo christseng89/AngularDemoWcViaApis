@@ -21,13 +21,11 @@ export class FxRateService {
   constructor(private readonly http: HttpClient) {}
 
   rates(): Observable<Record<string, number>> {
-    if (!this.cache$) {
-      this.cache$ = this.http.get<{ rates: Record<string, number> }>('/api/fx/rates').pipe(
+    this.cache$ ??= this.http.get<{ rates: Record<string, number> }>('/api/fx/rates').pipe(
         map((res) => res.rates ?? {}),
         catchError(() => of({})),
         shareReplay(1),
       );
-    }
     return this.cache$;
   }
 

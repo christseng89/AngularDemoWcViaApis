@@ -1,7 +1,7 @@
 import {
   JournalResult, fmt, escapeHtml,
   ChargeItem, renderChargeSection, groupChargesByCcy,
-  CUSTOMERS, CCYS,
+  CUSTOMERS, CCYS, THEME_STYLES,
 } from '../shared';
 
 const STYLES = `
@@ -62,7 +62,7 @@ export class LcExportAdviseElement extends HTMLElement {
     const rates = (this._result?.rates ?? {}) as Record<string, number>;
     this._initCharges();
 
-    this._shadow.innerHTML = `<style>${STYLES}</style>
+    this._shadow.innerHTML = `<style>${STYLES}${THEME_STYLES}</style>
     <div class="card">
       <div class="card-title">B1 — Export LC Advise</div>
       <form id="form">

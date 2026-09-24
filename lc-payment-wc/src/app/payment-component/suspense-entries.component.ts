@@ -41,11 +41,10 @@ let rowIdCounter = 0;
  * repeat type just for this one case.
  */
 @Component({
-  selector: 'app-suspense-entries',
-  standalone: true,
-  imports: [CommonModule, FormsModule],
-  templateUrl: './suspense-entries.component.html',
-  styleUrls: ['./suspense-entries.component.scss'],
+    selector: 'app-suspense-entries',
+    imports: [CommonModule, FormsModule],
+    templateUrl: './suspense-entries.component.html',
+    styleUrls: ['./suspense-entries.component.scss']
 })
 export class SuspenseEntriesComponent {
   @Input({ required: true }) label!: string;

@@ -1,7 +1,7 @@
 import {
   JournalResult, fmt, escapeHtml,
   ChargeItem, renderChargeSection, groupChargesByCcy,
-  CUSTOMERS, CCYS,
+  CUSTOMERS, CCYS, THEME_STYLES,
 } from '../shared';
 
 const COUNTRIES   = ['US', 'DE', 'JP', 'GB', 'CN', 'AU'];
@@ -66,7 +66,7 @@ export class LcIssueElement extends HTMLElement {
     const rates = (this._result?.rates ?? {}) as Record<string, number>;
     this._initCharges();
 
-    this._shadow.innerHTML = `<style>${STYLES}</style>
+    this._shadow.innerHTML = `<style>${STYLES}${THEME_STYLES}</style>
     <div class="card">
       <div class="card-title">A1 — Import LC Issue</div>
       <form id="form">

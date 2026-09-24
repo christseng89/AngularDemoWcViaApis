@@ -59,11 +59,10 @@ function parseFxAccount(glAccount: string): { referencedCurrency: string; isSusp
 }
 
 @Component({
-  selector: 'app-response-viewer',
-  standalone: true,
-  imports: [CommonModule],
-  templateUrl: './response-viewer.component.html',
-  styleUrls: ['./response-viewer.component.scss'],
+    selector: 'app-response-viewer',
+    imports: [CommonModule],
+    templateUrl: './response-viewer.component.html',
+    styleUrls: ['./response-viewer.component.scss']
 })
 export class ResponseViewerComponent {
   @Input() classification: ClassificationResult | null = null;
@@ -220,7 +219,7 @@ export class ResponseViewerComponent {
         // Suspense pair — attribute by matching the Other-Ccy-site's own gross magnitude against
         // the Suspense-Debit/Suspense-Credit clearing sums for this currency.
         const grossAmount = Number(otherCcySite.amount);
-        const debitSum = suspenseDebitSums.get(otherCcySite.currency) ?? NaN;
+        const debitSum = suspenseDebitSums.get(otherCcySite.currency) ?? Number.NaN;
         (Math.abs(grossAmount - debitSum) < 0.005 ? suspensePairsDebit : suspensePairsCredit).push([debit, credit]);
       }
     }
@@ -301,9 +300,12 @@ export class ResponseViewerComponent {
       push(p.currency, { drCrIndicator: p.drCr, glAccount: p.account, amount: String(p.amount), entryType: 'Credit FX Conversion Pair', description: p.site, exchangeRate: p.rate != null ? p.rate.toFixed(6) : undefined });
     }
 
-    return [...byCurrency.keys()].sort().map((currency) => {
+    return [...byCurrency.keys()].sort((left, right) => left.localeCompare(right)).map((currency) => {
       // Stable sort: 'D' before 'C', relative order within each direction unchanged.
-      const entries = [...byCurrency.get(currency)!].sort((a, b) => (a.drCrIndicator === b.drCrIndicator ? 0 : a.drCrIndicator === 'D' ? -1 : 1));
+      const entries = [...byCurrency.get(currency)!].sort((left, right) => {
+        if (left.drCrIndicator === right.drCrIndicator) return 0;
+        return left.drCrIndicator === 'D' ? -1 : 1;
+      });
       const dp = this.currencyDecimals[currency] ?? 2;
       const totalDebit = entries.filter((e) => e.drCrIndicator === 'D').reduce((sum, e) => sum.plus(e.amount), new Decimal(0));
       const totalCredit = entries.filter((e) => e.drCrIndicator === 'C').reduce((sum, e) => sum.plus(e.amount), new Decimal(0));

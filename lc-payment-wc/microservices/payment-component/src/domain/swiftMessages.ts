@@ -13,12 +13,12 @@
  * preserved on the leg (never coerced away) so a future message-routing
  * distinction, if one is ever added, has something to key off.
  */
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import type { PaymentLeg, SwiftMessage, SwiftMessageType } from '../types';
 import { BusinessValidationError } from '../errors';
 
-const ADV_REQUIRES_COVER_ADVICE: readonly string[] = ['MT103', 'PACS008'];
-const COVER_REQUIRES_ADVICE: readonly string[] = ['MT202COV', 'PACS009COV'];
+const ADV_REQUIRES_COVER_ADVICE = new Set(['MT103', 'PACS008']);
+const COVER_REQUIRES_ADVICE = new Set(['MT202COV', 'PACS009COV']);
 
 /**
  * Cross-field rule (§7, consolidated from both onChange handlers):
@@ -32,8 +32,8 @@ export function validateSwiftCrossField(creditLegs: readonly PaymentLeg[]): void
   creditLegs.forEach((leg, index) => {
     const cover = leg.payCoverMsgType;
     const advice = leg.payAdviceMsgType;
-    if (cover && COVER_REQUIRES_ADVICE.includes(cover)) {
-      if (!advice || !ADV_REQUIRES_COVER_ADVICE.includes(advice)) {
+    if (cover && COVER_REQUIRES_ADVICE.has(cover)) {
+      if (!advice || !ADV_REQUIRES_COVER_ADVICE.has(advice)) {
         throw new BusinessValidationError(
           'SWIFT_ADV_COV_MISMATCH',
           `Credit leg[${index}] (accountNo=${leg.accountNo}): The Payment Advice Message should be ` +

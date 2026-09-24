@@ -48,7 +48,8 @@ export function createPaymentInstructionsRouter(store: PaymentInstructionStore):
         dryRun: ext.dryRun,
       });
 
-      res.status(ext.dryRun ? 200 : result.created ? 201 : 200).json(result.instruction);
+      const responseStatus = !ext.dryRun && result.created ? 201 : 200;
+      res.status(responseStatus).json(result.instruction);
     } catch (err) {
       next(err);
     }

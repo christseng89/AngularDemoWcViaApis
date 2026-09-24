@@ -450,6 +450,21 @@ export function renderPaymentDetails(o: PayDetailsOpts): string {
     </div>`;
 }
 
+// App theme variables cross Shadow DOM boundaries. Every LC operation element
+// appends this shared override after its legacy prototype stylesheet.
+export const THEME_STYLES = `
+  :host{color:var(--text-primary,#172033)}
+  .card{background:var(--surface-raised,#fff);border-color:var(--border,#dce2ea)}
+  .card-title,.total-lbl,label,.sv{color:var(--text-primary,#172033)}
+  .sl,.hint{color:var(--text-secondary,#5d687b)}
+  input,select{background:var(--input-bg,#fff);color:var(--text-primary,#172033);border-color:var(--border-strong,#c8d1dd)}
+  input:focus,select:focus{border-color:var(--brand,#174ea6);box-shadow:0 0 0 3px var(--focus-ring,rgba(37,99,235,.28))}
+  option{background:var(--input-bg,#fff);color:var(--text-primary,#172033)}
+  .sum-card{background:var(--surface-accent,#eff6ff);border-color:var(--brand-soft,#dbeafe)}
+  .err{background:var(--danger-soft,#fee2e2);color:var(--danger,#b91c1c);border-color:var(--danger,#b91c1c)}
+  .note{background:var(--surface-subtle,#f8fafc);color:var(--text-secondary,#5d687b)}
+`;
+
 const FIELD_STYLE =
   'border:1px solid #d1d5db;border-radius:6px;padding:7px 10px;font-size:13px;' +
   'width:100%;box-sizing:border-box;outline:none;';

@@ -22,7 +22,7 @@
  * a combination that no longer needs to exist.)
  */
 import Decimal from 'decimal.js';
-import { randomUUID, createHash } from 'crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import type { PaymentInstruction } from '../types';
 import type { ValidatedConfirmRequest } from '../validation/requestSchema';
 import { validateDrCrBalance } from './balanceValidation';
@@ -46,8 +46,9 @@ function stableStringify(value: unknown): string {
   const obj = value as Record<string, unknown>;
   const keys = Object.keys(obj)
     .filter((k) => obj[k] !== undefined)
-    .sort();
-  return `{${keys.map((k) => `${JSON.stringify(k)}:${stableStringify(obj[k])}`).join(',')}}`;
+    .sort((left, right) => left.localeCompare(right));
+  const properties = keys.map((key) => `${JSON.stringify(key)}:${stableStringify(obj[key])}`);
+  return `{${properties.join(',')}}`;
 }
 
 /**

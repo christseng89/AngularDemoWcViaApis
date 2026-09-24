@@ -22,7 +22,7 @@
  * not an error.
  */
 import Decimal from 'decimal.js';
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import type { AccountEntry, ClassificationResult, PaymentLegInput } from '../types';
 import { sumMonetaryAmounts } from '../money';
 import { classify } from './classification';

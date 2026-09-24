@@ -1,7 +1,7 @@
 import {
   JournalResult, fmt, escapeHtml,
   ChargeItem, renderChargeSection, groupChargesByCcy,
-  CUSTOMERS, CCYS,
+  CUSTOMERS, CCYS, THEME_STYLES,
 } from '../shared';
 
 // B5 — Export LC Settlement without EBL (On Collection)
@@ -77,7 +77,7 @@ export class LcExportCollectionElement extends HTMLElement {
     const fbcTwd = s ? Number(s['fbcTwd']) : 0;
     const colFee = s ? Number(s['collectionFee']) : 0;
 
-    this._shadow.innerHTML = `<style>${STYLES}</style>
+    this._shadow.innerHTML = `<style>${STYLES}${THEME_STYLES}</style>
     <div class="card">
       <div class="card-title">B5 — Export LC On Collection (Settlement without EBL)</div>
       <form id="form">

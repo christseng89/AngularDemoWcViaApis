@@ -1,7 +1,7 @@
 import {
   JournalResult, fmt, escapeHtml,
   ChargeItem, renderChargeSection, groupChargesByCcy,
-  CUSTOMERS, CCYS,
+  CUSTOMERS, CCYS, THEME_STYLES,
 } from '../shared';
 
 const STYLES = `
@@ -67,7 +67,7 @@ export class LcExportNegoElement extends HTMLElement {
     const isSight = f.discountDays === 0;
     this._initCharges();
 
-    this._shadow.innerHTML = `<style>${STYLES}</style>
+    this._shadow.innerHTML = `<style>${STYLES}${THEME_STYLES}</style>
     <div class="card">
       <div class="card-title">B3 — Export LC Negotiation Payment</div>
       <form id="form">

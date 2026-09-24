@@ -34,13 +34,11 @@ export class CurrencyService {
   constructor(private readonly http: HttpClient) {}
 
   private records(): Observable<CurrencyRecord[]> {
-    if (!this.cache$) {
-      this.cache$ = this.http.get<{ currencies: CurrencyRecord[] }>('/api/currencies').pipe(
+    this.cache$ ??= this.http.get<{ currencies: CurrencyRecord[] }>('/api/currencies').pipe(
         map((res) => res.currencies ?? []),
         catchError(() => of([])),
         shareReplay(1),
       );
-    }
     return this.cache$;
   }
 

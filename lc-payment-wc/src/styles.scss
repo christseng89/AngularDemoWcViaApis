@@ -1,10 +1,235 @@
-/* Global styles for lc-payment-wc */
+:root {
+  --app-bg: #f3f6fa;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-subtle: #f8fafc;
+  --surface-accent: #eff6ff;
+  --text-primary: #172033;
+  --text-secondary: #5d687b;
+  --text-muted: #8a94a6;
+  --border: #dce2ea;
+  --border-strong: #c8d1dd;
+  --brand: #174ea6;
+  --brand-strong: #123b7a;
+  --brand-soft: #dbeafe;
+  --focus-ring: rgba(37, 99, 235, 0.28);
+  --success: #15803d;
+  --success-soft: #dcfce7;
+  --success-cta: #15803d;
+  --success-cta-hover: #166534;
+  --warning: #a16207;
+  --warning-soft: #fef3c7;
+  --danger: #b91c1c;
+  --danger-soft: #fee2e2;
+  --shadow: 0 18px 45px rgba(23, 32, 51, 0.08);
+  --input-bg: #ffffff;
+  --table-row: #ffffff;
+  --table-row-alt: #f8fafc;
+  --table-header: #f1f5f9;
+  --debug-surface: #f0fdf4;
+  --debug-border: #86efac;
+
+  --bs-body-bg: var(--app-bg);
+  --bs-body-color: var(--text-primary);
+  --bs-border-color: var(--border);
+  --bs-secondary-color: var(--text-secondary);
+}
+
+:root[data-theme='dark'] {
+  // Deliberately designed as a separate enterprise banking palette, not an
+  // inversion of Light. Surface steps remain visibly distinct at low luminance.
+  --app-bg: #070c14;
+  --surface: #0d1624;
+  --surface-raised: #152238;
+  --surface-subtle: #101b2c;
+  --surface-accent: #172d4b;
+  --text-primary: #f1f5fb;
+  --text-secondary: #bcc7d8;
+  --text-muted: #8f9db2;
+  --border: #2d3f58;
+  --border-strong: #496482;
+  --brand: #8db8ff;
+  --brand-strong: #bdd5ff;
+  --brand-soft: #1d406c;
+  --focus-ring: rgba(141, 184, 255, 0.42);
+  --success: #9bc5aa;
+  --success-soft: #153326;
+  --success-cta: #247a59;
+  --success-cta-hover: #2f8b68;
+  --warning: #e5c16d;
+  --warning-soft: #3d3015;
+  --danger: #f0a3a8;
+  --danger-soft: #402027;
+  --shadow: 0 22px 56px rgba(0, 0, 0, 0.48);
+  --input-bg: #080f1c;
+  --table-row: #101b2c;
+  --table-row-alt: #142137;
+  --table-header: #1a2940;
+  --debug-surface: #10271e;
+  --debug-border: #416e58;
+}
+
 * {
   box-sizing: border-box;
 }
 
 body {
   margin: 0;
-  font-family: 'Segoe UI', sans-serif;
-  background: #f8fafc;
+  min-width: 320px;
+  font-family: Inter, 'Segoe UI', system-ui, sans-serif;
+  color: var(--text-primary);
+  background: var(--app-bg);
+  transition: color 160ms ease, background-color 160ms ease;
+}
+
+html[data-theme='dark'] {
+  scrollbar-color: #41516a transparent;
+  scrollbar-width: thin;
+
+  .form-control,
+  .form-select {
+    color: var(--text-primary);
+    background-color: var(--input-bg);
+    border-color: var(--border-strong);
+  }
+
+  .form-control::placeholder {
+    color: var(--text-muted);
+    opacity: 1;
+  }
+
+  .form-control:focus,
+  .form-select:focus {
+    color: var(--text-primary);
+    background-color: var(--input-bg);
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px var(--focus-ring);
+  }
+
+  .btn-confirm {
+    background: var(--success-cta);
+    border: 1px solid #59a780;
+    box-shadow: 0 8px 22px rgba(16, 84, 59, 0.4);
+  }
+
+  .btn-confirm:hover {
+    background: var(--success-cta-hover);
+  }
+
+  .classification-row.related {
+    position: relative;
+    background: linear-gradient(135deg, #101f24 0%, var(--debug-surface) 100%);
+    border-color: var(--debug-border);
+    border-left: 3px solid #6f9f88;
+    box-shadow: inset 0 1px rgba(255, 255, 255, 0.025);
+  }
+
+  .classification-row .badge.on {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: #c7dfd0;
+    background: #1b3b2e;
+    border: 1px solid #3f725a;
+    border-radius: 999px;
+    font-size: 11px;
+    letter-spacing: 0.015em;
+  }
+
+  .classification-row .badge.on::before {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #91bda3;
+    box-shadow: 0 0 0 3px rgba(145, 189, 163, 0.12);
+    content: '';
+  }
+
+  .classification-row .xor-terms {
+    gap: 7px;
+  }
+
+  .classification-row .term {
+    padding: 4px 8px;
+    border: 1px solid #2a3c4d;
+    border-radius: 5px;
+    color: var(--text-muted);
+    background: rgba(7, 12, 20, 0.36);
+  }
+
+  .classification-row .term.on {
+    color: #a9c4e8;
+    border-color: #385574;
+  }
+
+  .classification-row .types-row {
+    padding-top: 9px;
+    border-top: 1px solid rgba(143, 157, 178, 0.18);
+    color: var(--text-secondary);
+  }
+
+  .instruction-id {
+    color: #79879b;
+    letter-spacing: 0.01em;
+  }
+
+  .entries-table tbody tr:not(.settlement-group-header) {
+    background: var(--table-row);
+  }
+
+  .entries-table tbody tr:not(.settlement-group-header):nth-child(even) {
+    background: var(--table-row-alt);
+  }
+
+  .settlement-group-header td,
+  .currency-totals-row td {
+    background: var(--table-header);
+  }
+}
+
+:root[data-theme='dark'] *::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+:root[data-theme='dark'] *::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+:root[data-theme='dark'] *::-webkit-scrollbar-thumb {
+  background: #41516a;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+
+:root[data-theme='dark'] *::-webkit-scrollbar-thumb:hover {
+  background: #5a6b84;
+  background-clip: padding-box;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }

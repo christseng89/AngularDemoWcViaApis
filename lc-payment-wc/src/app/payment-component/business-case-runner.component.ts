@@ -36,11 +36,10 @@ interface DisplayResult {
 }
 
 @Component({
-  selector: 'app-business-case-runner',
-  standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, FormlyModule, ResponseViewerComponent, LegAllocatorComponent, SuspenseEntriesComponent],
-  templateUrl: './business-case-runner.component.html',
-  styleUrls: ['./business-case-runner.component.scss'],
+    selector: 'app-business-case-runner',
+    imports: [CommonModule, FormsModule, ReactiveFormsModule, FormlyModule, ResponseViewerComponent, LegAllocatorComponent, SuspenseEntriesComponent],
+    templateUrl: './business-case-runner.component.html',
+    styleUrls: ['./business-case-runner.component.scss']
 })
 export class BusinessCaseRunnerComponent implements OnDestroy {
   readonly moduleGroups: ModuleGroup[] = MODULE_GROUPS;
@@ -661,7 +660,7 @@ export class BusinessCaseRunnerComponent implements OnDestroy {
   }
 
   onConfirm(): void {
-    if (!this.selectedCase || this.selectedCase.verdict !== 'PASS') return;
+    if (this.selectedCase?.verdict !== 'PASS') return;
     // H-2 client-side guard: never POST an over-precise amount (the server would 409/400 it anyway).
     if (this.hasAmountScaleError) {
       this.confirmError = 'Fix amount precision before confirming — ' + this.allAmountScaleErrors.join(' ');

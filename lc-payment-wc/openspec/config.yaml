@@ -1,0 +1,36 @@
+schema: spec-driven
+
+context: |
+  專案：LC Payment Component Simulator、Angular Web Component 展示層與 Payment Component 微服務。
+  技術棧：Angular、TypeScript、Express、Jest、OpenAPI、decimal.js。
+  業務領域：進口信用證、出口信用證、付款指示、結算分錄、Suspense Bridge、外匯轉換與 SWIFT 訊息。
+  權威順序：Product Owner 最新明確決策；已核准 OpenSpec change；OAS；current OpenSpec specs；自動化測試；現有實作。
+  金額 MUST 使用精確十進位運算並依幣別小數位處理；JavaScript 浮點數不得成為權威帳務計算來源。
+  Payment Component 只負責其付款指示、結算分錄及訊息契約；上游 LC、Balance、Charge 元件的帳務責任不得被混入。
+  OpenSpec current specs 只描述已實作且可觀察的行為。尚未完成的變更 MUST 留在 openspec/changes/。
+
+rules:
+  proposal:
+    - MUST 說明原因、範圍、非目標、受影響能力、相容性、遷移與回復。
+    - 不得把 Demo 假資料、推測規則或未實作 Trade Finance 行為描述為正式銀行產品規則。
+  specs:
+    - 每項規範性要求 MUST 使用 SHALL 或 MUST，並至少包含一個 WHEN／THEN Scenario。
+    - 金額、借貸平衡、FX、Suspense、SWIFT、冪等及持久化要求 MUST 同時包含成功與主要拒絕／邊界情境。
+    - specs 只描述可觀察契約；技術實作與 framework 選擇放在 design。
+  design:
+    - MUST 說明服務邊界、資料流、失敗行為、安全、可訪問性、相容性與回復策略。
+    - UI 主題 MUST 以語義 token 實作，不得把業務狀態依賴單一顏色。
+  tasks:
+    - MUST 採測試先行且列出準確檔案、命令與驗收證據。
+    - 行為變更 MUST 同步 OpenSpec、測試、build 與 Sonar Quality Gate。
+
+operations:
+  apply:
+    guidance:
+      - proposal、delta specs、design、tasks 及 BA review 完整前不得實作。
+      - 保留無關工作樹修改，不得手工修改 generated coverage 或 build output。
+  archive:
+    guidance:
+      - 只有 implementation、tests、build、Sonar 與全部 tasks 完成後才能 archive。
+      - archive 前後 MUST 執行 strict validation；若 CLI 不可用，MUST 記錄限制並進行結構審查。
+

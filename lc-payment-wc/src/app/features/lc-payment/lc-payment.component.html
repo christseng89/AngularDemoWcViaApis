@@ -2,12 +2,46 @@
 
   <!-- Page Header -->
   <div class="page-header">
-    <h1 class="page-title">LC Payment Journal</h1>
-    <p class="page-subtitle">Web Component Demo — CITF-correct Letter of Credit accounting entries</p>
+    <div class="page-heading">
+      <p class="page-kicker">TRADE FINANCE · PAYMENT OPERATIONS</p>
+      <h1 class="page-title">LC Payment Journal</h1>
+      <p class="page-subtitle">Web Component Demo — CITF-correct Letter of Credit accounting entries</p>
+    </div>
+
+    <div class="theme-control" role="radiogroup" aria-label="Colour theme">
+      <span class="theme-label">Theme</span>
+      <label
+        *ngFor="let option of themeOptions"
+        class="theme-option"
+        [class.active]="theme.preference() === option.id"
+        [attr.aria-label]="option.label + ' theme'">
+        <input
+          class="theme-input"
+          type="radio"
+          name="theme-preference"
+          [value]="option.id"
+          [checked]="theme.preference() === option.id"
+          [attr.aria-label]="option.label + ' theme'"
+          (change)="setTheme(option.id)" />
+        <span aria-hidden="true">{{ option.icon }}</span>
+        {{ option.label }}
+      </label>
+    </div>
   </div>
 
-  <!-- Main Tab Bar: Import / Export -->
+  <!-- Main Tab Bar: Simulator / Import / Export -->
   <ul class="nav nav-tabs main-tabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button
+        class="nav-link"
+        [class.active]="activeTab === 'payment-component'"
+        (click)="setMainTab('payment-component')"
+        type="button"
+        role="tab"
+        [attr.aria-selected]="activeTab === 'payment-component'">
+        <span class="tab-icon">&#x1F517;</span> Payment Component Simulator
+      </button>
+    </li>
     <li class="nav-item" role="presentation">
       <button
         class="nav-link"
@@ -28,17 +62,6 @@
         role="tab"
         [attr.aria-selected]="activeTab === 'export'">
         <span class="tab-icon">&#x2B06;</span> Export LC
-      </button>
-    </li>
-    <li class="nav-item" role="presentation">
-      <button
-        class="nav-link"
-        [class.active]="activeTab === 'payment-component'"
-        (click)="setMainTab('payment-component')"
-        type="button"
-        role="tab"
-        [attr.aria-selected]="activeTab === 'payment-component'">
-        <span class="tab-icon">&#x1F517;</span> Payment Component Simulator
       </button>
     </li>
   </ul>

@@ -1,7 +1,7 @@
 import {
   JournalResult, fmt, escapeHtml,
   ChargeItem, renderChargeSection, groupChargesByCcy,
-  CUSTOMERS, CCYS,
+  CUSTOMERS, CCYS, THEME_STYLES,
 } from '../shared';
 
 const STYLES = `
@@ -66,7 +66,7 @@ export class LcExportConfirmedElement extends HTMLElement {
     const quartersPreview = Math.ceil(f.tenorDays / 90);
     this._initCharges();
 
-    this._shadow.innerHTML = `<style>${STYLES}</style>
+    this._shadow.innerHTML = `<style>${STYLES}${THEME_STYLES}</style>
     <div class="card">
       <div class="card-title">B2 — Export LC Confirmed</div>
       <form id="form">

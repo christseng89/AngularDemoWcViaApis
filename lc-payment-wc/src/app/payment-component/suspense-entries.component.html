@@ -6,15 +6,16 @@
 
   <div class="suspense-row" *ngFor="let row of rows; trackBy: trackById">
     <input
+      [attr.aria-label]="label + ' amount for row ' + row.id"
       type="number" min="0" step="any"
       [(ngModel)]="row.amount"
       (ngModelChange)="onFieldChange()"
       placeholder="Amount" />
-    <select [(ngModel)]="row.currency" (ngModelChange)="onFieldChange()">
+    <select [attr.aria-label]="label + ' currency for row ' + row.id" [(ngModel)]="row.currency" (ngModelChange)="onFieldChange()">
       <option value="" disabled>Currency</option>
       <option *ngFor="let c of currencies$ | async" [value]="c">{{ c }}</option>
     </select>
-    <select [(ngModel)]="row.sourceComponent" (ngModelChange)="onFieldChange()" title="Which upstream component already booked the other leg of this entry">
+    <select [attr.aria-label]="label + ' source component for row ' + row.id" [(ngModel)]="row.sourceComponent" (ngModelChange)="onFieldChange()" title="Which upstream component already booked the other leg of this entry">
       <option value="CHARGE">Charge</option>
       <option value="BALANCE">Liability</option>
     </select>

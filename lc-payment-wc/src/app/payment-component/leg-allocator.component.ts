@@ -168,11 +168,10 @@ function clampPct(value: Decimal.Value): Decimal {
  * <span>), so there's exactly one source of truth for a given edit.
  */
 @Component({
-  selector: 'app-leg-allocator',
-  standalone: true,
-  imports: [CommonModule, FormsModule],
-  templateUrl: './leg-allocator.component.html',
-  styleUrls: ['./leg-allocator.component.scss'],
+    selector: 'app-leg-allocator',
+    imports: [CommonModule, FormsModule],
+    templateUrl: './leg-allocator.component.html',
+    styleUrls: ['./leg-allocator.component.scss']
 })
 export class LegAllocatorComponent implements OnInit, OnChanges {
   @Input({ required: true }) side!: LegSide;
@@ -497,7 +496,7 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
     const gap = money(this.totalAmount.minus(currentSum), scale);
     if (gap.isZero()) return;
 
-    const last = this.rows[this.rows.length - 1]!;
+    const last = this.rows.at(-1)!;
     if (gap.greaterThan(0)) {
       // Total grew — the new money just adds to the last row directly. No cascading: growing the
       // total doesn't require taking anything from any other row.
@@ -615,21 +614,23 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
     const pairs: FxPairEntry[] = [];
     for (const row of this.rows) {
       if (!this.needsRate(row) || row.pct.lessThanOrEqualTo(0)) continue;
-      pairs.push({
-        drCr: nativeDrCr,
-        account: `FX Exchange ${row.currency}`,
-        currency: this.transactionCurrency,
-        amount: row.amountTxCcy.toNumber(),
-        site: 'Trx Ccy',
-      });
-      pairs.push({
-        drCr: oppositeDrCr,
-        account: `FX Exchange ${this.transactionCurrency}`,
-        currency: row.currency,
-        amount: this.accountCcyAmount(row),
-        site: 'Other Ccy',
-        rate: row.rate.toNumber(),
-      });
+      pairs.push(
+        {
+          drCr: nativeDrCr,
+          account: `FX Exchange ${row.currency}`,
+          currency: this.transactionCurrency,
+          amount: row.amountTxCcy.toNumber(),
+          site: 'Trx Ccy',
+        },
+        {
+          drCr: oppositeDrCr,
+          account: `FX Exchange ${this.transactionCurrency}`,
+          currency: row.currency,
+          amount: this.accountCcyAmount(row),
+          site: 'Other Ccy',
+          rate: row.rate.toNumber(),
+        },
+      );
     }
     return pairs;
   }
@@ -772,7 +773,7 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
     row.driver = 'pct';
     row.amountTxCcy = money(this.totalAmount.times(row.pct).dividedBy(100), this.scaleFor(this.transactionCurrency));
     row.accountCcyOverride = null; // recomputed via %, not a fresh account-ccy retype — see Row.accountCcyOverride
-    this.finishPctEdit(row, wentThroughWaterfall);
+    this.finishWaterfallEdit(row, wentThroughWaterfall);
     // Scoped to the genuine multi-row waterfall only — NOT the single-row (not-yet-split) bypass,
     // where fixRow()'s pre-existing "typing a smaller value splits off a new remainder" behavior
     // must keep showing the edited row at its own (possibly 0) value, not silently vanish it in
@@ -794,15 +795,6 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
    * When the waterfall did NOT run (still a single, not-yet-split row), delegates to fixRow(row) —
    * the ORIGINAL, unchanged "typing a smaller % splits off a new remainder row" behavior.
    */
-  private finishPctEdit(row: Row, wentThroughWaterfall: boolean): void {
-    if (wentThroughWaterfall) {
-      row.isRemainder = false;
-      this.ensureRemainderRow();
-    } else {
-      this.fixRow(row);
-    }
-  }
-
   /**
    * User-requested "waterfall" rebalancing rule (business-requirement-confirmed, v1.12.3
    * REPLACES the earlier v1.12.0 "adjacent neighbor" model — see below) for editing an Amount
@@ -988,7 +980,7 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
     row.accountCcyOverride = null;
     row.driver = 'amount';
     row.pct = this.totalAmount.greaterThan(0) ? row.amountTxCcy.dividedBy(this.totalAmount).times(100).toDecimalPlaces(2, Decimal.ROUND_HALF_UP) : new Decimal(0);
-    this.finishAmountEdit(row, wentThroughWaterfall);
+    this.finishWaterfallEdit(row, wentThroughWaterfall);
     // Scoped to the genuine multi-row waterfall only — see the identical note in onPctInput above.
     if (wentThroughWaterfall && this.pruneZeroRow(row)) this.emit(); // the edited row itself settled at 0/0 — remove it (2026-08-12)
   }
@@ -1032,11 +1024,12 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
     // comment), so it rounds to the TRANSACTION currency's own scale, not row.currency's.
     const suspenseBucket = this.suspenseCurrencyTotals[row.currency];
     const matchesSuspenseBucket = !!suspenseBucket && amount.equals(new Decimal(suspenseBucket.rawTotal));
-    const requested = matchesSuspenseBucket
-      ? money(suspenseBucket.trxEquivalent, this.scaleFor(this.transactionCurrency))
-      : row.rate.greaterThan(0)
-        ? money(amount.dividedBy(row.rate), this.scaleFor(this.transactionCurrency))
-        : new Decimal(0);
+    let requested = new Decimal(0);
+    if (matchesSuspenseBucket) {
+      requested = money(suspenseBucket.trxEquivalent, this.scaleFor(this.transactionCurrency));
+    } else if (row.rate.greaterThan(0)) {
+      requested = money(amount.dividedBy(row.rate), this.scaleFor(this.transactionCurrency));
+    }
     // Same waterfall rule as onAmountInput above — this is just an alternate input surface for
     // the identical underlying amountTxCcy field, so it must rebalance neighbors the same way.
     const index = this.rows.indexOf(row);
@@ -1056,7 +1049,7 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
     row.accountCcyOverride = row.amountTxCcy.equals(requested) ? amount : null;
     row.driver = 'amount';
     row.pct = this.totalAmount.greaterThan(0) ? row.amountTxCcy.dividedBy(this.totalAmount).times(100).toDecimalPlaces(2, Decimal.ROUND_HALF_UP) : new Decimal(0);
-    this.finishAmountEdit(row, wentThroughWaterfall);
+    this.finishWaterfallEdit(row, wentThroughWaterfall);
     // Scoped to the genuine multi-row waterfall only — see the identical note in onPctInput above.
     if (wentThroughWaterfall && this.pruneZeroRow(row)) this.emit(); // the edited row itself settled at 0/0 — remove it (2026-08-12)
   }
@@ -1082,7 +1075,7 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
    * When the waterfall did NOT run (still a single, not-yet-split row), delegates to fixRow(row)
    * — the ORIGINAL, unchanged "typing a smaller amount splits off a new remainder row" behavior.
    */
-  private finishAmountEdit(row: Row, wentThroughWaterfall: boolean): void {
+  private finishWaterfallEdit(row: Row, wentThroughWaterfall: boolean): void {
     if (wentThroughWaterfall) {
       row.isRemainder = false;
       this.ensureRemainderRow();
@@ -1227,7 +1220,7 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
       // over-allocation, not just %-drift) — silently "fixing" the last row's % there would mask
       // the real over-allocation the Total Allocated warning exists to surface.
       if (this.rows.length > 0 && !amountRemaining.isNegative()) {
-        const last = this.rows[this.rows.length - 1]!;
+        const last = this.rows.at(-1)!;
         const othersPct = this.rows.slice(0, -1).reduce((sum, r) => sum.plus(r.pct), new Decimal(0));
         last.pct = new Decimal(100).minus(othersPct).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
       }
@@ -1284,7 +1277,8 @@ export class LegAllocatorComponent implements OnInit, OnChanges {
       .sort((a, b) => {
         const aMatch = a.currency === this.transactionCurrency;
         const bMatch = b.currency === this.transactionCurrency;
-        return aMatch === bMatch ? 0 : aMatch ? -1 : 1;
+        if (aMatch === bMatch) return 0;
+        return aMatch ? -1 : 1;
       });
     this.legsChange.emit(legs);
     const valid =

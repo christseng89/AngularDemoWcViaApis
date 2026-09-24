@@ -1,7 +1,7 @@
 import {
   JournalResult, fmt, escapeHtml,
   ChargeItem, renderChargeSection, groupChargesByCcy,
-  CUSTOMERS, CCYS,
+  CUSTOMERS, CCYS, THEME_STYLES,
 } from '../shared';
 
 const STYLES = `
@@ -88,7 +88,7 @@ export class LcExportSettlementElement extends HTMLElement {
     const fbcTwd = s ? Number(s['fbcTwd']) : 0;
     const comm   = s ? Number(s['commTwd']) : 0;
 
-    this._shadow.innerHTML = `<style>${STYLES}</style>
+    this._shadow.innerHTML = `<style>${STYLES}${THEME_STYLES}</style>
     <div class="card">
       <div class="card-title">B4 — Export LC Settlement</div>
       <form id="form">
