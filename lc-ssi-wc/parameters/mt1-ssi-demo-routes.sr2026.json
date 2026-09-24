@@ -35,38 +35,102 @@
         "INDA": {
           "accountReferenceTemplate": "DEMO-{currency}-CITI-INDA",
           "sourceRecordId": "MT1-NOSTRO-CITI-INDA",
-          "version": 1
+          "version": 1,
+          "mtProjectionByProfile": {
+            "MT103-BASE-SR2026": {
+              "tag": "53",
+              "option": "A",
+              "officialDescription": "Sender's Correspondent"
+            },
+            "MT103-STP-SR2026": {
+              "tag": "53",
+              "option": "A",
+              "officialDescription": "Sender's Correspondent"
+            },
+            "MT103-REMIT-SR2026": {
+              "tag": "53",
+              "option": "A",
+              "officialDescription": "Sender's Correspondent"
+            }
+          }
         },
         "INGA": {
           "accountReferenceTemplate": "DEMO-{currency}-CITI-INGA",
           "sourceRecordId": "MT1-SSI-CITI-INGA",
-          "version": 1
+          "version": 1,
+          "mtProjectionByProfile": {
+            "MT103-BASE-SR2026": {
+              "tag": "54",
+              "option": "A",
+              "officialDescription": "Receiver's Correspondent"
+            },
+            "MT103-STP-SR2026": {
+              "tag": "54",
+              "option": "A",
+              "officialDescription": "Receiver's Correspondent"
+            },
+            "MT103-REMIT-SR2026": {
+              "tag": "54",
+              "option": "A",
+              "officialDescription": "Receiver's Correspondent"
+            }
+          }
         }
       },
       "coveRelationships": [
         {
           "role": "INSTRUCTING_REIMBURSEMENT_AGENT",
           "owner": "OWN_SSI_OR_ACCOUNT_MASTER",
-          "institutionSide": "LOCAL",
+          "accountOwnerSide": "LOCAL",
+          "accountServicerSide": "COUNTERPARTY",
           "accountReferenceTemplate": "DEMO-{currency}-CITI-COVE-INSTRUCTING",
           "sourceRecordId": "MT1-NOSTRO-CITI-COVE-INSTRUCTING",
           "version": 1,
-          "mtTag": "53",
-          "mtOption": "A",
-          "mtOfficialDescription": "Sender's Correspondent",
+          "mtProjectionByProfile": {
+            "MT103-BASE-SR2026": {
+              "tag": "53",
+              "option": "A",
+              "officialDescription": "Sender's Correspondent"
+            },
+            "MT103-STP-SR2026": {
+              "tag": "53",
+              "option": "A",
+              "officialDescription": "Sender's Correspondent"
+            },
+            "MT103-REMIT-SR2026": {
+              "tag": "53",
+              "option": "A",
+              "officialDescription": "Sender's Correspondent"
+            }
+          },
           "mxAgentElement": "InstgRmbrsmntAgt",
           "mxAccountElement": "InstgRmbrsmntAgtAcct"
         },
         {
           "role": "INSTRUCTED_REIMBURSEMENT_AGENT",
           "owner": "COUNTERPARTY_SSI",
-          "institutionSide": "COUNTERPARTY",
+          "accountOwnerSide": "COUNTERPARTY",
+          "accountServicerSide": "LOCAL",
           "accountReferenceTemplate": "DEMO-{currency}-CITI-COVE-INSTRUCTED",
           "sourceRecordId": "MT1-SSI-CITI-COVE-INSTRUCTED",
           "version": 1,
-          "mtTag": "54",
-          "mtOption": "A",
-          "mtOfficialDescription": "Receiver's Correspondent",
+          "mtProjectionByProfile": {
+            "MT103-BASE-SR2026": {
+              "tag": "54",
+              "option": "A",
+              "officialDescription": "Receiver's Correspondent"
+            },
+            "MT103-STP-SR2026": {
+              "tag": "54",
+              "option": "A",
+              "officialDescription": "Receiver's Correspondent"
+            },
+            "MT103-REMIT-SR2026": {
+              "tag": "54",
+              "option": "A",
+              "officialDescription": "Receiver's Correspondent"
+            }
+          },
           "mxAgentElement": "InstdRmbrsmntAgt",
           "mxAccountElement": "InstdRmbrsmntAgtAcct"
         }

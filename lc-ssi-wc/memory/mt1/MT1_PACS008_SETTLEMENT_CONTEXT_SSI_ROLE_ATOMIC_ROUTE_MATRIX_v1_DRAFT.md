@@ -57,6 +57,8 @@ These are official profile-specific option sets used by `POL-MT1-PROFILE-OPTION-
 
 `Base` and `REMIT` use the same A/B/D sets for 53a, 54a and 55a. STP permits 53a A/B, 54a A, 55a A, 56a A and 57a A. REMIT is effective only when its controlled Product profile/service/community/MUG gate permits it.
 
+The evidence-projection pairs are Base↔pacs.008 plain and STP↔pacs.008 STP. REMIT is MT-only. A paired result is two native representations of one governed SSI route, not a field-for-field conversion: each projection independently applies its profile Mapping Key and points to the same `routeBindingId` and snapshot. Missing or incompatible paired metadata fails closed as `PROFILE_INCOMPLETE`; the Resolver never substitutes plain for REMIT.
+
 Candidate matching uses the full Mapping Key: `SR + Message + Direction + Sequence/Subsequence + Settlement Leg + Tag + Option + Official Role + Business Function/Profile`. For native MX roles, option compatibility means conformance with governed profile mapping metadata; an MT option is required only where that mapping explicitly defines one.
 
 ## 4. Settlement context and route outcome matrix

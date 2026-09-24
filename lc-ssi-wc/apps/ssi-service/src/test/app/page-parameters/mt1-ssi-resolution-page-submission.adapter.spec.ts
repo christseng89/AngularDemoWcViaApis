@@ -24,6 +24,121 @@ describe("Mt1SsiResolutionPageSubmissionAdapter", () => {
     routes,
   );
 
+  const executeProfile = (
+    profileId: string,
+    scenarioSuffix = "MT1-INDA-SSI",
+  ) => {
+    const selectedDefinition = source
+      .all("SR2026")
+      .find(({ profile }) => profile.profileId === profileId)!;
+    const selectedScenario = selectedDefinition.scenarios.find(
+      ({ scenarioId }) => scenarioId.endsWith(`:${scenarioSuffix}`),
+    )!;
+    const lookup = routes.lookup({
+      definitionId: selectedDefinition.definitionId,
+      definitionVersion: selectedDefinition.definitionVersion,
+      fixtureBindingId: selectedScenario.fixture.bindingId,
+      scenarioId: selectedScenario.scenarioId,
+      messageType: selectedDefinition.messageType,
+      sequence: selectedDefinition.sequences[0]!.sequenceId,
+      currency: "USD",
+      bookingEntity: "HK01",
+      valueDate: "2026-09-24",
+    });
+    return adapter.execute({
+      definition: selectedDefinition,
+      scenario: selectedScenario,
+      submission: {
+        definitionId: selectedDefinition.definitionId,
+        definitionVersion: selectedDefinition.definitionVersion,
+        scenarioId: selectedScenario.scenarioId,
+        fixtureBindingId: selectedScenario.fixture.bindingId,
+        contractSha256: "a".repeat(64),
+        eligibilitySnapshot: lookup.eligibilitySnapshot,
+        selectedRouteIdentity: lookup.items[0]!.selectedRouteIdentity,
+        values: {
+          ...Object.fromEntries(
+            selectedDefinition.fields.map((field) => [
+              field.fieldId,
+              selectedScenario.inputValues?.[field.fieldId] ??
+                field.defaultValue ??
+                "",
+            ]),
+          ),
+          "context.counterpartyBankServiceId": "BANK-SVC-CITIUS33",
+        },
+      },
+    });
+  };
+
+  it.each([
+    ["MT103-BASE-SR2026", "swift.cbprplus.04"],
+    ["MT103-STP-SR2026", "swift.cbprplus.stp.04"],
+  ])(
+    "returns evidence-only MT and MX views for paired profile %s",
+    (profileId, mxBusinessService) => {
+      const result = executeProfile(profileId);
+
+      expect(result.payloadGenerated).toBe(false);
+      expect(result.outputs.map(({ format }) => format)).toEqual([
+        "SWIFT_MT",
+        "ISO_20022",
+      ]);
+      expect(result.outputs).toEqual([
+        expect.objectContaining({
+          format: "SWIFT_MT",
+          messageIdentity: "MT103",
+          document: {
+            redirectDomain: null,
+            renderer:
+              "MT103 SSI evidence compatibility view from the same resolved route snapshot",
+            tags: { "53A": "/DEMO-USD-CITI-INDA\nCITIUS33" },
+            omitted: [],
+            renderingDecisions: expect.objectContaining({
+              "53A": expect.objectContaining({
+                outcome: "INCLUDE",
+                tagAndOption: "53A",
+                role: "INDA_SETTLEMENT_ACCOUNT_RELATIONSHIP",
+              }),
+              "54a": expect.objectContaining({ outcome: "NOT_APPLICABLE" }),
+              "55a": expect.objectContaining({ outcome: "NOT_APPLICABLE" }),
+              "56a": expect.objectContaining({ outcome: "NOT_APPLICABLE" }),
+              "57a": expect.objectContaining({ outcome: "NOT_APPLICABLE" }),
+            }),
+          },
+        }),
+        expect.objectContaining({
+          format: "ISO_20022",
+          messageIdentity: "pacs.008.001.08",
+          document: expect.objectContaining({
+            scope: "SSI_RESOLUTION_EVIDENCE_ONLY",
+            payloadGenerated: false,
+            businessService: mxBusinessService,
+            routeBindingId: result.routeBindingId,
+          }),
+        }),
+      ]);
+    },
+  );
+
+  it("keeps MT103 REMIT evidence MT-only", () => {
+    const result = executeProfile("MT103-REMIT-SR2026");
+
+    expect(result.payloadGenerated).toBe(false);
+    expect(result.outputs.map(({ format }) => format)).toEqual(["SWIFT_MT"]);
+    expect(result.outputs[0]).toMatchObject({
+      messageIdentity: "MT103",
+      document: {
+        redirectDomain: null,
+        renderer:
+          "MT103 SSI evidence compatibility view from the same resolved route snapshot",
+        tags: { "53A": "/DEMO-USD-CITI-INDA\nCITIUS33" },
+        omitted: [],
+        renderingDecisions: expect.any(Object),
+      },
+    });
+  });
+
   it("returns SSI-only MX resolution evidence without generating a payment payload", () => {
     const lookup = routes.lookup({
       definitionId: definition.definitionId,
@@ -70,12 +185,11 @@ describe("Mt1SsiResolutionPageSubmissionAdapter", () => {
         ssi: { id: "MT1-SSI-CITI", version: 1 },
         applicability: { id: "MT1-APP-CITI", version: 1 },
         nostro: { id: "MT1-NOSTRO-CITI", version: 1 },
-        rma: { id: "MT1-RMA-CITI", version: 1 },
         roles: [
           {
             role: "INDA_SETTLEMENT_ACCOUNT_RELATIONSHIP",
-            owner: "COUNTERPARTY_SSI",
-            recordId: "MT1-SSI-CITI",
+            owner: "OWN_SSI_OR_ACCOUNT_MASTER",
+            recordId: "MT1-NOSTRO-CITI-INDA",
             version: 1,
           },
         ],
@@ -89,14 +203,18 @@ describe("Mt1SsiResolutionPageSubmissionAdapter", () => {
             currency: "USD",
           },
         ],
-        projections: [
-          {
+        projections: expect.arrayContaining([
+          expect.objectContaining({
             kind: "ISO_20022_ELEMENT",
             identifier: "SttlmMtd",
             role: "INDA_SETTLEMENT_ACCOUNT_RELATIONSHIP",
+          }),
+          expect.objectContaining({
+            kind: "ISO_20022_ELEMENT",
+            identifier: "SttlmAcct",
             accountReference: "DEMO-USD-CITI-INDA",
-          },
-        ],
+          }),
+        ]),
       },
       outputs: [
         {
@@ -121,12 +239,16 @@ describe("Mt1SsiResolutionPageSubmissionAdapter", () => {
                   accountReference: "DEMO-USD-CITI-INDA",
                 }),
               ],
-              projections: [
+              projections: expect.arrayContaining([
                 expect.objectContaining({
                   identifier: "SttlmMtd",
                   value: "INDA",
                 }),
-              ],
+                expect.objectContaining({
+                  identifier: "SttlmAcct",
+                  value: "DEMO-USD-CITI-INDA",
+                }),
+              ]),
             },
           },
         },
@@ -184,23 +306,38 @@ describe("Mt1SsiResolutionPageSubmissionAdapter", () => {
           { role: "INSTRUCTING_REIMBURSEMENT_AGENT" },
           { role: "INSTRUCTED_REIMBURSEMENT_AGENT" },
         ],
-        projections: [
-          {
+        projections: expect.arrayContaining([
+          expect.objectContaining({
             kind: "SWIFT_MT_FIELD",
             identifier: "53",
             option: "A",
             label: "Sender's Correspondent",
-          },
-          {
+          }),
+          expect.objectContaining({
             kind: "SWIFT_MT_FIELD",
             identifier: "54",
             option: "A",
             label: "Receiver's Correspondent",
-          },
-        ],
+          }),
+        ]),
       },
     });
     expect(result.settlementRoute?.roles).toHaveLength(2);
+    expect(result.outputs[0]?.document).toMatchObject({
+      redirectDomain: null,
+      tags: {
+        "53A": "/DEMO-USD-CITI-COVE-INSTRUCTING\nCITIUS33",
+        "54A": "/DEMO-USD-CITI-COVE-INSTRUCTED\nDEMOHKHH",
+      },
+      omitted: [],
+      renderingDecisions: {
+        "53A": expect.objectContaining({ outcome: "INCLUDE" }),
+        "54A": expect.objectContaining({ outcome: "INCLUDE" }),
+        "55a": expect.objectContaining({ outcome: "NOT_APPLICABLE" }),
+        "56a": expect.objectContaining({ outcome: "NOT_APPLICABLE" }),
+        "57a": expect.objectContaining({ outcome: "NOT_APPLICABLE" }),
+      },
+    });
   });
 
   it("returns REQUIRED plus NO_ELIGIBLE_SSI when no atomic route is selected", () => {

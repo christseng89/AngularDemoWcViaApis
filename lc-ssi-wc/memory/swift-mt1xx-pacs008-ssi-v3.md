@@ -42,6 +42,14 @@ Only these governed profile identities may enter the active prototype:
 - pacs.008.001.08 plain with the governed `swift.cbprplus.04` profile; and
 - pacs.008.001.08 STP with the governed `swift.cbprplus.stp.04` profile.
 
+### 2.1 Index and evidence-projection policy
+
+The Payment SSI Index publishes three separate MT103 entries in controlled order: Base, STP, then REMIT. Base is paired with pacs.008 plain (`swift.cbprplus.04`) and STP is paired with pacs.008 STP (`swift.cbprplus.stp.04`) for presentation of two native SSI evidence projections from the same canonical `routeBindingId` and context snapshot. REMIT has no governed MX counterpart and is MT evidence only; it remains conditional on an effective approved Product/service/community/MUG profile row. The paired pacs.008 profiles are not separate selectable Index rows.
+
+This pairing is evidence-only. Every MT1 result keeps `payloadGenerated=false`; it neither establishes interchangeable profiles nor authorizes message composition, MT/MX conversion, transport selection or payment execution. The MT view contains governed FIN Tag+Option evidence and the MX view contains governed ISO 20022 settlement/reimbursement element evidence. Both views must be generated server-side from the same resolved route; the UI never translates between them.
+
+The `SWIFT_MT` evidence document reuses the product-wide compatibility-view shell: `redirectDomain=null`, a controlled MT103 SSI evidence `renderer`, `tags`, `omitted`, and `renderingDecisions`. `tags` contains only scenario-applicable resolved 53a–57a Tag+Option values. `omitted` contains only fields deliberately omitted by an authoritative rule; unselected options are never omissions. Every evaluated field family has one controlled decision: `INCLUDE`, `OMITTED_BY_RULE`, or `NOT_APPLICABLE`, with rule, canonical role, reason, and source/version provenance. This shell is display evidence only and is not a FIN block or complete MT103.
+
 The upstream adapter supplies `profileId`, `scenarioId` and `fixtureBindingId`. Raw MT/MX capture, parsing and full-message validation are not Resolver responsibilities. Unsupported or unapproved profile identities return `UNSUPPORTED_PROFILE` before SSI discovery.
 
 pacs.008 plain and STP share `MsgDefIdr=pacs.008.001.08`; therefore `MsgDefIdr` alone is insufficient and **must not** select a profile. The controlled identity is `profileId` plus the exact BAH `BizSvc`: `swift.cbprplus.04` for plain and `swift.cbprplus.stp.04` for STP. An MT code alone is likewise insufficient: the governed MT profile gate also includes its exact validation flag and, where applicable, the effective approved service, community and MUG metadata. These values are supplied by the controlled adapter/fixture and are not message-entry UI fields.

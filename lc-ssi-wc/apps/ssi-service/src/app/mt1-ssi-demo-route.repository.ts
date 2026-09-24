@@ -24,6 +24,15 @@ interface DemoSettlementRelationship {
   readonly accountReferenceTemplate: string;
   readonly sourceRecordId: string;
   readonly version: number;
+  readonly mtProjectionByProfile: Readonly<
+    Record<string, DemoMtProjection | undefined>
+  >;
+}
+
+interface DemoMtProjection {
+  readonly tag: string;
+  readonly option: string;
+  readonly officialDescription: string;
 }
 
 interface DemoCoveRelationship extends DemoSettlementRelationship {
@@ -33,10 +42,8 @@ interface DemoCoveRelationship extends DemoSettlementRelationship {
     | "THIRD_REIMBURSEMENT_AGENT";
   readonly owner:
     "OWN_SSI_OR_ACCOUNT_MASTER" | "COUNTERPARTY_SSI" | "THIRD_PARTY_SSI";
-  readonly institutionSide: "LOCAL" | "COUNTERPARTY";
-  readonly mtTag: string;
-  readonly mtOption: string;
-  readonly mtOfficialDescription: string;
+  readonly accountOwnerSide: "LOCAL" | "COUNTERPARTY";
+  readonly accountServicerSide: "LOCAL" | "COUNTERPARTY";
   readonly mxAgentElement: string;
   readonly mxAccountElement: string;
 }
@@ -88,6 +95,8 @@ export interface Mt1SsiSettlementRouteQuery {
   readonly settlementContext: "INDA" | "INGA" | "COVE";
   readonly currency: string;
   readonly messageType: string;
+  readonly profileId: string;
+  readonly evidenceFormats: readonly ("SWIFT_MT" | "ISO_20022")[];
 }
 
 @Injectable()
@@ -199,8 +208,7 @@ export class Mt1SsiDemoRouteRepository {
       query.settlementContext === "COVE"
         ? this.coveDetail(route, query)
         : this.serialDetail(route, query);
-    if (!detail || !detail.legs.length || !detail.projections.length)
-      return undefined;
+    if (!detail?.legs.length || !detail.projections.length) return undefined;
     return {
       routeBindingId: identity.routeId,
       counterparty: {
@@ -211,7 +219,6 @@ export class Mt1SsiDemoRouteRepository {
       ssi: route.ssi,
       applicability: route.applicability,
       nostro: route.nostro,
-      rma: route.rma,
       ...detail,
     };
   }
@@ -235,26 +242,54 @@ export class Mt1SsiDemoRouteRepository {
       relationship.accountReferenceTemplate,
       query.currency,
     );
-    const projection =
-      query.messageType === "MT103"
-        ? {
-            kind: "SWIFT_MT_FIELD" as const,
-            identifier: inda ? "53" : "54",
-            option: "A",
-            label: inda ? "Sender's Correspondent" : "Receiver's Correspondent",
-          }
-        : {
-            kind: "ISO_20022_ELEMENT" as const,
-            identifier: "SttlmMtd",
-            label: "Settlement Method",
-          };
+    const projections: Array<
+      ResolutionPageSettlementRoute["projections"][number]
+    > = [];
+    if (query.evidenceFormats.includes("SWIFT_MT")) {
+      const mt = relationship.mtProjectionByProfile[query.profileId];
+      if (!mt) return undefined;
+      projections.push({
+        kind: "SWIFT_MT_FIELD",
+        identifier: mt.tag,
+        option: mt.option,
+        label: mt.officialDescription,
+        role,
+        value: servicer.bic,
+        accountReference,
+        sourceRecordId: relationship.sourceRecordId,
+        version: relationship.version,
+      });
+    }
+    if (query.evidenceFormats.includes("ISO_20022")) {
+      projections.push(
+        {
+          kind: "ISO_20022_ELEMENT",
+          identifier: "SttlmMtd",
+          label: "Settlement Method",
+          role,
+          value: query.settlementContext,
+          sourceRecordId: relationship.sourceRecordId,
+          version: relationship.version,
+        },
+        {
+          kind: "ISO_20022_ELEMENT",
+          identifier: "SttlmAcct",
+          label: "Settlement Account",
+          role,
+          value: accountReference,
+          accountReference,
+          sourceRecordId: relationship.sourceRecordId,
+          version: relationship.version,
+        },
+      );
+    }
     return {
       roles: [
         {
           role,
-          owner: "COUNTERPARTY_SSI",
-          recordId: route.ssi.id,
-          version: route.ssi.version,
+          owner: inda ? "OWN_SSI_OR_ACCOUNT_MASTER" : "COUNTERPARTY_SSI",
+          recordId: relationship.sourceRecordId,
+          version: relationship.version,
         },
       ],
       legs: [
@@ -271,19 +306,7 @@ export class Mt1SsiDemoRouteRepository {
           version: relationship.version,
         },
       ],
-      projections: [
-        {
-          ...projection,
-          role,
-          value:
-            projection.kind === "SWIFT_MT_FIELD"
-              ? servicer.bic
-              : query.settlementContext,
-          accountReference,
-          sourceRecordId: relationship.sourceRecordId,
-          version: relationship.version,
-        },
-      ],
+      projections,
     };
   }
 
@@ -304,14 +327,16 @@ export class Mt1SsiDemoRouteRepository {
         version: relationship.version,
       })),
       legs: route.coveRelationships.map((relationship, index) => {
-        const institution =
-          relationship.institutionSide === "LOCAL" ? local : counterparty;
+        const accountOwner =
+          relationship.accountOwnerSide === "LOCAL" ? local : counterparty;
+        const accountServicer =
+          relationship.accountServicerSide === "LOCAL" ? local : counterparty;
         return {
           order: index + 1,
           relationship: "COVE" as const,
           role: relationship.role,
-          accountOwner: institution,
-          accountServicer: institution,
+          accountOwner,
+          accountServicer,
           accountReference: this.accountReference(
             relationship.accountReferenceTemplate,
             query.currency,
@@ -322,32 +347,81 @@ export class Mt1SsiDemoRouteRepository {
           version: relationship.version,
         };
       }),
-      projections: route.coveRelationships.map((relationship) => ({
-        ...(query.messageType === "MT103"
-          ? {
-              kind: "SWIFT_MT_FIELD" as const,
-              identifier: relationship.mtTag,
-              option: relationship.mtOption,
-              label: relationship.mtOfficialDescription,
-            }
-          : {
-              kind: "ISO_20022_ELEMENT" as const,
-              identifier: `${relationship.mxAgentElement}/${relationship.mxAccountElement}`,
-              label: relationship.role.replaceAll("_", " "),
-            }),
-        role: relationship.role,
-        value:
-          relationship.institutionSide === "LOCAL"
-            ? local.bic
-            : counterparty.bic,
-        accountReference: this.accountReference(
-          relationship.accountReferenceTemplate,
-          query.currency,
-        ),
-        sourceRecordId: relationship.sourceRecordId,
-        version: relationship.version,
-      })),
+      projections: this.coveProjections(
+        route.coveRelationships,
+        query,
+        local,
+        counterparty,
+      ),
     };
+  }
+
+  private coveProjections(
+    relationships: readonly DemoCoveRelationship[],
+    query: Mt1SsiSettlementRouteQuery,
+    local: ReturnType<Mt1SsiDemoRouteRepository["settlementInstitution"]>,
+    counterparty: ReturnType<
+      Mt1SsiDemoRouteRepository["settlementInstitution"]
+    >,
+  ): ResolutionPageSettlementRoute["projections"] {
+    const projections: ResolutionPageSettlementRoute["projections"][number][] =
+      [];
+    if (query.evidenceFormats.includes("ISO_20022"))
+      projections.push({
+        kind: "ISO_20022_ELEMENT",
+        identifier: "SttlmMtd",
+        label: "Settlement Method",
+        role: "COVE_SETTLEMENT_METHOD",
+        value: "COVE",
+        sourceRecordId: relationships[0]!.sourceRecordId,
+        version: relationships[0]!.version,
+      });
+    for (const relationship of relationships) {
+      const accountReference = this.accountReference(
+        relationship.accountReferenceTemplate,
+        query.currency,
+      );
+      const servicer =
+        relationship.accountServicerSide === "LOCAL" ? local : counterparty;
+      if (query.evidenceFormats.includes("SWIFT_MT")) {
+        const mt = relationship.mtProjectionByProfile[query.profileId];
+        if (!mt) return [];
+        projections.push({
+          kind: "SWIFT_MT_FIELD",
+          identifier: mt.tag,
+          option: mt.option,
+          label: mt.officialDescription,
+          role: relationship.role,
+          value: servicer.bic,
+          accountReference,
+          sourceRecordId: relationship.sourceRecordId,
+          version: relationship.version,
+        });
+      }
+      if (query.evidenceFormats.includes("ISO_20022"))
+        projections.push(
+          {
+            kind: "ISO_20022_ELEMENT",
+            identifier: relationship.mxAgentElement,
+            label: relationship.role.replaceAll("_", " "),
+            role: relationship.role,
+            value: servicer.bic,
+            sourceRecordId: relationship.sourceRecordId,
+            version: relationship.version,
+          },
+          {
+            kind: "ISO_20022_ELEMENT",
+            identifier: relationship.mxAccountElement,
+            label: `${relationship.role.replaceAll("_", " ")} Account`,
+            role: relationship.role,
+            value: accountReference,
+            accountReference,
+            sourceRecordId: relationship.sourceRecordId,
+            version: relationship.version,
+          },
+        );
+    }
+    return projections;
   }
 
   private bank(route: DemoRoute): DemoBank {

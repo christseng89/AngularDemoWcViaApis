@@ -39,6 +39,8 @@ The governed `transferMethod` enum is `SERIAL | COVER`.
 
 Both pacs.008 plain and STP use `MsgDefIdr=pacs.008.001.08`. `MsgDefIdr` alone is insufficient and must not select the profile. The adapter must bind `profileId` to the exact `BizSvc`: `swift.cbprplus.04` for plain or `swift.cbprplus.stp.04` for STP. An MT code alone must never select an MT profile; the controlled gate also uses the exact validation flag and applicable service/community/MUG metadata.
 
+For Index and result presentation, the controlled profile correspondences are exactly `MT103-BASE-SR2026` to `PACS008-PLAIN-SR2026` and `MT103-STP-SR2026` to `PACS008-STP-SR2026`. One successful Resolve may return both native MT and native MX SSI evidence projections only when both are bound to the same atomic route and snapshot. `MT103-REMIT-SR2026` has no MX counterpart and returns MT evidence only. All three remain `SSI_RESOLUTION_ONLY`, set `payloadGenerated=false`, and never create a complete MT103 or pacs.008 document.
+
 Each governed profile supplies allowed Mapping Keys and, where the mapping projects to MT, allowed `swiftTag` + `swiftOption` combinations. The Mapping Key direction is fixed to `OUTWARD`. Candidate eligibility must match that metadata for every required serial, intermediary and COVE role. A native MX role uses its governed MX profile mapping metadata without inventing an MT option.
 
 ## 3. Ownership exclusions
@@ -99,6 +101,8 @@ Pre-gate failures use `ssiApplicability=NOT_EVALUATED`. A successful externally 
 - source provenance.
 
 No output is a payment instruction, MT/MX payload, posting command or release authorization.
+
+The MT projection uses the shared compatibility-view document shape `redirectDomain`, `renderer`, `tags`, `omitted`, and `renderingDecisions`. It must not reuse MT202 field semantics. Each included MT103 53a–57a Tag+Option has an `INCLUDE` decision; an authoritative omission has `OMITTED_BY_RULE`; a role that is not applicable to the selected topology has `NOT_APPLICABLE`. Decisions carry the controlled rule, canonical SSI role, reason, and source/version provenance. Unchosen option alternatives are not placed in `omitted`. The MX evidence projection remains a separate ISO element view from the same route and snapshot.
 
 The contract applies controlled Product/BA policy rules `POL-MT1-ATOMIC-001`, `POL-MT1-COLLAPSED-001`, `POL-MT1-RANK-001`, `POL-MT1-FAIL-CLOSED-001`, `POL-MT1-PROFILE-OPTION-001` and `POL-MT1-DIRECTION-001` as defined by the active v3 Memory. These are not SWIFT network rules.
 

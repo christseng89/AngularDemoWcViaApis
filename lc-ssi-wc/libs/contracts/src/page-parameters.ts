@@ -84,6 +84,20 @@ export interface PageParameterProfile {
     readonly businessScenarioId: string;
     readonly businessService?: string;
   };
+  /** Governed Index presentation; absent on legacy profiles. */
+  readonly index?: {
+    readonly visible: boolean;
+    readonly groupId: string;
+    readonly label: string;
+    readonly order: number;
+    readonly generatedFields: readonly string[];
+  };
+  /** Evidence projections of one SSI route; never authorizes message conversion. */
+  readonly resolutionEvidence?: {
+    readonly formats: readonly ("SWIFT_MT" | "ISO_20022")[];
+    readonly counterpartProfileId?: string;
+    readonly counterpartBusinessService?: string;
+  };
 }
 
 export interface PageParameterDisplayIdentity {
@@ -312,6 +326,8 @@ export interface ResolutionPageDefinitionIndexItem {
   readonly businessDomain: PageParameterBusinessDomain;
   readonly transactionGroupId: string;
   readonly transactionGroupLabel: string;
+  /** Server-governed compact row label; absent on legacy Index items. */
+  readonly displayLabel?: string;
   readonly transactionGroupOrder: number;
   readonly scenarioLabel: string;
   readonly scenarioDescription: string;
@@ -536,7 +552,8 @@ export interface ResolutionPageSettlementRoute {
   readonly ssi: { readonly id: string; readonly version: number };
   readonly applicability: { readonly id: string; readonly version: number };
   readonly nostro: { readonly id: string; readonly version: number };
-  readonly rma: { readonly id: string; readonly version: number };
+  /** Absent for SSI-only domains where RMA is explicitly out of scope. */
+  readonly rma?: { readonly id: string; readonly version: number };
   readonly roles: readonly {
     readonly role: string;
     readonly owner: string;
@@ -571,7 +588,7 @@ export interface ResolutionPageSettlementRoute {
     readonly label: string;
     readonly role: string;
     readonly value: string;
-    readonly accountReference: string;
+    readonly accountReference?: string;
     readonly sourceRecordId: string;
     readonly version: number;
   }[];

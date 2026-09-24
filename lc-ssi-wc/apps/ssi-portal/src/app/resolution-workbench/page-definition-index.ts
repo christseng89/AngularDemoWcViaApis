@@ -8,6 +8,7 @@ export interface MessageDefinitionGroup {
   readonly id: string;
   readonly familyLabel: string;
   readonly messageCode: string;
+  readonly displayLabel?: string;
   readonly description: string;
   readonly inputFields: readonly string[];
   readonly profileSlots: readonly string[];
@@ -100,6 +101,7 @@ export const groupPageDefinitions = (
       existing &&
       (existing.familyLabel !== familyLabel ||
         existing.messageCode !== item.messageCode ||
+        existing.displayLabel !== item.displayLabel ||
         existing.description !== item.swiftDescription ||
         existing.order !== item.originalOrder ||
         existing.scenarioCount !== item.scenarioCount ||
@@ -111,6 +113,7 @@ export const groupPageDefinitions = (
       id: item.transactionGroupId,
       familyLabel,
       messageCode: item.messageCode,
+      ...(item.displayLabel ? { displayLabel: item.displayLabel } : {}),
       description: item.swiftDescription,
       inputFields: [
         ...new Set([...(existing?.inputFields ?? []), ...item.inputFields]),

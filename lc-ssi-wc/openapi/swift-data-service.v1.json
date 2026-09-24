@@ -47,18 +47,27 @@
         "profileId": "MT103-BASE-SR2026",
         "messageType": "MT103",
         "businessService": "FIN-MT103-BASE",
-        "allowedOptions": {
-          "53": ["A", "B", "D"],
-          "54": ["A", "B", "D"],
-          "55": ["A", "B", "D"],
-          "56": ["A", "C", "D"],
-          "57": ["A", "B", "C", "D"]
-        }
-      },
-      {
-        "profileId": "MT103-REMIT-SR2026",
-        "messageType": "MT103",
-        "businessService": "FIN-MT103-REMIT",
+        "index": {
+          "visible": true,
+          "groupId": "PAYMENT:MT103:BASE",
+          "label": "MT103 — Base",
+          "order": 1,
+          "generatedFields": [
+            "MT 53a",
+            "MT 54a",
+            "MT 55a",
+            "MT 56a",
+            "MT 57a",
+            "MX SttlmMtd",
+            "MX SttlmAcct",
+            "MX RmbrsmntAgt(+Acct)"
+          ]
+        },
+        "resolutionEvidence": {
+          "formats": ["SWIFT_MT", "ISO_20022"],
+          "counterpartProfileId": "PACS008-PLAIN-SR2026",
+          "counterpartBusinessService": "swift.cbprplus.04"
+        },
         "allowedOptions": {
           "53": ["A", "B", "D"],
           "54": ["A", "B", "D"],
@@ -71,6 +80,27 @@
         "profileId": "MT103-STP-SR2026",
         "messageType": "MT103",
         "businessService": "FIN-MT103-STP",
+        "index": {
+          "visible": true,
+          "groupId": "PAYMENT:MT103:STP",
+          "label": "MT103 — STP",
+          "order": 2,
+          "generatedFields": [
+            "MT 53a",
+            "MT 54A",
+            "MT 55A",
+            "MT 56A",
+            "MT 57A",
+            "MX SttlmMtd",
+            "MX SttlmAcct",
+            "MX RmbrsmntAgt(+Acct)"
+          ]
+        },
+        "resolutionEvidence": {
+          "formats": ["SWIFT_MT", "ISO_20022"],
+          "counterpartProfileId": "PACS008-STP-SR2026",
+          "counterpartBusinessService": "swift.cbprplus.stp.04"
+        },
         "allowedOptions": {
           "53": ["A", "B"],
           "54": ["A"],
@@ -80,10 +110,42 @@
         }
       },
       {
+        "profileId": "MT103-REMIT-SR2026",
+        "messageType": "MT103",
+        "businessService": "FIN-MT103-REMIT",
+        "index": {
+          "visible": true,
+          "groupId": "PAYMENT:MT103:REMIT",
+          "label": "MT103 — REMIT",
+          "order": 3,
+          "generatedFields": ["MT 53a", "MT 54a", "MT 55a", "MT 56a", "MT 57a"]
+        },
+        "resolutionEvidence": {
+          "formats": ["SWIFT_MT"]
+        },
+        "allowedOptions": {
+          "53": ["A", "B", "D"],
+          "54": ["A", "B", "D"],
+          "55": ["A", "B", "D"],
+          "56": ["A", "C", "D"],
+          "57": ["A", "B", "C", "D"]
+        }
+      },
+      {
         "profileId": "PACS008-PLAIN-SR2026",
         "messageType": "pacs.008.001.08",
         "messageDefinitionId": "pacs.008.001.08",
         "businessService": "swift.cbprplus.04",
+        "index": {
+          "visible": false,
+          "groupId": "PAYMENT:PACS008:PLAIN",
+          "label": "pacs.008 — Plain",
+          "order": 4,
+          "generatedFields": []
+        },
+        "resolutionEvidence": {
+          "formats": ["ISO_20022"]
+        },
         "allowedOptions": {}
       },
       {
@@ -91,6 +153,16 @@
         "messageType": "pacs.008.001.08",
         "messageDefinitionId": "pacs.008.001.08",
         "businessService": "swift.cbprplus.stp.04",
+        "index": {
+          "visible": false,
+          "groupId": "PAYMENT:PACS008:STP",
+          "label": "pacs.008 — STP",
+          "order": 5,
+          "generatedFields": []
+        },
+        "resolutionEvidence": {
+          "formats": ["ISO_20022"]
+        },
         "allowedOptions": {}
       }
     ],
@@ -2677,6 +2749,78 @@
           }
         }
       },
+      "ResolutionPageSwiftMtRenderingDecision": {
+        "type": "object",
+        "required": ["outcome"],
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": ["INCLUDE", "OMITTED_BY_RULE", "NOT_APPLICABLE"]
+          },
+          "ruleId": { "type": "string", "minLength": 1 },
+          "role": { "type": "string", "minLength": 1 },
+          "tagAndOption": { "type": "string", "pattern": "^5[3-7][A-D]$" },
+          "reason": { "type": "string", "minLength": 1 },
+          "provenance": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["sourceRecordId", "version"],
+            "properties": {
+              "sourceRecordId": { "type": "string", "minLength": 1 },
+              "version": { "type": "integer", "minimum": 1 }
+            }
+          }
+        },
+        "additionalProperties": true
+      },
+      "ResolutionPageSwiftMtCompatibilityView": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "MT compatibility or SSI evidence view. This document is not a complete FIN payment message.",
+        "required": [
+          "redirectDomain",
+          "renderer",
+          "tags",
+          "omitted",
+          "renderingDecisions"
+        ],
+        "properties": {
+          "redirectDomain": { "type": "null" },
+          "renderer": { "type": "string", "minLength": 1 },
+          "tags": {
+            "type": "object",
+            "additionalProperties": { "type": "string" }
+          },
+          "omitted": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "uniqueItems": true
+          },
+          "renderingDecisions": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ResolutionPageSwiftMtRenderingDecision"
+            }
+          },
+          "assertions": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          }
+        }
+      },
+      "ResolutionPageNonMtCompatibilityDocument": {
+        "type": "object",
+        "additionalProperties": true,
+        "not": {
+          "required": [
+            "redirectDomain",
+            "renderer",
+            "tags",
+            "omitted",
+            "renderingDecisions"
+          ]
+        }
+      },
       "ResolutionPageGeneratedOutput": {
         "type": "object",
         "additionalProperties": false,
@@ -2695,7 +2839,16 @@
           "label": { "type": "string", "minLength": 1 },
           "messageIdentity": { "type": "string", "minLength": 1 },
           "mediaType": { "type": "string", "enum": ["application/json"] },
-          "document": { "type": "object", "additionalProperties": true }
+          "document": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ResolutionPageSwiftMtCompatibilityView"
+              },
+              {
+                "$ref": "#/components/schemas/ResolutionPageNonMtCompatibilityDocument"
+              }
+            ]
+          }
         }
       },
       "ResolutionPageSettlementInstitution": {

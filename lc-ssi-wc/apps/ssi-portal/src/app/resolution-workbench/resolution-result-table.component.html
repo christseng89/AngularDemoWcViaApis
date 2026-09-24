@@ -30,10 +30,12 @@
         <dt>Applicability</dt>
         <dd>{{ selectedRoute.applicabilityId || "—" }}</dd>
       </div>
-      <div>
-        <dt>RMA</dt>
-        <dd>{{ selectedRoute.rmaId || "—" }}</dd>
-      </div>
+      @if (selectedRoute.rmaId) {
+        <div>
+          <dt>RMA</dt>
+          <dd>{{ selectedRoute.rmaId }}</dd>
+        </div>
+      }
       <div>
         <dt>Settlement route</dt>
         <dd>{{ selectedRoute.settlementRouteId || "—" }}</dd>
@@ -81,6 +83,7 @@
         <thead>
           <tr>
             <th scope="col">Tag + option</th>
+            <th scope="col">Field description</th>
             <th scope="col">Role</th>
             <th scope="col">BIC</th>
             <th scope="col">Institution</th>
@@ -97,6 +100,9 @@
               </td>
               <td>
                 <strong>{{ row.displayFieldName || "—" }}</strong>
+              </td>
+              <td>
+                <code>{{ row.role || "—" }}</code>
               </td>
               <td class="result-key">
                 <code>{{ row.bic || "—" }}</code>

@@ -103,7 +103,9 @@ export const resolutionRouteSummary = (
       nostroId: `${settlementRoute.nostro.id} v${settlementRoute.nostro.version}`,
       accountId: settlementRoute.legs[0]?.accountReference ?? "",
       applicabilityId: `${settlementRoute.applicability.id} v${settlementRoute.applicability.version}`,
-      rmaId: `${settlementRoute.rma.id} v${settlementRoute.rma.version}`,
+      rmaId: settlementRoute.rma
+        ? `${settlementRoute.rma.id} v${settlementRoute.rma.version}`
+        : "",
       counterpartyBic: settlementRoute.counterparty.bic,
       counterpartyName: settlementRoute.counterparty.name ?? "",
       roles: settlementRoute.roles.map(
@@ -114,9 +116,15 @@ export const resolutionRouteSummary = (
         (leg) =>
           `${leg.order} · ${leg.relationship} · ${leg.accountOwner.bic} → ${leg.accountServicer.bic} · ${leg.accountReference} · ${leg.currency}`,
       ),
-      projections: settlementRoute.projections.map(
-        (projection) =>
-          `${projectionIdentifier(projection)} · ${projection.label} · ${projection.value} · ${projection.accountReference}`,
+      projections: settlementRoute.projections.map((projection) =>
+        [
+          projectionIdentifier(projection),
+          projection.label,
+          projection.value,
+          projection.accountReference,
+        ]
+          .filter(Boolean)
+          .join(" · "),
       ),
     };
   }
@@ -185,41 +193,43 @@ export const resolutionRouteProjectionRows = (
     leg.accountOwner,
     leg.accountServicer,
   ]);
-  return settlementRoute.projections.map((projection, index) => {
-    const leg = settlementRoute.legs.find(
-      (candidate) =>
-        candidate.role === projection.role &&
-        candidate.accountReference === projection.accountReference,
-    );
-    const institution = institutions.find(
-      ({ bic }) => bic === projection.value,
-    );
-    const tagAndOption =
-      projection.kind === "SWIFT_MT_FIELD"
-        ? `${projection.identifier}${projection.option ?? ""}`
-        : projection.identifier;
-    return {
-      key: `${projection.kind}:${tagAndOption}:${projection.role}:${index}`,
-      sequenceId: "",
-      settlementLeg: leg?.relationship ?? "",
-      swiftTag: projection.identifier,
-      swiftOption: projection.option ?? "",
-      tagAndOption,
-      role: projection.role,
-      fieldName: projection.label,
-      displayFieldName: projection.label,
-      renderedValue: projection.value,
-      bic: institution?.bic ?? "",
-      institutionName: institution?.name ?? "",
-      accountReference: projection.accountReference,
-      partyIdentifier: "",
-      status: "RESOLVED",
-      statusLabel: "RESOLVED",
-      reasonCode: "",
-      statusDetail: `Source: ${projection.sourceRecordId} v${projection.version}`,
-      provenance: `${projection.sourceRecordId} · ${projection.version}`,
-    };
-  });
+  return settlementRoute.projections
+    .filter(({ kind }) => kind === "SWIFT_MT_FIELD")
+    .map((projection, index) => {
+      const leg = settlementRoute.legs.find(
+        (candidate) =>
+          candidate.role === projection.role &&
+          candidate.accountReference === projection.accountReference,
+      );
+      const institution = institutions.find(
+        ({ bic }) => bic === projection.value,
+      );
+      const tagAndOption =
+        projection.kind === "SWIFT_MT_FIELD"
+          ? `${projection.identifier}${projection.option ?? ""}`
+          : projection.identifier;
+      return {
+        key: `${projection.kind}:${tagAndOption}:${projection.role}:${index}`,
+        sequenceId: "",
+        settlementLeg: leg?.relationship ?? "",
+        swiftTag: projection.identifier,
+        swiftOption: projection.option ?? "",
+        tagAndOption,
+        role: projection.role,
+        fieldName: projection.label,
+        displayFieldName: projection.label,
+        renderedValue: projection.value,
+        bic: institution?.bic ?? "",
+        institutionName: institution?.name ?? "",
+        accountReference: projection.accountReference ?? "",
+        partyIdentifier: "",
+        status: "RESOLVED",
+        statusLabel: "RESOLVED",
+        reasonCode: "",
+        statusDetail: `Source: ${projection.sourceRecordId} v${projection.version}`,
+        provenance: `${projection.sourceRecordId} · ${projection.version}`,
+      };
+    });
 };
 
 export const emptyResolutionMessage = (

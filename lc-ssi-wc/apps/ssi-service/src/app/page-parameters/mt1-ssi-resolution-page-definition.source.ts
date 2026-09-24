@@ -26,7 +26,7 @@ const DEFAULT_OAS = join(
 const OAS_ARTIFACT = "openapi/swift-data-service.v1.json";
 const MEMORY_ARTIFACT = "memory/swift-mt1xx-pacs008-ssi-v3.md";
 const MEMORY_SHA =
-  "78155529D7B672A30D718794E064BCD23C8E69B25CE33872489C09BF642CC118";
+  "C5F4C7F981BC6F43406A9991DECFAF3A17FB28A9C6D4B3241F48E572D074F161";
 
 export interface Mt1SsiResolutionPageDefinitionSourceOptions {
   readonly oasPath?: string;
@@ -253,6 +253,8 @@ export class Mt1SsiResolutionPageDefinitionSource implements ResolutionPageDefin
           businessScenarioId: primaryScenario.scenarioId,
           businessService: profile.businessService,
         },
+        index: profile.index,
+        resolutionEvidence: profile.resolutionEvidence,
       },
       sequences: [
         {

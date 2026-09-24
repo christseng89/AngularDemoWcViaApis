@@ -29,14 +29,17 @@ describe("payment message index interaction contract", () => {
     expect(template).toContain('(click)="openScenario(row)"');
     expect(template).not.toContain('(dblclick)="openScenario(row)"');
     expect(template).toContain('(keydown.enter)="openScenario(row)"');
-    expect(template).toContain("Click or press Enter to open");
+    expect(template.replace(/\s+/g, " ")).toContain(
+      "Click or press Enter to open.",
+    );
   });
 
-  it("shows only SSI-generated tags while keeping a separate tag-only input column", () => {
-    expect(template).toContain("MESSAGE FAMILY");
+  it("omits the redundant family column and keeps generated tags separate from inputs", () => {
+    expect(template).not.toContain("MESSAGE FAMILY");
     expect(template).toContain("MESSAGE TYPE");
     expect(template).not.toContain("MT TYPE");
-    expect(template).toContain("group.familyLabel");
+    expect(template).not.toContain("group.familyLabel");
+    expect(template).toContain('colspan="6"');
     expect(template).toContain("group.profileCount");
     expect(template).toContain("PROFILE / BIZSVC");
     expect(template).toContain("row.profileLabel");
@@ -109,10 +112,15 @@ describe("payment message index interaction contract", () => {
 
   it("shows the governed selected scenario above the shared workbench", () => {
     const workbenchTemplate = readFileSync(
-      join(process.cwd(), "apps/ssi-portal/src/app/resolution-workbench/resolution-workbench.component.html"),
+      join(
+        process.cwd(),
+        "apps/ssi-portal/src/app/resolution-workbench/resolution-workbench.component.html",
+      ),
       "utf8",
     );
-    expect(workbenchTemplate).toContain('SCENARIO · {{ page.selectedScenarioLabel }}');
+    expect(workbenchTemplate).toContain(
+      "SCENARIO · {{ page.selectedScenarioLabel }}",
+    );
     expect(workbenchTemplate).not.toContain("STEP 03 · REVIEW AND RESOLVE");
   });
 

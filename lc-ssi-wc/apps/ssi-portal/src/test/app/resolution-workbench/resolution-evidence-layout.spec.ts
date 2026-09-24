@@ -63,7 +63,7 @@ describe("resolution evidence layout", () => {
     expect(resultTable).toContain('<th scope="col">Tag + option</th>');
   });
 
-  it("shows the business role label once, with the primary value style", () => {
+  it("keeps the official field description and business role in separate columns", () => {
     const resultTable = readFileSync(
       join(directory, "resolution-result-table.component.html"),
       "utf8",
@@ -71,7 +71,9 @@ describe("resolution evidence layout", () => {
     expect(resultTable).toContain(
       '<strong>{{ row.displayFieldName || "—" }}</strong>',
     );
-    expect(resultTable).not.toContain("row.role ||");
+    expect(resultTable).toContain('<th scope="col">Field description</th>');
+    expect(resultTable).toContain('<th scope="col">Role</th>');
+    expect(resultTable).toContain('{{ row.role || "—" }}');
   });
 
   it("omits the duplicated rendered value column from the primary table", () => {

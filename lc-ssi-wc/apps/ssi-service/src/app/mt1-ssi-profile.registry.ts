@@ -8,6 +8,18 @@ export interface Mt1SsiProfile {
   readonly messageDefinitionId?: "pacs.008.001.08";
   readonly businessService: string;
   readonly allowedOptions: Readonly<Record<string, readonly string[]>>;
+  readonly index: {
+    readonly visible: boolean;
+    readonly groupId: string;
+    readonly label: string;
+    readonly order: number;
+    readonly generatedFields: readonly string[];
+  };
+  readonly resolutionEvidence: {
+    readonly formats: readonly ("SWIFT_MT" | "ISO_20022")[];
+    readonly counterpartProfileId?: string;
+    readonly counterpartBusinessService?: string;
+  };
 }
 
 export interface Mt1SsiInputParameter {
@@ -101,6 +113,61 @@ export class Mt1SsiProfileRegistry {
     )
       return false;
     const profiles = contract["profiles"] as Record<string, unknown>[];
+    const validIndex = (profile: Record<string, unknown>): boolean => {
+      const index = profile["index"] as Record<string, unknown> | undefined;
+      return Boolean(
+        index &&
+        typeof index["visible"] === "boolean" &&
+        typeof index["groupId"] === "string" &&
+        typeof index["label"] === "string" &&
+        Number.isInteger(index["order"]) &&
+        Array.isArray(index["generatedFields"]) &&
+        index["generatedFields"].every(
+          (field) => typeof field === "string" && field.trim(),
+        ),
+      );
+    };
+    const validEvidence = (profile: Record<string, unknown>): boolean => {
+      const evidence = profile["resolutionEvidence"] as
+        Record<string, unknown> | undefined;
+      return Boolean(
+        evidence &&
+        Array.isArray(evidence["formats"]) &&
+        evidence["formats"].length > 0 &&
+        evidence["formats"].every((format) =>
+          ["SWIFT_MT", "ISO_20022"].includes(String(format)),
+        ) &&
+        (evidence["counterpartProfileId"] === undefined ||
+          typeof evidence["counterpartProfileId"] === "string") &&
+        (evidence["counterpartBusinessService"] === undefined ||
+          typeof evidence["counterpartBusinessService"] === "string"),
+      );
+    };
+    const profilesById = new Map(
+      profiles.map((profile) => [String(profile["profileId"]), profile]),
+    );
+    const validCounterpart = (profile: Record<string, unknown>): boolean => {
+      const evidence = profile["resolutionEvidence"] as Record<string, unknown>;
+      const counterpartId = evidence["counterpartProfileId"];
+      const counterpartService = evidence["counterpartBusinessService"];
+      if (counterpartId === undefined && counterpartService === undefined)
+        return true;
+      if (
+        typeof counterpartId !== "string" ||
+        typeof counterpartService !== "string"
+      )
+        return false;
+      const counterpart = profilesById.get(counterpartId);
+      const counterpartEvidence = counterpart?.["resolutionEvidence"] as
+        Record<string, unknown> | undefined;
+      return Boolean(
+        counterpart &&
+        counterpart["messageType"] === "pacs.008.001.08" &&
+        counterpart["businessService"] === counterpartService &&
+        Array.isArray(counterpartEvidence?.["formats"]) &&
+        counterpartEvidence["formats"].includes("ISO_20022"),
+      );
+    };
     return (
       new Set(profiles.map((profile) => profile["profileId"])).size === 5 &&
       profiles.every(
@@ -111,7 +178,10 @@ export class Mt1SsiProfileRegistry {
           ) &&
           typeof profile["businessService"] === "string" &&
           profile["allowedOptions"] !== null &&
-          typeof profile["allowedOptions"] === "object",
+          typeof profile["allowedOptions"] === "object" &&
+          validIndex(profile) &&
+          validEvidence(profile) &&
+          validCounterpart(profile),
       )
     );
   }

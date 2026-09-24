@@ -75,6 +75,8 @@ describe("Mt1SsiDemoRouteRepository", () => {
         settlementContext: "INGA",
         currency: "USD",
         messageType: "MT103",
+        profileId: "MT103-BASE-SR2026",
+        evidenceFormats: ["SWIFT_MT", "ISO_20022"],
       },
     );
 
@@ -82,14 +84,137 @@ describe("Mt1SsiDemoRouteRepository", () => {
       accountOwner: { bic: "CITIUS33", name: "Citibank Demo" },
       accountServicer: { bic: "DEMOHKHH", name: "Demo Bank Hong Kong" },
     });
-    expect(route?.projections).toEqual([
+    expect(route?.roles).toEqual([
       expect.objectContaining({
-        kind: "SWIFT_MT_FIELD",
-        identifier: "54",
-        option: "A",
-        value: "DEMOHKHH",
+        role: "INGA_SETTLEMENT_ACCOUNT_RELATIONSHIP",
+        owner: "COUNTERPARTY_SSI",
       }),
     ]);
+    expect(route?.projections).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          kind: "SWIFT_MT_FIELD",
+          identifier: "54",
+          option: "A",
+          value: "DEMOHKHH",
+        }),
+        expect.objectContaining({
+          kind: "ISO_20022_ELEMENT",
+          identifier: "SttlmMtd",
+          value: "INGA",
+        }),
+        expect.objectContaining({
+          kind: "ISO_20022_ELEMENT",
+          identifier: "SttlmAcct",
+          value: "DEMO-USD-CITI-INGA",
+          accountReference: "DEMO-USD-CITI-INGA",
+        }),
+      ]),
+    );
+    expect(
+      route?.projections.find(({ identifier }) => identifier === "SttlmMtd"),
+    ).not.toHaveProperty("accountReference");
+  });
+
+  it("uses own SSI ownership for INDA and returns one non-RMA route", () => {
+    const repository = new Mt1SsiDemoRouteRepository();
+    const lookup = repository.lookup({
+      definitionId: "PAYMENT-MT103-BASE-SR2026",
+      definitionVersion: "V1",
+      fixtureBindingId: "FIXTURE-1",
+      scenarioId: "MT103-BASE-SR2026:MT1-INDA-SSI",
+      messageType: "MT103",
+      sequence: "SSI_ROUTE",
+      currency: "USD",
+      bookingEntity: "HK01",
+      valueDate: "2026-09-24",
+    });
+
+    const route = repository.settlementRoute(
+      lookup.items[0]!.selectedRouteIdentity!,
+      lookup.eligibilitySnapshot!.snapshotId,
+      {
+        settlementContext: "INDA",
+        currency: "USD",
+        messageType: "MT103",
+        profileId: "MT103-BASE-SR2026",
+        evidenceFormats: ["SWIFT_MT", "ISO_20022"],
+      },
+    );
+
+    expect(route).not.toHaveProperty("rma");
+    expect(route?.roles).toEqual([
+      expect.objectContaining({
+        role: "INDA_SETTLEMENT_ACCOUNT_RELATIONSHIP",
+        owner: "OWN_SSI_OR_ACCOUNT_MASTER",
+        recordId: "MT1-NOSTRO-CITI-INDA",
+      }),
+    ]);
+    expect(route?.legs[0]).toMatchObject({
+      accountOwner: { bic: "DEMOHKHH" },
+      accountServicer: { bic: "CITIUS33" },
+    });
+  });
+
+  it("projects a complete COVE boundary and separate ISO agent/account elements", () => {
+    const repository = new Mt1SsiDemoRouteRepository();
+    const lookup = repository.lookup({
+      definitionId: "PAYMENT-MT103-STP-SR2026",
+      definitionVersion: "V1",
+      fixtureBindingId: "FIXTURE-1",
+      scenarioId: "MT103-STP-SR2026:MT1-COVE-SSI",
+      messageType: "MT103",
+      sequence: "SSI_ROUTE",
+      currency: "USD",
+      bookingEntity: "HK01",
+      valueDate: "2026-09-24",
+    });
+
+    const route = repository.settlementRoute(
+      lookup.items[0]!.selectedRouteIdentity!,
+      lookup.eligibilitySnapshot!.snapshotId,
+      {
+        settlementContext: "COVE",
+        currency: "USD",
+        messageType: "MT103",
+        profileId: "MT103-STP-SR2026",
+        evidenceFormats: ["SWIFT_MT", "ISO_20022"],
+      },
+    );
+
+    expect(route?.legs).toEqual([
+      expect.objectContaining({
+        role: "INSTRUCTING_REIMBURSEMENT_AGENT",
+        accountOwner: expect.objectContaining({ bic: "DEMOHKHH" }),
+        accountServicer: expect.objectContaining({ bic: "CITIUS33" }),
+      }),
+      expect.objectContaining({
+        role: "INSTRUCTED_REIMBURSEMENT_AGENT",
+        accountOwner: expect.objectContaining({ bic: "CITIUS33" }),
+        accountServicer: expect.objectContaining({ bic: "DEMOHKHH" }),
+      }),
+    ]);
+    expect(route?.projections).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ identifier: "SttlmMtd", value: "COVE" }),
+        expect.objectContaining({
+          identifier: "InstgRmbrsmntAgt",
+          value: "CITIUS33",
+        }),
+        expect.objectContaining({
+          identifier: "InstgRmbrsmntAgtAcct",
+          value: "DEMO-USD-CITI-COVE-INSTRUCTING",
+        }),
+        expect.objectContaining({
+          identifier: "InstdRmbrsmntAgt",
+          value: "DEMOHKHH",
+        }),
+        expect.objectContaining({
+          identifier: "InstdRmbrsmntAgtAcct",
+          value: "DEMO-USD-CITI-COVE-INSTRUCTED",
+        }),
+      ]),
+    );
   });
 
   it("rejects an invalid controlled demo fixture", () => {
@@ -104,8 +229,8 @@ describe("Mt1SsiDemoRouteRepository", () => {
       }),
     );
 
-    expect(
-      () => new Mt1SsiDemoRouteRepository({ fixturePath }),
-    ).toThrow("MT1_SSI_DEMO_ROUTE_FIXTURE_INVALID");
+    expect(() => new Mt1SsiDemoRouteRepository({ fixturePath })).toThrow(
+      "MT1_SSI_DEMO_ROUTE_FIXTURE_INVALID",
+    );
   });
 });

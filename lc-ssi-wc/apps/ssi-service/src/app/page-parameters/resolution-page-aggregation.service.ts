@@ -154,7 +154,13 @@ const scenarioCountFor = (
   allDefinitions: readonly ResolutionPageDefinition[],
 ): number =>
   allDefinitions
-    .filter(({ messageType }) => messageType === contract.messageType)
+    .filter(
+      (definition) =>
+        (definition.profile.index?.groupId ??
+          `${definition.businessDomain}:${definition.messageType}`) ===
+        (contract.profile.index?.groupId ??
+          `${contract.businessDomain}:${contract.messageType}`),
+    )
     .reduce((count, definition) => count + definition.scenarios.length, 0);
 
 @Injectable()
@@ -234,6 +240,7 @@ export class ResolutionPageAggregationService {
       .map(({ definitionId }) => definitionId);
     const definitions = allDefinitions
       .filter(({ scenarios }) => scenarios.length > 0)
+      .filter(({ profile }) => profile.index?.visible !== false)
       .filter(
         (definition) =>
           !businessDomain || definition.businessDomain === businessDomain,
@@ -252,9 +259,17 @@ export class ResolutionPageAggregationService {
         omittedZeroScenarioDefinitions,
         signOffBlocked: omittedZeroScenarioDefinitions.length > 0,
       },
-      items: definitions.map((contract) =>
-        this.indexItem(contract, definitions, allDefinitions, messageOrder),
-      ),
+      items: definitions
+        .map((contract) =>
+          this.indexItem(contract, definitions, allDefinitions, messageOrder),
+        )
+        .sort(
+          (left, right) =>
+            left.transactionGroupOrder - right.transactionGroupOrder ||
+            left.transactionGroupId.localeCompare(right.transactionGroupId) ||
+            left.scenarioOrder - right.scenarioOrder ||
+            left.definitionId.localeCompare(right.definitionId),
+        ),
     };
     this.indexByReleaseAndDomain.set(cacheKey, index);
     return index;
@@ -269,8 +284,9 @@ export class ResolutionPageAggregationService {
     const primaryScenario = contract.scenarios[0]!;
     const outOfScope = primaryScenario.execution.action !== "RESOLVE_SSI";
     const profileSlots = profileSlotsFor(contract);
-    const targetProfileSlots =
-      contract.businessDomain === "PAYMENT"
+    const targetProfileSlots = contract.profile.index
+      ? contract.profile.index.generatedFields
+      : contract.businessDomain === "PAYMENT"
         ? (this.paymentMessageIndex?.findSelectable(contract.messageType)
             ?.mtCompatibility.ssiFields ?? profileSlots)
         : profileSlots;
@@ -279,15 +295,27 @@ export class ResolutionPageAggregationService {
       .join(" / ");
     const swiftDescription =
       SWIFT_DESCRIPTION[contract.messageType] ?? contract.title;
-    const transactionGroupOrder = messageOrder.get(contract.messageType)!;
+    const transactionGroupOrder =
+      contract.profile.index?.order ??
+      (contract.businessDomain === "PAYMENT" ? 100 : 0) +
+        messageOrder.get(contract.messageType)!;
+    const transactionGroupId =
+      contract.profile.index?.groupId ??
+      `${contract.businessDomain}:${contract.messageType}`;
+    const transactionGroupLabel =
+      contract.profile.index?.label ??
+      `${contract.messageType} — ${contract.businessFunction.replaceAll("_", " ")}`;
     return {
       definitionId: contract.definitionId,
       definitionVersion: contract.definitionVersion,
       contractSha256: hashCanonical(contract),
       title: contract.title,
       businessDomain: contract.businessDomain,
-      transactionGroupId: `${contract.businessDomain}:${contract.messageType}`,
-      transactionGroupLabel: `${contract.messageType} — ${contract.businessFunction.replaceAll("_", " ")}`,
+      transactionGroupId,
+      transactionGroupLabel,
+      ...(contract.profile.index
+        ? { displayLabel: contract.profile.index.label }
+        : {}),
       transactionGroupOrder,
       scenarioLabel: primaryScenario.label,
       scenarioDescription: contract.description ?? primaryScenario.label,

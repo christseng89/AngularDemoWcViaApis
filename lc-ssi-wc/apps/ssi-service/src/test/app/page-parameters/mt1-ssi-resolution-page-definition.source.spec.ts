@@ -1,5 +1,7 @@
 import { Mt1SsiResolutionPageDefinitionSource } from "../../../app/page-parameters/mt1-ssi-resolution-page-definition.source";
 import { ResolutionPageFixtureManifestService } from "../../../app/page-parameters/resolution-page-fixture-manifest.service";
+import { ResolutionPageAggregationService } from "../../../app/page-parameters/resolution-page-aggregation.service";
+import { PageParameterEnvironmentPolicy } from "../../../app/page-parameters/page-parameter-environment.policy";
 
 describe("MT1/pacs.008 OAS-driven Payment SSI page definitions", () => {
   const definitions = () =>
@@ -21,15 +23,15 @@ describe("MT1/pacs.008 OAS-driven Payment SSI page definitions", () => {
         direction: "OUTGOING",
       },
       {
-        profileId: "MT103-REMIT-SR2026",
-        messageType: "MT103",
-        businessService: "FIN-MT103-REMIT",
-        direction: "OUTGOING",
-      },
-      {
         profileId: "MT103-STP-SR2026",
         messageType: "MT103",
         businessService: "FIN-MT103-STP",
+        direction: "OUTGOING",
+      },
+      {
+        profileId: "MT103-REMIT-SR2026",
+        messageType: "MT103",
+        businessService: "FIN-MT103-REMIT",
         direction: "OUTGOING",
       },
       {
@@ -43,6 +45,111 @@ describe("MT1/pacs.008 OAS-driven Payment SSI page definitions", () => {
         messageType: "pacs.008.001.08",
         businessService: "swift.cbprplus.stp.04",
         direction: "OUTGOING",
+      },
+    ]);
+  });
+
+  it("projects three visible MT103 Index rows and keeps pacs.008 as paired evidence profiles", () => {
+    expect(
+      definitions().map(({ profile }) => ({
+        profileId: profile.profileId,
+        index: profile.index,
+        resolutionEvidence: profile.resolutionEvidence,
+      })),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          profileId: "MT103-BASE-SR2026",
+          index: expect.objectContaining({
+            visible: true,
+            groupId: "PAYMENT:MT103:BASE",
+            label: "MT103 — Base",
+            order: 1,
+          }),
+          resolutionEvidence: expect.objectContaining({
+            formats: ["SWIFT_MT", "ISO_20022"],
+            counterpartProfileId: "PACS008-PLAIN-SR2026",
+          }),
+        }),
+        expect.objectContaining({
+          profileId: "MT103-STP-SR2026",
+          index: expect.objectContaining({ visible: true, order: 2 }),
+          resolutionEvidence: expect.objectContaining({
+            formats: ["SWIFT_MT", "ISO_20022"],
+            counterpartProfileId: "PACS008-STP-SR2026",
+          }),
+        }),
+        expect.objectContaining({
+          profileId: "MT103-REMIT-SR2026",
+          index: expect.objectContaining({ visible: true, order: 3 }),
+          resolutionEvidence: { formats: ["SWIFT_MT"] },
+        }),
+        expect.objectContaining({
+          profileId: "PACS008-PLAIN-SR2026",
+          index: expect.objectContaining({ visible: false }),
+        }),
+        expect.objectContaining({
+          profileId: "PACS008-STP-SR2026",
+          index: expect.objectContaining({ visible: false }),
+        }),
+      ]),
+    );
+  });
+
+  it("publishes three separately selectable MT103 Index rows in controlled profile order", () => {
+    const source = new Mt1SsiResolutionPageDefinitionSource();
+    const aggregation = new ResolutionPageAggregationService(
+      source,
+      new PageParameterEnvironmentPolicy("DEMO"),
+    );
+
+    expect(
+      aggregation.index("SR2026", "PAYMENT").items.map((item) => ({
+        groupId: item.transactionGroupId,
+        label: item.transactionGroupLabel,
+        order: item.transactionGroupOrder,
+        generatedFields: item.targetProfileSlots,
+        scenarios: item.scenarioCount,
+      })),
+    ).toEqual([
+      {
+        groupId: "PAYMENT:MT103:BASE",
+        label: "MT103 — Base",
+        order: 1,
+        generatedFields: [
+          "MT 53a",
+          "MT 54a",
+          "MT 55a",
+          "MT 56a",
+          "MT 57a",
+          "MX SttlmMtd",
+          "MX SttlmAcct",
+          "MX RmbrsmntAgt(+Acct)",
+        ],
+        scenarios: 3,
+      },
+      {
+        groupId: "PAYMENT:MT103:STP",
+        label: "MT103 — STP",
+        order: 2,
+        generatedFields: [
+          "MT 53a",
+          "MT 54A",
+          "MT 55A",
+          "MT 56A",
+          "MT 57A",
+          "MX SttlmMtd",
+          "MX SttlmAcct",
+          "MX RmbrsmntAgt(+Acct)",
+        ],
+        scenarios: 3,
+      },
+      {
+        groupId: "PAYMENT:MT103:REMIT",
+        label: "MT103 — REMIT",
+        order: 3,
+        generatedFields: ["MT 53a", "MT 54a", "MT 55a", "MT 56a", "MT 57a"],
+        scenarios: 3,
       },
     ]);
   });

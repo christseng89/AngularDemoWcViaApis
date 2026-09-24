@@ -67,15 +67,24 @@ jest.mock("@angular/common", () => ({ DOCUMENT: Symbol("DOCUMENT") }));
 jest.mock("../../../app/resolution-workbench/parameter-lookup.facade", () => ({
   ParameterLookupFacade: class {},
 }));
-jest.mock("../../../app/resolution-workbench/generic-parameter-form.component", () => ({
-  GenericParameterFormComponent: class {},
-}));
-jest.mock("../../../app/resolution-workbench/resolution-failure.component", () => ({
-  ResolutionFailureComponent: class {},
-}));
-jest.mock("../../../app/resolution-workbench/resolution-workbench.facade", () => ({
-  ResolutionWorkbenchFacade: class {},
-}));
+jest.mock(
+  "../../../app/resolution-workbench/generic-parameter-form.component",
+  () => ({
+    GenericParameterFormComponent: class {},
+  }),
+);
+jest.mock(
+  "../../../app/resolution-workbench/resolution-failure.component",
+  () => ({
+    ResolutionFailureComponent: class {},
+  }),
+);
+jest.mock(
+  "../../../app/resolution-workbench/resolution-workbench.facade",
+  () => ({
+    ResolutionWorkbenchFacade: class {},
+  }),
+);
 
 const metadata = (provider: "BANK_SERVICE" | "SSI_COUNTERPARTY") => ({
   provider,
@@ -572,6 +581,7 @@ describe("Portal new-code component behavior", () => {
       settlementRoute: {
         ...component.result().settlementRoute,
         projections: [
+          component.result().settlementRoute!.projections[0]!,
           {
             kind: "ISO_20022_ELEMENT",
             identifier: "SttlmMtd",
@@ -585,7 +595,13 @@ describe("Portal new-code component behavior", () => {
         ],
       },
     } as never);
-    expect(component.rows()).toEqual([]);
+    expect(component.rows()).toEqual([
+      expect.objectContaining({
+        tagAndOption: "54A",
+        displayFieldName: "Receiver's Correspondent",
+        role: "INGA_SETTLEMENT_ACCOUNT_RELATIONSHIP",
+      }),
+    ]);
   });
 
   it("covers result dialog close and focus containment", async () => {

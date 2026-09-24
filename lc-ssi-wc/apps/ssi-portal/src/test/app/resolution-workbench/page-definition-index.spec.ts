@@ -156,15 +156,67 @@ describe("filterPageDefinitions", () => {
     expect(row?.profileLabel).toBe("swift.cbprplus.stp.04");
   });
 
+  it("keeps the three server-governed MT103 profiles as separate Index rows", () => {
+    const profiles = [
+      ["BASE", "MT103 — Base", 1],
+      ["STP", "MT103 — STP", 2],
+      ["REMIT", "MT103 — REMIT", 3],
+    ] as const;
+    const groups = groupPageDefinitions(
+      profiles.map(([profile, displayLabel, order]) => ({
+        ...item,
+        definitionId: `PAYMENT-MT103-${profile}-SR2026`,
+        transactionGroupId: `PAYMENT:MT103:${profile}`,
+        transactionGroupLabel: displayLabel,
+        transactionGroupOrder: order,
+        displayLabel,
+        messageCode: "MT103",
+        query: {
+          ...item.query,
+          messageFamily: "MT1_PACS008",
+          messageType: "MT103",
+          businessService: `FIN-MT103-${profile}`,
+        },
+      })),
+    );
+
+    expect(
+      groups.map(({ id, displayLabel, messageCode }) => ({
+        id,
+        displayLabel,
+        messageCode,
+      })),
+    ).toEqual([
+      {
+        id: "PAYMENT:MT103:BASE",
+        displayLabel: "MT103 — Base",
+        messageCode: "MT103",
+      },
+      {
+        id: "PAYMENT:MT103:STP",
+        displayLabel: "MT103 — STP",
+        messageCode: "MT103",
+      },
+      {
+        id: "PAYMENT:MT103:REMIT",
+        displayLabel: "MT103 — REMIT",
+        messageCode: "MT103",
+      },
+    ]);
+  });
+
   it.each([
     ["MT1_PACS008", "MT1 / pacs.008"],
     ["MT2_PACS009", "MT2 / pacs.009"],
-  ])("labels the %s family without classifying MX as an MT", (messageFamily, expected) => {
-    const [group] = groupPageDefinitions([
-      { ...item, query: { ...item.query, messageFamily } },
-    ]);
-    expect(group?.familyLabel).toBe(expected);
-  });
+  ])(
+    "labels the %s family without classifying MX as an MT",
+    (messageFamily, expected) => {
+      const [group] = groupPageDefinitions([
+        { ...item, query: { ...item.query, messageFamily } },
+      ]);
+      expect(group?.familyLabel).toBe(expected);
+    },
+  );
 
   it("fails closed when API scenario count does not reconcile", () => {
     const group = groupPageDefinitions([{ ...item, scenarioCount: 2 }])[0]!;

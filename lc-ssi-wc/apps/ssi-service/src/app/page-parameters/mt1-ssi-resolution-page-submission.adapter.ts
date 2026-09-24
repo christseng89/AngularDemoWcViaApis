@@ -61,7 +61,7 @@ export class Mt1SsiResolutionPageSubmissionAdapter {
       request,
       submission,
     );
-    const candidate = this.candidate(submission, settlementRoute);
+    const candidate = this.candidate(definition, submission, settlementRoute);
     const repository: Mt1SsiCandidateRepository = {
       discover: () => (candidate ? [candidate] : []),
     };
@@ -130,35 +130,110 @@ export class Mt1SsiResolutionPageSubmissionAdapter {
     resolutionOutcome: string,
     settlementRoute: ResolutionPageSettlementRoute | undefined,
   ): ResolutionPageExecutionResult["outputs"] {
-    if (
-      resolutionOutcome !== "ELIGIBLE_COMPLETE_ROUTE" ||
-      !settlementRoute ||
-      !definition.messageType.startsWith("pacs.008")
-    )
+    if (resolutionOutcome !== "ELIGIBLE_COMPLETE_ROUTE" || !settlementRoute)
       return [];
-    const messageIdentity =
-      request.messageDefinitionId || definition.profile.messageDefinitionId;
-    if (!messageIdentity) return [];
-    return [
-      {
-        outputId: "ssi-resolution-iso-20022",
-        format: "ISO_20022",
-        label: messageIdentity,
-        messageIdentity,
-        mediaType: "application/json",
-        document: {
-          decision: "RESOLVED",
-          code: resolutionOutcome,
-          resolutionDomain: "OUTWARD_SSI_ONLY",
-          payloadGenerated: false,
-          messageDefinitionId: messageIdentity,
-          businessService: request.businessService,
-          scope: "SSI_RESOLUTION_EVIDENCE_ONLY",
-          settlementContext: request.settlementContext,
-          settlementRoute,
+    const policy = definition.profile.resolutionEvidence;
+    if (!policy?.formats.length) return [];
+    return policy.formats.flatMap((format) => {
+      const iso = format === "ISO_20022";
+      const messageIdentity = iso
+        ? (definition.profile.messageDefinitionId ?? "pacs.008.001.08")
+        : definition.messageType;
+      const businessService = iso
+        ? (policy.counterpartBusinessService ?? request.businessService)
+        : request.businessService;
+      const route = {
+        ...settlementRoute,
+        projections: settlementRoute.projections.filter(({ kind }) =>
+          iso ? kind === "ISO_20022_ELEMENT" : kind === "SWIFT_MT_FIELD",
+        ),
+      };
+      if (!route.projections.length) return [];
+      const document = iso
+        ? {
+            decision: "RESOLVED",
+            code: resolutionOutcome,
+            resolutionDomain: "OUTWARD_SSI_ONLY",
+            payloadGenerated: false,
+            routeBindingId: settlementRoute.routeBindingId,
+            messageDefinitionId: messageIdentity,
+            businessService,
+            scope: "SSI_RESOLUTION_EVIDENCE_ONLY",
+            settlementContext: request.settlementContext,
+            settlementRoute: route,
+          }
+        : this.swiftMtEvidenceDocument(settlementRoute, request);
+      return [
+        {
+          outputId: iso
+            ? "ssi-resolution-iso-20022"
+            : "ssi-resolution-swift-mt",
+          format,
+          label: messageIdentity,
+          messageIdentity,
+          mediaType: "application/json" as const,
+          document,
         },
-      },
-    ];
+      ];
+    });
+  }
+
+  private swiftMtEvidenceDocument(
+    settlementRoute: ResolutionPageSettlementRoute,
+    request: Mt1SsiResolutionRequest,
+  ): Readonly<Record<string, unknown>> {
+    const projections = settlementRoute.projections.filter(
+      ({ kind }) => kind === "SWIFT_MT_FIELD",
+    );
+    const tags: Record<string, string> = {};
+    const renderingDecisions: Record<string, unknown> = {};
+    const includedFamilies = new Set<string>();
+    for (const projection of projections) {
+      const tagAndOption = `${projection.identifier}${projection.option ?? ""}`;
+      includedFamilies.add(projection.identifier);
+      tags[tagAndOption] = projection.accountReference
+        ? `/${projection.accountReference}\n${projection.value}`
+        : String(projection.value);
+      renderingDecisions[tagAndOption] = {
+        outcome: "INCLUDE",
+        ruleId: "POL-MT1-ATOMIC-001",
+        role: projection.role,
+        tagAndOption,
+        reason: `Resolved by the selected atomic ${request.settlementContext} SSI route`,
+        provenance: {
+          sourceRecordId: projection.sourceRecordId,
+          version: projection.version,
+        },
+      };
+    }
+    const roles: Readonly<Record<string, string>> = {
+      "53": "SENDER_CORRESPONDENT",
+      "54": "RECEIVER_CORRESPONDENT",
+      "55": "THIRD_REIMBURSEMENT_INSTITUTION",
+      "56": "INTERMEDIARY_INSTITUTION",
+      "57": "ACCOUNT_WITH_INSTITUTION",
+    };
+    for (const [family, role] of Object.entries(roles)) {
+      if (includedFamilies.has(family)) continue;
+      renderingDecisions[`${family}a`] = {
+        outcome: "NOT_APPLICABLE",
+        ruleId: "POL-MT1-ATOMIC-001",
+        role,
+        reason: `No applicable ${role} role in the selected atomic ${request.settlementContext} SSI route`,
+        provenance: {
+          sourceRecordId: settlementRoute.ssi.id,
+          version: settlementRoute.ssi.version,
+        },
+      };
+    }
+    return {
+      redirectDomain: null,
+      renderer:
+        "MT103 SSI evidence compatibility view from the same resolved route snapshot",
+      tags,
+      omitted: [],
+      renderingDecisions,
+    };
   }
 
   private request(
@@ -225,22 +300,36 @@ export class Mt1SsiResolutionPageSubmissionAdapter {
           "INDA" | "INGA" | "COVE",
         currency: request.currency,
         messageType: definition.messageType,
+        profileId: definition.profile.profileId,
+        evidenceFormats: definition.profile.resolutionEvidence?.formats ?? [],
       },
     );
   }
 
   private candidate(
+    definition: ResolutionPageDefinition,
     submission: ResolutionPageSubmission,
     settlementRoute: ResolutionPageSettlementRoute | undefined,
   ): Mt1SsiRouteCandidate | undefined {
     const selected = submission.selectedRouteIdentity;
     if (!selected || !submission.eligibilitySnapshot || !settlementRoute)
       return undefined;
+    const profile = this.profiles.find(definition.profile.profileId);
+    const optionCompatible = Boolean(
+      profile &&
+      settlementRoute.projections
+        .filter(({ kind }) => kind === "SWIFT_MT_FIELD")
+        .every(
+          ({ identifier, option }) =>
+            Boolean(option) &&
+            profile.allowedOptions[identifier]?.includes(option!),
+        ),
+    );
     return {
       routeBindingId: selected.routeId,
       snapshotToken: submission.eligibilitySnapshot.contextSha256,
       rank: [0],
-      optionCompatible: true,
+      optionCompatible,
       complete: true,
       roles: settlementRoute.roles as Mt1SsiRouteCandidate["roles"],
     };

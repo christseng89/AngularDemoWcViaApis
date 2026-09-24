@@ -50,7 +50,6 @@
             </caption>
             <thead>
               <tr>
-                <th>MESSAGE FAMILY</th>
                 <th [attr.aria-sort]="ariaSort('messageCode')">
                   <button
                     type="button"
@@ -149,11 +148,10 @@
                     $event.preventDefault(); activateGroup(group, $event)
                   "
                 >
-                  <td data-label="MESSAGE FAMILY">
-                    {{ group.familyLabel }}
-                  </td>
                   <td data-label="MESSAGE TYPE">
-                    <strong>{{ group.messageCode }}</strong>
+                    <strong>{{
+                      group.displayLabel || group.messageCode
+                    }}</strong>
                   </td>
                   <td data-label="SWIFT DESCRIPTION">
                     {{ group.description }}
@@ -200,7 +198,7 @@
                 </tr>
               } @empty {
                 <tr>
-                  <td colspan="7" class="empty-state">
+                  <td colspan="6" class="empty-state">
                     No SSI-supported message matches this search.
                   </td>
                 </tr>
@@ -510,7 +508,10 @@
         </table>
       </div>
       <footer class="scenario-drawer-footer">
-        <span>Page {{ drawerPage() }} / {{ drawerTotalPages() }} · Click or press Enter to open.</span>
+        <span
+          >Page {{ drawerPage() }} / {{ drawerTotalPages() }} · Click or press
+          Enter to open.</span
+        >
         <div>
           <button
             type="button"

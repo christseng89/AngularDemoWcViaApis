@@ -13,13 +13,19 @@ import type { ResolutionPageGeneratedOutput } from "@ssi/contracts";
         <div class="resolution-results__heading">
           <div>
             <span class="eyebrow">
-              {{ payloadGenerated() ? "Generated messages" : "Resolution evidence" }}
+              {{
+                payloadGenerated()
+                  ? "Generated messages"
+                  : "Resolution evidence"
+              }}
             </span>
             <h3 id="generated-outputs-title">
               {{
                 payloadGenerated()
                   ? "MT and ISO 20022 outputs"
-                  : "ISO 20022 SSI resolution"
+                  : outputs().length > 1
+                    ? "MT and ISO 20022 SSI evidence"
+                    : "ISO 20022 SSI resolution"
               }}
             </h3>
           </div>
