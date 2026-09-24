@@ -30,7 +30,6 @@
       "ssi": { "id": "MT1-SSI-CITI", "version": 1 },
       "applicability": { "id": "MT1-APP-CITI", "version": 1 },
       "nostro": { "id": "MT1-NOSTRO-CITI", "version": 1 },
-      "rma": { "id": "MT1-RMA-CITI", "version": 1 },
       "settlementRelationships": {
         "INDA": {
           "accountReferenceTemplate": "DEMO-{currency}-CITI-INDA",

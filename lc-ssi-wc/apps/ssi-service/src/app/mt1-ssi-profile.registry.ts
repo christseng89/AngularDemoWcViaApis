@@ -164,17 +164,16 @@ export class Mt1SsiProfileRegistry {
     const validApproval = (profile: Record<string, unknown>): boolean => {
       if (profile["profileId"] !== "MT103-REMIT-SR2026") return true;
       const approval = profile["approval"] as
-        | Record<string, unknown>
-        | undefined;
+        Record<string, unknown> | undefined;
       return Boolean(
         approval?.["status"] === "APPROVED" &&
-          ["product", "service", "community", "mug"].every(
-            (key) => typeof approval[key] === "string" && approval[key],
-          ) &&
-          typeof approval?.["effectiveFrom"] === "string" &&
-          approval["effectiveFrom"] <= this.asOfDate &&
-          typeof approval?.["effectiveTo"] === "string" &&
-          approval["effectiveTo"] >= this.asOfDate,
+        ["product", "service", "community", "mug"].every(
+          (key) => typeof approval[key] === "string" && approval[key],
+        ) &&
+        typeof approval?.["effectiveFrom"] === "string" &&
+        approval["effectiveFrom"] <= this.asOfDate &&
+        typeof approval?.["effectiveTo"] === "string" &&
+        approval["effectiveTo"] >= this.asOfDate,
       );
     };
     const profilesById = new Map(

@@ -59,7 +59,6 @@ interface DemoRoute {
   readonly ssi: Identity;
   readonly applicability: Identity;
   readonly nostro: Identity;
-  readonly rma: Identity;
   readonly settlementRelationships: Readonly<
     Record<"INDA" | "INGA", DemoSettlementRelationship>
   >;
@@ -177,7 +176,6 @@ export class Mt1SsiDemoRouteRepository {
         ssi: route.ssi,
         applicability: route.applicability,
         nostro: route.nostro,
-        rma: route.rma,
       };
       return (
         identity.routeId === hashCanonical(expected) &&
@@ -186,9 +184,7 @@ export class Mt1SsiDemoRouteRepository {
         identity.applicability.id === route.applicability.id &&
         identity.applicability.version === route.applicability.version &&
         identity.nostro.id === route.nostro.id &&
-        identity.nostro.version === route.nostro.version &&
-        identity.rma.id === route.rma.id &&
-        identity.rma.version === route.rma.version
+        identity.nostro.version === route.nostro.version
       );
     });
   }
@@ -457,7 +453,6 @@ export class Mt1SsiDemoRouteRepository {
       ssi: route.ssi,
       applicability: route.applicability,
       nostro: route.nostro,
-      rma: route.rma,
     };
     return {
       routeId: hashCanonical(records),

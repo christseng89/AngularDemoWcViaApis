@@ -300,9 +300,8 @@ describe("Payment SSI route UI acceptance", () => {
     const submission = oas.components.schemas["ResolutionPageSubmission"]!;
     const lookupBinding = lookup.properties?.["eligibilitySnapshot"];
     const submissionBinding = submission.properties?.["eligibilitySnapshot"];
-    const selectedRoute = oas.components.schemas[
-      "PageParameterSelectedRouteIdentity"
-    ]!;
+    const selectedRoute =
+      oas.components.schemas["PageParameterSelectedRouteIdentity"]!;
 
     expect(lookupBinding).toBeDefined();
     expect(submissionBinding).toEqual(lookupBinding);
@@ -319,8 +318,8 @@ describe("Payment SSI route UI acceptance", () => {
         "ssi",
         "applicability",
         "nostro",
-        "rma",
       ]),
     );
+    expect(selectedRoute.required).not.toContain("rma");
   });
 });

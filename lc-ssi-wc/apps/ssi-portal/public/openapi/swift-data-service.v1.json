@@ -2468,8 +2468,7 @@
           "contextSha256",
           "ssi",
           "applicability",
-          "nostro",
-          "rma"
+          "nostro"
         ],
         "properties": {
           "routeId": { "type": "string", "minLength": 1 },
@@ -2955,7 +2954,6 @@
                 "label",
                 "role",
                 "value",
-                "accountReference",
                 "sourceRecordId",
                 "version"
               ],

@@ -156,10 +156,10 @@ describe("resolution-page NVR validation scope contract", () => {
     expect(schemas["ResolutionPageSettlementRoute"]?.required).toEqual([
       "routeBindingId",
       "counterparty",
-        "ssi",
-        "applicability",
-        "nostro",
-        "roles",
+      "ssi",
+      "applicability",
+      "nostro",
+      "roles",
       "legs",
       "projections",
     ]);

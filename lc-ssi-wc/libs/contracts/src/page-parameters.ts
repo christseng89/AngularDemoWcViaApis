@@ -448,7 +448,7 @@ export interface PageParameterSelectedRouteIdentity {
   readonly ssi: PageParameterVersionedRecordIdentity;
   readonly applicability: PageParameterVersionedRecordIdentity;
   readonly nostro: PageParameterVersionedRecordIdentity;
-  readonly rma: PageParameterVersionedRecordIdentity;
+  readonly rma?: PageParameterVersionedRecordIdentity;
 }
 
 export interface PageParameterEligibilitySnapshot {

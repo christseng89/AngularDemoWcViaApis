@@ -464,6 +464,9 @@ export class ResolutionPageSubmissionAdapter {
       textValue(submission.values, "context.counterpartyBankServiceId") ||
       textValue(submission.values, "context.receiverBankServiceId");
     const selectedBic = this.bankServices.resolve(selectedBankId).bic;
+    if (!route.rma)
+      throw new ConflictException({ code: "SELECTED_ROUTE_RMA_REQUIRED" });
+    const selectedRma = route.rma;
     const same = candidates.filter(
       (candidate) =>
         candidate.snapshot.sha256 === snapshot.snapshotId &&
@@ -473,8 +476,8 @@ export class ResolutionPageSubmissionAdapter {
         candidate.applicability.version === route.applicability.version &&
         candidate.nostro.id === route.nostro.id &&
         candidate.nostro.version === route.nostro.version &&
-        candidate.rma.id === route.rma.id &&
-        candidate.rma.version === route.rma.version &&
+        candidate.rma.id === selectedRma.id &&
+        candidate.rma.version === selectedRma.version &&
         candidate.ssi.route["counterpartyBic"] === selectedBic &&
         route.routeId ===
           hashCanonical({

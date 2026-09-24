@@ -91,7 +91,7 @@ describe("resolution evidence layout", () => {
   });
 
   it("labels a single evidence output from its actual MT or MX format", () => {
-    expect(generatedOutputs).toContain('singleEvidenceHeading()');
+    expect(generatedOutputs).toContain("singleEvidenceHeading()");
     expect(generatedOutputs).toContain('format === "SWIFT_MT"');
     expect(generatedOutputs).toContain('"MT SSI evidence"');
     expect(generatedOutputs).toContain('"ISO 20022 SSI evidence"');

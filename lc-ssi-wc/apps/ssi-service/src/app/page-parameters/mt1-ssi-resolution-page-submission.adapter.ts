@@ -165,11 +165,7 @@ export class Mt1SsiResolutionPageSubmissionAdapter {
             settlementContext: request.settlementContext,
             settlementRoute: route,
           }
-        : this.swiftMtEvidenceDocument(
-            settlementRoute,
-            request,
-            policy.swiftMtRenderableOptions ?? [],
-          );
+        : this.swiftMtEvidenceDocument(settlementRoute, request);
       return [
         {
           outputId: iso
@@ -188,7 +184,6 @@ export class Mt1SsiResolutionPageSubmissionAdapter {
   private swiftMtEvidenceDocument(
     settlementRoute: ResolutionPageSettlementRoute,
     request: Mt1SsiResolutionRequest,
-    renderableOptions: readonly string[],
   ): Readonly<Record<string, unknown>> {
     const projections = settlementRoute.projections.filter(
       ({ kind }) => kind === "SWIFT_MT_FIELD",
@@ -197,11 +192,6 @@ export class Mt1SsiResolutionPageSubmissionAdapter {
     const renderingDecisions: Record<string, unknown> = {};
     const includedFamilies = new Set<string>();
     for (const projection of projections) {
-      if (
-        !projection.option ||
-        !renderableOptions.includes(projection.option)
-      )
-        throw new Error("PROFILE_INCOMPLETE");
       const tagAndOption = `${projection.identifier}${projection.option ?? ""}`;
       includedFamilies.add(projection.identifier);
       tags[tagAndOption] = projection.accountReference
@@ -337,7 +327,11 @@ export class Mt1SsiResolutionPageSubmissionAdapter {
         .every(
           ({ identifier, option }) =>
             Boolean(option) &&
-            profile.allowedOptions[identifier]?.includes(option!),
+            profile.allowedOptions[identifier]?.includes(option!) &&
+            (!profile.resolutionEvidence.formats.includes("SWIFT_MT") ||
+              profile.resolutionEvidence.swiftMtRenderableOptions?.includes(
+                option!,
+              )),
         ),
     );
     return {

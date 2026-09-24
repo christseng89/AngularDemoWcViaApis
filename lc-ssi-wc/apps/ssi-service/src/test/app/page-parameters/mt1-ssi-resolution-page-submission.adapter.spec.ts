@@ -27,6 +27,8 @@ describe("Mt1SsiResolutionPageSubmissionAdapter", () => {
   const executeProfile = (
     profileId: string,
     scenarioSuffix = "MT1-INDA-SSI",
+    routeRepository = routes,
+    submissionAdapter = adapter,
   ) => {
     const selectedDefinition = source
       .all("SR2026")
@@ -34,7 +36,7 @@ describe("Mt1SsiResolutionPageSubmissionAdapter", () => {
     const selectedScenario = selectedDefinition.scenarios.find(
       ({ scenarioId }) => scenarioId.endsWith(`:${scenarioSuffix}`),
     )!;
-    const lookup = routes.lookup({
+    const lookup = routeRepository.lookup({
       definitionId: selectedDefinition.definitionId,
       definitionVersion: selectedDefinition.definitionVersion,
       fixtureBindingId: selectedScenario.fixture.bindingId,
@@ -45,7 +47,7 @@ describe("Mt1SsiResolutionPageSubmissionAdapter", () => {
       bookingEntity: "HK01",
       valueDate: "2026-09-24",
     });
-    return adapter.execute({
+    return submissionAdapter.execute({
       definition: selectedDefinition,
       scenario: selectedScenario,
       submission: {
@@ -156,6 +158,46 @@ describe("Mt1SsiResolutionPageSubmissionAdapter", () => {
         }),
       },
     });
+  });
+
+  it("fails closed with a structured result when an MT option is not renderable", () => {
+    const fixture = JSON.parse(
+      readFileSync(
+        join(process.cwd(), "parameters", "mt1-ssi-demo-routes.sr2026.json"),
+        "utf8",
+      ),
+    );
+    fixture.routes[0].settlementRelationships.INDA.mtProjectionByProfile[
+      "MT103-BASE-SR2026"
+    ].option = "B";
+    const fixturePath = join(
+      process.cwd(),
+      "tmp",
+      "mt1-non-renderable-option-route.json",
+    );
+    writeFileSync(fixturePath, JSON.stringify(fixture));
+    const nonRenderableRoutes = new Mt1SsiDemoRouteRepository({ fixturePath });
+    const nonRenderableAdapter = new Mt1SsiResolutionPageSubmissionAdapter(
+      new Mt1SsiProfileRegistry(),
+      nonRenderableRoutes,
+    );
+
+    const result = executeProfile(
+      "MT103-BASE-SR2026",
+      "MT1-INDA-SSI",
+      nonRenderableRoutes,
+      nonRenderableAdapter,
+    );
+
+    expect(result).toMatchObject({
+      outcome: "VALIDATION_REJECTED",
+      ssiApplicability: "REQUIRED",
+      resolutionOutcome: "PROFILE_INCOMPLETE",
+      reasonCode: "PROFILE_INCOMPLETE",
+      payloadGenerated: false,
+      outputs: [],
+    });
+    expect(result).not.toHaveProperty("settlementRoute");
   });
 
   it("returns SSI-only MX resolution evidence without generating a payment payload", () => {
@@ -551,4 +593,6 @@ describe("Mt1SsiResolutionPageSubmissionAdapter", () => {
   });
 });
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
