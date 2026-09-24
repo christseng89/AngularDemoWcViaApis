@@ -54,7 +54,11 @@ export interface PaymentAtomicRouteCandidate {
     readonly accountServicerBic: string;
     readonly priority: number;
   };
-  readonly rma: { readonly id: string; readonly version: number };
+  readonly rma: {
+    readonly id: string;
+    readonly version: number;
+    readonly decisionId: string;
+  };
   readonly snapshot: { readonly sha256: string; readonly method: string };
 }
 
@@ -143,6 +147,7 @@ export class PaymentGovernedApplicabilityService {
       const priority = nostro["priority"];
       const rmaId = rma["rmaId"];
       const rmaVersion = rma["rmaVersion"];
+      const rmaDecisionId = rma["decisionId"];
       if (
         nostro["decision"] !== "RESOLVED" ||
         typeof nostroId !== "string" ||
@@ -151,6 +156,7 @@ export class PaymentGovernedApplicabilityService {
         rma["authorised"] !== true ||
         typeof rmaId !== "string" ||
         typeof rmaVersion !== "number" ||
+        typeof rmaDecisionId !== "string" ||
         (query.servicerRelationship !== undefined &&
           !servicerRelationshipMatches(
             query.servicerRelationship,
@@ -169,7 +175,7 @@ export class PaymentGovernedApplicabilityService {
             priority,
             accountServicerBic,
           },
-          rma: { id: rmaId, version: rmaVersion },
+          rma: { id: rmaId, version: rmaVersion, decisionId: rmaDecisionId },
           snapshot,
         },
       ];

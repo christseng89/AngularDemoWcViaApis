@@ -1327,7 +1327,11 @@ describe("ResolutionPageSubmissionAdapter", () => {
       ssi: { id: "SSI-PAYMENT-1", version: 1 },
       applicability: { id: "APP-PAYMENT-1", version: 2 },
       nostro: { id: "NOSTRO-PAYMENT-1", version: 3 },
-      rma: { id: "RMA-PAYMENT-1", version: 4 },
+      rma: {
+        id: "RMA-PAYMENT-1",
+        version: 4,
+        decisionId: "RMA-DECISION-PAYMENT-1",
+      },
     };
     const paymentRoutes = {
       atomicCandidates: jest.fn(() => [
@@ -1342,7 +1346,10 @@ describe("ResolutionPageSubmissionAdapter", () => {
             ...routeIdentity.nostro,
             accountServicerBic: "DEUTDEFF",
           },
-          rma: routeIdentity.rma,
+          rma: {
+            ...routeIdentity.rma,
+            decisionId: "RMA-DECISION-PAYMENT-RECHECK",
+          },
           snapshot: { sha256: "DB-SNAPSHOT", method: "logical" },
         },
       ]),
@@ -1370,7 +1377,6 @@ describe("ResolutionPageSubmissionAdapter", () => {
       "context.currency": "USD",
       "context.bookingEntity": "HK01",
       "context.valueDate": "2026-09-14",
-      "context.amount": "1000.00",
       "context.counterpartyBankServiceId": "BANK-SVC-DEUTDEFF",
     };
     const contextSha256 = hashCanonical({
@@ -1382,6 +1388,7 @@ describe("ResolutionPageSubmissionAdapter", () => {
       valueDate: paymentValues["context.valueDate"],
       fixtureBindingId: paymentScenario.fixture.bindingId,
     });
+    const candidateContextSha256 = "c".repeat(64);
     const paymentSubmission = {
       definitionId: paymentDefinition.definitionId,
       definitionVersion: paymentDefinition.definitionVersion,
@@ -1394,11 +1401,14 @@ describe("ResolutionPageSubmissionAdapter", () => {
         contextSha256,
       },
       selectedRouteIdentity: {
-        routeId: hashCanonical(routeIdentity),
+        routeId: hashCanonical({
+          ...routeIdentity,
+          contextSha256: candidateContextSha256,
+        }),
         definitionId: paymentDefinition.definitionId,
         definitionVersion: paymentDefinition.definitionVersion,
         fixtureBindingId: paymentScenario.fixture.bindingId,
-        contextSha256,
+        contextSha256: candidateContextSha256,
         ...routeIdentity,
       },
     };
@@ -1457,7 +1467,6 @@ describe("ResolutionPageSubmissionAdapter", () => {
         "context.currency": "USD",
         "context.bookingEntity": "HK01",
         "context.valueDate": "2026-09-14",
-        "context.amount": "1000.00",
         "context.counterpartyBankServiceId": "BANK-SVC-DEUTDEFF",
       },
     });
@@ -1477,10 +1486,8 @@ describe("ResolutionPageSubmissionAdapter", () => {
     );
   });
 
-  it.each([undefined, "MT202", "MT203", "MT205"])(
-    "passes optional MT205 onward predecessor %s through governed submission",
-    (previousType) => {
-      const paymentSource = new PaymentResolutionPageDefinitionSource();
+  it("passes the governed hidden MT205 predecessor through submission", () => {
+    const paymentSource = new PaymentResolutionPageDefinitionSource();
       const paymentPages = new ResolutionPageAggregationService(
         paymentSource,
         new PageParameterEnvironmentPolicy("DEMO"),
@@ -1509,19 +1516,17 @@ describe("ResolutionPageSubmissionAdapter", () => {
           "context.currency": "USD",
           "context.bookingEntity": "HK01",
           "context.valueDate": "2026-09-14",
-          "context.amount": "1000.00",
           "context.counterpartyBankServiceId": "BANK-SVC-DEUTDEFF",
-          ...(previousType ? { "context.previousMessageType": previousType } : {}),
         },
       });
 
-      const forwarded = payment.execute.mock.calls[0]?.[0] as {
-        submission: { values: Record<string, string | boolean> }
-      };
-      expect(forwarded.submission.values["context.previousMessageType"])
-        .toBe(previousType);
-    },
-  );
+    const forwarded = payment.execute.mock.calls[0]?.[0] as {
+      submission: { values: Record<string, string | boolean> };
+    };
+    expect(forwarded.submission.values["context.previousMessageType"]).toBe(
+      "MT202",
+    );
+  });
 
   it("preserves the governed negative COV oracle through generic submission", () => {
     const paymentSource = new PaymentResolutionPageDefinitionSource();
@@ -1561,7 +1566,6 @@ describe("ResolutionPageSubmissionAdapter", () => {
         "context.currency": "USD",
         "context.bookingEntity": "HK01",
         "context.valueDate": "2026-09-14",
-        "context.amount": "1000.00",
         "context.counterpartyBankServiceId": "BANK-SVC-DEUTDEFF",
       },
     });

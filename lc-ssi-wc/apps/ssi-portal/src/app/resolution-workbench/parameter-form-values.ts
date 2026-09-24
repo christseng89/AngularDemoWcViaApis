@@ -44,11 +44,8 @@ export const selectedLookupBinding = (
 ): SelectedLookupBinding => {
   if (!item.selectedRouteIdentity || !envelope.eligibilitySnapshot)
     throw new Error("PAGE_PARAMETER_ROUTE_BINDING_REQUIRED");
-  if (
-    item.selectedRouteIdentity.contextSha256 !==
-    envelope.eligibilitySnapshot.contextSha256
-  )
-    throw new Error("PAGE_PARAMETER_ROUTE_CONTEXT_MISMATCH");
+  if (!/^[a-f0-9]{64}$/i.test(item.selectedRouteIdentity.contextSha256))
+    throw new Error("PAGE_PARAMETER_ROUTE_CONTEXT_INVALID");
   return {
     selectedRouteIdentity: item.selectedRouteIdentity,
     eligibilitySnapshot: envelope.eligibilitySnapshot,

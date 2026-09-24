@@ -55,26 +55,43 @@ const definitions = (): readonly ResolutionPageDefinition[] =>
   new PaymentResolutionPageDefinitionSource().all("SR2026");
 
 describe("controlled Payment definition options", () => {
-  it("governs actual MT205 onward predecessor as optional hidden provenance only", () => {
+  it("defaults MT205 profiles to a same-country executable demo currency", () => {
+    const source = new PaymentResolutionPageDefinitionSource(
+      undefined,
+      undefined,
+      undefined,
+      {
+        payment: () => ({
+          currencies: ["HKD", "USD"],
+          bookingEntities: ["HK01"],
+          defaultCurrency: "USD",
+          defaultBookingEntity: "HK01",
+        }),
+      } as never,
+    );
+    for (const messageType of ["MT205", "MT205COV"]) {
+      const definition = source.all("SR2026").find(
+        (candidate) => candidate.messageType === messageType,
+      )!;
+      expect(
+        definition.fields.find(
+          ({ fieldId }) => fieldId === "context.currency",
+        )?.defaultValue,
+      ).toBe("HKD");
+    }
+  });
+
+  it("keeps the governed MT205 predecessor attestation out of page fields", () => {
     const definition = definitions().find(({ messageType }) => messageType === "MT205")!;
     const field = definition.fields.find(({ fieldId }) => fieldId === "context.previousMessageType");
-    expect(field).toMatchObject({
-      required: false,
-      visibility: "HIDDEN_EVIDENCE",
-      options: [
-        { value: "MT202", label: "MT202" },
-        { value: "MT203", label: "MT203" },
-        { value: "MT205", label: "MT205" },
-      ],
-    });
-    expect(field?.defaultValue).toBeUndefined();
+    expect(field).toBeUndefined();
     const onward = definition.scenarios.find(({ scenarioId }) => scenarioId === "MT205-OP-STANDARD-DOMESTIC-ONWARD")!;
-    expect(onward.inputValues?.["context.previousMessageType"]).toBeUndefined();
-    expect(onward.fieldPolicies?.find(({ fieldId }) => fieldId === field?.fieldId)).toMatchObject({
-      inputOwnership: "TRANSACTION_CONTEXT",
-      visibility: "HIDDEN_EVIDENCE",
-      processingPolicy: "APPLY",
-      required: false,
+    expect(onward.inputValues).toMatchObject({
+      "context.previousMessageType": "MT202",
+      "context.previousMessageNonCoverAttested": true,
+      "context.previousMessageAttestationId":
+        "MT205-PREDECESSOR-NON-COVER-001",
+      "context.previousMessageAttestationVersion": "1.0.0",
     });
   });
   it("uses coverage and Entity reference instead of runtime SSI candidate options", () => {
@@ -218,8 +235,8 @@ describe("PaymentResolutionPageDefinitionSource", () => {
       );
 
       expect(definition?.profile).toMatchObject({
-        profileKind: "MT_TO_MX",
-        paymentExecutable: true,
+        profileKind: "SSI_RESOLUTION_ONLY",
+        paymentExecutable: false,
         messageDefinitionId: "pacs.009.001.08",
         businessService,
         selectionBasis: { businessService },
@@ -721,11 +738,7 @@ describe("PaymentResolutionPageDefinitionSource", () => {
       defaultValue: "2026-09-15",
       businessDate: expect.objectContaining({ timeZone: "Asia/Hong_Kong" }),
     });
-    expect(field("context.amount")).toMatchObject({
-      defaultValue: "1000.00",
-      displayOrder: 50,
-      columnSpan: 2,
-    });
+    expect(field("context.amount")).toBeUndefined();
     expect(field("context.counterpartyBankServiceId")).toMatchObject({
       displayOrder: 45,
       columnSpan: 1,

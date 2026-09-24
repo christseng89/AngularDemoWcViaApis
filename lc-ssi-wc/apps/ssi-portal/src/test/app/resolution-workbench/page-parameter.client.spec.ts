@@ -121,4 +121,54 @@ describe("live ResolutionPageDefinition transport", () => {
     ]);
     expect(calls.every(({ url }) => !url.includes("/settlements/"))).toBe(true);
   });
+
+  it("accepts candidate-specific route hashes under one governed eligibility snapshot", async () => {
+    const client = new HttpResolutionPageParameterClient();
+    const snapshot = {
+      snapshotId: "s".repeat(64),
+      snapshotIdentityMethod: "SQLITE_WAL_AWARE_LOGICAL_SNAPSHOT_V1",
+      contextSha256: "e".repeat(64),
+    };
+    const envelope = {
+      provider: "SSI_COUNTERPARTY",
+      action: "SSI_COUNTERPARTY",
+      eligibilitySnapshot: snapshot,
+      items: [
+        {
+          provider: "SSI_COUNTERPARTY",
+          action: "SSI_COUNTERPARTY",
+          bankServiceId: "BANK-SVC-CITIUS33",
+          bic: "CITIUS33",
+          displayValue: "CITIUS33 — Citibank N.A.",
+          selectedRouteIdentity: {
+            routeId: "r".repeat(64),
+            definitionId: "PAYMENT-MT202-SR2026",
+            definitionVersion: "1",
+            fixtureBindingId: "FIXTURE-MT202-OP-DIRECT",
+            contextSha256: "c".repeat(64),
+            ssi: { id: "SSI-1", version: 1 },
+            applicability: { id: "APPL-1", version: 1 },
+            nostro: { id: "NOSTRO-1", version: 1 },
+            rma: { id: "RMA-1", version: 1, decisionId: "DECISION-1" },
+          },
+        },
+      ],
+    };
+    http.get.mockReturnValueOnce(of(envelope));
+
+    const result = await firstValueFrom(
+      client.lookup(
+        {
+          provider: "SSI_COUNTERPARTY",
+          action: "SSI_COUNTERPARTY",
+          endpoint:
+            "/api/v1/resolution-page-definitions/lookups/ssi-counterparties",
+          valueField: "bankServiceId",
+        } as never,
+        {},
+      ),
+    );
+
+    expect(result).toEqual(envelope);
+  });
 });

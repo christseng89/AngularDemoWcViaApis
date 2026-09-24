@@ -203,15 +203,24 @@ export class CounterpartySsiResolutionService {
       validationScope: SCOPE,
     };
 
-    const error = isCover
-      ? this.coverValidationError(source, raw)
-      : this.validationError(source, raw);
+    const error = this.validateContext(request, raw);
     if (error) return error;
 
     if (isCover)
       return is205 ? this.mt205Cover(base, raw) : this.mt202Cover(base, raw);
     if (is205) return this.mt205(base, raw, beneficiary);
     return this.mt202(base, raw, beneficiary);
+  }
+
+  validateContext(
+    request: RouteResolutionRequest,
+    raw: Context,
+  ): Context | undefined {
+    const source = request.sourceMessageType ?? "";
+    const governedContext = { ...request, ...raw };
+    return source.endsWith("COV")
+      ? this.coverValidationError(source, governedContext)
+      : this.validationError(source, governedContext);
   }
 
   private beneficiary(request: RouteResolutionRequest, raw: Context): string {
@@ -290,6 +299,29 @@ export class CounterpartySsiResolutionService {
     raw: Context,
   ): Context | undefined {
     if (
+      source.startsWith("MT205") &&
+      raw["ownAccountSubScenario"] !== undefined
+    )
+      return this.failure(422, "PROFILE_INCOMPLETE", {
+        validation: "FAIL",
+        reason: "Scenario is not registered for the selected MT205 profile",
+        payloadGenerated: false,
+      });
+    if (
+      source.startsWith("MT205") &&
+      raw["bicCountryConsistency"] === "CONFLICT"
+    )
+      return this.failure(
+        422,
+        "JURISDICTION_EVIDENCE_CONFLICT",
+        {
+          validation: "FAIL",
+          reasonCode: "JURISDICTION_SOURCE_CONFLICT",
+          payloadGenerated: false,
+        },
+        "Governed location source conflicts with the BIC country",
+      );
+    if (
       raw["requiresReceiverCorrespondent"] &&
       !raw["receiverCorrespondentSource"]
     )
@@ -315,20 +347,57 @@ export class CounterpartySsiResolutionService {
         },
         "56a present but mandatory succeeding 57a source missing",
       );
-    if (raw["previousMessage"] === null && source.startsWith("MT205"))
-      return this.failure(422, "MESSAGE_CONTEXT_MISSING", {
-        validation: "FAIL",
-        missing: ["52a", "21 source"],
-      });
+    const previous = isObject(raw["previousMessage"])
+      ? raw["previousMessage"]
+      : undefined;
     if (
-      raw["senderCountry"] &&
-      raw["receiverCountry"] &&
-      (raw["senderCountry"] !== raw["receiverCountry"] ||
-        raw["underlyingCover"])
+      source.startsWith("MT205") &&
+      !previous
     )
-      return this.failure(400, "COUNTERPARTY_PAYMENT_PROFILE_MISMATCH", {
+      return this.failure(
+        422,
+        "INVALID_UPSTREAM_CONTEXT",
+        { validation: "FAIL", payloadGenerated: false },
+        "A versioned predecessor-chain attestation is required",
+      );
+    if (source === "MT205" && previous) {
+      const permitted = new Set([
+        "MT200",
+        "MT201",
+        "MT202",
+        "MT203",
+        "MT205",
+        "GOVERNED_EQUIVALENT_FI_CREDIT_TRANSFER",
+      ]);
+      if (
+        !permitted.has(String(previous["type"] ?? "")) ||
+        previous["nonCoverAttested"] !== true ||
+        typeof previous["attestationId"] !== "string" ||
+        typeof previous["attestationVersion"] !== "string" ||
+        !/^[a-f\d]{64}$/i.test(String(previous["artifactSha256"] ?? ""))
+      )
+        return this.failure(
+          422,
+          "INVALID_UPSTREAM_CONTEXT",
+          { validation: "FAIL", payloadGenerated: false },
+          "MT205 predecessor requires versioned non-cover proof",
+        );
+      if (
+        (previous["type"] === "MT200" || previous["type"] === "MT201") &&
+        raw["initialTransferType"] !== previous["type"]
+      )
+        return this.failure(
+          422,
+          "INVALID_UPSTREAM_CONTEXT",
+          { validation: "FAIL", payloadGenerated: false },
+          "Initial MT200/MT201 equivalence requires a matching governed initialTransferType",
+        );
+    }
+    if (source === "MT205" && raw["underlyingCover"])
+      return this.failure(422, "INVALID_UPSTREAM_CONTEXT", {
         validation: "FAIL",
-        reason: "MT205 is domestic and non-cover",
+        reason: "MT205 is non-cover",
+        payloadGenerated: false,
       });
     return undefined;
   }
@@ -337,14 +406,14 @@ export class CounterpartySsiResolutionService {
     if (raw["availableRmaVersions"])
       return this.failure(
         422,
-        "RMA_NOT_AUTHORISED",
+        "RMA_NOT_AUTHORIZED",
         { validation: "FAIL", payloadGenerated: false },
         "No exact pacs.009.001.08 / swift.cbprplus.04 authorisation",
       );
     if (raw["rmaFixture"])
       return this.failure(
         422,
-        "RMA_NOT_AUTHORISED",
+        "RMA_NOT_AUTHORIZED",
         { confirmation: "BLOCKED", payloadGenerated: false },
         raw["availableRmaVersions"]
           ? "No exact pacs.009.001.08 / swift.cbprplus.04 authorisation"
@@ -378,7 +447,7 @@ export class CounterpartySsiResolutionService {
       () => this.coverSequenceBError(raw),
       () => this.coverOptionError(cover205, raw),
       () => this.coverInvariantError(cover205, raw),
-      () => this.coverPreviousMessageError(raw),
+      () => this.coverPreviousMessageError(source, raw),
     ];
     for (const validation of validations) {
       const error = validation();
@@ -400,6 +469,20 @@ export class CounterpartySsiResolutionService {
         "MESSAGE_CONTEXT_MISSING",
         { validation: "FAIL", payloadGenerated: false },
         "Cover Sequence B is mandatory upstream context",
+      );
+    if (
+      !isObject(raw["block3"]) ||
+      raw["block3"]["119"] !== "COV" ||
+      typeof raw["incoming121"] !== "string" ||
+      !raw["incoming121"] ||
+      !isObject(raw["sequenceB"]) ||
+      raw["underlyingCustomerCreditTransfer"] !== true
+    )
+      return this.failure(
+        422,
+        "PROFILE_INCOMPLETE",
+        { validation: "FAIL", payloadGenerated: false },
+        "Genuine-cover context is mandatory",
       );
     if (
       raw["block3"] &&
@@ -475,21 +558,49 @@ export class CounterpartySsiResolutionService {
         reason: "underlying data must be unchanged",
       });
     if (
+      cover205 &&
       raw["senderCountry"] &&
       raw["receiverCountry"] &&
       raw["senderCountry"] !== raw["receiverCountry"]
     )
-      return this.failure(400, "COUNTERPARTY_PAYMENT_PROFILE_MISMATCH", {
+      return this.failure(422, "JURISDICTION_NOT_PERMITTED", {
         validation: "FAIL",
-        reason: cover205 ? "must be domestic onward cover" : "Use MT202 Core",
+        reason: "MT205 COV must be domestic onward cover",
+        payloadGenerated: false,
       });
     return undefined;
   }
 
-  private coverPreviousMessageError(raw: Context): Context | undefined {
+  private coverPreviousMessageError(
+    source: string,
+    raw: Context,
+  ): Context | undefined {
     const previous = isObject(raw["previousMessage"])
       ? raw["previousMessage"]
       : undefined;
+    if (source === "MT205COV") {
+      const permitted = new Set(["MT202COV", "MT205COV", "EQUIVALENT_COVER"]);
+      if (
+        !previous ||
+        !permitted.has(String(previous["type"] ?? "")) ||
+        !previous["20"] ||
+        !previous["21"] ||
+        !previous["121"] ||
+        !previous["A.52A"] ||
+        !previous["A.58A"] ||
+        !isObject(previous["sequenceB"]) ||
+        !previous["sequenceB"]["50A"] ||
+        !previous["sequenceB"]["59"] ||
+        !/^[a-f\d]{64}$/i.test(String(previous["artifactSha256"] ?? "")) ||
+        typeof previous["artifactVersion"] !== "string"
+      )
+        return this.failure(
+          422,
+          "INVALID_UPSTREAM_CONTEXT",
+          { validation: "FAIL", payloadGenerated: false },
+          "MT205COV requires complete governed cover-predecessor evidence",
+        );
+    }
     if (previous?.["type"] === "MT202COV" && previous["A.58A"] === null)
       return this.failure(
         422,

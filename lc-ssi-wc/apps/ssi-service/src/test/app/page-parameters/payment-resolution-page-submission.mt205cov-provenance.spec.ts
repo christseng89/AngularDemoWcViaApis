@@ -1,4 +1,3 @@
-import { BadRequestException } from "@nestjs/common";
 import type {
   ResolutionPageScenario,
   ResolutionPageSubmission,
@@ -58,7 +57,7 @@ const success = {
     httpStatus: 200,
     decision: "RESOLVED",
     code: "SSI_RESOLVED",
-    payloadGenerated: true,
+    payloadGenerated: false,
   },
   mt: {
     tags: {
@@ -94,6 +93,20 @@ const harness = () => {
     adapter: new PaymentResolutionPageSubmissionAdapter(
       resolver,
       banks as never,
+      undefined,
+      {
+        list: jest.fn(() => [
+          {
+            id: "ENTITY-HK01",
+            version: 1,
+            status: "ACTIVE",
+            branchCode: "HK01",
+            countryCode: "DE",
+            validFrom: "2026-01-01",
+            validTo: "2026-12-31",
+          },
+        ]),
+      } as never,
     ),
   };
 };
@@ -114,7 +127,7 @@ describe("MT205COV previous-message provenance contract", () => {
           type: "MT202COV",
           "20": "PREVIOUS-TX-001",
           "21": "PREVIOUS-RELATED-001",
-          "121": "8ec66d20-3450-4f31-9f68-d16e911c515c",
+          "121": "a6d08f4c-94af-4f48-a44b-5b958af61a32",
           "A.52A": "CITIUS33",
           "A.58A": "DEUTDEFF",
           sequenceB: {
@@ -128,83 +141,24 @@ describe("MT205COV previous-message provenance contract", () => {
     );
   });
 
-  it.each([
-    "context.previousMessageType",
-    "context.previousMessage20",
-    "context.previousMessage21",
-    "context.previousMessage121",
-    "context.previousMessageA52",
-    "context.previousMessageA58",
-    "context.previousMessageSequenceB50A",
-    "context.previousMessageSequenceB59",
-    "context.previousMessageArtifactSha256",
-    "context.previousMessageArtifactVersion",
-  ])("fails closed before resolution when %s is absent", (fieldId) => {
+  it("ignores client tampering and uses the governed hidden predecessor fixture", () => {
     const context = harness();
-    const values = { ...completeValues };
-    delete values[fieldId];
-
-    expect(() =>
-      context.adapter.execute({
-        definition,
-        scenario,
-        submission: submission(values),
+    context.adapter.execute({
+      definition,
+      scenario,
+      submission: submission({
+        ...completeValues,
+        "context.previousMessageType": "MT205",
+        "context.previousMessageArtifactSha256": "not-a-hash",
       }),
-    ).toThrow(BadRequestException);
-    expect(context.resolver.resolve).not.toHaveBeenCalled();
-  });
-
-  it.each(["MT202", "MT205", " "])(
-    "rejects non-cover previousMessageType %p",
-    (previousMessageType) => {
-      const context = harness();
-
-      expect(() =>
-        context.adapter.execute({
-          definition,
-          scenario,
-          submission: submission({
-            ...completeValues,
-            "context.previousMessageType": previousMessageType,
-          }),
-        }),
-      ).toThrow(BadRequestException);
-      expect(context.resolver.resolve).not.toHaveBeenCalled();
-    },
-  );
-
-  it.each(["not-a-hash", "a".repeat(63), "g".repeat(64)])(
-    "rejects malformed previous-message artifact SHA-256 %p",
-    (artifactSha256) => {
-      const context = harness();
-
-      expect(() =>
-        context.adapter.execute({
-          definition,
-          scenario,
-          submission: submission({
-            ...completeValues,
-            "context.previousMessageArtifactSha256": artifactSha256,
-          }),
-        }),
-      ).toThrow(BadRequestException);
-      expect(context.resolver.resolve).not.toHaveBeenCalled();
-    },
-  );
-
-  it("rejects blank previous-message artifact version", () => {
-    const context = harness();
-
-    expect(() =>
-      context.adapter.execute({
-        definition,
-        scenario,
-        submission: submission({
-          ...completeValues,
-          "context.previousMessageArtifactVersion": " ",
+    });
+    expect(context.resolver.resolve).toHaveBeenCalledWith(
+      expect.objectContaining({
+        previousMessage: expect.objectContaining({
+          type: "MT202COV",
+          artifactSha256: "b".repeat(64),
         }),
       }),
-    ).toThrow(BadRequestException);
-    expect(context.resolver.resolve).not.toHaveBeenCalled();
+    );
   });
 });

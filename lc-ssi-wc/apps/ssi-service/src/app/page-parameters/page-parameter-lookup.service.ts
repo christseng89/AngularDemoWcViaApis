@@ -27,6 +27,7 @@ import type {
 import { hashCanonical } from "../canonical-json";
 import { Mt1SsiResolutionPageDefinitionSource } from "./mt1-ssi-resolution-page-definition.source";
 import { Mt1SsiDemoRouteRepository } from "../mt1-ssi-demo-route.repository";
+import { EntityRepository } from "../entity/entity.repository";
 
 interface SsiCounterpartyLookupQuery {
   readonly scenarioId: string;
@@ -113,6 +114,8 @@ export class PageParameterLookupService {
     private readonly mt1Source?: Mt1SsiResolutionPageDefinitionSource,
     @Optional()
     private readonly mt1Routes?: Mt1SsiDemoRouteRepository,
+    @Optional()
+    private readonly entities?: EntityRepository,
   ) {}
 
   bankService(bankServiceId: string | undefined): PageParameterLookupResult {
@@ -421,7 +424,7 @@ export class PageParameterLookupService {
             }
           : {}),
       }) ?? [];
-    const source: Array<{
+    const unfilteredSource: Array<{
       record: SsiRecord;
       candidate?: PaymentAtomicRouteCandidate;
     }> = hasAtomic
@@ -429,12 +432,16 @@ export class PageParameterLookupService {
       : this.paymentApplicability
           .candidates(query)
           .map((record) => ({ record }));
+    const source = unfilteredSource.filter((entry) =>
+      this.mt205JurisdictionEligible(input, entry.record),
+    );
     const routes = source.flatMap((entry) => {
       const route = this.paymentRouteResult(
         entry,
         definition,
         pageScenario,
         contextSha256,
+        input,
       );
       return route ? [route] : [];
     });
@@ -502,6 +509,33 @@ export class PageParameterLookupService {
     };
   }
 
+  private mt205JurisdictionEligible(
+    input: SsiCounterpartyLookupQuery,
+    record: SsiRecord,
+  ): boolean {
+    if (!input.messageType.startsWith("MT205") || !this.entities) return true;
+    const sender = this.entities
+      .list("ACTIVE")
+      .find(
+        (entity) =>
+          entity.branchCode === input.bookingEntity &&
+          entity.validFrom <= input.valueDate &&
+          (!entity.validTo || entity.validTo >= input.valueDate),
+      );
+    if (!sender) return false;
+    const receiverBic =
+      record.route["actualReceiverBic"] ??
+      record.route["accountWithBic"] ??
+      record.route["counterpartyBic"] ??
+      "";
+    const receiver = this.directory
+      .search(receiverBic)
+      .find((bank) => bank.bic === receiverBic);
+    return Boolean(
+      receiver?.country && receiver.country === sender.countryCode,
+    );
+  }
+
   private paymentRouteResult(
     entry: {
       readonly record: SsiRecord;
@@ -513,12 +547,57 @@ export class PageParameterLookupService {
     pageScenario:
       { readonly fixture: { readonly bindingId: string } } | undefined,
     contextSha256: string,
+    input: SsiCounterpartyLookupQuery,
   ): PageParameterLookupResult | undefined {
     const bic = entry.record.route["counterpartyBic"];
     if (!bic) return undefined;
     const bank = this.directory.search(bic).find((item) => item.bic === bic);
     if (!bank) return undefined;
     const candidate = entry.candidate;
+    const actualReceiverBic =
+      entry.record.route["actualReceiverBic"] ??
+      entry.record.route["accountWithBic"] ??
+      "";
+    const actualReceiver = this.directory
+      .search(actualReceiverBic)
+      .find((item) => item.bic === actualReceiverBic);
+    const senderEntity = this.entities
+      ?.list("ACTIVE")
+      .find(
+        (entity) =>
+          entity.branchCode === input.bookingEntity &&
+          entity.validFrom <= input.valueDate &&
+          (!entity.validTo || entity.validTo >= input.valueDate),
+      );
+    const candidateContextSha256 = candidate
+      ? hashCanonical({
+          baseContextSha256: contextSha256,
+          databaseSnapshot: candidate.snapshot,
+          ssi: { id: candidate.ssi.id, version: candidate.ssi.version },
+          applicability: {
+            id: candidate.applicability.id,
+            version: candidate.applicability.version,
+          },
+          nostro: candidate.nostro,
+          rma: candidate.rma,
+          route: {
+            actualReceiverBic,
+            accountWithBic: entry.record.route["accountWithBic"] ?? "",
+            executionTransport: entry.record.route["messagingService"] ?? "",
+          },
+          jurisdiction: {
+            senderSourceId: senderEntity?.id ?? "",
+            senderSourceVersion: senderEntity?.version ?? 0,
+            senderCountry: senderEntity?.countryCode ?? "",
+            receiverSourceId: actualReceiver?.bankServiceId ?? "",
+            receiverCountry: actualReceiver?.country ?? "",
+          },
+          topologyRuling: {
+            id: "BA-TOPOLOGY-INDA-INGA-001",
+            version: "1.0.0",
+          },
+        })
+      : contextSha256;
     const selectedRouteIdentity =
       candidate && definition && pageScenario
         ? {
@@ -533,11 +612,12 @@ export class PageParameterLookupService {
                 version: candidate.nostro.version,
               },
               rma: candidate.rma,
+              contextSha256: candidateContextSha256,
             }),
             definitionId: definition.definitionId,
             definitionVersion: definition.definitionVersion,
             fixtureBindingId: pageScenario.fixture.bindingId,
-            contextSha256,
+            contextSha256: candidateContextSha256,
             ssi: { id: candidate.ssi.id, version: candidate.ssi.version },
             applicability: {
               id: candidate.applicability.id,

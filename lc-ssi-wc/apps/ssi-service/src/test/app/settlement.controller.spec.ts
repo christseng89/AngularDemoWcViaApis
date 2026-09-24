@@ -32,6 +32,8 @@ const routePreview = (recommended = true) => ({
           actualReceiverBic: "CITIUS33",
           accountWithBic: "CITIUS33",
           accountId: "NOSTRO-USD",
+          senderBic: "DEMOHKHH",
+          messagingService: "FINPLUS",
           currency: "USD",
           routePurpose: "INTERBANK_TRANSFER",
         },
@@ -68,7 +70,14 @@ const routePreview = (recommended = true) => ({
   },
 });
 
-const harness = (dataIssues: readonly Json[] = []) => {
+const harness = (
+  dataIssues: readonly Json[] = [],
+  gates: {
+    readonly rma?: object;
+    readonly banks?: object;
+    readonly entities?: object;
+  } = {},
+) => {
   const service = {
     resolve: jest.fn(() => ({ decision: "RESOLVED" })),
     clearingOptions: jest.fn(() => ["FEDWIRE"]),
@@ -85,6 +94,7 @@ const harness = (dataIssues: readonly Json[] = []) => {
   };
   const counterparty = {
     precondition: jest.fn(() => undefined),
+    validateContext: jest.fn(() => undefined),
     supports: jest.fn(() => false),
     resolve: jest.fn(() => ({ mx: { httpStatus: 200 }, mt: {} })),
   };
@@ -111,6 +121,9 @@ const harness = (dataIssues: readonly Json[] = []) => {
         globalIssues: () => dataIssues,
         issuesFor: () => dataIssues,
       } as unknown as SsiDataQualityService,
+      gates.rma as never,
+      gates.banks as never,
+      gates.entities as never,
     ),
     service,
     batch,
@@ -264,18 +277,21 @@ describe("SettlementController", () => {
     );
     expect(contract).toMatchObject({
       code: "SSI_RESOLVED",
-      payloadGenerated: true,
+      payloadGenerated: false,
       mx: {
         httpStatus: 200,
         code: "SSI_RESOLVED",
-        payloadGenerated: true,
+        payloadGenerated: false,
         canonicalRoles: {
           selectedSsi: "SSI-DEMO-024",
           creditor: "BARCGB22",
           creditorSource: "REQUEST_PASS_THROUGH",
         },
         messageComposerContext: {
-          SttlmMtd: { value: "INDA", source: "SETTLEMENT_POLICY" },
+          SttlmMtd: {
+            value: "INDA",
+            source: "BA-TOPOLOGY-INDA-INGA-001",
+          },
           Dbtr: { value: "DEMOHKHH", source: "OWN_ENTITY" },
           SttlmAcct: {
             value: "NOSTRO-USD",
@@ -332,6 +348,130 @@ describe("SettlementController", () => {
       },
     });
     expect(supported.counterparty.resolve).toHaveBeenCalled();
+  });
+
+  it("revalidates the selected route against the active exact RMA record", () => {
+    const context = harness([], {
+      rma: {
+        check: jest.fn(() => ({
+          decisionId: "RMA-DECISION-NEW",
+          decision: "AUTHORISED",
+          authorised: true,
+          checkedAt: "2026-09-14T00:00:00.000Z",
+          effectiveAt: "2026-09-14",
+          rmaId: "RMA-DIFFERENT",
+          rmaVersion: 2,
+        })),
+      },
+    });
+    context.counterparty.supports.mockReturnValue(true);
+    context.counterparty.resolve.mockReturnValue({ mx: { httpStatus: 200 }, mt: {} });
+    context.service.resolve.mockReturnValue(routePreview());
+
+    const response = responseOf(() =>
+      context.controller.resolve(
+        baseBody({
+          sourceMessageType: "MT202",
+          selectedRmaId: "RMA-SELECTED",
+          selectedRmaVersion: 1,
+        }) as never,
+      ),
+    );
+    expect(mxOf(response)).toMatchObject({
+      httpStatus: 422,
+      code: "RMA_NOT_AUTHORIZED",
+      payloadGenerated: false,
+    });
+  });
+
+  it("reuses the governed OWN_BIC for the post-discovery RMA check", () => {
+    const previousOwnBic = process.env["OWN_BIC"];
+    process.env["OWN_BIC"] = "DEMOHKHH";
+    const rma = {
+      check: jest.fn(() => ({
+        decisionId: "RMA-DECISION-RECHECK",
+        decision: "AUTHORISED",
+        authorised: true,
+        checkedAt: "2026-09-25T00:00:00.000Z",
+        effectiveAt: "2026-09-25",
+        rmaId: "RMA-SELECTED",
+        rmaVersion: 3,
+      })),
+    };
+    const context = harness([], { rma });
+    context.counterparty.supports.mockReturnValue(true);
+    context.counterparty.resolve.mockReturnValue({
+      mx: { httpStatus: 200, canonicalRoles: { sender: "CITIUS33" } },
+      mt: {},
+    });
+    const preview = routePreview();
+    delete (preview.recommendedRoute!.route as Record<string, unknown>)[
+      "senderBic"
+    ];
+    context.service.resolve.mockReturnValue(preview);
+
+    expect(
+      context.controller.resolve(
+        baseBody({
+          sourceMessageType: "MT202",
+          selectedRmaId: "RMA-SELECTED",
+          selectedRmaVersion: 3,
+        }) as never,
+      ),
+    ).toMatchObject({ code: "SSI_RESOLVED" });
+    expect(rma.check).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ownBic: "DEMOHKHH",
+        counterpartyBic: "CITIUS33",
+      }),
+    );
+
+    if (previousOwnBic === undefined) delete process.env["OWN_BIC"];
+    else process.env["OWN_BIC"] = previousOwnBic;
+  });
+
+  it("applies MT205 jurisdiction to the selected route actual receiver", () => {
+    const context = harness([], {
+      banks: {
+        search: jest.fn(() => [
+          {
+            bankServiceId: "BANK-SVC-CITIUS33",
+            bic: "CITIUS33",
+            country: "US",
+          },
+        ]),
+      },
+      entities: {
+        list: jest.fn(() => [
+          {
+            id: "ENTITY-HK01",
+            version: 3,
+            branchCode: "HK01",
+            countryCode: "HK",
+            validFrom: "2026-01-01",
+            validTo: "2026-12-31",
+          },
+        ]),
+      },
+    });
+    context.counterparty.supports.mockReturnValue(true);
+    context.counterparty.resolve.mockReturnValue({ mx: { httpStatus: 200 }, mt: {} });
+    context.service.resolve.mockReturnValue(routePreview());
+
+    const response = responseOf(() =>
+      context.controller.resolve(
+        baseBody({
+          sourceMessageType: "MT205",
+          bookingEntity: "HK01",
+          valueDate: "2026-09-14",
+        }) as never,
+      ),
+    );
+    expect(mxOf(response)).toMatchObject({
+      httpStatus: 422,
+      code: "JURISDICTION_NOT_PERMITTED",
+      payloadGenerated: false,
+    });
   });
 
   it.each([
@@ -458,12 +598,12 @@ describe("SettlementController", () => {
     });
     expect(mtOf(receiverFallback)["omitted"]).toContain("57a");
 
-    const distinctBanks = resolveWithRoute({
-      actualReceiverBic: "CHASUS33",
-      accountWithBic: "CITIUS33",
-    });
-    expect((mtOf(distinctBanks)["tags"] as Json)["57A"]).toBe("ORIGINAL57");
-    expect(mtOf(distinctBanks)["omitted"]).not.toContain("57a");
+    expect(() =>
+      resolveWithRoute({
+        actualReceiverBic: "CHASUS33",
+        accountWithBic: "CITIUS33",
+      }),
+    ).toThrow(HttpException);
 
     const cover = resolveWithRoute(
       { actualReceiverBic: "CITIUS33", accountWithBic: "CITIUS33" },

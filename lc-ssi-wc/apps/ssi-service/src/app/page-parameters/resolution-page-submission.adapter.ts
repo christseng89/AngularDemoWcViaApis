@@ -434,8 +434,8 @@ export class ResolutionPageSubmissionAdapter {
       route.definitionId !== definition.definitionId ||
       route.definitionVersion !== definition.definitionVersion ||
       route.fixtureBindingId !== scenario.fixture.bindingId ||
-      route.contextSha256 !== snapshot.contextSha256 ||
-      route.contextSha256 !== contextSha256 ||
+      snapshot.contextSha256 !== contextSha256 ||
+      !/^[a-f0-9]{64}$/i.test(route.contextSha256) ||
       (definition.messageFamily !== "MT1_PACS008" &&
         this.snapshots !== undefined &&
         snapshot.snapshotId !== this.snapshots.current().sha256)
@@ -485,6 +485,7 @@ export class ResolutionPageSubmissionAdapter {
             applicability: route.applicability,
             nostro: route.nostro,
             rma: route.rma,
+            contextSha256: route.contextSha256,
           }),
     );
     if (same.length !== 1)

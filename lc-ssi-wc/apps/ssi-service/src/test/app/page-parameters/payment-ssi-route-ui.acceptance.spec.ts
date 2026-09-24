@@ -24,7 +24,6 @@ const COMMON_USER_INPUTS = [
   "context.currency",
   "context.bookingEntity",
   "context.valueDate",
-  "context.amount",
 ] as const;
 
 const OWN_ACCOUNT_USER_INPUTS = ["context.receiverBankServiceId"] as const;
@@ -92,7 +91,6 @@ describe("Payment SSI route UI acceptance", () => {
         "context.currency": "USD",
         "context.bookingEntity": "HK01",
         "context.valueDate": "2026-09-15",
-        "context.amount": "1000.00",
       };
       return Object.entries(expected)
         .filter(
@@ -318,8 +316,8 @@ describe("Payment SSI route UI acceptance", () => {
         "ssi",
         "applicability",
         "nostro",
+        "rma",
       ]),
     );
-    expect(selectedRoute.required).not.toContain("rma");
   });
 });

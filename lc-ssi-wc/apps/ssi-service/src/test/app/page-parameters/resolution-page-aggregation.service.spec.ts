@@ -616,10 +616,10 @@ describe("ResolutionPageAggregationService", () => {
       messageType: "MT202",
       profile: {
         profileId: "PACS009-PLAIN",
-        profileKind: "MT_TO_MX",
+        profileKind: "SSI_RESOLUTION_ONLY",
         businessService: "swift.cbprplus.04",
         messageDefinitionId: "pacs.009.001.08",
-        paymentExecutable: true,
+        paymentExecutable: false,
         selectionBasis: {
           businessScenarioId: "GENERIC_PLAIN",
           businessService: "swift.cbprplus.04",

@@ -4,6 +4,7 @@ import {
   Get,
   HttpCode,
   HttpException,
+  Optional,
   Param,
   Post,
 } from "@nestjs/common";
@@ -28,6 +29,10 @@ import {
   type SsiDataIssue,
 } from "./ssi-data-quality.service";
 import { scalarText } from "./scalar-text";
+import { RmaApplicationService, type RmaDecision } from "./rma/rma-application.service";
+import { BankServiceDirectory } from "./bank-service-directory";
+import { EntityRepository } from "./entity/entity.repository";
+import { hashCanonical } from "./canonical-json";
 
 type Json = Record<string, unknown>;
 
@@ -70,6 +75,9 @@ export class SettlementController {
     private readonly messageDomains: MessageDomainResolutionService,
     private readonly snapshotIdentity: DatabaseSnapshotIdentityService,
     private readonly dataQuality: SsiDataQualityService,
+    @Optional() private readonly rma?: RmaApplicationService,
+    @Optional() private readonly bankServices?: BankServiceDirectory,
+    @Optional() private readonly entities?: EntityRepository,
   ) {}
 
   @Get("data-quality")
@@ -193,11 +201,28 @@ export class SettlementController {
       reason: this.exclusionReason(candidate.evidence),
       evidence: candidate.evidence,
     }));
+    const c81Only =
+      preview.excludedRoutes.length > 0 &&
+      preview.excludedRoutes.every((candidate) =>
+        candidate.evidence.some(
+          (item) =>
+            item.outcome === "FAIL" &&
+            item.reasonCode === "C81_SEQUENCE_A_56_REQUIRES_57",
+        ),
+      );
+    const code = c81Only ? "NO_ELIGIBLE_SSI" : "SSI_NOT_FOUND";
     throw new HttpException(
       {
         mx: {
           httpStatus: 422,
-          code: "SSI_NOT_FOUND",
+          code,
+          ...(c81Only
+            ? {
+                ssiApplicability: "REQUIRED",
+                resolutionOutcome: "NO_ELIGIBLE_SSI",
+                reasonCode: "C81_SEQUENCE_A_56_REQUIRES_57",
+              }
+            : {}),
           redirectDomain: null,
           payloadGenerated: false,
           detail: preview.explanation,
@@ -205,7 +230,7 @@ export class SettlementController {
         },
         mt: {
           validation: "FAIL",
-          code: "SSI_NOT_FOUND",
+          code,
           payloadGenerated: false,
         },
       },
@@ -496,6 +521,8 @@ export class SettlementController {
   private chosenRouteSnapshot(
     chosen: Mt2RankedRoute,
     nostroEvidence: Json,
+    request?: Mt2SettlementResolutionRequest,
+    execution?: ReturnType<SettlementController["routeExecutionBinding"]>,
   ): Json {
     return {
       ssiId: chosen.ssiId,
@@ -508,6 +535,22 @@ export class SettlementController {
       nostroVersion: nostroEvidence["nostroVersion"] ?? 0,
       matchedApplicabilityId: chosen.applicability["id"] ?? "",
       applicabilityVersion: chosen.applicability["version"] ?? 0,
+      ...(execution?.rmaDecision?.rmaId
+        ? {
+            rmaId: execution.rmaDecision.rmaId,
+            rmaVersion: execution.rmaDecision.rmaVersion,
+            rmaDecisionId: execution.rmaDecision.decisionId,
+            rmaProfileId: request?.profileId,
+            rmaPairedEvidenceProfileId: request?.pairedEvidenceProfileId,
+            rmaBusinessService: request?.businessService,
+          }
+        : {}),
+      ...(request?.routeBindingId
+        ? { routeBindingId: request.routeBindingId }
+        : {}),
+      ...(request?.contextSnapshotId
+        ? { contextSnapshotId: request.contextSnapshotId }
+        : {}),
       routePurpose: chosen.route["routePurpose"] ?? "",
       selectedBy:
         chosen.route["routePurpose"] === "INTERBANK_TRANSFER"
@@ -515,6 +558,18 @@ export class SettlementController {
           : "CONTROLLED_RANK_KEYS",
       specificity:
         chosen.fallbackTier === 0 ? "NAMED_COUNTERPARTY" : "FALLBACK",
+      ...(execution
+        ? {
+            actualReceiverBic: this.routeBankPair(chosen.route).actualReceiver,
+            executionTransport: execution.executionTransport,
+            settlementMethod: execution.settlementMethod,
+            topologyRulingId: "BA-TOPOLOGY-INDA-INGA-001",
+            topologyRulingVersion: "1.0.0",
+            ...(execution.jurisdictionEvidence
+              ? { jurisdictionEvidence: execution.jurisdictionEvidence }
+              : {}),
+          }
+        : {}),
     };
   }
 
@@ -653,6 +708,176 @@ export class SettlementController {
     };
   }
 
+  private mt2GateFailure(code: string, detail: string): never {
+    throw new HttpException(
+      {
+        mx: {
+          httpStatus: 422,
+          decision: "REQUIRED",
+          code,
+          detail,
+          payloadGenerated: false,
+        },
+        payloadGenerated: false,
+      },
+      422,
+    );
+  }
+
+  private routeExecutionBinding(
+    route: Json,
+    request: ReturnType<typeof toMt2BankResolutionRequest>,
+    actualReceiver: string,
+    accountWith: string,
+    governedSenderBic: string,
+  ): {
+    executionTransport: "FIN" | "FINPLUS";
+    settlementMethod: "INDA" | "INGA";
+    rmaDecision?: RmaDecision;
+    jurisdictionEvidence?: Json;
+  } {
+    if (request.routeBindingId) {
+      const currentSnapshot = this.snapshotIdentity.current();
+      const expectedRouteBindingId = hashCanonical({
+        ssi: { id: request.selectedSsiId, version: request.selectedSsiVersion },
+        applicability: {
+          id: request.selectedApplicabilityId,
+          version: request.selectedApplicabilityVersion,
+        },
+        nostro: {
+          id: request.selectedNostroId,
+          version: request.selectedNostroVersion,
+        },
+        rma: {
+          id: request.selectedRmaId,
+          version: request.selectedRmaVersion,
+          decisionId: request.selectedRmaDecisionId,
+        },
+        contextSha256: request.contextSnapshotId,
+      });
+      if (
+        expectedRouteBindingId !== request.routeBindingId ||
+        !request.databaseSnapshotId ||
+        request.databaseSnapshotId !== currentSnapshot.sha256 ||
+        request.snapshotIdentityMethod !== currentSnapshot.method
+      )
+        this.mt2GateFailure(
+          "STALE",
+          "The atomic route or logical database snapshot changed after discovery.",
+        );
+    }
+    const executionTransport = scalarText(route["messagingService"]).toUpperCase();
+    if (executionTransport !== "FIN" && executionTransport !== "FINPLUS")
+      this.mt2GateFailure(
+        "PROFILE_INCOMPLETE",
+        "The selected route has no governed FIN/FINPLUS delivery policy.",
+      );
+    if (
+      executionTransport === "FIN" &&
+      route["finContingencyApproved"] !== "true" &&
+      route["finContingencyApproved"] !== true
+    )
+      this.mt2GateFailure(
+        "PROFILE_INCOMPLETE",
+        "FIN requires an approved governed contingency binding.",
+      );
+
+    const senderBic = scalarText(
+      process.env["OWN_BIC"]?.trim().toUpperCase() ||
+        route["senderBic"] ||
+        route["debtorBic"] ||
+        governedSenderBic,
+    );
+    const settlementMethod =
+      accountWith === actualReceiver
+        ? "INDA"
+        : accountWith === senderBic
+          ? "INGA"
+          : undefined;
+    if (!settlementMethod)
+      this.mt2GateFailure(
+        "INVALID_CONTEXT_TOPOLOGY",
+        "The selected route does not support a governed INDA/INGA topology.",
+      );
+
+    let jurisdictionEvidence: Json | undefined;
+    if (request.sourceMessageType?.startsWith("MT205")) {
+      const bank = this.bankServices
+        ?.search(actualReceiver)
+        .find((candidate) => candidate.bic === actualReceiver);
+      const entity = this.entities
+        ?.list("ACTIVE")
+        .find(
+          (candidate) =>
+            candidate.branchCode === request.bookingEntity &&
+            candidate.validFrom <= request.valueDate &&
+            (!candidate.validTo || candidate.validTo >= request.valueDate),
+        );
+      if (!bank || !entity)
+        this.mt2GateFailure(
+          "PROFILE_INCOMPLETE",
+          "Governed sender and selected-receiver jurisdiction sources are required.",
+        );
+      const senderCountry = entity.countryCode.toUpperCase();
+      const receiverCountry = bank.country.toUpperCase();
+      if (
+        senderBic.slice(4, 6).toUpperCase() !== senderCountry ||
+        actualReceiver.slice(4, 6).toUpperCase() !== receiverCountry
+      )
+        this.mt2GateFailure(
+          "JURISDICTION_EVIDENCE_CONFLICT",
+          "A BIC country component conflicts with its governed location source.",
+        );
+      if (senderCountry !== receiverCountry)
+        this.mt2GateFailure(
+          "JURISDICTION_NOT_PERMITTED",
+          "MT205/MT205COV requires sender and selected receiver in the same country.",
+        );
+      jurisdictionEvidence = {
+        senderCountry,
+        receiverCountry,
+        senderCountrySourceId: entity.id,
+        senderCountrySourceVersion: entity.version,
+        receiverCountrySourceId: bank.bankServiceId,
+        receiverCountrySourceVersion: 1,
+        actualReceiverBic: actualReceiver,
+      };
+    }
+
+    let rmaDecision: RmaDecision | undefined;
+    if (this.rma) {
+      if (!senderBic || !actualReceiver)
+        this.mt2GateFailure(
+          "RMA_NOT_AUTHORIZED",
+          "The selected route has no exact sender/receiver pair for RMA.",
+        );
+      rmaDecision = this.rma.check({
+        ownBic: senderBic,
+        counterpartyBic: actualReceiver,
+        service: executionTransport,
+        direction: "OUTBOUND",
+        messageType: "pacs.009.001.08",
+        at: request.valueDate,
+        operationalOnly: true,
+      });
+      if (
+        !rmaDecision.authorised ||
+        rmaDecision.rmaId !== request.selectedRmaId ||
+        rmaDecision.rmaVersion !== request.selectedRmaVersion
+      )
+        this.mt2GateFailure(
+          "RMA_NOT_AUTHORIZED",
+          "The selected route is not covered by the same active Four-eyes RMA record.",
+        );
+    }
+    return {
+      executionTransport,
+      settlementMethod,
+      ...(rmaDecision ? { rmaDecision } : {}),
+      ...(jurisdictionEvidence ? { jurisdictionEvidence } : {}),
+    };
+  }
+
   private omitMt202AccountWithWhenReceiverMatches(
     tags: Json,
     omitted: Set<unknown>,
@@ -680,6 +905,13 @@ export class SettlementController {
     const mx = (rendered["mx"] ?? {}) as Json;
     const mt = (rendered["mt"] ?? {}) as Json;
     const roles = (mx["canonicalRoles"] ?? {}) as Json;
+    const execution = this.routeExecutionBinding(
+      route,
+      request,
+      actualReceiver,
+      accountWith,
+      scalarText(roles["sender"] ?? roles["debtor"]),
+    );
     const canonicalSettlement = (preview.canonicalSettlementPreview ??
       {}) as Json;
     const nostroEvidence = (preview.nostroEvidence ?? {}) as Json;
@@ -717,7 +949,12 @@ export class SettlementController {
       reason: this.exclusionReason(candidate.evidence),
       evidence: candidate.evidence,
     }));
-    const chosenRoute = this.chosenRouteSnapshot(chosen, nostroEvidence);
+    const chosenRoute = this.chosenRouteSnapshot(
+      chosen,
+      nostroEvidence,
+      request,
+      execution,
+    );
     const alternatives = this.resolvedAlternatives(preview);
     const snapshotIdentity = this.snapshotIdentity.current();
     return {
@@ -726,13 +963,17 @@ export class SettlementController {
         ...mx,
         decision: preview.decision,
         code: "SSI_RESOLVED",
-        payloadGenerated: true,
+        payloadGenerated: false,
         chosenRoute,
         alternatives,
         roleProvenance,
         canonicalRoles: roles,
         messageComposerContext: {
-          SttlmMtd: { value: "INDA", source: "SETTLEMENT_POLICY" },
+          SttlmMtd: {
+            value: execution.settlementMethod,
+            source: "BA-TOPOLOGY-INDA-INGA-001",
+            rulingVersion: "1.0.0",
+          },
           Dbtr: {
             value: route["senderBic"] ?? "DEMOHKHH",
             source: "OWN_ENTITY",
@@ -748,7 +989,7 @@ export class SettlementController {
       chosenRoute,
       resolutionDecision: preview.decision,
       code: "SSI_RESOLVED",
-      payloadGenerated: true,
+      payloadGenerated: false,
       alternatives,
       excludedCandidates,
       fieldProvenance:
@@ -1078,8 +1319,22 @@ export class SettlementController {
   @HttpCode(200)
   resolve(@Body() body: Mt2SettlementResolutionRequest): unknown {
     try {
-      const ownAccount = this.ownAccountScenario(body);
-      if (ownAccount) return ownAccount;
+      const request = toMt2BankResolutionRequest(
+        body,
+        this.paymentMessageIndex,
+      );
+      if (body.scenarioCode) {
+        const contextError = this.counterpartySsi.validateContext(
+          request,
+          body as Record<string, unknown>,
+        );
+        if (contextError) {
+          const status = contextError["mx"] as Record<string, unknown>;
+          throw new HttpException(contextError, Number(status["httpStatus"]));
+        }
+        const ownAccount = this.ownAccountScenario(body);
+        if (ownAccount) return ownAccount;
+      }
       const precondition = this.counterpartySsi.precondition(
         body as Record<string, unknown>,
       );
@@ -1087,10 +1342,6 @@ export class SettlementController {
         const mx = precondition["mx"] as Record<string, unknown>;
         throw new HttpException(precondition, Number(mx["httpStatus"]));
       }
-      const request = toMt2BankResolutionRequest(
-        body,
-        this.paymentMessageIndex,
-      );
       const dataIssues = this.dataQuality.issuesFor(request);
       if (dataIssues.length) this.failClosedIncorrectSsi(body, dataIssues);
       if (this.counterpartySsi.supports(request.sourceMessageType ?? "")) {

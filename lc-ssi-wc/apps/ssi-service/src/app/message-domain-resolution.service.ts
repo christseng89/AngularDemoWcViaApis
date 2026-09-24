@@ -277,7 +277,7 @@ export class MessageDomainResolutionService {
           CdtrAcct: { value: creditReference, ...accountProvenance(credit) },
           Cdtr: { value: sender, source: "OWN_ENTITY" },
         },
-        payloadGenerated: true,
+        payloadGenerated: false,
         snapshotHash: snapshotIdentity.sha256,
         snapshotIdentityMethod: snapshotIdentity.method,
         resolutionToken,

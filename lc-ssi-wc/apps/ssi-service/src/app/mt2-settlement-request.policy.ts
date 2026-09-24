@@ -3,10 +3,59 @@ import type { RouteResolutionRequest } from "./route-resolution.policy";
 import type { PaymentMessageIndexService } from "./payment-message-index.service";
 import { BankServiceDirectory } from "./bank-service-directory";
 
+export type Phase1ProfileId =
+  | "MT2-MT202-PLAIN-SR2026"
+  | "MT2-MT202COV-COV-SR2026"
+  | "MT2-MT205-PLAIN-SR2026"
+  | "MT2-MT205COV-COV-SR2026";
+
+export type PairedEvidenceProfileId =
+  "PACS009-PLAIN-SR2026" | "PACS009-COV-SR2026";
+
+export interface Mt2ControlledProfileBinding {
+  readonly profileId: Phase1ProfileId;
+  readonly pairedEvidenceProfileId: PairedEvidenceProfileId;
+  readonly businessService: "swift.cbprplus.04" | "swift.cbprplus.cov.04";
+}
+
+const CONTROLLED_PROFILES: Readonly<
+  Record<string, Mt2ControlledProfileBinding>
+> = {
+  MT202: {
+    profileId: "MT2-MT202-PLAIN-SR2026",
+    pairedEvidenceProfileId: "PACS009-PLAIN-SR2026",
+    businessService: "swift.cbprplus.04",
+  },
+  MT202COV: {
+    profileId: "MT2-MT202COV-COV-SR2026",
+    pairedEvidenceProfileId: "PACS009-COV-SR2026",
+    businessService: "swift.cbprplus.cov.04",
+  },
+  MT205: {
+    profileId: "MT2-MT205-PLAIN-SR2026",
+    pairedEvidenceProfileId: "PACS009-PLAIN-SR2026",
+    businessService: "swift.cbprplus.04",
+  },
+  MT205COV: {
+    profileId: "MT2-MT205COV-COV-SR2026",
+    pairedEvidenceProfileId: "PACS009-COV-SR2026",
+    businessService: "swift.cbprplus.cov.04",
+  },
+};
+
+export const mt2ControlledProfile = (
+  sourceMessageType: string,
+): Mt2ControlledProfileBinding | undefined =>
+  CONTROLLED_PROFILES[sourceMessageType];
+
 export type Mt2SettlementResolutionRequest = Omit<
   RouteResolutionRequest,
   "counterpartyType" | "counterpartyBic"
 > & {
+  readonly profileId?: Phase1ProfileId;
+  readonly pairedEvidenceProfileId?: PairedEvidenceProfileId;
+  readonly paymentDirection?: "OUTWARD";
+  readonly localBankRole?: "INSTRUCTING_AGENT";
   readonly counterpartyBankServiceId?: string;
   readonly accountWithBankServiceId?: string;
   readonly intermediaryBankServiceId?: string;
@@ -38,8 +87,43 @@ export type Mt2SettlementResolutionRequest = Omit<
     sequenceB?: Readonly<{ "50A": string; "59": string }>;
     artifactSha256?: string;
     artifactVersion?: string;
+    nonCoverAttested?: true;
+    attestationId?: string;
+    attestationVersion?: string;
   }>;
+  readonly initialTransferType?: "MT200" | "MT201";
+  readonly selectedApplicabilityId?: string;
+  readonly selectedApplicabilityVersion?: number;
+  readonly selectedNostroId?: string;
+  readonly selectedNostroVersion?: number;
+  readonly selectedRmaId?: string;
+  readonly selectedRmaVersion?: number;
+  readonly selectedRmaDecisionId?: string;
+  readonly routeBindingId?: string;
+  readonly contextSnapshotId?: string;
+  readonly databaseSnapshotId?: string;
+  readonly snapshotIdentityMethod?: string;
+  readonly senderCountry?: string;
+  readonly receiverCountry?: string;
+  readonly senderCountrySourceId?: string;
+  readonly senderCountrySourceVersion?: string;
+  readonly receiverCountrySourceId?: string;
+  readonly receiverCountrySourceVersion?: string;
 };
+
+export type Mt2BankResolutionRequest = RouteResolutionRequest &
+  Partial<Mt2SettlementResolutionRequest> &
+  Partial<
+    Required<
+      Pick<
+        Mt2SettlementResolutionRequest,
+        | "profileId"
+        | "pairedEvidenceProfileId"
+        | "paymentDirection"
+        | "localBankRole"
+      >
+    >
+  >;
 
 function rejectsClientCounterpartyType(request: object): void {
   if (Object.hasOwn(request, "counterpartyType"))
@@ -68,7 +152,7 @@ export function toMt2BankResolutionRequest(
   messageIndex: PaymentMessageIndexService,
   sourceMessageTypeOverride?: string,
   bankServices: BankServiceDirectory = new BankServiceDirectory(),
-): RouteResolutionRequest {
+): Mt2BankResolutionRequest {
   rejectsClientCounterpartyType(request);
   rejectsClientCounterpartyBic(request);
   rejectsManualBankIdentity(request);
@@ -80,17 +164,33 @@ export function toMt2BankResolutionRequest(
     throw new BadRequestException("PAYMENT_SOURCE_MESSAGE_TYPE_REQUIRED");
   const profile = messageIndex.findSelectable(sourceMessageType);
   if (!profile) throw new BadRequestException("MESSAGE_TYPE_NOT_SUPPORTED");
+  const controlled = mt2ControlledProfile(sourceMessageType);
+  if (
+    controlled &&
+    profile.businessService !== undefined &&
+    profile.businessService !== controlled.businessService
+  )
+    throw new BadRequestException("PAYMENT_PROFILE_BINDING_INVALID");
   if (request.messageType !== profile.targetMessage)
     throw new BadRequestException("PAYMENT_SOURCE_TARGET_MISMATCH");
   const bank = bankServices.resolve(
     request.counterpartyBankServiceId ??
       request.beneficiaryBankServiceId ??
+      request.receiverBankServiceId ??
       request.bankServiceId,
   );
   return {
     ...request,
     sourceMessageType,
-    businessService: profile.businessService,
+    ...(controlled
+      ? {
+          profileId: controlled.profileId,
+          pairedEvidenceProfileId: controlled.pairedEvidenceProfileId,
+          paymentDirection: "OUTWARD" as const,
+          localBankRole: "INSTRUCTING_AGENT" as const,
+          businessService: controlled.businessService,
+        }
+      : { businessService: profile.businessService }),
     counterpartyBic: bank.bic,
     counterpartyCountry: request.counterpartyCountry || bank.country,
     counterpartyType: "BANK",

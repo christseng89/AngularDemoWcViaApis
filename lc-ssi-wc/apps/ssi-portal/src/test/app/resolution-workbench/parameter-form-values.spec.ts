@@ -44,7 +44,7 @@ describe("parameter form value allow-list", () => {
     };
     const eligibilitySnapshot = {
       snapshotId: "SNAPSHOT-1",
-      contextSha256: "a".repeat(64),
+      contextSha256: "b".repeat(64),
     };
 
     expect(
@@ -55,19 +55,19 @@ describe("parameter form value allow-list", () => {
     ).toEqual({ selectedRouteIdentity, eligibilitySnapshot });
   });
 
-  it("requires both route identity and its matching eligibility snapshot", () => {
+  it("requires both route identity and a valid candidate-specific route hash", () => {
     expect(() => selectedLookupBinding({} as never, {} as never)).toThrow(
       "PAGE_PARAMETER_ROUTE_BINDING_REQUIRED",
     );
     expect(() =>
       selectedLookupBinding(
         {
-          selectedRouteIdentity: { contextSha256: "a".repeat(64) },
+          selectedRouteIdentity: { contextSha256: "not-a-sha" },
         } as never,
         {
           eligibilitySnapshot: { contextSha256: "b".repeat(64) },
         } as never,
       ),
-    ).toThrow("PAGE_PARAMETER_ROUTE_CONTEXT_MISMATCH");
+    ).toThrow("PAGE_PARAMETER_ROUTE_CONTEXT_INVALID");
   });
 });

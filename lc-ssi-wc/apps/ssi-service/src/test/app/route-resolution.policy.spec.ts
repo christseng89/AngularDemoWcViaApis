@@ -92,7 +92,9 @@ describe("counterparty SSI coverage boundary", () => {
       sourceMessageType: "MT202COV",
       businessService: "swift.cbprplus.cov.04",
     };
-    expect(previewResolution(covRequest, [first, second], rows).decision).toBe("SSI_AMBIGUOUS");
+    expect(previewResolution(covRequest, [first, second], rows).decision).toBe(
+      "SSI_AMBIGUOUS",
+    );
     expect(
       previewResolution(
         { ...covRequest, selectedSsiId: first.id },
@@ -102,7 +104,18 @@ describe("counterparty SSI coverage boundary", () => {
     ).toBe(first.id);
   });
 
-  it.each(["AUD", "CAD", "CHF", "CNY", "EUR", "GBP", "HKD", "JPY", "SGD", "USD"])(
+  it.each([
+    "AUD",
+    "CAD",
+    "CHF",
+    "CNY",
+    "EUR",
+    "GBP",
+    "HKD",
+    "JPY",
+    "SGD",
+    "USD",
+  ])(
     "resolves %s Payment SSI without local clearing-system eligibility",
     (currency) => {
       const paymentRequest: RouteResolutionRequest = {
@@ -155,9 +168,25 @@ describe("counterparty SSI coverage boundary", () => {
       const result = previewResolution(paymentRequest, [ssi], [row]);
       expect(result.decision).toBe("RESOLVED");
       expect(result.recommendedRoute?.ssiId).toBe(ssi.id);
-      expect(result.recommendedRoute?.evidence.some(({ criterion }) => criterion.startsWith("CLEARING_"))).toBe(false);
-      expect(previewResolution({ ...paymentRequest, settlementCountry: "NZ" }, [ssi], [row]).decision).toBe("NO_ELIGIBLE_ROUTE");
-      expect(previewResolution({ ...paymentRequest, settlementMarket: "AU_DOMESTIC" }, [ssi], [row]).decision).toBe("NO_ELIGIBLE_ROUTE");
+      expect(
+        result.recommendedRoute?.evidence.some(({ criterion }) =>
+          criterion.startsWith("CLEARING_"),
+        ),
+      ).toBe(false);
+      expect(
+        previewResolution(
+          { ...paymentRequest, settlementCountry: "NZ" },
+          [ssi],
+          [row],
+        ).decision,
+      ).toBe("NO_ELIGIBLE_ROUTE");
+      expect(
+        previewResolution(
+          { ...paymentRequest, settlementMarket: "AU_DOMESTIC" },
+          [ssi],
+          [row],
+        ).decision,
+      ).toBe("NO_ELIGIBLE_ROUTE");
     },
   );
 
@@ -192,8 +221,7 @@ describe("counterparty SSI coverage boundary", () => {
         messageTypes: "pacs.009.001.08",
         ...(profile
           ? {
-              businessService:
-                "swift.cbprplus.04,swift.cbprplus.cov.04",
+              businessService: "swift.cbprplus.04,swift.cbprplus.cov.04",
               sourceMessageTypes: "MT202,MT205,MT202COV,MT205COV",
             }
           : {}),
@@ -230,8 +258,9 @@ describe("counterparty SSI coverage boundary", () => {
     );
 
     const tied = [candidate("SSI-DEMO-003"), candidate("SSI-DEMO-022")];
-    expect(previewResolution(coverRequest, tied, rows(tied.map(({ id }) => id))))
-      .toMatchObject({ decision: "SSI_AMBIGUOUS" });
+    expect(
+      previewResolution(coverRequest, tied, rows(tied.map(({ id }) => id))),
+    ).toMatchObject({ decision: "SSI_AMBIGUOUS" });
   });
 
   it("does not turn a global fallback into counterparty SSI coverage", () => {
@@ -357,6 +386,123 @@ describe("counterparty SSI coverage boundary", () => {
       "SSI-B",
     ]);
     expect(result.alternatives[0]?.rank).toEqual([10, 0, 2]);
+  });
+
+  it("filters a C81-invalid MT2 candidate without rejecting a valid route", () => {
+    const mt2Request: RouteResolutionRequest = {
+      ...request,
+      consumer: "CENTRAL_PAYMENT",
+      product: "CENTRAL_PAYMENT",
+      businessFunction: "INTERBANK_TRANSFER",
+      paymentLeg: "INTERBANK_SETTLEMENT",
+      counterpartyBic: "CITIUS33",
+      counterpartyCountry: "US",
+      messageType: "pacs.009.001.08",
+      sourceMessageType: "MT202",
+    };
+    const candidate = (
+      id: string,
+      sequenceA: Readonly<Record<string, string>>,
+    ) => ({
+      id,
+      counterpartyId: "CP-CITIUS33",
+      status: "ACTIVE",
+      version: 1,
+      route: {
+        currency: "USD",
+        counterpartyBic: "CITIUS33",
+        counterpartyCountry: "US",
+        accountCurrency: "USD",
+        bookingEntity: "HK01",
+        messageTypes: "pacs.009.001.08",
+        validFrom: "2026-01-01",
+        validTo: "2027-12-31",
+        routePreference: "PRIMARY",
+        priority: "10",
+        ...sequenceA,
+      },
+    });
+    const invalid = candidate("SSI-C81-INVALID", {
+      intermediaryBic: "HSBCHKHH",
+    });
+    const valid = candidate("SSI-C81-VALID", {
+      intermediaryBic: "HSBCHKHH",
+      accountWithBic: "CITIUS33",
+    });
+    const rows = [invalid, valid].map((item) => ({
+      ...applicability,
+      id: `${item.id}:APPL:1`,
+      ssiId: item.id,
+      consumer: "CENTRAL_PAYMENT",
+      product: "CENTRAL_PAYMENT",
+      businessFunction: "INTERBANK_TRANSFER",
+      paymentLeg: "INTERBANK_SETTLEMENT",
+    }));
+
+    const result = previewResolution(mt2Request, [invalid, valid], rows);
+
+    expect(result).toMatchObject({
+      decision: "RESOLVED",
+      recommendedRoute: { ssiId: "SSI-C81-VALID" },
+    });
+    expect(result.excludedRoutes[0]?.evidence).toContainEqual(
+      expect.objectContaining({
+        criterion: "MT2_SEQUENCE_A_C81",
+        outcome: "FAIL",
+        reasonCode: "C81_SEQUENCE_A_56_REQUIRES_57",
+      }),
+    );
+  });
+
+  it("returns no eligible route when every MT2 candidate violates C81", () => {
+    const mt2Request: RouteResolutionRequest = {
+      ...request,
+      consumer: "CENTRAL_PAYMENT",
+      product: "CENTRAL_PAYMENT",
+      businessFunction: "INTERBANK_TRANSFER",
+      paymentLeg: "INTERBANK_SETTLEMENT",
+      counterpartyBic: "CITIUS33",
+      counterpartyCountry: "US",
+      messageType: "pacs.009.001.08",
+      sourceMessageType: "MT205",
+    };
+    const invalid = {
+      id: "SSI-C81-ONLY",
+      counterpartyId: "CP-CITIUS33",
+      status: "ACTIVE",
+      version: 1,
+      route: {
+        currency: "USD",
+        counterpartyBic: "CITIUS33",
+        counterpartyCountry: "US",
+        intermediaryBic: "HSBCHKHH",
+        accountCurrency: "USD",
+        bookingEntity: "HK01",
+        messageTypes: "pacs.009.001.08",
+        validFrom: "2026-01-01",
+        validTo: "2027-12-31",
+      },
+    };
+    const row = {
+      ...applicability,
+      id: `${invalid.id}:APPL:1`,
+      ssiId: invalid.id,
+      consumer: "CENTRAL_PAYMENT",
+      product: "CENTRAL_PAYMENT",
+      businessFunction: "INTERBANK_TRANSFER",
+      paymentLeg: "INTERBANK_SETTLEMENT",
+    };
+
+    const result = previewResolution(mt2Request, [invalid], [row]);
+
+    expect(result.decision).toBe("NO_ELIGIBLE_ROUTE");
+    expect(result.excludedRoutes[0]?.evidence).toContainEqual(
+      expect.objectContaining({
+        criterion: "MT2_SEQUENCE_A_C81",
+        outcome: "FAIL",
+        reasonCode: "C81_SEQUENCE_A_56_REQUIRES_57",
+      }),
+    );
   });
 
   it("fails closed for blank applicability and a different booking entity", () => {

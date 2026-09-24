@@ -379,6 +379,43 @@ function coverProfileEvidence(
   );
 }
 
+const MT2_SEQUENCE_A_PROFILES = new Set([
+  "MT202",
+  "MT202COV",
+  "MT205",
+  "MT205COV",
+]);
+
+const present = (value: string | undefined): boolean => Boolean(value?.trim());
+
+function mt2SequenceAC81Evidence(
+  route: Readonly<Record<string, string>>,
+  request: RouteResolutionRequest,
+): ResolutionEvidence {
+  const source = request.sourceMessageType ?? "";
+  if (!MT2_SEQUENCE_A_PROFILES.has(source))
+    return check(
+      "MT2_SEQUENCE_A_C81",
+      true,
+      "NOT_APPLICABLE",
+      "NOT_APPLICABLE",
+      "C81_SEQUENCE_A_56_REQUIRES_57",
+    );
+  const has56 = present(
+    route["intermediaryBic"] ?? route["A.56A"] ?? route["56A"],
+  );
+  const has57 = present(
+    route["accountWithBic"] ?? route["A.57A"] ?? route["57A"],
+  );
+  return check(
+    "MT2_SEQUENCE_A_C81",
+    !has56 || has57,
+    "56a absent or 57a present",
+    `56a=${has56 ? "PRESENT" : "ABSENT"};57a=${has57 ? "PRESENT" : "ABSENT"}`,
+    "C81_SEQUENCE_A_56_REQUIRES_57",
+  );
+}
+
 function routeEvidence(context: EvidenceContext): ResolutionEvidence[] {
   const { request, candidate, applicability, valueTime } = context;
   const route = candidate.route;
@@ -420,6 +457,7 @@ function routeEvidence(context: EvidenceContext): ResolutionEvidence[] {
       "MESSAGE_TYPE_NOT_SUPPORTED",
     ),
     coverProfileEvidence(route, request),
+    mt2SequenceAC81Evidence(route, request),
     check(
       "VALUE_DATE",
       routeEffectiveAt(route, valueTime),

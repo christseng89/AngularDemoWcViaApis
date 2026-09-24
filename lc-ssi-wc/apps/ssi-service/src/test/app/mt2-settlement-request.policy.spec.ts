@@ -38,6 +38,10 @@ describe("MT2 settlement request policy", () => {
   it("derives BANK from the selected MT2 message profile", () => {
     expect(toMt2BankResolutionRequest(request, messageIndex)).toEqual({
       ...request,
+      profileId: "MT2-MT202-PLAIN-SR2026",
+      pairedEvidenceProfileId: "PACS009-PLAIN-SR2026",
+      paymentDirection: "OUTWARD",
+      localBankRole: "INSTRUCTING_AGENT",
       businessService: "swift.cbprplus.04",
       counterpartyBic: "BARCGB22",
       counterpartyType: "BANK",
@@ -95,4 +99,58 @@ describe("MT2 settlement request policy", () => {
       toMt2BankResolutionRequest(item, messageIndex, "MT202").counterpartyType,
     ).toBe("BANK");
   });
+
+  it.each([
+    [
+      "MT202",
+      "MT2-MT202-PLAIN-SR2026",
+      "PACS009-PLAIN-SR2026",
+      "swift.cbprplus.04",
+    ],
+    [
+      "MT202COV",
+      "MT2-MT202COV-COV-SR2026",
+      "PACS009-COV-SR2026",
+      "swift.cbprplus.cov.04",
+    ],
+    [
+      "MT205",
+      "MT2-MT205-PLAIN-SR2026",
+      "PACS009-PLAIN-SR2026",
+      "swift.cbprplus.04",
+    ],
+    [
+      "MT205COV",
+      "MT2-MT205COV-COV-SR2026",
+      "PACS009-COV-SR2026",
+      "swift.cbprplus.cov.04",
+    ],
+  ])(
+    "binds %s to its exact outward SSI profile",
+    (
+      sourceMessageType,
+      profileId,
+      pairedEvidenceProfileId,
+      businessService,
+    ) => {
+      const index = {
+        findSelectable: jest.fn(() => ({
+          messageType: sourceMessageType,
+          targetMessage: "pacs.009.001.08",
+          businessService,
+          selectable: true,
+        })),
+      } as unknown as PaymentMessageIndexService;
+
+      expect(
+        toMt2BankResolutionRequest({ ...request, sourceMessageType }, index),
+      ).toMatchObject({
+        profileId,
+        pairedEvidenceProfileId,
+        paymentDirection: "OUTWARD",
+        localBankRole: "INSTRUCTING_AGENT",
+        businessService,
+      });
+    },
+  );
 });

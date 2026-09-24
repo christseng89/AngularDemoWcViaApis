@@ -5,7 +5,7 @@ interface OasParameter {
   readonly name: string;
   readonly required?: boolean;
   readonly schema?: {
-    readonly enum?: readonly string[];
+    readonly enum?: readonly (string | boolean)[];
   };
 }
 
@@ -38,6 +38,7 @@ interface Mt1OasContract {
 
 interface OasDocument {
   readonly "x-mt1-ssi-resolution": Mt1OasContract;
+  readonly "x-mt2-ssi-resolution": Mt1OasContract;
   readonly paths: Readonly<Record<string, { readonly get?: OasOperation }>>;
   readonly components: {
     readonly schemas: Readonly<Record<string, OasSchema>>;
@@ -64,6 +65,17 @@ describe("MT1 / pacs.008 outward SSI OpenAPI contract", () => {
     });
     expect(contract.profileSelectionRule).toContain("BizSvc");
     expect(contract.profileSelectionRule).toContain("MsgDefIdr");
+  });
+
+  it("publishes the MT2 / pacs.009 outward SSI-only boundary", () => {
+    expect(
+      readOas("openapi/swift-data-service.v1.json")["x-mt2-ssi-resolution"],
+    ).toMatchObject({
+      messageFamily: "MT2_PACS009",
+      paymentDirection: "OUTWARD",
+      localBankRole: "INSTRUCTING_AGENT",
+      productType: "SSI_RESOLUTION_ONLY",
+    });
   });
 
   it("documents MT103 and pacs.008 page-definition selection", () => {
@@ -128,8 +140,22 @@ describe("MT1 / pacs.008 outward SSI OpenAPI contract", () => {
       "PROFILE_INCOMPLETE",
       "UNSUPPORTED_DIRECTION",
       "UNSUPPORTED_PROFILE",
+      "RMA_NOT_AUTHORIZED",
+      "JURISDICTION_EVIDENCE_CONFLICT",
+      "JURISDICTION_NOT_PERMITTED",
     ]);
     expect(execution?.properties?.["routeBindingId"]?.type).toBe("string");
+    expect(execution?.properties?.["profileKind"]?.enum).toEqual([
+      "SSI_RESOLUTION_ONLY",
+    ]);
+    expect(execution?.properties?.["paymentExecutable"]?.enum).toEqual([
+      false,
+    ]);
+    expect(execution?.properties?.["contextSnapshotId"]?.type).toBe("string");
+    expect(execution?.properties?.["rmaAuthorizationDecisionId"]?.type).toBe(
+      "string",
+    );
+    expect(execution?.properties?.["evidenceCards"]?.type).toBe("array");
     expect(execution?.properties?.["outputs"]?.description).toContain(
       "MT103 Base and STP",
     );

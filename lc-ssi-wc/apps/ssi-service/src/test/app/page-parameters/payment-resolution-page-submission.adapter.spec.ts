@@ -76,7 +76,7 @@ const successfulEnvelope = (tags: Readonly<Record<string, string>>) => ({
     httpStatus: 200,
     decision: "RESOLVED",
     code: "SSI_RESOLVED",
-    payloadGenerated: true,
+    payloadGenerated: false,
     messageDefinitionId: "pacs.009.001.08",
     businessService: "swift.cbprplus.04",
     canonicalRoles: { debtorAgent: "CITIUS33", creditorAgent: "DEUTDEFF" },
@@ -102,7 +102,14 @@ describe("PaymentResolutionPageSubmissionAdapter", () => {
       name: "Governed bank",
       country: bankServiceId.includes("DEUT") ? "DE" : "US",
     })),
-    search: jest.fn(() => []),
+    search: jest.fn((bic: string) => [
+      {
+        bankServiceId: `BANK-SVC-${bic}`,
+        bic,
+        name: "Governed bank",
+        country: bic.slice(4, 6),
+      },
+    ]),
   };
 
   const defaultResponse = successfulEnvelope({
@@ -181,6 +188,19 @@ describe("PaymentResolutionPageSubmissionAdapter", () => {
             },
           ]),
         } as never,
+        {
+          list: jest.fn(() => [
+            {
+              id: "ENTITY-HK01",
+              version: 1,
+              status: "ACTIVE",
+              branchCode: "HK01",
+              countryCode: "DE",
+              validFrom: "2026-01-01",
+              validTo: "2026-12-31",
+            },
+          ]),
+        } as never,
       ),
     };
   };
@@ -199,6 +219,10 @@ describe("PaymentResolutionPageSubmissionAdapter", () => {
     expect(context.resolver.resolve).toHaveBeenCalledWith(
       expect.objectContaining({
         sourceMessageType: "MT202",
+        profileId: "MT2-MT202-PLAIN-SR2026",
+        pairedEvidenceProfileId: "PACS009-PLAIN-SR2026",
+        paymentDirection: "OUTWARD",
+        localBankRole: "INSTRUCTING_AGENT",
         messageType: "pacs.009.001.08",
         businessService: "swift.cbprplus.04",
         businessFunction: "INTERBANK_TRANSFER",
@@ -211,7 +235,9 @@ describe("PaymentResolutionPageSubmissionAdapter", () => {
     );
     expect(result).toMatchObject({
       outcome: "RESOLVED",
-      payloadGenerated: true,
+      payloadGenerated: false,
+      ssiApplicability: "REQUIRED",
+      resolutionOutcome: "ELIGIBLE_COMPLETE_ROUTE",
       confirmedResolutionCreated: false,
       repairQueueCreated: false,
       nvrOutcome: "PASS",
@@ -234,6 +260,8 @@ describe("PaymentResolutionPageSubmissionAdapter", () => {
           mediaType: "application/json",
           document: expect.objectContaining({
             messageDefinitionId: "pacs.009.001.08",
+            businessService: "swift.cbprplus.04",
+            payloadGenerated: false,
             canonicalRoles: {
               debtorAgent: "CITIUS33",
               creditorAgent: "DEUTDEFF",
@@ -298,7 +326,7 @@ describe("PaymentResolutionPageSubmissionAdapter", () => {
     },
   );
 
-  it("preserves COV Sequence A/B tags and the COV BizSvc", () => {
+  it("keeps COV Sequence B customer data out of SSI evidence", () => {
     const definition = definitionFor("MT202COV");
     const scenario = scenarioFor(definition, "MT202COV-OP-STANDARD");
     const context = harness(
@@ -326,17 +354,14 @@ describe("PaymentResolutionPageSubmissionAdapter", () => {
     expect(result.fields).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ sequenceId: "A", swiftTag: "58" }),
-        expect.objectContaining({
-          sequenceId: "B",
-          swiftTag: "50",
-          swiftOption: "K",
-        }),
-        expect.objectContaining({
-          sequenceId: "B",
-          swiftTag: "59",
-          swiftOption: "NONE",
-        }),
       ]),
+    );
+    expect(result.fields).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ sequenceId: "B" })]),
+    );
+    expect(JSON.stringify(result.outputs)).not.toContain("ORDERING CUSTOMER");
+    expect(JSON.stringify(result.outputs)).not.toContain(
+      "BENEFICIARY CUSTOMER",
     );
   });
 
@@ -349,6 +374,17 @@ describe("PaymentResolutionPageSubmissionAdapter", () => {
         ...defaultResponse.chosenRoute,
         nostroId: "NOSTRO-PAYMENT-001",
         nostroVersion: 1,
+        accountId: "DEMO-NOSTRO-USD-001",
+        rmaId: "RMA-PAYMENT-001",
+        rmaVersion: 1,
+        rmaDecisionId: "RMA-DECISION-001",
+        actualReceiverBic: "CITIUS33",
+        executionTransport: "FINPLUS",
+        settlementMethod: "INDA",
+        topologyRulingId: "BA-TOPOLOGY-INDA-INGA-001",
+        topologyRulingVersion: "1.0.0",
+        routeBindingId: SHA,
+        contextSnapshotId: SHA,
       },
     });
     const submission = {
@@ -362,11 +398,15 @@ describe("PaymentResolutionPageSubmissionAdapter", () => {
         ssi: { id: "SSI-PAYMENT-001", version: 3 },
         applicability: { id: "APP-PAYMENT-001", version: 2 },
         nostro: { id: "NOSTRO-PAYMENT-001", version: 1 },
-        rma: { id: "RMA-PAYMENT-001", version: 1 },
+        rma: {
+          id: "RMA-PAYMENT-001",
+          version: 1,
+          decisionId: "RMA-DISCOVERY-001",
+        },
       },
     };
 
-    context.adapter.execute({ definition, scenario, submission });
+    const result = context.adapter.execute({ definition, scenario, submission });
 
     expect(context.resolver.resolve).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -374,6 +414,29 @@ describe("PaymentResolutionPageSubmissionAdapter", () => {
         selectedSsiVersion: 3,
       }),
     );
+    expect(result).toMatchObject({
+      profileKind: "SSI_RESOLUTION_ONLY",
+      paymentExecutable: false,
+      payloadGenerated: false,
+      routeBindingId: SHA,
+      contextSnapshotId: SHA,
+      rmaAuthorizationDecisionId: "RMA-DECISION-001",
+      settlementRoute: expect.objectContaining({
+        routeBindingId: SHA,
+        settlementMethod: "INDA",
+      }),
+      evidenceCards: [
+        expect.objectContaining({ format: "SWIFT_MT" }),
+        expect.objectContaining({
+          format: "ISO_20022",
+          evidenceProjections: expect.arrayContaining([
+            expect.objectContaining({
+              mappingRuleId: "MAP-MT2-STTLMMTD-002",
+            }),
+          ]),
+        }),
+      ],
+    });
   });
 
   it("rejects a resolver route that differs from the selected complete route", () => {
@@ -392,14 +455,16 @@ describe("PaymentResolutionPageSubmissionAdapter", () => {
       rma: { id: "RMA-PAYMENT-001", version: 1 },
     };
 
-    expect(() => context.adapter.execute({
-      definition,
-      scenario,
-      submission: {
-        ...submissionFor(definition, scenario),
-        selectedRouteIdentity,
-      },
-    })).toThrow();
+    expect(() =>
+      context.adapter.execute({
+        definition,
+        scenario,
+        submission: {
+          ...submissionFor(definition, scenario),
+          selectedRouteIdentity,
+        },
+      }),
+    ).toThrow();
   });
 
   it.each([
@@ -415,7 +480,7 @@ describe("PaymentResolutionPageSubmissionAdapter", () => {
           httpStatus: 200,
           decision: "RESOLVED",
           code: "RESOLVED",
-          payloadGenerated: true,
+          payloadGenerated: false,
           resolutionDomain: "OWN_SSI_NOSTRO",
           canonicalScenario: code,
         },
@@ -590,14 +655,36 @@ describe("PaymentResolutionPageSubmissionAdapter", () => {
     }
   });
 
-  it.each([
-    ["MT205COV-OP-STANDARD", "MT202COV"],
-  ])("derives previous-message context for %s", (scenarioId, expectedType) => {
-    const definition = definitionFor(
-      scenarioId.startsWith("MT205COV") ? "MT205COV" : "MT205",
+  it.each([["MT205COV-OP-STANDARD", "MT202COV"]])(
+    "derives previous-message context for %s",
+    (scenarioId, expectedType) => {
+      const definition = definitionFor(
+        scenarioId.startsWith("MT205COV") ? "MT205COV" : "MT205",
+      );
+      const baseScenario = definition.scenarios[0]!;
+      const scenario = { ...baseScenario, scenarioId };
+      const context = harness();
+
+      context.adapter.execute({
+        definition,
+        scenario,
+        submission: submissionFor(definition, scenario),
+      });
+
+      expect(context.resolver.resolve).toHaveBeenCalledWith(
+        expect.objectContaining({
+          previousMessage: expect.objectContaining({ type: expectedType }),
+        }),
+      );
+    },
+  );
+
+  it("adds the governed non-cover predecessor attestation for MT205 standard onward", () => {
+    const definition = definitionFor("MT205");
+    const scenario = scenarioFor(
+      definition,
+      "MT205-OP-STANDARD-DOMESTIC-ONWARD",
     );
-    const baseScenario = definition.scenarios[0]!;
-    const scenario = { ...baseScenario, scenarioId };
     const context = harness();
 
     context.adapter.execute({
@@ -608,32 +695,23 @@ describe("PaymentResolutionPageSubmissionAdapter", () => {
 
     expect(context.resolver.resolve).toHaveBeenCalledWith(
       expect.objectContaining({
-        previousMessage: expect.objectContaining({ type: expectedType }),
+        previousMessage: expect.objectContaining({
+          type: "MT202",
+          nonCoverAttested: true,
+          attestationVersion: "1.0.0",
+        }),
       }),
     );
   });
 
-  it("does not invent previous-message provenance for MT205 standard onward", () => {
-    const definition = definitionFor("MT205");
-    const scenario = scenarioFor(definition, "MT205-OP-STANDARD-DOMESTIC-ONWARD");
-    const context = harness();
-
-    context.adapter.execute({
-      definition,
-      scenario,
-      submission: submissionFor(definition, scenario),
-    });
-
-    expect(context.resolver.resolve).toHaveBeenCalledWith(
-      expect.not.objectContaining({ previousMessage: expect.anything() }),
-    );
-  });
-
-  it.each(["MT202", "MT203", "MT205"])(
-    "passes actual %s provenance without changing the selected route",
+  it.each(["MT203", "MT205"])(
+    "ignores client-supplied %s predecessor and retains governed provenance",
     (previousType) => {
       const definition = definitionFor("MT205");
-      const scenario = scenarioFor(definition, "MT205-OP-STANDARD-DOMESTIC-ONWARD");
+      const scenario = scenarioFor(
+        definition,
+        "MT205-OP-STANDARD-DOMESTIC-ONWARD",
+      );
       const context = harness();
       const result = context.adapter.execute({
         definition,
@@ -645,28 +723,38 @@ describe("PaymentResolutionPageSubmissionAdapter", () => {
 
       expect(context.resolver.resolve).toHaveBeenCalledWith(
         expect.objectContaining({
-          previousMessage: expect.objectContaining({ type: previousType }),
+          previousMessage: expect.objectContaining({ type: "MT202" }),
         }),
       );
-      expect(result.evidence.selectedSsi).toEqual({ id: "SSI-PAYMENT-001", version: 3 });
-      expect(result.evidence.selectedApplicability).toEqual({ id: "APP-PAYMENT-001", version: 2 });
+      expect(result.evidence.selectedSsi).toEqual({
+        id: "SSI-PAYMENT-001",
+        version: 3,
+      });
+      expect(result.evidence.selectedApplicability).toEqual({
+        id: "APP-PAYMENT-001",
+        version: 2,
+      });
     },
   );
 
-  it("records actual MT205 prior-message provenance in the request audit identity", () => {
+  it("keeps client predecessor changes out of the request audit identity", () => {
     const definition = definitionFor("MT205");
-    const scenario = scenarioFor(definition, "MT205-OP-STANDARD-DOMESTIC-ONWARD");
-    const requestHashes = ["MT202", "MT203", "MT205"].map((previousType) =>
-      harness().adapter.execute({
-        definition,
-        scenario,
-        submission: submissionFor(definition, scenario, {
-          "context.previousMessageType": previousType,
-        }),
-      }).evidence.requestSha256,
+    const scenario = scenarioFor(
+      definition,
+      "MT205-OP-STANDARD-DOMESTIC-ONWARD",
+    );
+    const requestHashes = ["MT202", "MT203", "MT205"].map(
+      (previousType) =>
+        harness().adapter.execute({
+          definition,
+          scenario,
+          submission: submissionFor(definition, scenario, {
+            "context.previousMessageType": previousType,
+          }),
+        }).evidence.requestSha256,
     );
 
-    expect(new Set(requestHashes).size).toBe(3);
+    expect(new Set(requestHashes).size).toBe(1);
   });
 
   it.each([
@@ -788,7 +876,7 @@ describe("PaymentResolutionPageSubmissionAdapter", () => {
       httpStatus: 200,
       decision: "RESOLVED",
       code: "SSI_RESOLVED",
-      payloadGenerated: true,
+      payloadGenerated: false,
       mt: {
         tags: {
           "53A": "/ACCOUNT\nCITIUS33",
@@ -854,7 +942,7 @@ describe("PaymentResolutionPageSubmissionAdapter", () => {
             httpStatus: 200,
             decision: "RESOLVED",
             code: "SSI_NOT_FOUND",
-            payloadGenerated: true,
+            payloadGenerated: false,
           },
           chosenRoute: {
             ssiId: "SSI-1",
@@ -866,13 +954,13 @@ describe("PaymentResolutionPageSubmissionAdapter", () => {
         },
       ],
       [
-        "success code without generated payload",
+        "SSI-only success incorrectly claims a generated payment payload",
         {
           mx: {
             httpStatus: 200,
             decision: "RESOLVED",
             code: "SSI_RESOLVED",
-            payloadGenerated: false,
+            payloadGenerated: true,
           },
           chosenRoute: {
             ssiId: "SSI-1",
@@ -890,7 +978,7 @@ describe("PaymentResolutionPageSubmissionAdapter", () => {
             httpStatus: 200,
             decision: "RESOLVED",
             code: "SSI_RESOLVED",
-            payloadGenerated: true,
+            payloadGenerated: false,
           },
           mt: { tags: { "58A": "DEUTDEFF" } },
         },

@@ -100,8 +100,9 @@ const lookupEnvelope = (
         response.items.some(
           (item) =>
             !item.selectedRouteIdentity ||
-            item.selectedRouteIdentity?.contextSha256 !==
-              response.eligibilitySnapshot!.contextSha256,
+            !/^[a-f0-9]{64}$/i.test(
+              item.selectedRouteIdentity.contextSha256,
+            ),
         )
       )
         throw new Error("PAGE_PARAMETER_ROUTE_BINDING_INVALID");

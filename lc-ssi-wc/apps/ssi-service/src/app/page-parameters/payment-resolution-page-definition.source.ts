@@ -206,20 +206,6 @@ const transactionFields = (
     constraints: [requiredConstraint("valueDate")],
   },
   {
-    fieldId: "context.amount",
-    path: "amount",
-    label: "Amount",
-    control: "TEXT",
-    dataType: "STRING",
-    required: true,
-    displayOrder: 50,
-    section: "TRANSACTION",
-    visibility: "USER_INPUT",
-    defaultValue: "1000.00",
-    columnSpan: 2,
-    constraints: [requiredConstraint("amount")],
-  },
-  {
     fieldId: "context.counterpartyBankServiceId",
     path: "counterpartyBankServiceId",
     label: "Counterparty Bank",
@@ -450,25 +436,7 @@ const validationContextFields = (
   messageType: string,
 ): PageParameterField[] => {
   if (messageType === "MT205") {
-    return [
-        {
-          fieldId: "context.previousMessageType",
-          path: "previousMessage.type",
-          label: "Actual previous FI message type",
-          control: "TEXT",
-          dataType: "STRING",
-          required: false,
-          displayOrder: 70,
-          section: "VALIDATION_CONTEXT",
-          visibility: "HIDDEN_EVIDENCE",
-          readOnly: true,
-          options: ["MT202", "MT203", "MT205"].map((type) => ({
-            value: type,
-            label: type,
-          })),
-          constraints: [],
-        },
-    ];
+    return [];
   }
   if (!messageType.endsWith("COV")) return [];
   return [
@@ -495,7 +463,8 @@ const validationContextFields = (
             required: true,
             displayOrder: 64,
             section: "VALIDATION_CONTEXT",
-            visibility: "USER_INPUT",
+            visibility: "HIDDEN_EVIDENCE",
+            readOnly: true,
             constraints: [requiredConstraint("sequenceB50A")],
           },
           {
@@ -507,7 +476,8 @@ const validationContextFields = (
             required: true,
             displayOrder: 65,
             section: "VALIDATION_CONTEXT",
-            visibility: "USER_INPUT",
+            visibility: "HIDDEN_EVIDENCE",
+            readOnly: true,
             constraints: [requiredConstraint("sequenceB59")],
           },
           ...(messageType === "MT205COV"
@@ -592,7 +562,8 @@ function userContextField(
     required: true,
     displayOrder,
     section: "VALIDATION_CONTEXT",
-    visibility: "USER_INPUT",
+    visibility: "HIDDEN_EVIDENCE",
+    readOnly: true,
     constraints: [requiredConstraint(suffix)],
   };
 }
@@ -938,17 +909,23 @@ export class PaymentResolutionPageDefinitionSource implements ResolutionPageDefi
     const businessDatePolicy =
       this.businessDates ?? new PageParameterBusinessDatePolicy();
     const defaultValueDate = businessDatePolicy.firstAvailableDate();
+    const configuredOptions = this.definitionOptions
+      ? this.definitionOptions.payment(
+          configured.messageType,
+          defaultValueDate,
+        )
+      : this.governedOptions?.options(
+          configured.messageType,
+          defaultValueDate,
+        );
+    const transactionOptions =
+      configured.messageType.startsWith("MT205") &&
+      configuredOptions?.currencies.includes("HKD")
+        ? { ...configuredOptions, defaultCurrency: "HKD" }
+        : configuredOptions;
     const fields = [
       ...transactionFields(
-        this.definitionOptions
-          ? this.definitionOptions.payment(
-              configured.messageType,
-              defaultValueDate,
-            )
-          : this.governedOptions?.options(
-              configured.messageType,
-              defaultValueDate,
-            ),
+        transactionOptions,
         defaultValueDate,
         businessDatePolicy.metadata(),
         Boolean(this.definitionOptions),
@@ -965,6 +942,7 @@ export class PaymentResolutionPageDefinitionSource implements ResolutionPageDefi
           ...configured.governedInputValues,
           ...scenario.resolverInputValues,
           "context.transactionReference": `PAYMENT-${scenario.scenarioId}`,
+          "context.amount": "1000.00",
           ...(configured.messageType.endsWith("COV")
             ? { "context.swift119NONE": "COV" }
             : {}),
@@ -1042,10 +1020,10 @@ export class PaymentResolutionPageDefinitionSource implements ResolutionPageDefi
       },
       profile: {
         profileId: `PACS009-${configured.messageType}-SR2026`,
-        profileKind: "MT_TO_MX",
+        profileKind: "SSI_RESOLUTION_ONLY",
         businessService: configured.businessService,
         messageDefinitionId: "pacs.009.001.08",
-        paymentExecutable: true,
+        paymentExecutable: false,
         selectionBasis: {
           businessScenarioId: primaryScenario.scenarioId,
           businessService: configured.businessService,

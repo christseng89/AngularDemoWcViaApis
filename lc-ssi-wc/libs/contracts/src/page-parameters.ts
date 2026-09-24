@@ -448,7 +448,9 @@ export interface PageParameterSelectedRouteIdentity {
   readonly ssi: PageParameterVersionedRecordIdentity;
   readonly applicability: PageParameterVersionedRecordIdentity;
   readonly nostro: PageParameterVersionedRecordIdentity;
-  readonly rma?: PageParameterVersionedRecordIdentity;
+  readonly rma?: PageParameterVersionedRecordIdentity & {
+    readonly decisionId?: string;
+  };
 }
 
 export interface PageParameterEligibilitySnapshot {
@@ -553,6 +555,9 @@ export interface ResolutionPageGeneratedOutput {
 }
 
 export interface ResolutionPageSettlementRoute {
+  readonly actualReceiverBic?: string;
+  readonly executionTransport?: "FIN" | "FINPLUS";
+  readonly settlementMethod?: "INDA" | "INGA";
   readonly routeBindingId: string;
   readonly counterparty: {
     readonly bankServiceId: string;
@@ -604,6 +609,44 @@ export interface ResolutionPageSettlementRoute {
   }[];
 }
 
+export interface ResolutionPageEvidenceProjection {
+  readonly projectionId: string;
+  readonly classification:
+    | "SSI_DERIVED"
+    | "UPSTREAM_CONTEXT"
+    | "OMITTED_BY_RULE"
+    | "NOT_APPLICABLE";
+  readonly role: string;
+  readonly mtTagOption?: string;
+  readonly isoPath?: string;
+  readonly valueType?: "BIC" | "ACCOUNT_REFERENCE" | "SETTLEMENT_METHOD";
+  readonly value?: string;
+  readonly sourceRecordType?:
+    | "BANK_SSI"
+    | "OWN_NOSTRO_ACCOUNT"
+    | "UPSTREAM_ATTESTATION"
+    | "TOPOLOGY_RULE";
+  readonly sourceRecordId?: string;
+  readonly sourceRecordVersion?: string;
+  readonly mappingRuleId?: string;
+  readonly accountOwnerBic?: string;
+  readonly accountServicerBic?: string;
+  readonly rulingProvenance?: {
+    readonly rulingId: string;
+    readonly rulingVersion: string;
+  };
+  readonly decisionRuleId?: string;
+  readonly reason?: string;
+}
+
+export interface ResolutionPageEvidenceCard {
+  readonly format: "SWIFT_MT" | "ISO_20022";
+  readonly profileId: string;
+  readonly messageDefinitionId?: string;
+  readonly businessService?: string;
+  readonly evidenceProjections: readonly ResolutionPageEvidenceProjection[];
+}
+
 export interface ResolutionPageExecutionResult {
   readonly definitionId: string;
   readonly definitionVersion: string;
@@ -612,10 +655,13 @@ export interface ResolutionPageExecutionResult {
   readonly outcome: ResolutionPageExecutionOutcome;
   readonly reasonCode?: string;
   readonly payloadGenerated: boolean;
+  /** SSI resolution evidence is not an executable payment instruction. */
+  readonly paymentExecutable?: false;
+  readonly profileKind?: "SSI_RESOLUTION_ONLY";
   readonly confirmedResolutionCreated: boolean;
   readonly repairQueueCreated: boolean;
   readonly nvrOutcome: PageParameterCompatibleNvrOutcome;
-  /** Present for MT1/pacs.008 SSI-resolution-only responses. */
+  /** Present for governed MT1/pacs.008 and MT2/pacs.009 SSI-resolution-only responses. */
   readonly ssiApplicability?: "NOT_EVALUATED" | "REQUIRED" | "NOT_REQUIRED";
   /** Kept independent from applicability so REQUIRED is never mistaken for success. */
   readonly resolutionOutcome?:
@@ -628,10 +674,16 @@ export interface ResolutionPageExecutionResult {
     | "INVALID_UPSTREAM_CONTEXT"
     | "PROFILE_INCOMPLETE"
     | "UNSUPPORTED_DIRECTION"
-    | "UNSUPPORTED_PROFILE";
+    | "UNSUPPORTED_PROFILE"
+    | "RMA_NOT_AUTHORIZED"
+    | "JURISDICTION_EVIDENCE_CONFLICT"
+    | "JURISDICTION_NOT_PERMITTED";
   readonly routeBindingId?: string;
+  readonly contextSnapshotId?: string;
+  readonly rmaAuthorizationDecisionId?: string;
   /** Bank-controlled atomic route selected by SSI resolution; never customer CPI. */
   readonly settlementRoute?: ResolutionPageSettlementRoute;
+  readonly evidenceCards?: readonly ResolutionPageEvidenceCard[];
   readonly fields: readonly ResolutionPageFieldResult[];
   readonly outputs: readonly ResolutionPageGeneratedOutput[];
   readonly evidence: ResolutionPageExecutionEvidence;

@@ -240,6 +240,42 @@
       }
     ]
   },
+  "x-mt2-ssi-resolution": {
+    "schemaVersion": "1.0",
+    "standardsRelease": "SR2026",
+    "scope": "OUTWARD_SSI_ONLY",
+    "messageFamily": "MT2_PACS009",
+    "paymentDirection": "OUTWARD",
+    "localBankRole": "INSTRUCTING_AGENT",
+    "productType": "SSI_RESOLUTION_ONLY",
+    "profileSelectionRule": "Select the governed profile by profileId and exact BizSvc. pacs.009 plain and COV share MsgDefIdr pacs.009.001.08, so MsgDefIdr alone must never select the profile.",
+    "profiles": [
+      {
+        "profileId": "MT2-MT202-PLAIN-SR2026",
+        "messageType": "MT202",
+        "pairedEvidenceProfileId": "PACS009-PLAIN-SR2026",
+        "businessService": "swift.cbprplus.04"
+      },
+      {
+        "profileId": "MT2-MT202COV-COV-SR2026",
+        "messageType": "MT202COV",
+        "pairedEvidenceProfileId": "PACS009-COV-SR2026",
+        "businessService": "swift.cbprplus.cov.04"
+      },
+      {
+        "profileId": "MT2-MT205-PLAIN-SR2026",
+        "messageType": "MT205",
+        "pairedEvidenceProfileId": "PACS009-PLAIN-SR2026",
+        "businessService": "swift.cbprplus.04"
+      },
+      {
+        "profileId": "MT2-MT205COV-COV-SR2026",
+        "messageType": "MT205COV",
+        "pairedEvidenceProfileId": "PACS009-COV-SR2026",
+        "businessService": "swift.cbprplus.cov.04"
+      }
+    ]
+  },
   "x-resolution-page-field-policy": {
     "schemaVersion": "1.0",
     "defaultBankServicePolicy": {
@@ -2553,7 +2589,8 @@
           "contextSha256",
           "ssi",
           "applicability",
-          "nostro"
+          "nostro",
+          "rma"
         ],
         "properties": {
           "routeId": { "type": "string", "minLength": 1 },
@@ -2571,7 +2608,14 @@
             "$ref": "#/components/schemas/PageParameterVersionedRecordIdentity"
           },
           "rma": {
-            "$ref": "#/components/schemas/PageParameterVersionedRecordIdentity"
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "version", "decisionId"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "version": { "type": "integer", "minimum": 1 },
+              "decisionId": { "type": "string", "minLength": 1 }
+            }
           }
         }
       },
@@ -2955,6 +2999,9 @@
         ],
         "properties": {
           "routeBindingId": { "type": "string", "minLength": 1 },
+          "actualReceiverBic": { "$ref": "#/components/schemas/Bic" },
+          "executionTransport": { "enum": ["FIN", "FINPLUS"] },
+          "settlementMethod": { "enum": ["INDA", "INGA"] },
           "counterparty": {
             "type": "object",
             "additionalProperties": false,
@@ -3063,6 +3110,35 @@
           }
         }
       },
+      "ResolutionPageEvidenceProjection": {
+        "type": "object",
+        "required": ["projectionId", "classification", "role"],
+        "properties": {
+          "projectionId": { "type": "string", "minLength": 1 },
+          "classification": { "enum": ["SSI_DERIVED", "UPSTREAM_CONTEXT", "OMITTED_BY_RULE", "NOT_APPLICABLE"] },
+          "role": { "type": "string", "minLength": 1 },
+          "mtTagOption": { "type": "string" },
+          "isoPath": { "type": "string" },
+          "valueType": { "enum": ["BIC", "ACCOUNT_REFERENCE", "SETTLEMENT_METHOD"] },
+          "value": { "type": "string" },
+          "sourceRecordType": { "enum": ["BANK_SSI", "OWN_NOSTRO_ACCOUNT", "UPSTREAM_ATTESTATION", "TOPOLOGY_RULE"] },
+          "sourceRecordId": { "type": "string" },
+          "sourceRecordVersion": { "type": "string" },
+          "mappingRuleId": { "type": "string" },
+          "rulingProvenance": { "type": "object" }
+        }
+      },
+      "ResolutionPageEvidenceCard": {
+        "type": "object",
+        "required": ["format", "profileId", "evidenceProjections"],
+        "properties": {
+          "format": { "enum": ["SWIFT_MT", "ISO_20022"] },
+          "profileId": { "type": "string", "minLength": 1 },
+          "messageDefinitionId": { "type": "string" },
+          "businessService": { "type": "string" },
+          "evidenceProjections": { "type": "array", "minItems": 1, "items": { "$ref": "#/components/schemas/ResolutionPageEvidenceProjection" } }
+        }
+      },
       "ResolutionPageExecutionResult": {
         "type": "object",
         "required": [
@@ -3095,17 +3171,19 @@
           },
           "reasonCode": { "type": "string" },
           "payloadGenerated": { "type": "boolean" },
+          "paymentExecutable": { "enum": [false] },
+          "profileKind": { "enum": ["SSI_RESOLUTION_ONLY"] },
           "confirmedResolutionCreated": { "type": "boolean" },
           "repairQueueCreated": { "type": "boolean" },
           "nvrOutcome": {
             "$ref": "#/components/schemas/PageParameterCompatibleNvrOutcome"
           },
           "ssiApplicability": {
-            "description": "MT1 / pacs.008 Bank SSI applicability, kept independent from the resolution outcome.",
+            "description": "MT1/pacs.008 and MT2/pacs.009 Bank SSI applicability, kept independent from the resolution outcome.",
             "enum": ["NOT_EVALUATED", "REQUIRED", "NOT_REQUIRED"]
           },
           "resolutionOutcome": {
-            "description": "Typed MT1 / pacs.008 outward SSI resolution outcome. Non-success outcomes fail closed without payment composition or execution.",
+            "description": "Typed outward Bank SSI resolution outcome for MT1/pacs.008 and MT2/pacs.009. Non-success outcomes fail closed without payment composition or execution.",
             "enum": [
               "BILATERAL_RELATIONSHIP_CONFIRMED",
               "ELIGIBLE_COMPLETE_ROUTE",
@@ -3116,7 +3194,10 @@
               "INVALID_UPSTREAM_CONTEXT",
               "PROFILE_INCOMPLETE",
               "UNSUPPORTED_DIRECTION",
-              "UNSUPPORTED_PROFILE"
+              "UNSUPPORTED_PROFILE",
+              "RMA_NOT_AUTHORIZED",
+              "JURISDICTION_EVIDENCE_CONFLICT",
+              "JURISDICTION_NOT_PERMITTED"
             ]
           },
           "routeBindingId": {
@@ -3124,8 +3205,15 @@
             "minLength": 1,
             "description": "Identity of the indivisible, version-locked atomic SSI route; clients must not mix fields or legs across route bindings."
           },
+          "contextSnapshotId": { "type": "string", "minLength": 1 },
+          "rmaAuthorizationDecisionId": { "type": "string", "minLength": 1 },
           "settlementRoute": {
             "$ref": "#/components/schemas/ResolutionPageSettlementRoute"
+          },
+          "evidenceCards": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "$ref": "#/components/schemas/ResolutionPageEvidenceCard" }
           },
           "fields": { "type": "array", "items": { "type": "object" } },
           "outputs": {

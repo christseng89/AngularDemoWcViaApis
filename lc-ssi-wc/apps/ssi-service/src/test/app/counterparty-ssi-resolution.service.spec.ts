@@ -19,23 +19,184 @@ const request: RouteResolutionRequest = {
   transactionReference: "QA",
 };
 
+const governedRaw = (
+  source: string,
+  raw: Record<string, unknown>,
+): Record<string, unknown> => {
+  const basePrevious = source.endsWith("COV")
+    ? {
+        type: "MT202COV",
+        "20": "PREVIOUS",
+        "21": "PREVIOUS",
+        "121": "123e4567-e89b-12d3-a456-426614174000",
+        "A.52A": "CITIUS33",
+        "A.58A": "CITIUS33",
+        sequenceB: { "50A": "DEMOHKHH", "59": "CUSTOMER" },
+        artifactSha256: "b".repeat(64),
+        artifactVersion: "1.0.0",
+      }
+    : {
+        type: "MT202",
+        "20": "PREVIOUS",
+        "21": "PREVIOUS",
+        nonCoverAttested: true,
+        attestationId: "MT205-NON-COVER-001",
+        attestationVersion: "1.0.0",
+        artifactSha256: "a".repeat(64),
+      };
+  const suppliedPrevious = raw["previousMessage"];
+  return {
+  ...(source.endsWith("COV")
+    ? {
+        block3: { "119": "COV" },
+        incoming121: "123e4567-e89b-12d3-a456-426614174000",
+        sequenceB: { "50A": "DEMOHKHH", "59": "CUSTOMER" },
+        underlyingCustomerCreditTransfer: true,
+      }
+    : {}),
+  ...(source.startsWith("MT205")
+    ? {
+        previousMessage: basePrevious,
+        senderCountry: "US",
+        receiverCountry: "US",
+        senderCountrySourceId: "ENTITY-US",
+        senderCountrySourceVersion: "1",
+        receiverCountrySourceId: "BANK-SVC-CITIUS33",
+        receiverCountrySourceVersion: "1",
+      }
+    : {}),
+    ...raw,
+    ...(source.startsWith("MT205") && suppliedPrevious && typeof suppliedPrevious === "object"
+      ? {
+          previousMessage: { ...basePrevious, ...(suppliedPrevious as Record<string, unknown>) },
+          ...(["MT200", "MT201"].includes(
+            String((suppliedPrevious as Record<string, unknown>)["type"] ?? ""),
+          )
+            ? {
+                initialTransferType: (suppliedPrevious as Record<string, unknown>)[
+                  "type"
+                ],
+              }
+            : {}),
+        }
+      : {}),
+  };
+};
+
 describe("CounterpartySsiResolutionService", () => {
   const service = new CounterpartySsiResolutionService();
+
+  it("fails closed when an MT202COV own-account request omits genuine-cover context", () => {
+    const result = service.validateContext(
+      {
+        ...request,
+        sourceMessageType: "MT202COV",
+        scenarioCode: "BOOK_TRANSFER_SAME_RECEIVER",
+      } as never,
+      {},
+    );
+    expect(result?.["mx"]).toMatchObject({
+      httpStatus: 422,
+      code: "PROFILE_INCOMPLETE",
+      payloadGenerated: false,
+    });
+  });
+
+  it("defers MT205COV jurisdiction evidence to the selected route gate", () => {
+    const raw = governedRaw("MT205COV", {});
+    for (const key of [
+      "senderCountry",
+      "receiverCountry",
+      "senderCountrySourceId",
+      "senderCountrySourceVersion",
+      "receiverCountrySourceId",
+      "receiverCountrySourceVersion",
+    ])
+      delete raw[key];
+
+    expect(
+      service.validateContext(
+        { ...request, sourceMessageType: "MT205COV" } as never,
+        raw,
+      ),
+    ).toBeUndefined();
+  });
+
+  it.each([
+    [{}, "INVALID_UPSTREAM_CONTEXT"],
+    [
+      {
+        previousMessage: {
+          type: "MT200",
+          "20": "PREVIOUS",
+          "21": "PREVIOUS",
+        },
+        senderCountry: "HK",
+        receiverCountry: "HK",
+      },
+      "INVALID_UPSTREAM_CONTEXT",
+    ],
+    [
+      {
+        previousMessage: {
+          type: "MT200",
+          "20": "PREVIOUS",
+          "21": "PREVIOUS",
+          nonCoverAttested: true,
+          attestationId: "MT205-NON-COVER-001",
+          attestationVersion: "1",
+          artifactSha256: "a".repeat(64),
+        },
+      },
+      "INVALID_UPSTREAM_CONTEXT",
+    ],
+  ])(
+    "fails closed for incomplete MT205 governed context %p",
+    (raw, expectedCode) => {
+      const result = service.validateContext(
+        { ...request, sourceMessageType: "MT205" },
+        raw,
+      );
+      expect(result?.["mx"]).toMatchObject({
+        httpStatus: 422,
+        code: expectedCode,
+        payloadGenerated: false,
+      });
+    },
+  );
 
   it.each([
     ["MT202", "BARCGB22", "UPSTREAM_MESSAGE_CONTEXT"],
     ["MT203", "CITIUS33", undefined],
     ["MT205", "CITIUS33", undefined],
-  ])("uses actual %s provenance only for governed downstream MT205 roles", (previousType, beneficiary, creditorSource) => {
-    const result = service.resolve(
-      { ...request, sourceMessageType: "MT205" },
-      { previousMessage: { type: previousType, "21": "RELATED", "52A": "CHASUS33", "58A": "BARCGB22" } },
-    );
-    expect(result["mt"]).toMatchObject({ tags: { "58A": beneficiary } });
-    expect((result["mx"] as Record<string, unknown>)["canonicalRoles"]).toMatchObject(
-      creditorSource ? { creditorSource } : { beneficiaryInstitution: "CITIUS33" },
-    );
-  });
+  ])(
+    "uses actual %s provenance only for governed downstream MT205 roles",
+    (previousType, beneficiary, creditorSource) => {
+      const result = service.resolve(
+        { ...request, sourceMessageType: "MT205" },
+        governedRaw("MT205", {
+          previousMessage: {
+            type: previousType,
+            "21": "RELATED",
+            "52A": "CHASUS33",
+            "58A": "BARCGB22",
+            nonCoverAttested: true,
+            attestationId: `MT205-${previousType}`,
+            attestationVersion: "1.0.0",
+            artifactSha256: "a".repeat(64),
+          },
+        }),
+      );
+      expect(result["mt"]).toMatchObject({ tags: { "58A": beneficiary } });
+      expect(
+        (result["mx"] as Record<string, unknown>)["canonicalRoles"],
+      ).toMatchObject(
+        creditorSource
+          ? { creditorSource }
+          : { beneficiaryInstitution: "CITIUS33" },
+      );
+    },
+  );
 
   it("renders a canonical MT202 envelope from the resolved Bank Service identity", () => {
     expect(service.resolve(request, {})).toMatchObject({
@@ -121,14 +282,9 @@ describe("CounterpartySsiResolutionService", () => {
       { intermediaryBankServiceId: "BANK", accountWithBankServiceId: null },
       "PROFILE_INCOMPLETE",
     ],
-    ["MT205", { previousMessage: null }, "MESSAGE_CONTEXT_MISSING"],
-    [
-      "MT205",
-      { senderCountry: "HK", receiverCountry: "US" },
-      "COUNTERPARTY_PAYMENT_PROFILE_MISMATCH",
-    ],
-    ["MT202", { availableRmaVersions: [1] }, "RMA_NOT_AUTHORISED"],
-    ["MT202", { rmaFixture: true }, "RMA_NOT_AUTHORISED"],
+    ["MT205", { previousMessage: null }, "INVALID_UPSTREAM_CONTEXT"],
+    ["MT202", { availableRmaVersions: [1] }, "RMA_NOT_AUTHORIZED"],
+    ["MT202", { rmaFixture: true }, "RMA_NOT_AUTHORIZED"],
     ["MT202", { counterpartyId: "CUST-00002" }, "SSI_NOT_FOUND"],
     ["MT202", { currency: "XAU" }, "CURRENCY_NOT_SUPPORTED"],
     ["MT202", { accountWith: {} }, "AGENT_ID_INSUFFICIENT"],
@@ -172,14 +328,24 @@ describe("CounterpartySsiResolutionService", () => {
     [
       "MT202COV",
       { underlyingCustomerCreditTransfer: false },
-      "COUNTERPARTY_PAYMENT_PROFILE_MISMATCH",
+      "PROFILE_INCOMPLETE",
     ],
     ["MT202COV", { before: "x", after: "y" }, "OPTION_CONSTRAINT_VIOLATION"],
     ["MT202COV", { modified: ["B.50A"] }, "OPTION_CONSTRAINT_VIOLATION"],
     [
-      "MT205COV",
-      { senderCountry: "HK", receiverCountry: "US" },
-      "COUNTERPARTY_PAYMENT_PROFILE_MISMATCH",
+      "MT205",
+      {
+        previousMessage: {
+          type: "GOVERNED_EQUIVALENT_FI_CREDIT_TRANSFER",
+          nonCoverAttested: false,
+        },
+      },
+      "INVALID_UPSTREAM_CONTEXT",
+    ],
+    [
+      "MT205",
+      { ownAccountSubScenario: "BOOK_TRANSFER_SAME_RECEIVER" },
+      "PROFILE_INCOMPLETE",
     ],
     [
       "MT202COV",
@@ -189,9 +355,15 @@ describe("CounterpartySsiResolutionService", () => {
   ])("fails %s governed input %p with %s", (source, raw, code) => {
     const result = service.resolve(
       { ...request, sourceMessageType: source },
-      raw,
+      governedRaw(source, raw),
     );
     expect(result["mx"]).toMatchObject({ code, payloadGenerated: false });
+  });
+
+  it("does not apply the MT205 same-country rule to MT202", () => {
+    expect(
+      service.resolve(request, { senderCountry: "HK", receiverCountry: "US" }),
+    ).toMatchObject({ mx: { httpStatus: 200, decision: "RESOLVED" } });
   });
 
   it.each([
@@ -236,7 +408,7 @@ describe("CounterpartySsiResolutionService", () => {
   ])("renders %s governed success for %p", (source, raw) => {
     const result = service.resolve(
       { ...request, sourceMessageType: source },
-      raw,
+      governedRaw(source, raw),
     );
     expect(result["mx"]).toMatchObject({
       httpStatus: 200,

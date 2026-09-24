@@ -106,13 +106,26 @@
       "messageType": "MT205",
       "businessFunction": "Financial Institution Transfer Execution",
       "businessService": "swift.cbprplus.04",
+      "governedInputValues": {
+        "context.previousMessageType": "MT202",
+        "context.previousMessage20": "GOVERNED-PREDECESSOR-001",
+        "context.previousMessage21": "GOVERNED-PREDECESSOR-001",
+        "context.previousMessageNonCoverAttested": true,
+        "context.previousMessageAttestationId": "MT205-PREDECESSOR-NON-COVER-001",
+        "context.previousMessageAttestationVersion": "1.0.0",
+        "context.previousMessageArtifactSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
       "scenarios": [
         {
           "scenarioId": "MT205-OP-INITIAL-MT200-201-EQUIVALENCE",
           "servicerRelationship": "NOT_APPLICABLE",
           "label": "Initial MT200/MT201 equivalence",
           "polarity": "POSITIVE",
-          "audience": "OPERATIONAL"
+          "audience": "OPERATIONAL",
+          "resolverInputValues": {
+            "context.previousMessageType": "MT200",
+            "context.initialTransferType": "MT200"
+          }
         },
         {
           "scenarioId": "MT205-OP-STANDARD-DOMESTIC-ONWARD",

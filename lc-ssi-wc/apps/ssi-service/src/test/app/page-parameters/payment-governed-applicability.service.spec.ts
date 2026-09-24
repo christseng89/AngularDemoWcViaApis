@@ -77,7 +77,7 @@ describe("PaymentGovernedApplicabilityService", () => {
         decision: "RESOLVED", nostroId: "N-1", nostroVersion: 4,
         priority: 10, accountServicerBic: "DEUTDEFF",
       })) } as never,
-      { check: jest.fn(() => ({ authorised: true, rmaId: "R-1", rmaVersion: 5 })) } as never,
+      { check: jest.fn(() => ({ authorised: true, rmaId: "R-1", rmaVersion: 5, decisionId: "D-1" })) } as never,
       { current: jest.fn(() => ({ sha256: "db-sha", method: "logical" })) } as never,
     );
 
@@ -227,6 +227,7 @@ describe("PaymentGovernedApplicabilityService", () => {
           authorised: true,
           rmaId: "R-1",
           rmaVersion: 5,
+          decisionId: "D-1",
         })),
       } as never,
       snapshots as never,
@@ -244,7 +245,7 @@ describe("PaymentGovernedApplicabilityService", () => {
         ssi,
         applicability: app,
         nostro: { id: "N-1", version: 4, accountServicerBic: "DEUTDEFF", priority: 10 },
-        rma: { id: "R-1", version: 5 },
+        rma: { id: "R-1", version: 5, decisionId: "D-1" },
         snapshot: { sha256: "db-sha", method: "logical" },
       },
     ]);
@@ -272,6 +273,7 @@ describe("PaymentGovernedApplicabilityService", () => {
         authorised: true,
         rmaId: "R-1",
         rmaVersion: 1,
+        decisionId: "D-1",
       }));
       const current = jest
         .fn()
@@ -326,6 +328,7 @@ describe("PaymentGovernedApplicabilityService", () => {
         authorised: true,
         rmaId: "R-1",
         rmaVersion: 1,
+        decisionId: "D-1",
       }));
       const service = new PaymentGovernedApplicabilityService(
         {
@@ -378,7 +381,7 @@ describe("PaymentGovernedApplicabilityService", () => {
         decision: "RESOLVED", nostroId: "N-1", nostroVersion: 1,
         priority: 10, accountServicerBic: "DEUTDEFF",
       })) } as never,
-      { check: jest.fn(() => ({ authorised: true, rmaId: "R-1", rmaVersion: 1 })) } as never,
+      { check: jest.fn(() => ({ authorised: true, rmaId: "R-1", rmaVersion: 1, decisionId: "D-1" })) } as never,
       { current: jest.fn(() => ({ sha256: "db-sha", method: "logical" })) } as never,
     );
     const query = {
@@ -397,7 +400,7 @@ describe("PaymentGovernedApplicabilityService", () => {
       "fixtureFamily" in request || "fixtureBindingId" in request ||
       request["operationalOnly"] !== true
         ? { authorised: false }
-        : { authorised: true, rmaId: "RMA-ACTIVE", rmaVersion: 19 },
+        : { authorised: true, rmaId: "RMA-ACTIVE", rmaVersion: 19, decisionId: "D-1" },
     );
     const service = new PaymentGovernedApplicabilityService(
       { findPaymentCandidateBindings: jest.fn(() => [{ ssi, applicability: app }]) } as never,
@@ -418,7 +421,11 @@ describe("PaymentGovernedApplicabilityService", () => {
     });
 
     expect(candidates).toHaveLength(1);
-    expect(candidates[0]?.rma).toEqual({ id: "RMA-ACTIVE", version: 19 });
+    expect(candidates[0]?.rma).toEqual({
+      id: "RMA-ACTIVE",
+      version: 19,
+      decisionId: "D-1",
+    });
     expect(check).toHaveBeenCalledWith(expect.objectContaining({
       ownBic: "DEMOHKHH", counterpartyBic: "DEUTDEFF",
       direction: "OUTBOUND", messageType: "pacs.009.001.08",
@@ -457,6 +464,7 @@ describe("PaymentGovernedApplicabilityService", () => {
           authorised: true,
           rmaId: "R-1",
           rmaVersion: 5,
+          decisionId: "D-1",
         })),
       } as never,
       snapshots as never,
