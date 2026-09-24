@@ -42,6 +42,11 @@
     "schemaVersion": "1.0",
     "standardsRelease": "SR2026",
     "scope": "OUTWARD_SSI_ONLY",
+    "messageFamily": "MT1_PACS008",
+    "paymentDirection": "OUTWARD",
+    "localBankRole": "INSTRUCTING_AGENT",
+    "productType": "SSI_RESOLUTION_ONLY",
+    "profileSelectionRule": "Select the governed profile by profileId and exact business service. pacs.008 plain and STP share MsgDefIdr pacs.008.001.08, so MsgDefIdr alone must never select the profile; use the exact BAH BizSvc.",
     "profiles": [
       {
         "profileId": "MT103-BASE-SR2026",
@@ -1992,7 +1997,7 @@
     "/v1/resolution-page-definitions/execute": {
       "post": {
         "summary": "Execute a governed SSI resolution page submission",
-        "description": "Executes only scenarios owned by SSI_FIELD_RESOLUTION_API with action RESOLVE_SSI. Upstream FIN validation scenarios use their separately governed endpoint.",
+        "description": "Executes only scenarios owned by SSI_FIELD_RESOLUTION_API with action RESOLVE_SSI. MT1 / pacs.008 execution is outward Bank SSI resolution only; customer payment instructions remain upstream. Upstream FIN validation scenarios use their separately governed endpoint.",
         "operationId": "executeResolutionPage",
         "requestBody": {
           "required": true,
@@ -2006,7 +2011,7 @@
         },
         "responses": {
           "200": {
-            "description": "Governed resolution result; payloadGenerated is false when no SSI route is produced",
+            "description": "Governed resolution result. MT1 / pacs.008 returns SSI evidence only and always keeps payloadGenerated false; it does not compose or execute a payment message.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2023,6 +2028,72 @@
             "description": "Resolver rejected the submission or no eligible SSI exists"
           },
           "502": { "description": "Resolver returned an invalid response" }
+        }
+      }
+    },
+    "/v1/resolution-page-definitions/lookups/ssi-counterparties": {
+      "get": {
+        "summary": "List governed executable SSI counterparties",
+        "description": "Returns only counterparties with an executable SSI route for the complete governed context. The returned eligibility snapshot and route identity are revalidated on Resolve SSI; changed context or eligibility fails closed.",
+        "operationId": "listSsiCounterparties",
+        "parameters": [
+          {
+            "name": "scenarioId",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "messageType",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "sequence",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "currency",
+            "in": "query",
+            "required": true,
+            "schema": { "$ref": "#/components/schemas/Currency" }
+          },
+          {
+            "name": "bookingEntity",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "valueDate",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "format": "date" }
+          },
+          {
+            "name": "query",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Governed executable counterparty choices, eligibility snapshot and atomic route identities",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageParameterLookupEnvelope"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid or incomplete governed lookup context"
+          }
         }
       }
     },
@@ -2194,7 +2265,14 @@
             "required": true,
             "schema": {
               "type": "string",
-              "enum": ["MT202", "MT202COV", "MT205", "MT205COV"]
+              "enum": [
+                "MT103",
+                "pacs.008.001.08",
+                "MT202",
+                "MT202COV",
+                "MT205",
+                "MT205COV"
+              ]
             }
           },
           {
@@ -2223,7 +2301,14 @@
             "required": false,
             "schema": {
               "type": "string",
-              "enum": ["swift.cbprplus.04", "swift.cbprplus.cov.04"]
+              "enum": [
+                "FIN-MT103-BASE",
+                "FIN-MT103-STP",
+                "FIN-MT103-REMIT",
+                "swift.cbprplus.04",
+                "swift.cbprplus.stp.04",
+                "swift.cbprplus.cov.04"
+              ]
             }
           }
         ],
@@ -3015,13 +3100,37 @@
           "nvrOutcome": {
             "$ref": "#/components/schemas/PageParameterCompatibleNvrOutcome"
           },
+          "ssiApplicability": {
+            "description": "MT1 / pacs.008 Bank SSI applicability, kept independent from the resolution outcome.",
+            "enum": ["NOT_EVALUATED", "REQUIRED", "NOT_REQUIRED"]
+          },
+          "resolutionOutcome": {
+            "description": "Typed MT1 / pacs.008 outward SSI resolution outcome. Non-success outcomes fail closed without payment composition or execution.",
+            "enum": [
+              "BILATERAL_RELATIONSHIP_CONFIRMED",
+              "ELIGIBLE_COMPLETE_ROUTE",
+              "NO_ELIGIBLE_SSI",
+              "AMBIGUOUS_ROUTE",
+              "STALE",
+              "INVALID_CONTEXT_TOPOLOGY",
+              "INVALID_UPSTREAM_CONTEXT",
+              "PROFILE_INCOMPLETE",
+              "UNSUPPORTED_DIRECTION",
+              "UNSUPPORTED_PROFILE"
+            ]
+          },
+          "routeBindingId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Identity of the indivisible, version-locked atomic SSI route; clients must not mix fields or legs across route bindings."
+          },
           "settlementRoute": {
             "$ref": "#/components/schemas/ResolutionPageSettlementRoute"
           },
           "fields": { "type": "array", "items": { "type": "object" } },
           "outputs": {
             "type": "array",
-            "description": "Server-generated output representations from the same canonical resolution. Payment MT2/pacs.009 success returns SWIFT_MT and ISO_20022; clients do not convert them.",
+            "description": "Server-generated evidence representations from the same canonical routeBindingId; clients do not convert them. MT103 Base and STP return paired SWIFT_MT and ISO_20022 SSI evidence using their governed pacs.008 counterpart BizSvc. MT103 REMIT returns SWIFT_MT only. pacs.008 plain and STP share MsgDefIdr pacs.008.001.08 and are distinguished by BizSvc.",
             "items": {
               "$ref": "#/components/schemas/ResolutionPageGeneratedOutput"
             }
