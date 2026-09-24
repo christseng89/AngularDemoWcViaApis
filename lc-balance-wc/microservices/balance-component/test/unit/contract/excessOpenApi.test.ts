@@ -52,6 +52,8 @@ describe('OpenAPI V4 Excess contract', () => {
     ]) {
       expect(openApi).toContain(contract);
     }
-    expect(openApi).toContain("exportAuthorization:\n                  $ref: '#/components/schemas/ExportAuthorizationClaim'");
+    expect(openApi).toMatch(
+      /exportAuthorization:\r?\n\s+\$ref: '#\/components\/schemas\/ExportAuthorizationClaim'/,
+    );
   });
 });
