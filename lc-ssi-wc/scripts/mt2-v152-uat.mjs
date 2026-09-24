@@ -8,7 +8,7 @@ const root = process.cwd();
 const apiBase = process.env.SSI_BFF_URL ?? "http://localhost:3100/api";
 const registryPath = resolve(
   root,
-  "qa/mt2/reports/evidence/v15.2/assertion-registry.json",
+  "qa/reports/latest/mt2/evidence/v15.2/assertion-registry.json",
 );
 const registry = JSON.parse(await readFile(registryPath, "utf8"));
 const registered = new Map(
@@ -487,7 +487,7 @@ const report = {
 };
 const reportPath = resolve(
   root,
-  "qa/mt2/reports/MT2XX_v15.2_api_evidence_20260911.json",
+  "qa/reports/latest/mt2/MT2XX_v15.2_api_evidence_20260911.json",
 );
 const reportRaw = Buffer.from(`${JSON.stringify(report, null, 2)}\n`, "utf8");
 await writeFile(reportPath, reportRaw);

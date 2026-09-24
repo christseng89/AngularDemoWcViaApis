@@ -42,23 +42,23 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const workspace = path.resolve(here, "../..");
 const workbook = path.resolve(
   workspace,
-  "qa/mt2/mt2-final/fixtures/MT2XX_測試案例_SSI與NOSTRO_v6.2_FINAL.xlsx",
+  "qa/fixtures/mt2/MT2XX_測試案例_SSI與NOSTRO_v6.2_FINAL.xlsx",
 );
 const output = path.resolve(
   workspace,
-  "qa/mt2/reports/MT2XX_139測試案例_訊息輸入與預期輸出.docx",
+  "qa/reports/latest/mt2/MT2XX_139測試案例_訊息輸入與預期輸出.docx",
 );
 const validationOutput = path.resolve(
   workspace,
-  "qa/mt2/reports/MT2XX_139測試案例_文件驗證.json",
+  "qa/reports/latest/mt2/MT2XX_139測試案例_文件驗證.json",
 );
 
 const endpointConfig = JSON.parse(
-  fs.readFileSync(path.resolve(workspace, "qa/mt2/mt2-final/case-endpoints.json")),
+  fs.readFileSync(path.resolve(workspace, "qa/tests/mt2/final/case-endpoints.json")),
 );
 const adapterRegistry = JSON.parse(
   fs.readFileSync(
-    path.resolve(workspace, "qa/mt2/mt2-final/message-adapter-registry.json"),
+    path.resolve(workspace, "qa/tests/mt2/final/message-adapter-registry.json"),
   ),
 );
 

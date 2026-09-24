@@ -648,7 +648,7 @@ const runAnalysis = async ({
   });
   const output = path.resolve(
     workspace,
-    "qa/mt2/mt2-final/evidence/sonar-measures.json",
+    "qa/reports/latest/mt2/sonar-measures.json",
   );
   fs.mkdirSync(path.dirname(output), { recursive: true });
   fs.writeFileSync(

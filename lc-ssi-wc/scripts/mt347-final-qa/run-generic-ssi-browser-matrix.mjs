@@ -6,7 +6,7 @@ const portalUrl = process.env.PORTAL_URL ?? "http://localhost:4600/";
 const browserPath =
   process.env.PLAYWRIGHT_BROWSER_PATH ??
   "C:/Program Files/Google/Chrome/Application/chrome.exe";
-const outputDirectory = process.env.UAT_OUTPUT_DIR ?? "qa/mt347/reports/latest";
+const outputDirectory = process.env.UAT_OUTPUT_DIR ?? "qa/reports/latest/mt347";
 const domainFilter = process.env.UAT_DOMAIN;
 const scenarioFilter = process.env.UAT_SCENARIO;
 const scenarioFilters = process.env.UAT_SCENARIOS?.split(",")
@@ -28,7 +28,7 @@ if (
 const currencyFieldSelector = "#parameter-context-currency";
 const counterpartyLookupSelector =
   "#parameter-context-counterpartyBankServiceId + ssi-bank-service-lookup";
-const positiveFixturePath = "qa/mt347/fixtures/mt347-positive.v1.json";
+const positiveFixturePath = "qa/fixtures/mt347/mt347-positive.v1.json";
 const positiveFixtureText = await readFile(positiveFixturePath, "utf8");
 const positiveFixture = JSON.parse(positiveFixtureText);
 const positiveFixtureSha256 = createHash("sha256")
@@ -36,7 +36,7 @@ const positiveFixtureSha256 = createHash("sha256")
   .digest("hex")
   .toUpperCase();
 const identityOraclePath =
-  "qa/mt347/fixtures/mt347-executable-counterparties.v4.json";
+  "qa/fixtures/mt347/mt347-executable-counterparties.v4.json";
 const identityOracleText = await readFile(identityOraclePath, "utf8");
 const expandedPositiveFixture = JSON.parse(identityOracleText);
 const identityOracleSha256 = createHash("sha256")
@@ -46,7 +46,7 @@ const identityOracleSha256 = createHash("sha256")
 const positiveOracleByCase = new Map(
   positiveFixture.records.map((record) => [record.testCaseId, record]),
 );
-const negativeFixturePath = "qa/mt347/fixtures/mt347-negative.v1.json";
+const negativeFixturePath = "qa/fixtures/mt347/mt347-negative.v1.json";
 const negativeFixtureText = await readFile(negativeFixturePath, "utf8");
 const negativeFixture = JSON.parse(negativeFixtureText);
 const negativeFixtureSha256 = createHash("sha256")

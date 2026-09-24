@@ -11,7 +11,7 @@ import { writeEvidence } from "./evidence-reporter.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const config = loadConfig(
   process.env.MT2_QA_CONFIG ??
-    path.resolve(here, "../../qa/mt2/mt2-final/mt2-final-qa.config.json"),
+    path.resolve(here, "../../qa/tests/mt2/final/mt2-final-qa.config.json"),
 );
 const context = { workspace: path.resolve(here, "../..") };
 const inventory = new WorkbookGate(config);

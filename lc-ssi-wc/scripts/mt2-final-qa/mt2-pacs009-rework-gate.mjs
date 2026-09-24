@@ -74,7 +74,7 @@ const runCli = () => {
   const workspace = process.cwd();
   const contractFile = path.resolve(
     workspace,
-    "qa/mt2/mt2-final/mt2-pacs009-rework-gate.json",
+    "qa/tests/mt2/final/mt2-pacs009-rework-gate.json",
   );
   const evidenceFile = process.argv[2]
     ? path.resolve(workspace, process.argv[2])

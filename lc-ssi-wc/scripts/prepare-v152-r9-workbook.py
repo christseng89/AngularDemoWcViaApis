@@ -10,11 +10,11 @@ from openpyxl import load_workbook
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "qa/mt2/uat/MT2xx_SSI_Resolution_UAT執行清單_v15.2_DRAFT_R8.xlsx"
-OUTPUT = ROOT / "qa/mt2/uat/MT2xx_SSI_Resolution_UAT執行清單_v15.2_DRAFT_R9.xlsx"
-REGISTRY = ROOT / "qa/mt2/reports/evidence/v15.2/assertion-registry.json"
-OVERLAY_MANIFEST = ROOT / "qa/mt2/mt2-final/fixtures/overlays/ssi-demo.v15.2-own-account-uat.manifest.json"
-OVERLAY_REGRESSION = ROOT / "qa/mt2/reports/MT2XX_v15.2_overlay_regression_20260911.json"
+SOURCE = ROOT / "qa/reports/latest/mt2/MT2xx_SSI_Resolution_UAT執行清單_v15.2_DRAFT_R8.xlsx"
+OUTPUT = ROOT / "qa/reports/latest/mt2/MT2xx_SSI_Resolution_UAT執行清單_v15.2_DRAFT_R9.xlsx"
+REGISTRY = ROOT / "qa/reports/latest/mt2/evidence/v15.2/assertion-registry.json"
+OVERLAY_MANIFEST = ROOT / "qa/fixtures/mt2/overlays/ssi-demo.v15.2-own-account-uat.manifest.json"
+OVERLAY_REGRESSION = ROOT / "qa/reports/latest/mt2/MT2XX_v15.2_overlay_regression_20260911.json"
 BASE_SHA = "52A58C19901F1FBD6A3EE964968A14164EDA89DF22B284282C88D05C3D5CEEF6"
 OVERLAY_SHA = "C7C07A2DD74DD223CE8D0354DCA85B78816793B4C65D7163D5CDD1EC3B8C7F21"
 LIVE_MAIN_SHA = "5B512253C4EE1B5A1E7B4B910C36563F4032BBB28F5A806ED90AFE6F425153E4"
@@ -189,7 +189,7 @@ def main() -> None:
                 "OPEN-010",
                 "Evidence trust boundary",
                 "OPEN：不得使用環境變數或 main-file-only hash；assertion 必須由獨立 verifier 評估。",
-                "qa/mt2/reports/evidence/v15.2/assertion-registry.json",
+                "qa/reports/latest/mt2/evidence/v15.2/assertion-registry.json",
                 sha256(REGISTRY),
             ),
             (

@@ -14,15 +14,26 @@ qa-archived/
 QA_ARCHIVE/
 audit/
 
-# Rebuildable QA run artifacts (keep reviewed MD/JSON/DOCX summaries tracked)
-qa/mt2/migration-backups/
-qa/mt2/reports/mt2-139-ui-evidence/
-qa/mt2/reports/mt2-pareto-fixed-evidence/
-qa/mt2/reports/mt2-pareto-fixed-evidence-r3/
-qa/mt2/reports/mt2-resolver-exhaustive-evidence/
-qa/mt2/reports/mt2-resolver-exhaustive-evidence-r3/
-qa/mt2/reports/*.stdout.log
-qa/mt2/reports/*.stderr.log
+# Demo QA repository allowlist: reproducible inputs, executable tests, current TDD,
+# and the latest summary evidence only. Legacy/generated folders remain local.
+qa/*
+!qa/README.md
+!qa/fixtures/
+!qa/fixtures/**
+!qa/tests/
+!qa/tests/**
+!qa/tdd/
+!qa/tdd/**
+!qa/reports/
+qa/reports/*
+!qa/reports/latest/
+!qa/reports/latest/**
+
+# Transient outputs created by QA runners inside the approved layout.
+qa/reports/latest/**/*.partial.json
+qa/reports/latest/**/*.stdout.log
+qa/reports/latest/**/*.stderr.log
+qa/reports/latest/**/*.png
 
 *.log
 *.sha256.txt

@@ -44,7 +44,7 @@ test("controlled expectations conserve the v6 case ledger", () => {
 test("controlled v6 workbook identity and all ledgers pass", async () => {
   const workbook = path.join(
     workspace,
-    "qa/mt347/tdd/MT347_SR2026_SSI_TDD_CONTROLLED_v6.xlsx",
+    "qa/tdd/mt347/MT347_SR2026_SSI_TDD_CONTROLLED_v6.xlsx",
   );
   const report = await evaluateWorkbook({
     workbook,

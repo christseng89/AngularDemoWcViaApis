@@ -12,14 +12,14 @@ from openpyxl.styles import Font
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "qa/mt2/uat/MT2xx_SSI_Resolution_UAT執行清單_v15.2_DRAFT_R9.xlsx"
-OUTPUT = ROOT / "qa/mt2/uat/MT2xx_SSI_Resolution_UAT執行清單_v15.2_DRAFT_R10.xlsx"
-API_REPORT = ROOT / "qa/mt2/reports/MT2XX_v15.2_api_evidence_20260911.json"
-BROWSER_REPORT = ROOT / "qa/mt2/reports/MT2XX_v15.2_browser_UAT_overlay_20260911.json"
-OVERLAY_MANIFEST = ROOT / "qa/mt2/mt2-final/fixtures/overlays/ssi-demo.v15.2-own-account-uat.manifest.json"
-OVERLAY_REGRESSION = ROOT / "qa/mt2/reports/MT2XX_v15.2_overlay_regression_20260911.json"
-SCHEMA = ROOT / "qa/mt2/reports/evidence/v15.2/evidence.schema.json"
-REGISTRY = ROOT / "qa/mt2/reports/evidence/v15.2/assertion-registry.json"
+SOURCE = ROOT / "qa/reports/latest/mt2/MT2xx_SSI_Resolution_UAT執行清單_v15.2_DRAFT_R9.xlsx"
+OUTPUT = ROOT / "qa/reports/latest/mt2/MT2xx_SSI_Resolution_UAT執行清單_v15.2_DRAFT_R10.xlsx"
+API_REPORT = ROOT / "qa/reports/latest/mt2/MT2XX_v15.2_api_evidence_20260911.json"
+BROWSER_REPORT = ROOT / "qa/reports/latest/mt2/MT2XX_v15.2_browser_UAT_overlay_20260911.json"
+OVERLAY_MANIFEST = ROOT / "qa/fixtures/mt2/overlays/ssi-demo.v15.2-own-account-uat.manifest.json"
+OVERLAY_REGRESSION = ROOT / "qa/reports/latest/mt2/MT2XX_v15.2_overlay_regression_20260911.json"
+SCHEMA = ROOT / "qa/reports/latest/mt2/evidence/v15.2/evidence.schema.json"
+REGISTRY = ROOT / "qa/reports/latest/mt2/evidence/v15.2/assertion-registry.json"
 VERIFIER = ROOT / "scripts/mt2-v152-evidence-verifier.mjs"
 
 

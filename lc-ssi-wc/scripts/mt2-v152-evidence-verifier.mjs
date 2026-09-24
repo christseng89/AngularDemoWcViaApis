@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const root = process.cwd();
-const registryPath = resolve(root, "qa/mt2/reports/evidence/v15.2/assertion-registry.json");
+const registryPath = resolve(root, "qa/reports/latest/mt2/evidence/v15.2/assertion-registry.json");
 const hex64 = /^[0-9a-f]{64}$/i;
 const valueAt = (body, key) => body?.[key] ?? body?.mx?.[key] ?? null;
 

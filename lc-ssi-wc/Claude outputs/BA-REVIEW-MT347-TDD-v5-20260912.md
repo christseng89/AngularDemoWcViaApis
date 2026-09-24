@@ -2,7 +2,7 @@
 
 | 項目 | 值 |
 |---|---|
-| 覆核對象 | `qa/mt347/tdd/MT347_SR2026_SSI_TDD_CONTROLLED_v5.xlsx`（333,945 B） |
+| 覆核對象 | `qa/tdd/mt347/MT347_SR2026_SSI_TDD_CONTROLLED_v5.xlsx`（333,945 B） |
 | 檔案 SHA-256 | `82C6ABCFD91E7D35E1382F8C86BF796D8DBF05CF8C8D94F9F0C7B5889AB52C9A` |
 | sidecar 比對 | `.sha256.txt` 記載值與重算值**逐字元相符** ✔ |
 | 覆核範圍 | **僅 v5**，且**僅限已同意之 25 支範圍內**。未與 v1–v4 比對。 |

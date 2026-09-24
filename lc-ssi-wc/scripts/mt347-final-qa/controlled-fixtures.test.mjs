@@ -15,7 +15,7 @@ const sha256 = (path) =>
 
 test("controlled MT347 fixtures preserve the TDD v5 identities and isolation", () => {
   const manifest = readJson(
-    "qa/mt347/fixtures/mt347-fixtures.v1.manifest.json",
+    "qa/fixtures/mt347/mt347-fixtures.v1.manifest.json",
   );
   assert.equal(
     manifest.sourceWorkbookSha256,
@@ -25,7 +25,7 @@ test("controlled MT347 fixtures preserve the TDD v5 identities and isolation", (
   const identities = new Set();
   for (const [name, count] of Object.entries(expected)) {
     const artifact = manifest.artifacts[name];
-    const relativePath = `qa/mt347/fixtures/mt347-${name}.v1.json`;
+    const relativePath = `qa/fixtures/mt347/mt347-${name}.v1.json`;
     const data = readJson(relativePath);
     assert.equal(artifact.count, count);
     assert.equal(data.records.length, count);
@@ -79,10 +79,10 @@ test("the governed catalogue carries the corrected v5 NVR semantics", () => {
 });
 
 test("canonical seed contains every executable MT347 binding and excludes scope boundaries", () => {
-  const positive = readJson("qa/mt347/fixtures/mt347-positive.v1.json").records;
-  const negative = readJson("qa/mt347/fixtures/mt347-negative.v1.json").records;
+  const positive = readJson("qa/fixtures/mt347/mt347-positive.v1.json").records;
+  const negative = readJson("qa/fixtures/mt347/mt347-negative.v1.json").records;
   const seed = readJson(
-    "qa/FIX_DATA/rma/reload-test-data/ssi-demo.v15.8.pacs009-repaired-isolated.canonical.seed.json",
+    "qa/fixtures/rma/reload-test-data/ssi-demo.v15.8.pacs009-repaired-isolated.canonical.seed.json",
   );
   const payloads = (table) =>
     seed.tables[table].rows.map((row) =>
@@ -146,7 +146,7 @@ test("canonical seed contains every executable MT347 binding and excludes scope 
 
 test("fixture role inputs are sourced independently from expected assertions", () => {
   const configuration = readJson("parameters/mt347-fixture-inputs.v1.json");
-  const positive = readJson("qa/mt347/fixtures/mt347-positive.v1.json");
+  const positive = readJson("qa/fixtures/mt347/mt347-positive.v1.json");
   assert.equal(configuration.sourcePolicy, "INPUT_ONLY_NO_EXPECTED_ORACLE");
   for (const record of positive.records) {
     assert.equal(
@@ -167,7 +167,7 @@ test("fixture role inputs are sourced independently from expected assertions", (
 });
 
 test("canonical role ownership follows the governed FIN profile", () => {
-  const positive = readJson("qa/mt347/fixtures/mt347-positive.v1.json").records;
+  const positive = readJson("qa/fixtures/mt347/mt347-positive.v1.json").records;
   const catalogue = readJson("parameters/ssi-mappings.sr2026.json").mappings;
   for (const record of positive) {
     const allowedSsiRoles = new Set(
@@ -233,7 +233,7 @@ test("canonical role ownership follows the governed FIN profile", () => {
 
 test("transaction-owned roles are kept outside standing SSI route data", () => {
   const seed = readJson(
-    "qa/FIX_DATA/rma/reload-test-data/ssi-demo.v15.8.pacs009-repaired-isolated.canonical.seed.json",
+    "qa/fixtures/rma/reload-test-data/ssi-demo.v15.8.pacs009-repaired-isolated.canonical.seed.json",
   );
   const payloads = (table) =>
     seed.tables[table].rows.map((row) =>
@@ -246,7 +246,7 @@ test("transaction-owned roles are kept outside standing SSI route data", () => {
     (row) => row.fixtureFamily === "MT347-SR2026-SSI",
   );
   const variants = readJson(
-    "qa/mt347/fixtures/mt347-executable-counterparties.v4.json",
+    "qa/fixtures/mt347/mt347-executable-counterparties.v4.json",
   );
   assert.deepEqual(variants.supportedCurrencies, [
     "USD",
@@ -288,7 +288,7 @@ test("transaction-owned roles are kept outside standing SSI route data", () => {
 
 test("MT300-001 offers three governed SSI counterparties in each controlled currency", () => {
   const seed = readJson(
-    "qa/FIX_DATA/rma/reload-test-data/ssi-demo.v15.8.pacs009-repaired-isolated.canonical.seed.json",
+    "qa/fixtures/rma/reload-test-data/ssi-demo.v15.8.pacs009-repaired-isolated.canonical.seed.json",
   );
   const payloads = (table) =>
     seed.tables[table].rows.map((row) =>

@@ -6,7 +6,7 @@
       "bindingId": "FIX-MT300-001@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -14,7 +14,7 @@
       "bindingId": "FIX-MT300-002@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -22,7 +22,7 @@
       "bindingId": "FIX-MT300-006@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -30,7 +30,7 @@
       "bindingId": "FIX-MT300-007@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -38,7 +38,7 @@
       "bindingId": "FIX-MT300-011@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -46,7 +46,7 @@
       "bindingId": "FIX-MT300-012@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -54,7 +54,7 @@
       "bindingId": "FIX-MT300-016@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -62,7 +62,7 @@
       "bindingId": "FIX-MT304-001@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -70,7 +70,7 @@
       "bindingId": "FIX-MT304-002@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -78,7 +78,7 @@
       "bindingId": "FIX-MT304-006@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -86,7 +86,7 @@
       "bindingId": "FIX-MT304-007@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -94,7 +94,7 @@
       "bindingId": "FIX-MT304-011@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -102,7 +102,7 @@
       "bindingId": "FIX-MT304-012@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -110,7 +110,7 @@
       "bindingId": "FIX-MT304-013@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -118,7 +118,7 @@
       "bindingId": "FIX-MT304-016@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -126,7 +126,7 @@
       "bindingId": "FIX-MT305-001@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -134,7 +134,7 @@
       "bindingId": "FIX-MT305-002@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -142,7 +142,7 @@
       "bindingId": "FIX-MT305-006@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -150,7 +150,7 @@
       "bindingId": "FIX-MT306-001@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -158,7 +158,7 @@
       "bindingId": "FIX-MT306-002@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -166,7 +166,7 @@
       "bindingId": "FIX-MT306-007@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -174,7 +174,7 @@
       "bindingId": "FIX-MT306-008@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -182,7 +182,7 @@
       "bindingId": "FIX-MT306-013@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -190,7 +190,7 @@
       "bindingId": "FIX-MT306-014@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -198,7 +198,7 @@
       "bindingId": "FIX-MT306-019@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -206,7 +206,7 @@
       "bindingId": "FIX-MT320-001@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -214,7 +214,7 @@
       "bindingId": "FIX-MT320-002@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -222,7 +222,7 @@
       "bindingId": "FIX-MT320-007@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -230,7 +230,7 @@
       "bindingId": "FIX-MT320-008@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -238,7 +238,7 @@
       "bindingId": "FIX-MT320-013@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -246,7 +246,7 @@
       "bindingId": "FIX-MT320-014@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -254,7 +254,7 @@
       "bindingId": "FIX-MT320-019@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -262,7 +262,7 @@
       "bindingId": "FIX-MT320-020@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -270,7 +270,7 @@
       "bindingId": "FIX-MT320-025@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -278,7 +278,7 @@
       "bindingId": "FIX-MT320-026@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -286,7 +286,7 @@
       "bindingId": "FIX-MT320-031@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -294,7 +294,7 @@
       "bindingId": "FIX-MT330-001@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -302,7 +302,7 @@
       "bindingId": "FIX-MT330-002@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -310,7 +310,7 @@
       "bindingId": "FIX-MT330-007@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -318,7 +318,7 @@
       "bindingId": "FIX-MT330-008@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -326,7 +326,7 @@
       "bindingId": "FIX-MT330-013@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -334,7 +334,7 @@
       "bindingId": "FIX-MT330-014@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -342,7 +342,7 @@
       "bindingId": "FIX-MT330-019@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -350,7 +350,7 @@
       "bindingId": "FIX-MT330-020@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -358,7 +358,7 @@
       "bindingId": "FIX-MT330-025@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -366,7 +366,7 @@
       "bindingId": "FIX-MT340-001@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -374,7 +374,7 @@
       "bindingId": "FIX-MT340-002@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -382,7 +382,7 @@
       "bindingId": "FIX-MT340-007@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -390,7 +390,7 @@
       "bindingId": "FIX-MT340-008@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -398,7 +398,7 @@
       "bindingId": "FIX-MT340-013@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -406,7 +406,7 @@
       "bindingId": "FIX-MT340-014@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -414,7 +414,7 @@
       "bindingId": "FIX-MT340-019@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -422,7 +422,7 @@
       "bindingId": "FIX-MT341-001@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -430,7 +430,7 @@
       "bindingId": "FIX-MT341-002@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -438,7 +438,7 @@
       "bindingId": "FIX-MT341-007@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -446,7 +446,7 @@
       "bindingId": "FIX-MT350-001@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -454,7 +454,7 @@
       "bindingId": "FIX-MT350-002@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -462,7 +462,7 @@
       "bindingId": "FIX-MT350-007@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -470,7 +470,7 @@
       "bindingId": "FIX-MT360-001@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -478,7 +478,7 @@
       "bindingId": "FIX-MT360-002@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -486,7 +486,7 @@
       "bindingId": "FIX-MT360-008@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -494,7 +494,7 @@
       "bindingId": "FIX-MT360-009@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -502,7 +502,7 @@
       "bindingId": "FIX-MT360-015@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -510,7 +510,7 @@
       "bindingId": "FIX-MT360-016@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -518,7 +518,7 @@
       "bindingId": "FIX-MT360-017@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -526,7 +526,7 @@
       "bindingId": "FIX-MT360-022@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -534,7 +534,7 @@
       "bindingId": "FIX-MT360-023@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -542,7 +542,7 @@
       "bindingId": "FIX-MT360-024@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -550,7 +550,7 @@
       "bindingId": "FIX-MT360-029@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -558,7 +558,7 @@
       "bindingId": "FIX-MT361-001@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -566,7 +566,7 @@
       "bindingId": "FIX-MT361-002@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -574,7 +574,7 @@
       "bindingId": "FIX-MT361-008@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -582,7 +582,7 @@
       "bindingId": "FIX-MT361-009@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -590,7 +590,7 @@
       "bindingId": "FIX-MT361-015@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -598,7 +598,7 @@
       "bindingId": "FIX-MT361-016@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -606,7 +606,7 @@
       "bindingId": "FIX-MT361-022@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -614,7 +614,7 @@
       "bindingId": "FIX-MT361-023@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -622,7 +622,7 @@
       "bindingId": "FIX-MT361-029@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -630,7 +630,7 @@
       "bindingId": "FIX-MT361-030@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -638,7 +638,7 @@
       "bindingId": "FIX-MT361-031@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -646,7 +646,7 @@
       "bindingId": "FIX-MT361-036@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -654,7 +654,7 @@
       "bindingId": "FIX-MT361-037@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -662,7 +662,7 @@
       "bindingId": "FIX-MT361-038@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -670,7 +670,7 @@
       "bindingId": "FIX-MT361-043@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -678,7 +678,7 @@
       "bindingId": "FIX-MT362-001@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -686,7 +686,7 @@
       "bindingId": "FIX-MT362-002@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -694,7 +694,7 @@
       "bindingId": "FIX-MT362-008@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -702,7 +702,7 @@
       "bindingId": "FIX-MT362-009@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -710,7 +710,7 @@
       "bindingId": "FIX-MT362-015@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -718,7 +718,7 @@
       "bindingId": "FIX-MT364-001@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -726,7 +726,7 @@
       "bindingId": "FIX-MT364-002@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -734,7 +734,7 @@
       "bindingId": "FIX-MT364-007@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -742,7 +742,7 @@
       "bindingId": "FIX-MT364-008@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -750,7 +750,7 @@
       "bindingId": "FIX-MT364-013@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -758,7 +758,7 @@
       "bindingId": "FIX-MT365-001@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -766,7 +766,7 @@
       "bindingId": "FIX-MT365-002@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -774,7 +774,7 @@
       "bindingId": "FIX-MT365-007@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -782,7 +782,7 @@
       "bindingId": "FIX-MT365-008@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -790,7 +790,7 @@
       "bindingId": "FIX-MT365-013@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -798,7 +798,7 @@
       "bindingId": "FIX-MT365-014@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -806,7 +806,7 @@
       "bindingId": "FIX-MT365-019@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -814,7 +814,7 @@
       "bindingId": "FIX-MT365-020@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -822,7 +822,7 @@
       "bindingId": "FIX-MT365-025@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -830,7 +830,7 @@
       "bindingId": "FIX-MT400-001@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -838,7 +838,7 @@
       "bindingId": "FIX-MT400-002@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -846,7 +846,7 @@
       "bindingId": "FIX-MT400-005@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -854,7 +854,7 @@
       "bindingId": "FIX-MT400-007@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -862,7 +862,7 @@
       "bindingId": "FIX-MT730-001@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -870,7 +870,7 @@
       "bindingId": "FIX-MT730-002@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -878,7 +878,7 @@
       "bindingId": "FIX-MT730-005@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -886,7 +886,7 @@
       "bindingId": "FIX-MT730-007@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -894,7 +894,7 @@
       "bindingId": "FIX-MT734-001@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -902,7 +902,7 @@
       "bindingId": "FIX-MT734-002@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -910,7 +910,7 @@
       "bindingId": "FIX-MT734-005@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -918,7 +918,7 @@
       "bindingId": "FIX-MT742-001@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -926,7 +926,7 @@
       "bindingId": "FIX-MT742-002@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -934,7 +934,7 @@
       "bindingId": "FIX-MT742-005@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -942,7 +942,7 @@
       "bindingId": "FIX-MT742-006@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -950,7 +950,7 @@
       "bindingId": "FIX-MT742-012@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -958,7 +958,7 @@
       "bindingId": "FIX-MT742-013@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -966,7 +966,7 @@
       "bindingId": "FIX-MT750-001@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -974,7 +974,7 @@
       "bindingId": "FIX-MT750-002@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -982,7 +982,7 @@
       "bindingId": "FIX-MT750-005@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -990,7 +990,7 @@
       "bindingId": "FIX-MT752-001@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -998,7 +998,7 @@
       "bindingId": "FIX-MT752-002@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -1006,7 +1006,7 @@
       "bindingId": "FIX-MT752-005@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -1014,7 +1014,7 @@
       "bindingId": "FIX-MT754-001@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -1022,7 +1022,7 @@
       "bindingId": "FIX-MT754-002@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -1030,7 +1030,7 @@
       "bindingId": "FIX-MT754-005@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -1038,7 +1038,7 @@
       "bindingId": "FIX-MT754-006@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -1046,7 +1046,7 @@
       "bindingId": "FIX-MT754-008@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -1054,7 +1054,7 @@
       "bindingId": "FIX-MT754-011@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -1062,7 +1062,7 @@
       "bindingId": "FIX-MT754-012@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -1070,7 +1070,7 @@
       "bindingId": "FIX-MT754-013@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -1078,7 +1078,7 @@
       "bindingId": "FIX-MT756-001@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -1086,7 +1086,7 @@
       "bindingId": "FIX-MT756-002@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -1094,7 +1094,7 @@
       "bindingId": "FIX-MT756-005@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -1102,7 +1102,7 @@
       "bindingId": "FIX-MT756-006@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -1110,7 +1110,7 @@
       "bindingId": "FIX-MT756-008@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -1118,7 +1118,7 @@
       "bindingId": "FIX-MT756-012@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -1126,7 +1126,7 @@
       "bindingId": "FIX-MT765-001@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -1134,7 +1134,7 @@
       "bindingId": "FIX-MT765-002@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -1142,7 +1142,7 @@
       "bindingId": "FIX-MT765-003@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -1150,7 +1150,7 @@
       "bindingId": "FIX-MT765-006@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -1158,7 +1158,7 @@
       "bindingId": "FIX-MT768-001@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -1166,7 +1166,7 @@
       "bindingId": "FIX-MT768-002@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -1174,7 +1174,7 @@
       "bindingId": "FIX-MT768-005@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -1182,7 +1182,7 @@
       "bindingId": "FIX-MT768-007@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -1190,7 +1190,7 @@
       "bindingId": "FIX-MT769-001@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -1198,7 +1198,7 @@
       "bindingId": "FIX-MT769-002@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -1206,7 +1206,7 @@
       "bindingId": "FIX-MT769-005@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -1214,7 +1214,7 @@
       "bindingId": "FIX-MT769-007@v1",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-positive.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-positive.v1.json",
       "sourceArtifactSha256": "2b66ff31ce5cf05450baa795b591ce120d24a9bda35491e46f424bfad8964c3b",
       "isolation": "CANONICAL"
     },
@@ -1222,7 +1222,7 @@
       "bindingId": "FIX-MT300-003@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1230,7 +1230,7 @@
       "bindingId": "FIX-MT300-004@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1238,7 +1238,7 @@
       "bindingId": "FIX-MT300-005@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1246,7 +1246,7 @@
       "bindingId": "FIX-MT300-008@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1254,7 +1254,7 @@
       "bindingId": "FIX-MT300-009@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1262,7 +1262,7 @@
       "bindingId": "FIX-MT300-010@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1270,7 +1270,7 @@
       "bindingId": "FIX-MT300-013@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1278,7 +1278,7 @@
       "bindingId": "FIX-MT300-014@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1286,7 +1286,7 @@
       "bindingId": "FIX-MT300-015@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1294,7 +1294,7 @@
       "bindingId": "FIX-MT304-003@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1302,7 +1302,7 @@
       "bindingId": "FIX-MT304-004@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1310,7 +1310,7 @@
       "bindingId": "FIX-MT304-005@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1318,7 +1318,7 @@
       "bindingId": "FIX-MT304-008@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1326,7 +1326,7 @@
       "bindingId": "FIX-MT304-009@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1334,7 +1334,7 @@
       "bindingId": "FIX-MT304-010@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1342,7 +1342,7 @@
       "bindingId": "FIX-MT304-014@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1350,7 +1350,7 @@
       "bindingId": "FIX-MT304-015@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1358,7 +1358,7 @@
       "bindingId": "FIX-MT305-003@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1366,7 +1366,7 @@
       "bindingId": "FIX-MT305-004@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1374,7 +1374,7 @@
       "bindingId": "FIX-MT305-005@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1382,7 +1382,7 @@
       "bindingId": "FIX-MT306-003@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1390,7 +1390,7 @@
       "bindingId": "FIX-MT306-004@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1398,7 +1398,7 @@
       "bindingId": "FIX-MT306-005@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1406,7 +1406,7 @@
       "bindingId": "FIX-MT306-006@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1414,7 +1414,7 @@
       "bindingId": "FIX-MT306-009@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1422,7 +1422,7 @@
       "bindingId": "FIX-MT306-010@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1430,7 +1430,7 @@
       "bindingId": "FIX-MT306-011@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1438,7 +1438,7 @@
       "bindingId": "FIX-MT306-012@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1446,7 +1446,7 @@
       "bindingId": "FIX-MT306-015@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1454,7 +1454,7 @@
       "bindingId": "FIX-MT306-016@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1462,7 +1462,7 @@
       "bindingId": "FIX-MT306-017@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1470,7 +1470,7 @@
       "bindingId": "FIX-MT306-018@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1478,7 +1478,7 @@
       "bindingId": "FIX-MT320-003@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1486,7 +1486,7 @@
       "bindingId": "FIX-MT320-004@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1494,7 +1494,7 @@
       "bindingId": "FIX-MT320-005@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1502,7 +1502,7 @@
       "bindingId": "FIX-MT320-006@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1510,7 +1510,7 @@
       "bindingId": "FIX-MT320-009@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1518,7 +1518,7 @@
       "bindingId": "FIX-MT320-010@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1526,7 +1526,7 @@
       "bindingId": "FIX-MT320-011@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1534,7 +1534,7 @@
       "bindingId": "FIX-MT320-012@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1542,7 +1542,7 @@
       "bindingId": "FIX-MT320-015@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1550,7 +1550,7 @@
       "bindingId": "FIX-MT320-016@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1558,7 +1558,7 @@
       "bindingId": "FIX-MT320-017@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1566,7 +1566,7 @@
       "bindingId": "FIX-MT320-018@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1574,7 +1574,7 @@
       "bindingId": "FIX-MT320-021@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1582,7 +1582,7 @@
       "bindingId": "FIX-MT320-022@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1590,7 +1590,7 @@
       "bindingId": "FIX-MT320-023@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1598,7 +1598,7 @@
       "bindingId": "FIX-MT320-024@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1606,7 +1606,7 @@
       "bindingId": "FIX-MT320-027@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1614,7 +1614,7 @@
       "bindingId": "FIX-MT320-028@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1622,7 +1622,7 @@
       "bindingId": "FIX-MT320-029@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1630,7 +1630,7 @@
       "bindingId": "FIX-MT320-030@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1638,7 +1638,7 @@
       "bindingId": "FIX-MT330-003@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1646,7 +1646,7 @@
       "bindingId": "FIX-MT330-004@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1654,7 +1654,7 @@
       "bindingId": "FIX-MT330-005@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1662,7 +1662,7 @@
       "bindingId": "FIX-MT330-006@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1670,7 +1670,7 @@
       "bindingId": "FIX-MT330-009@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1678,7 +1678,7 @@
       "bindingId": "FIX-MT330-010@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1686,7 +1686,7 @@
       "bindingId": "FIX-MT330-011@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1694,7 +1694,7 @@
       "bindingId": "FIX-MT330-012@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1702,7 +1702,7 @@
       "bindingId": "FIX-MT330-015@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1710,7 +1710,7 @@
       "bindingId": "FIX-MT330-016@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1718,7 +1718,7 @@
       "bindingId": "FIX-MT330-017@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1726,7 +1726,7 @@
       "bindingId": "FIX-MT330-018@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1734,7 +1734,7 @@
       "bindingId": "FIX-MT330-021@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1742,7 +1742,7 @@
       "bindingId": "FIX-MT330-022@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1750,7 +1750,7 @@
       "bindingId": "FIX-MT330-023@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1758,7 +1758,7 @@
       "bindingId": "FIX-MT330-024@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1766,7 +1766,7 @@
       "bindingId": "FIX-MT340-003@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1774,7 +1774,7 @@
       "bindingId": "FIX-MT340-004@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1782,7 +1782,7 @@
       "bindingId": "FIX-MT340-005@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1790,7 +1790,7 @@
       "bindingId": "FIX-MT340-006@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1798,7 +1798,7 @@
       "bindingId": "FIX-MT340-009@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1806,7 +1806,7 @@
       "bindingId": "FIX-MT340-010@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1814,7 +1814,7 @@
       "bindingId": "FIX-MT340-011@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1822,7 +1822,7 @@
       "bindingId": "FIX-MT340-012@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1830,7 +1830,7 @@
       "bindingId": "FIX-MT340-015@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1838,7 +1838,7 @@
       "bindingId": "FIX-MT340-016@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1846,7 +1846,7 @@
       "bindingId": "FIX-MT340-017@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1854,7 +1854,7 @@
       "bindingId": "FIX-MT340-018@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1862,7 +1862,7 @@
       "bindingId": "FIX-MT341-003@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1870,7 +1870,7 @@
       "bindingId": "FIX-MT341-004@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1878,7 +1878,7 @@
       "bindingId": "FIX-MT341-005@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1886,7 +1886,7 @@
       "bindingId": "FIX-MT341-006@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1894,7 +1894,7 @@
       "bindingId": "FIX-MT350-003@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1902,7 +1902,7 @@
       "bindingId": "FIX-MT350-004@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1910,7 +1910,7 @@
       "bindingId": "FIX-MT350-005@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1918,7 +1918,7 @@
       "bindingId": "FIX-MT350-006@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1926,7 +1926,7 @@
       "bindingId": "FIX-MT360-003@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1934,7 +1934,7 @@
       "bindingId": "FIX-MT360-004@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1942,7 +1942,7 @@
       "bindingId": "FIX-MT360-005@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1950,7 +1950,7 @@
       "bindingId": "FIX-MT360-006@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1958,7 +1958,7 @@
       "bindingId": "FIX-MT360-007@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1966,7 +1966,7 @@
       "bindingId": "FIX-MT360-010@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1974,7 +1974,7 @@
       "bindingId": "FIX-MT360-011@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1982,7 +1982,7 @@
       "bindingId": "FIX-MT360-012@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1990,7 +1990,7 @@
       "bindingId": "FIX-MT360-013@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -1998,7 +1998,7 @@
       "bindingId": "FIX-MT360-014@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2006,7 +2006,7 @@
       "bindingId": "FIX-MT360-018@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2014,7 +2014,7 @@
       "bindingId": "FIX-MT360-019@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2022,7 +2022,7 @@
       "bindingId": "FIX-MT360-020@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2030,7 +2030,7 @@
       "bindingId": "FIX-MT360-021@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2038,7 +2038,7 @@
       "bindingId": "FIX-MT360-025@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2046,7 +2046,7 @@
       "bindingId": "FIX-MT360-026@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2054,7 +2054,7 @@
       "bindingId": "FIX-MT360-027@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2062,7 +2062,7 @@
       "bindingId": "FIX-MT360-028@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2070,7 +2070,7 @@
       "bindingId": "FIX-MT361-003@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2078,7 +2078,7 @@
       "bindingId": "FIX-MT361-004@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2086,7 +2086,7 @@
       "bindingId": "FIX-MT361-005@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2094,7 +2094,7 @@
       "bindingId": "FIX-MT361-006@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2102,7 +2102,7 @@
       "bindingId": "FIX-MT361-007@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2110,7 +2110,7 @@
       "bindingId": "FIX-MT361-010@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2118,7 +2118,7 @@
       "bindingId": "FIX-MT361-011@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2126,7 +2126,7 @@
       "bindingId": "FIX-MT361-012@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2134,7 +2134,7 @@
       "bindingId": "FIX-MT361-013@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2142,7 +2142,7 @@
       "bindingId": "FIX-MT361-014@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2150,7 +2150,7 @@
       "bindingId": "FIX-MT361-017@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2158,7 +2158,7 @@
       "bindingId": "FIX-MT361-018@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2166,7 +2166,7 @@
       "bindingId": "FIX-MT361-019@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2174,7 +2174,7 @@
       "bindingId": "FIX-MT361-020@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2182,7 +2182,7 @@
       "bindingId": "FIX-MT361-021@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2190,7 +2190,7 @@
       "bindingId": "FIX-MT361-024@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2198,7 +2198,7 @@
       "bindingId": "FIX-MT361-025@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2206,7 +2206,7 @@
       "bindingId": "FIX-MT361-026@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2214,7 +2214,7 @@
       "bindingId": "FIX-MT361-027@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2222,7 +2222,7 @@
       "bindingId": "FIX-MT361-028@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2230,7 +2230,7 @@
       "bindingId": "FIX-MT361-032@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2238,7 +2238,7 @@
       "bindingId": "FIX-MT361-033@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2246,7 +2246,7 @@
       "bindingId": "FIX-MT361-034@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2254,7 +2254,7 @@
       "bindingId": "FIX-MT361-035@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2262,7 +2262,7 @@
       "bindingId": "FIX-MT361-039@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2270,7 +2270,7 @@
       "bindingId": "FIX-MT361-040@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2278,7 +2278,7 @@
       "bindingId": "FIX-MT361-041@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2286,7 +2286,7 @@
       "bindingId": "FIX-MT361-042@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2294,7 +2294,7 @@
       "bindingId": "FIX-MT362-003@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2302,7 +2302,7 @@
       "bindingId": "FIX-MT362-004@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2310,7 +2310,7 @@
       "bindingId": "FIX-MT362-005@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2318,7 +2318,7 @@
       "bindingId": "FIX-MT362-006@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2326,7 +2326,7 @@
       "bindingId": "FIX-MT362-007@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2334,7 +2334,7 @@
       "bindingId": "FIX-MT362-010@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2342,7 +2342,7 @@
       "bindingId": "FIX-MT362-011@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2350,7 +2350,7 @@
       "bindingId": "FIX-MT362-012@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2358,7 +2358,7 @@
       "bindingId": "FIX-MT362-013@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2366,7 +2366,7 @@
       "bindingId": "FIX-MT362-014@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2374,7 +2374,7 @@
       "bindingId": "FIX-MT364-003@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2382,7 +2382,7 @@
       "bindingId": "FIX-MT364-004@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2390,7 +2390,7 @@
       "bindingId": "FIX-MT364-005@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2398,7 +2398,7 @@
       "bindingId": "FIX-MT364-006@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2406,7 +2406,7 @@
       "bindingId": "FIX-MT364-009@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2414,7 +2414,7 @@
       "bindingId": "FIX-MT364-010@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2422,7 +2422,7 @@
       "bindingId": "FIX-MT364-011@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2430,7 +2430,7 @@
       "bindingId": "FIX-MT364-012@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2438,7 +2438,7 @@
       "bindingId": "FIX-MT365-003@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2446,7 +2446,7 @@
       "bindingId": "FIX-MT365-004@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2454,7 +2454,7 @@
       "bindingId": "FIX-MT365-005@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2462,7 +2462,7 @@
       "bindingId": "FIX-MT365-006@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2470,7 +2470,7 @@
       "bindingId": "FIX-MT365-009@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2478,7 +2478,7 @@
       "bindingId": "FIX-MT365-010@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2486,7 +2486,7 @@
       "bindingId": "FIX-MT365-011@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2494,7 +2494,7 @@
       "bindingId": "FIX-MT365-012@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2502,7 +2502,7 @@
       "bindingId": "FIX-MT365-015@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2510,7 +2510,7 @@
       "bindingId": "FIX-MT365-016@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2518,7 +2518,7 @@
       "bindingId": "FIX-MT365-017@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2526,7 +2526,7 @@
       "bindingId": "FIX-MT365-018@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2534,7 +2534,7 @@
       "bindingId": "FIX-MT365-021@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2542,7 +2542,7 @@
       "bindingId": "FIX-MT365-022@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2550,7 +2550,7 @@
       "bindingId": "FIX-MT365-023@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2558,7 +2558,7 @@
       "bindingId": "FIX-MT365-024@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2566,7 +2566,7 @@
       "bindingId": "FIX-MT400-003@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2574,7 +2574,7 @@
       "bindingId": "FIX-MT400-004@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2582,7 +2582,7 @@
       "bindingId": "FIX-MT400-006@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2590,7 +2590,7 @@
       "bindingId": "FIX-MT730-003@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2598,7 +2598,7 @@
       "bindingId": "FIX-MT730-004@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2606,7 +2606,7 @@
       "bindingId": "FIX-MT730-006@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2614,7 +2614,7 @@
       "bindingId": "FIX-MT734-003@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2622,7 +2622,7 @@
       "bindingId": "FIX-MT734-004@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2630,7 +2630,7 @@
       "bindingId": "FIX-MT742-003@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2638,7 +2638,7 @@
       "bindingId": "FIX-MT742-004@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2646,7 +2646,7 @@
       "bindingId": "FIX-MT742-007@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2654,7 +2654,7 @@
       "bindingId": "FIX-MT742-008@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2662,7 +2662,7 @@
       "bindingId": "FIX-MT742-009@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2670,7 +2670,7 @@
       "bindingId": "FIX-MT742-010@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2678,7 +2678,7 @@
       "bindingId": "FIX-MT742-011@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2686,7 +2686,7 @@
       "bindingId": "FIX-MT742-014@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2694,7 +2694,7 @@
       "bindingId": "FIX-MT750-003@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2702,7 +2702,7 @@
       "bindingId": "FIX-MT750-004@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2710,7 +2710,7 @@
       "bindingId": "FIX-MT752-003@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2718,7 +2718,7 @@
       "bindingId": "FIX-MT752-004@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2726,7 +2726,7 @@
       "bindingId": "FIX-MT754-003@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2734,7 +2734,7 @@
       "bindingId": "FIX-MT754-004@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2742,7 +2742,7 @@
       "bindingId": "FIX-MT754-007@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2750,7 +2750,7 @@
       "bindingId": "FIX-MT754-009@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2758,7 +2758,7 @@
       "bindingId": "FIX-MT754-010@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2766,7 +2766,7 @@
       "bindingId": "FIX-MT754-014@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2774,7 +2774,7 @@
       "bindingId": "FIX-MT756-003@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2782,7 +2782,7 @@
       "bindingId": "FIX-MT756-004@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2790,7 +2790,7 @@
       "bindingId": "FIX-MT756-007@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2798,7 +2798,7 @@
       "bindingId": "FIX-MT756-009@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2806,7 +2806,7 @@
       "bindingId": "FIX-MT756-010@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2814,7 +2814,7 @@
       "bindingId": "FIX-MT756-011@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2822,7 +2822,7 @@
       "bindingId": "FIX-MT765-004@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2830,7 +2830,7 @@
       "bindingId": "FIX-MT765-005@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2838,7 +2838,7 @@
       "bindingId": "FIX-MT768-003@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2846,7 +2846,7 @@
       "bindingId": "FIX-MT768-004@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2854,7 +2854,7 @@
       "bindingId": "FIX-MT768-006@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2862,7 +2862,7 @@
       "bindingId": "FIX-MT769-003@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2870,7 +2870,7 @@
       "bindingId": "FIX-MT769-004@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2878,7 +2878,7 @@
       "bindingId": "FIX-MT769-006@v1",
       "fixtureSet": "MT347-NEGATIVE",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-negative.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-negative.v1.json",
       "sourceArtifactSha256": "a1beb2cad51701cd00e3ef9b100e91b4c1cbcdfa9ac46edbdfa662cd42e27a06",
       "isolation": "TRANSACTIONAL_NEGATIVE"
     },
@@ -2886,7 +2886,7 @@
       "bindingId": "FIX-MT416-AUDIT-001@v1",
       "fixtureSet": "MT347-SCOPE-BOUNDARY",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-boundary.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-boundary.v1.json",
       "sourceArtifactSha256": "2e31424d58d4da06cda24c1631c0990b1e0eb0b4bd2cf06c0e945c9865791325",
       "isolation": "BOUNDARY"
     },
@@ -2894,7 +2894,7 @@
       "bindingId": "FIX-MT785-AUDIT-001@v1",
       "fixtureSet": "MT347-SCOPE-BOUNDARY",
       "fixtureVersion": "v1",
-      "sourceArtifactId": "qa/mt347/fixtures/mt347-boundary.v1.json",
+      "sourceArtifactId": "qa/fixtures/mt347/mt347-boundary.v1.json",
       "sourceArtifactSha256": "2e31424d58d4da06cda24c1631c0990b1e0eb0b4bd2cf06c0e945c9865791325",
       "isolation": "BOUNDARY"
     }

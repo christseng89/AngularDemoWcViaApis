@@ -80,7 +80,7 @@
 ### Task 5: Rebuild MT2/pacs.009 acceptance evidence
 
 **Files:**
-- Modify: `qa/mt2/mt2-final/ui-journeys.json`
+- Modify: `qa/tests/mt2/final/ui-journeys.json`
 - Create: `qa/user_guide/MT2-PACS009-OPERATIONAL-INPUT-GUIDE.md`
 - Create: `scripts/mt2-final-qa/run-generic-payment-browser-matrix.mjs`
 - Modify: `scripts/mt2-final-qa/run.mjs`

@@ -139,7 +139,7 @@ test("metric boundaries are strictly greater than 95 and less than 1", async () 
 });
 
 test("production config loads the frozen 139-case workbook", async () => {
-  const config = loadConfig("qa/mt2/mt2-final/mt2-final-qa.config.json");
+  const config = loadConfig("qa/tests/mt2/final/mt2-final-qa.config.json");
   const result = await new WorkbookGate(config).execute();
   assert.equal(result.status, "PASS", result.reason);
   assert.equal(result.evidence.total, 139);

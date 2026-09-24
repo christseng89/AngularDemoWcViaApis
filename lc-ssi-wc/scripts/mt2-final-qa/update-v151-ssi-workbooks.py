@@ -11,10 +11,10 @@ from openpyxl import load_workbook
 
 ROOT = Path(__file__).resolve().parents[2]
 FILES = (
-    ROOT / "qa/mt2/tdd/MT2XX_測試案例_SSI與NOSTRO_v6.xlsx",
-    ROOT / "qa/mt2/mt2-final/fixtures/MT2XX_測試案例_SSI與NOSTRO_v6.xlsx",
+    ROOT / "qa/tdd/mt2/MT2XX_測試案例_SSI與NOSTRO_v6.xlsx",
+    ROOT / "qa/fixtures/mt2/MT2XX_測試案例_SSI與NOSTRO_v6.xlsx",
 )
-SNAPSHOT = ROOT / "qa/mt2/mt2-final/fixtures/baselines/ssi-demo.v15.1-post-migration.sqlite"
+SNAPSHOT = ROOT / "qa/fixtures/mt2/baselines/ssi-demo.v15.1-post-migration.sqlite"
 
 
 def digest(path: Path) -> str:

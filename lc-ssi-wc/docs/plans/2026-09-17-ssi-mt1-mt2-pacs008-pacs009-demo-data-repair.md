@@ -101,7 +101,7 @@ BA and QA must review the Rule Table against the following local, controlled SR2
 | MT1 project memory | `memory/swift-mt1xx-pacs008-v2.md` | raw `1C17114AB2A2AD3C2455EAEE910951FFA426C2CCF25FB9A29E2385C6325980A1`; canonical LF `AA4287E19FFF3D2EB2DD826F83CC73B4AAE1BAA7F05910960FE6C8E5E6F28886` | Project scope, settlement-leg boundary and frozen OPEN-01/OPEN-02 decisions; pending authority holds only groups whose disposition depends on that authority |
 | MT1 matrix review | `memory/mt1/MT1XX_PACS008_v0.6_MATRIX_REVIEW.md` | `23F87D36C696F6C5D4B70B76A36E9CA2BD85E88A27ECF9E82A6AF2D764A80092` | BA/QA-reviewed matrix bundle; implementation still requires the stated approval gate |
 | MT2 project memory | `memory/swift-mt2xx-pacs009-v2.md` | raw `3F28D940510D4F4B0CEC5C5EB906FBB69EB3D63D42F5B815363E2DE3AD7BCBFA`; canonical LF `FE2418F9711C742D20E0A349D4E0E791BFAA574BBEB25C6F7F876D0677B8F196` | Plain/COV/ADV boundary, MRG rulings, account evidence and converter contract; pending authority holds only groups whose disposition depends on that authority |
-| MT2 final gate | `qa/mt2/mt2-final/mt2-pacs009-rework-gate.json` | `F04A8512A144B2088655946AACD52672C51D49AF3997098F60B5259EEF62B448` | Executable four-message scope and acceptance requirements |
+| MT2 final gate | `qa/tests/mt2/final/mt2-pacs009-rework-gate.json` | `F04A8512A144B2088655946AACD52672C51D49AF3997098F60B5259EEF62B448` | Executable four-message scope and acceptance requirements |
 
 ### Source precedence
 
@@ -735,10 +735,10 @@ No Gate implicitly authorizes the next Gate.
 
 **Files:**
 
-- Create: `qa/FIX_DATA/ssi/mt1-mt2/active-inventory.v1.json`
-- Create: `qa/FIX_DATA/ssi/mt1-mt2/runtime-drift-preservation.v1.json`
-- Create: `qa/FIX_DATA/src/ssi/mt1-mt2-active-inventory.ts`
-- Test: `qa/FIX_DATA/src/ssi/mt1-mt2-active-inventory.test.ts`
+- Create: `qa/fixtures/ssi/mt1-mt2/active-inventory.v1.json`
+- Create: `qa/fixtures/ssi/mt1-mt2/runtime-drift-preservation.v1.json`
+- Create: `qa/fixtures/src/ssi/mt1-mt2-active-inventory.ts`
+- Test: `qa/fixtures/src/ssi/mt1-mt2-active-inventory.test.ts`
 
 **Step 1: Write the failing test**
 
@@ -748,7 +748,7 @@ Do not create the test or implementation until Gate 0I is explicitly recorded. G
 
 **Step 2: Run the test and confirm it fails**
 
-Run: `node --experimental-strip-types --test qa/FIX_DATA/src/ssi/mt1-mt2-active-inventory.test.ts`
+Run: `node --experimental-strip-types --test qa/fixtures/src/ssi/mt1-mt2-active-inventory.test.ts`
 
 Expected: FAIL because the inventory application does not exist.
 
@@ -758,9 +758,9 @@ Create `ActiveMessageInventoryRepository`, `MessageFamilyClassifier` and `Invent
 
 **Step 4: Validate and commit**
 
-Run: `node --experimental-strip-types --test qa/FIX_DATA/src/ssi/mt1-mt2-active-inventory.test.ts`
+Run: `node --experimental-strip-types --test qa/fixtures/src/ssi/mt1-mt2-active-inventory.test.ts`
 
-Run: `npx eslint qa/FIX_DATA/src/ssi/mt1-mt2-active-inventory.ts qa/FIX_DATA/src/ssi/mt1-mt2-active-inventory.test.ts`
+Run: `npx eslint qa/fixtures/src/ssi/mt1-mt2-active-inventory.ts qa/fixtures/src/ssi/mt1-mt2-active-inventory.test.ts`
 
 Expected: both commands exit `0`. Commit only after Product Owner explicitly authorizes committing the controlled artifact; Gate 1 does not imply commit/push authorization.
 
@@ -768,25 +768,25 @@ Expected: both commands exit `0`. Commit only after Product Owner explicitly aut
 
 **Files:**
 
-- Create: `qa/FIX_DATA/ssi/mt1-mt2/repair-rule-table.v1.json`
-- Create: `qa/FIX_DATA/ssi/mt1-mt2/test-oracle.v1.json`
-- Create: `qa/FIX_DATA/ssi/mt1-mt2/ba-qa-review.v1.md`
-- Create: `qa/FIX_DATA/ssi/mt1-mt2/rule-oracle.schema.v1.json`
-- Create: `qa/FIX_DATA/ssi/mt1-mt2/outcome-reason-code-catalogue.v1.json`
-- Create: `qa/FIX_DATA/ssi/mt1-mt2/schema-meta-test-vectors.v1.json`
-- Create: `qa/FIX_DATA/ssi/mt1-mt2/expected-partition-manifest.v1.json`
-- Create: `qa/FIX_DATA/ssi/mt1-mt2/product-policy-evidence-registry.v1.json`
-- Create: `qa/FIX_DATA/ssi/mt1-mt2/ba-ruling-evidence-registry.v1.json`
-- Create: `qa/FIX_DATA/ssi/mt1-mt2/qa-invariant-evidence-registry.v1.json`
-- Create: `qa/FIX_DATA/ssi/mt1-mt2/out-of-scope-message-catalogue.v1.json`
-- Create: `qa/FIX_DATA/ssi/mt1-mt2/execution-context-catalogues.v1.json`
-- Create: `qa/FIX_DATA/ssi/mt1-mt2/derivation-tuple-catalogue.v1.json`
-- Create: `qa/FIX_DATA/ssi/mt1-mt2/api-execution-contract-catalogue.v1.json`
-- Create: `qa/FIX_DATA/ssi/mt1-mt2/expected-selected-identity-manifest.v1.json`
-- Create: `qa/FIX_DATA/ssi/mt1-mt2/schema-approval-pack.v1.json`
-- Create: `qa/FIX_DATA/src/ssi/mt1-mt2-rule-oracle.schema.ts`
-- Create: `qa/FIX_DATA/src/ssi/validate-mt1-mt2-rule-table.ts`
-- Test: `qa/FIX_DATA/src/ssi/validate-mt1-mt2-rule-table.test.ts`
+- Create: `qa/fixtures/ssi/mt1-mt2/repair-rule-table.v1.json`
+- Create: `qa/fixtures/ssi/mt1-mt2/test-oracle.v1.json`
+- Create: `qa/fixtures/ssi/mt1-mt2/ba-qa-review.v1.md`
+- Create: `qa/fixtures/ssi/mt1-mt2/rule-oracle.schema.v1.json`
+- Create: `qa/fixtures/ssi/mt1-mt2/outcome-reason-code-catalogue.v1.json`
+- Create: `qa/fixtures/ssi/mt1-mt2/schema-meta-test-vectors.v1.json`
+- Create: `qa/fixtures/ssi/mt1-mt2/expected-partition-manifest.v1.json`
+- Create: `qa/fixtures/ssi/mt1-mt2/product-policy-evidence-registry.v1.json`
+- Create: `qa/fixtures/ssi/mt1-mt2/ba-ruling-evidence-registry.v1.json`
+- Create: `qa/fixtures/ssi/mt1-mt2/qa-invariant-evidence-registry.v1.json`
+- Create: `qa/fixtures/ssi/mt1-mt2/out-of-scope-message-catalogue.v1.json`
+- Create: `qa/fixtures/ssi/mt1-mt2/execution-context-catalogues.v1.json`
+- Create: `qa/fixtures/ssi/mt1-mt2/derivation-tuple-catalogue.v1.json`
+- Create: `qa/fixtures/ssi/mt1-mt2/api-execution-contract-catalogue.v1.json`
+- Create: `qa/fixtures/ssi/mt1-mt2/expected-selected-identity-manifest.v1.json`
+- Create: `qa/fixtures/ssi/mt1-mt2/schema-approval-pack.v1.json`
+- Create: `qa/fixtures/src/ssi/mt1-mt2-rule-oracle.schema.ts`
+- Create: `qa/fixtures/src/ssi/validate-mt1-mt2-rule-table.ts`
+- Test: `qa/fixtures/src/ssi/validate-mt1-mt2-rule-table.test.ts`
 - Reference: `memory/swift-mt1xx-pacs008-v2.md`
 - Reference: `memory/swift-mt2xx-pacs009-v2.md`
 
@@ -802,9 +802,9 @@ Only a same-SHA `PASS` on the complete schema approval pack authorizes schema/va
 
 **Step 2: Run schema/cardinality validation**
 
-Run: `node --experimental-strip-types --test qa/FIX_DATA/src/ssi/validate-mt1-mt2-rule-table.test.ts`
+Run: `node --experimental-strip-types --test qa/fixtures/src/ssi/validate-mt1-mt2-rule-table.test.ts`
 
-Run: `node --experimental-strip-types qa/FIX_DATA/src/ssi/validate-mt1-mt2-rule-table.ts --rules qa/FIX_DATA/ssi/mt1-mt2/repair-rule-table.v1.json --oracle qa/FIX_DATA/ssi/mt1-mt2/test-oracle.v1.json --out qa/FIX_DATA/ssi/mt1-mt2/rule-table-validation.v1.json`
+Run: `node --experimental-strip-types qa/fixtures/src/ssi/validate-mt1-mt2-rule-table.ts --rules qa/fixtures/ssi/mt1-mt2/repair-rule-table.v1.json --oracle qa/fixtures/ssi/mt1-mt2/test-oracle.v1.json --out qa/fixtures/ssi/mt1-mt2/rule-table-validation.v1.json`
 
 Expected: both commands exit `0`; every target group has exactly one disposition. Validator compares actual partition against the independently approved `expected-partition-manifest.v1.json` and reports `missing=0`, `extra=0`, `misclassified=0`; self-emitted sets are not sufficient. `Unknown=0`, `Multiple=0`, `DRAFT=0`, `BLOCKED=0`, `HOLD_DEPENDENCY=0` in the executable partition; every executable group's disposition is proven independent of pending upstream authority; disposition and token/row deltas reconcile exactly.
 
@@ -820,10 +820,10 @@ Do not implement Generator until `DRAFT=0` and `BLOCKED=0`.
 
 **Files:**
 
-- Create: `qa/FIX_DATA/src/message-version-policy.ts`
-- Create: `qa/FIX_DATA/src/versioned-record-identity.ts`
-- Create: `qa/FIX_DATA/src/dataset-visibility-policy.ts`
-- Create: `qa/FIX_DATA/src/ssi/mt1-mt2-repair-planner.ts`
+- Create: `qa/fixtures/src/message-version-policy.ts`
+- Create: `qa/fixtures/src/versioned-record-identity.ts`
+- Create: `qa/fixtures/src/dataset-visibility-policy.ts`
+- Create: `qa/fixtures/src/ssi/mt1-mt2-repair-planner.ts`
 - Test: corresponding `*.test.ts` files
 
 **Step 1: Write failing policy tests**
@@ -832,7 +832,7 @@ Cover eligible `.12 -> .08`, dual-token `REMOVE_SOURCE_TOKEN`, already-canonical
 
 **Step 2: Run tests and observe failure**
 
-Run: `node --experimental-strip-types --test qa/FIX_DATA/src/message-version-policy.test.ts qa/FIX_DATA/src/versioned-record-identity.test.ts qa/FIX_DATA/src/dataset-visibility-policy.test.ts qa/FIX_DATA/src/ssi/mt1-mt2-repair-planner.test.ts`
+Run: `node --experimental-strip-types --test qa/fixtures/src/message-version-policy.test.ts qa/fixtures/src/versioned-record-identity.test.ts qa/fixtures/src/dataset-visibility-policy.test.ts qa/fixtures/src/ssi/mt1-mt2-repair-planner.test.ts`
 
 Expected: non-zero exit because the modules or required policy outcomes do not exist.
 
@@ -850,10 +850,10 @@ Expected: exit `0`; all shared and SSI-specific policy tests PASS. The shared po
 
 **Files:**
 
-- Create: `qa/FIX_DATA/src/ssi/mt1-mt2-demo.generator.ts`
-- Create: `qa/FIX_DATA/src/ssi/mt1-mt2-canonical-seed.mapper.ts`
+- Create: `qa/fixtures/src/ssi/mt1-mt2-demo.generator.ts`
+- Create: `qa/fixtures/src/ssi/mt1-mt2-canonical-seed.mapper.ts`
 - Test: corresponding `*.test.ts`
-- Output: `qa/FIX_DATA/ssi/mt1-mt2/generated/`
+- Output: `qa/fixtures/ssi/mt1-mt2/generated/`
 
 **Step 1: Write failing cardinality and isolation tests**
 
@@ -869,9 +869,9 @@ Every new Applicability ID and FK must point to the matching new SSI version. Ne
 
 **Step 4: Validate; commit only with explicit Product Owner authorization**
 
-Run: `node --experimental-strip-types qa/FIX_DATA/src/ssi/mt1-mt2-demo.generator.ts --rules qa/FIX_DATA/ssi/mt1-mt2/repair-rule-table.v1.json --oracle qa/FIX_DATA/ssi/mt1-mt2/test-oracle.v1.json --out qa/FIX_DATA/ssi/mt1-mt2/generated/ssi-demo.mt1-mt2-pacs008-pacs009.sr2026.v1.candidate.json`
+Run: `node --experimental-strip-types qa/fixtures/src/ssi/mt1-mt2-demo.generator.ts --rules qa/fixtures/ssi/mt1-mt2/repair-rule-table.v1.json --oracle qa/fixtures/ssi/mt1-mt2/test-oracle.v1.json --out qa/fixtures/ssi/mt1-mt2/generated/ssi-demo.mt1-mt2-pacs008-pacs009.sr2026.v1.candidate.json`
 
-Run: `node --experimental-strip-types --test qa/FIX_DATA/src/ssi/mt1-mt2-demo.generator.test.ts qa/FIX_DATA/src/ssi/mt1-mt2-canonical-seed.mapper.test.ts`
+Run: `node --experimental-strip-types --test qa/fixtures/src/ssi/mt1-mt2-demo.generator.test.ts qa/fixtures/src/ssi/mt1-mt2-canonical-seed.mapper.test.ts`
 
 Expected: both commands exit `0`; a second generation is byte-identical and has the same SHA; `CONVERT`, `REMOVE_SOURCE_TOKEN`, lifecycle and row-delta totals equal the approved Rule Table.
 
@@ -879,20 +879,20 @@ Expected: both commands exit `0`; a second generation is byte-identical and has 
 
 **Files:**
 
-- Create: `qa/FIX_DATA/src/ssi/prepare-mt1-mt2-reload-source.ts`
-- Test: `qa/FIX_DATA/src/ssi/prepare-mt1-mt2-reload-source.test.ts`
-- Create: `qa/FIX_DATA/ssi/reload-test-data/ssi-demo.mt1-mt2.v1.candidate.canonical.seed.json`
-- Create: `qa/FIX_DATA/ssi/mt1-mt2/generated/candidate-seed-manifest.v1.json`
+- Create: `qa/fixtures/src/ssi/prepare-mt1-mt2-reload-source.ts`
+- Test: `qa/fixtures/src/ssi/prepare-mt1-mt2-reload-source.test.ts`
+- Create: `qa/fixtures/ssi/reload-test-data/ssi-demo.mt1-mt2.v1.candidate.canonical.seed.json`
+- Create: `qa/fixtures/ssi/mt1-mt2/generated/candidate-seed-manifest.v1.json`
 
 **Step 1: Write the failing complete-seed tests**
 
-Run: `node --experimental-strip-types --test qa/FIX_DATA/src/ssi/prepare-mt1-mt2-reload-source.test.ts`
+Run: `node --experimental-strip-types --test qa/fixtures/src/ssi/prepare-mt1-mt2-reload-source.test.ts`
 
 Expected before implementation: non-zero exit. Tests require exact base/configured-seed identity, generated overlay identity, all fourteen preserved runtime rows, no duplicate IDs/FKs, full table coverage, candidate/approved path separation and approved path absence.
 
 **Step 2: Build but do not publish the complete candidate**
 
-Run: `node --experimental-strip-types qa/FIX_DATA/src/ssi/prepare-mt1-mt2-reload-source.ts --mode build-candidate --base-configured-seed qa/FIX_DATA/ssi/reload-test-data/ssi-demo.mt347-v1.1.approved.canonical.seed.json --generated-overlay qa/FIX_DATA/ssi/mt1-mt2/generated/ssi-demo.mt1-mt2-pacs008-pacs009.sr2026.v1.candidate.json --preserve-runtime-rows qa/FIX_DATA/ssi/mt1-mt2/runtime-drift-preservation.v1.json --candidate qa/FIX_DATA/ssi/reload-test-data/ssi-demo.mt1-mt2.v1.candidate.canonical.seed.json --manifest qa/FIX_DATA/ssi/mt1-mt2/generated/candidate-seed-manifest.v1.json`
+Run: `node --experimental-strip-types qa/fixtures/src/ssi/prepare-mt1-mt2-reload-source.ts --mode build-candidate --base-configured-seed qa/fixtures/ssi/reload-test-data/ssi-demo.mt347-v1.1.approved.canonical.seed.json --generated-overlay qa/fixtures/ssi/mt1-mt2/generated/ssi-demo.mt1-mt2-pacs008-pacs009.sr2026.v1.candidate.json --preserve-runtime-rows qa/fixtures/ssi/mt1-mt2/runtime-drift-preservation.v1.json --candidate qa/fixtures/ssi/reload-test-data/ssi-demo.mt1-mt2.v1.candidate.canonical.seed.json --manifest qa/fixtures/ssi/mt1-mt2/generated/candidate-seed-manifest.v1.json`
 
 Expected: exit `0`; output is a full canonical seed, not an overlay. Manifest records every input/output SHA and table count. Nothing is written to an approved path, configured Reload source or DB.
 
@@ -904,11 +904,11 @@ Expected: exit `0`; the candidate logical identity becomes the sole source for T
 
 **Files:**
 
-- Create: `qa/FIX_DATA/src/ssi/mt1-mt2-api-dry-run.ts`
-- Test: `qa/FIX_DATA/src/ssi/mt1-mt2-api-dry-run.test.ts`
-- Ephemeral DB: `qa/FIX_DATA/ssi/mt1-mt2/generated/api-dry-run.isolated.sqlite`
-- Input: `qa/FIX_DATA/ssi/mt1-mt2/api-execution-contract-catalogue.v1.json`
-- Output: `qa/FIX_DATA/ssi/mt1-mt2/generated/api-dry-run.v1.json`
+- Create: `qa/fixtures/src/ssi/mt1-mt2-api-dry-run.ts`
+- Test: `qa/fixtures/src/ssi/mt1-mt2-api-dry-run.test.ts`
+- Ephemeral DB: `qa/fixtures/ssi/mt1-mt2/generated/api-dry-run.isolated.sqlite`
+- Input: `qa/fixtures/ssi/mt1-mt2/api-execution-contract-catalogue.v1.json`
+- Output: `qa/fixtures/ssi/mt1-mt2/generated/api-dry-run.v1.json`
 
 **Step 1: Write a failing stub-server integration test**
 
@@ -916,9 +916,9 @@ Prove Positive exact success, Negative exact failure, OOS not submitted and zero
 
 **Step 2: Run against a candidate-backed isolated SSI API**
 
-Run: `node --experimental-strip-types qa/FIX_DATA/src/ssi/mt1-mt2-api-dry-run.ts --mode candidate-backed-isolated --candidate-seed qa/FIX_DATA/ssi/reload-test-data/ssi-demo.mt1-mt2.v1.candidate.canonical.seed.json --manifest qa/FIX_DATA/ssi/mt1-mt2/generated/candidate-seed-manifest.v1.json --oracle qa/FIX_DATA/ssi/mt1-mt2/test-oracle.v1.json --api-contract-catalogue qa/FIX_DATA/ssi/mt1-mt2/api-execution-contract-catalogue.v1.json --isolated-db qa/FIX_DATA/ssi/mt1-mt2/generated/api-dry-run.isolated.sqlite --service-project ssi-service --service-port 3310 --base-url http://127.0.0.1:3310/api --out qa/FIX_DATA/ssi/mt1-mt2/generated/api-dry-run.v1.json`
+Run: `node --experimental-strip-types qa/fixtures/src/ssi/mt1-mt2-api-dry-run.ts --mode candidate-backed-isolated --candidate-seed qa/fixtures/ssi/reload-test-data/ssi-demo.mt1-mt2.v1.candidate.canonical.seed.json --manifest qa/fixtures/ssi/mt1-mt2/generated/candidate-seed-manifest.v1.json --oracle qa/fixtures/ssi/mt1-mt2/test-oracle.v1.json --api-contract-catalogue qa/fixtures/ssi/mt1-mt2/api-execution-contract-catalogue.v1.json --isolated-db qa/fixtures/ssi/mt1-mt2/generated/api-dry-run.isolated.sqlite --service-project ssi-service --service-port 3310 --base-url http://127.0.0.1:3310/api --out qa/fixtures/ssi/mt1-mt2/generated/api-dry-run.v1.json`
 
-Run: `node --experimental-strip-types --test qa/FIX_DATA/src/ssi/mt1-mt2-api-dry-run.test.ts`
+Run: `node --experimental-strip-types --test qa/fixtures/src/ssi/mt1-mt2-api-dry-run.test.ts`
 
 Expected: both commands exit `0`. The runner materializes only the ephemeral DB from the full candidate seed, starts an isolated `ssi-service` child with `SSI_DATABASE_PATH` bound to that exact file and `SSI_SERVICE_PORT=3310`, records the child PID and bound port, waits for the child service to report that exact database snapshot identity, then executes API cases and terminates the child. Runtime DB and the port-4600 UI are never used. Every response evidence row binds child PID, bound port, candidate seed SHA, isolated DB logical SHA, Rule/Oracle SHA and Page Definition SHA. `databaseWrites=0`, before/after isolated snapshot identical, mismatch=0, exact stub calls match and OOS/Full-FIN rows are not submitted to SSI resolution. Runner-side access to the candidate file cannot substitute for server-reported snapshot identity.
 
@@ -934,21 +934,21 @@ Gate 2 remains failed if any expected reason differs.
 
 **Files:**
 
-- Create: `qa/FIX_DATA/src/ssi/mt1-mt2-reload-preflight.ts`
-- Test: `qa/FIX_DATA/src/ssi/mt1-mt2-reload-preflight.test.ts`
-- Output: `qa/FIX_DATA/ssi/mt1-mt2/generated/reload-preflight.v1.json`
+- Create: `qa/fixtures/src/ssi/mt1-mt2-reload-preflight.ts`
+- Test: `qa/fixtures/src/ssi/mt1-mt2-reload-preflight.test.ts`
+- Output: `qa/fixtures/ssi/mt1-mt2/generated/reload-preflight.v1.json`
 
 **Step 1: Build an isolated DB from the frozen complete candidate seed**
 
 No runtime DB access is allowed in this step.
 
-Run: `node --experimental-strip-types qa/FIX_DATA/src/ssi/mt1-mt2-reload-preflight.ts --source qa/FIX_DATA/ssi/reload-test-data/ssi-demo.mt1-mt2.v1.candidate.canonical.seed.json --manifest qa/FIX_DATA/ssi/mt1-mt2/generated/candidate-seed-manifest.v1.json --mode plan-only --out qa/FIX_DATA/ssi/mt1-mt2/generated/reload-preflight.v1.json`
+Run: `node --experimental-strip-types qa/fixtures/src/ssi/mt1-mt2-reload-preflight.ts --source qa/fixtures/ssi/reload-test-data/ssi-demo.mt1-mt2.v1.candidate.canonical.seed.json --manifest qa/fixtures/ssi/mt1-mt2/generated/candidate-seed-manifest.v1.json --mode plan-only --out qa/fixtures/ssi/mt1-mt2/generated/reload-preflight.v1.json`
 
 Expected: exit `0`; no runtime DB access and no DB write.
 
 **Step 2: Apply the candidate twice**
 
-Run: `node --experimental-strip-types --test qa/FIX_DATA/src/ssi/mt1-mt2-reload-preflight.test.ts`
+Run: `node --experimental-strip-types --test qa/fixtures/src/ssi/mt1-mt2-reload-preflight.test.ts`
 
 Expected: exit `0`; in an ephemeral SQLite copy only, first Apply matches approved SSI/Applicability and token deltas. The governed Reload service must compare configured-seed logical identity with the current DB identity before its destructive transaction: an identical identity returns `DEMO_DATA_ALREADY_CURRENT` before `BEGIN/DELETE/INSERT`. Second generation, preflight and Reload therefore yield physical `inserts=0`, `updates=0`, `deletes=0`, `tokenAdds=0`, `tokenRemovals=0`. Logical zero-delta alone is insufficient.
 
@@ -964,19 +964,19 @@ Inject a failure after SSI insertion and before Applicability completion. Rollba
 
 **Files:**
 
-- Create: `qa/FIX_DATA/ssi/mt1-mt2/generated/dba-preflight.v1.json`
-- Create: `qa/FIX_DATA/src/ssi/mt1-mt2-dba-preflight.ts`
-- Test: `qa/FIX_DATA/src/ssi/mt1-mt2-dba-preflight.test.ts`
+- Create: `qa/fixtures/ssi/mt1-mt2/generated/dba-preflight.v1.json`
+- Create: `qa/fixtures/src/ssi/mt1-mt2-dba-preflight.ts`
+- Test: `qa/fixtures/src/ssi/mt1-mt2-dba-preflight.test.ts`
 
 **Step 1: Run DB-side query-plan and latency tests on the identical isolated snapshot**
 
-Run: `node --experimental-strip-types --test qa/FIX_DATA/src/ssi/mt1-mt2-dba-preflight.test.ts`
+Run: `node --experimental-strip-types --test qa/fixtures/src/ssi/mt1-mt2-dba-preflight.test.ts`
 
 Expected: exit `0`; query/filter/sort plans use the approved DB-side paths; WAL/lock behavior has no uncontrolled writer contention. The versioned performance profile uses at least 30 cold samples and 100 hot samples, reports p50/p95/max and maximum payload bytes, requires p95 <= 1 second, payload <= 512 KiB and p95 regression <= 10% against the latest accepted baseline SHA. Missing baseline, sample, percentile or threshold evidence is `NOT_EXECUTED/NOT_ACCEPTED`, never PASS.
 
 **Step 2: Freeze the DBA verdict**
 
-Run: `node --experimental-strip-types qa/FIX_DATA/src/ssi/mt1-mt2-dba-preflight.ts --preflight qa/FIX_DATA/ssi/mt1-mt2/generated/reload-preflight.v1.json --out qa/FIX_DATA/ssi/mt1-mt2/generated/dba-preflight.v1.json`
+Run: `node --experimental-strip-types qa/fixtures/src/ssi/mt1-mt2-dba-preflight.ts --preflight qa/fixtures/ssi/mt1-mt2/generated/reload-preflight.v1.json --out qa/fixtures/ssi/mt1-mt2/generated/dba-preflight.v1.json`
 
 Expected: exit `0`; `verdict=PASS`, snapshot SHA equals Gate 3, and table-by-table integrity assertions reconcile. Gate 4A remains closed until this evidence is approved.
 
@@ -984,11 +984,11 @@ Expected: exit `0`; `verdict=PASS`, snapshot SHA equals Gate 3, and table-by-tab
 
 **Files:**
 
-- Input: `qa/FIX_DATA/ssi/reload-test-data/ssi-demo.mt1-mt2.v1.candidate.canonical.seed.json`
-- Input: `qa/FIX_DATA/ssi/mt1-mt2/generated/candidate-seed-manifest.v1.json`
-- Publish after Gate 4A only: `qa/FIX_DATA/ssi/reload-test-data/ssi-demo.mt1-mt2.v1.approved.canonical.seed.json`
-- Use: `qa/FIX_DATA/src/ssi/prepare-mt1-mt2-reload-source.ts`
-- Test: `qa/FIX_DATA/src/ssi/prepare-mt1-mt2-reload-source.test.ts`
+- Input: `qa/fixtures/ssi/reload-test-data/ssi-demo.mt1-mt2.v1.candidate.canonical.seed.json`
+- Input: `qa/fixtures/ssi/mt1-mt2/generated/candidate-seed-manifest.v1.json`
+- Publish after Gate 4A only: `qa/fixtures/ssi/reload-test-data/ssi-demo.mt1-mt2.v1.approved.canonical.seed.json`
+- Use: `qa/fixtures/src/ssi/prepare-mt1-mt2-reload-source.ts`
+- Test: `qa/fixtures/src/ssi/prepare-mt1-mt2-reload-source.test.ts`
 - Modify: `.env.example`
 - Modify: `apps/ssi-service/src/app/development-data-reload.service.ts`
 - Repo archive index only: `docs/archive/ssi/mt1-mt2-reload-source-index.md`
@@ -996,13 +996,13 @@ Expected: exit `0`; `verdict=PASS`, snapshot SHA equals Gate 3, and table-by-tab
 
 **Step 1: Re-run Reload parity and publication-boundary tests**
 
-Run: `node --experimental-strip-types --test qa/FIX_DATA/src/ssi/prepare-mt1-mt2-reload-source.test.ts`
+Run: `node --experimental-strip-types --test qa/fixtures/src/ssi/prepare-mt1-mt2-reload-source.test.ts`
 
 Expected: exit `0`. Candidate seed logical SHA equals the Gate 3 Preflight input/after-SHA, includes the exact fourteen-row preservation multiset, and the approved filename is absent before Gate 4A.
 
 **Step 2: Stop and obtain explicit Gate 4A authorization, then publish from exact approved artifacts**
 
-Run only after recorded Gate 4A approval: `node --experimental-strip-types qa/FIX_DATA/src/ssi/prepare-mt1-mt2-reload-source.ts --candidate qa/FIX_DATA/ssi/reload-test-data/ssi-demo.mt1-mt2.v1.candidate.canonical.seed.json --authorization qa/FIX_DATA/ssi/mt1-mt2/gate-4a-authorization.v1.json --publish qa/FIX_DATA/ssi/reload-test-data/ssi-demo.mt1-mt2.v1.approved.canonical.seed.json`
+Run only after recorded Gate 4A approval: `node --experimental-strip-types qa/fixtures/src/ssi/prepare-mt1-mt2-reload-source.ts --candidate qa/fixtures/ssi/reload-test-data/ssi-demo.mt1-mt2.v1.candidate.canonical.seed.json --authorization qa/fixtures/ssi/mt1-mt2/gate-4a-authorization.v1.json --publish qa/fixtures/ssi/reload-test-data/ssi-demo.mt1-mt2.v1.approved.canonical.seed.json`
 
 Expected: exit `0`; the published seed embeds Candidate, Rule Table, Oracle, Preflight, DBA and authorization SHA values and remains Development-only. Gate 4A authorizes publication only, never Reload execution.
 
@@ -1012,7 +1012,7 @@ Move superseded payload/evidence only to the repo-external `qa-archived/ssi/mt1-
 
 **Step 4: Verify publication without executing Reload**
 
-Run: `node --experimental-strip-types --test qa/FIX_DATA/src/ssi/prepare-mt1-mt2-reload-source.test.ts`
+Run: `node --experimental-strip-types --test qa/fixtures/src/ssi/prepare-mt1-mt2-reload-source.test.ts`
 
 Expected: exit `0`; external archive directory and superseded artifact exist, archived SHA equals the index entry, replacement SHA equals the published artifact, and publication assertions PASS. DB opens/writes and Reload API calls observed by the test are zero. Missing external archive evidence keeps Gate 4A incomplete.
 
@@ -1020,11 +1020,11 @@ Expected: exit `0`; external archive directory and superseded artifact exist, ar
 
 **Files:**
 
-- Create: `qa/FIX_DATA/src/ssi/mt1-mt2-runtime-apply.ts`
-- Test: `qa/FIX_DATA/src/ssi/mt1-mt2-runtime-apply.test.ts`
-- Output: `qa/FIX_DATA/ssi/mt1-mt2/generated/runtime-apply.v1.json`
-- Backup: `qa/FIX_DATA/ssi/mt1-mt2/generated/backup/runtime-before-<logical-sha>.sqlite`
-- Restore drill output: `qa/FIX_DATA/ssi/mt1-mt2/generated/backup/restore-drill.v1.json`
+- Create: `qa/fixtures/src/ssi/mt1-mt2-runtime-apply.ts`
+- Test: `qa/fixtures/src/ssi/mt1-mt2-runtime-apply.test.ts`
+- Output: `qa/fixtures/ssi/mt1-mt2/generated/runtime-apply.v1.json`
+- Backup: `qa/fixtures/ssi/mt1-mt2/generated/backup/runtime-before-<logical-sha>.sqlite`
+- Restore drill output: `qa/fixtures/ssi/mt1-mt2/generated/backup/restore-drill.v1.json`
 
 **Step 1: Stop until Gate 4B isolated Reload authorization is recorded**
 
@@ -1032,23 +1032,23 @@ BA/QA approval, source publication and Preflight PASS do not authorize isolated 
 
 **Step 2: After Gate 4B, execute Reload twice in an isolated DB**
 
-Run only after recorded Gate 4B approval: `node --experimental-strip-types qa/FIX_DATA/src/ssi/mt1-mt2-runtime-apply.ts --mode isolated-reload --seed qa/FIX_DATA/ssi/reload-test-data/ssi-demo.mt1-mt2.v1.approved.canonical.seed.json --authorization qa/FIX_DATA/ssi/mt1-mt2/gate-4b-authorization.v1.json --service apps/ssi-service/src/app/development-data-reload.service.ts --out qa/FIX_DATA/ssi/mt1-mt2/generated/isolated-reload.v1.json`
+Run only after recorded Gate 4B approval: `node --experimental-strip-types qa/fixtures/src/ssi/mt1-mt2-runtime-apply.ts --mode isolated-reload --seed qa/fixtures/ssi/reload-test-data/ssi-demo.mt1-mt2.v1.approved.canonical.seed.json --authorization qa/fixtures/ssi/mt1-mt2/gate-4b-authorization.v1.json --service apps/ssi-service/src/app/development-data-reload.service.ts --out qa/fixtures/ssi/mt1-mt2/generated/isolated-reload.v1.json`
 
 Expected: exit `0`; both Reloads produce the same logical SHA and exact row/token counts; the second Reload returns `DEMO_DATA_ALREADY_CURRENT` before opening a write transaction and has physical zero writes; rollback/failure injection PASS. This mode uses the service against an explicitly supplied isolated DB path and must not call the Development Runtime endpoint.
 
 **Step 3: Create and verify a SQLite-consistent recovery backup**
 
-Run before requesting Gate 4C: `node --experimental-strip-types qa/FIX_DATA/src/ssi/mt1-mt2-runtime-apply.ts --mode backup-verify --runtime-db ./data/ssi-demo.sqlite --expected-runtime-sha <GATE_4C_BEFORE_SHA> --backup-dir qa/FIX_DATA/ssi/mt1-mt2/generated/backup --out qa/FIX_DATA/ssi/mt1-mt2/generated/backup/backup-verify.v1.json`
+Run before requesting Gate 4C: `node --experimental-strip-types qa/fixtures/src/ssi/mt1-mt2-runtime-apply.ts --mode backup-verify --runtime-db ./data/ssi-demo.sqlite --expected-runtime-sha <GATE_4C_BEFORE_SHA> --backup-dir qa/fixtures/ssi/mt1-mt2/generated/backup --out qa/fixtures/ssi/mt1-mt2/generated/backup/backup-verify.v1.json`
 
-Run: `node --experimental-strip-types qa/FIX_DATA/src/ssi/mt1-mt2-runtime-apply.ts --mode restore-drill --backup-manifest qa/FIX_DATA/ssi/mt1-mt2/generated/backup/backup-verify.v1.json --restore-target qa/FIX_DATA/ssi/mt1-mt2/generated/backup/restore-drill.sqlite --out qa/FIX_DATA/ssi/mt1-mt2/generated/backup/restore-drill.v1.json`
+Run: `node --experimental-strip-types qa/fixtures/src/ssi/mt1-mt2-runtime-apply.ts --mode restore-drill --backup-manifest qa/fixtures/ssi/mt1-mt2/generated/backup/backup-verify.v1.json --restore-target qa/fixtures/ssi/mt1-mt2/generated/backup/restore-drill.sqlite --out qa/fixtures/ssi/mt1-mt2/generated/backup/restore-drill.v1.json`
 
 Expected: both commands exit `0`. Backup is created with SQLite's WAL-consistent backup API, never by copying only the main file. Backup logical SHA equals runtime before-SHA. The restore drill runs only against the isolated restore target after injected mid-transaction failure and proves identical table-by-table row multiset, IDs/FKs and logical SHA. Runtime restore remains a fail-only action requiring the recorded Gate 4C rollback condition.
 
 The Runtime restore sequence, executable only after a Gate 4C invariant failure, is fixed:
 
 1. Run `npm run dev:stop` and verify SSI service/BFF/UI ports are closed.
-2. Run `node --experimental-strip-types qa/FIX_DATA/src/ssi/mt1-mt2-runtime-apply.ts --mode assert-quiesced --runtime-db ./data/ssi-demo.sqlite --ports 3000,3100,4600 --out qa/FIX_DATA/ssi/mt1-mt2/generated/backup/quiesce.v1.json`.
-3. Run `node --experimental-strip-types qa/FIX_DATA/src/ssi/mt1-mt2-runtime-apply.ts --mode runtime-restore --runtime-db ./data/ssi-demo.sqlite --quiesce-evidence qa/FIX_DATA/ssi/mt1-mt2/generated/backup/quiesce.v1.json --backup-manifest qa/FIX_DATA/ssi/mt1-mt2/generated/backup/backup-verify.v1.json --authorization qa/FIX_DATA/ssi/mt1-mt2/gate-4c-authorization.v1.json --expected-restored-sha <GATE_4C_BEFORE_SHA> --out qa/FIX_DATA/ssi/mt1-mt2/generated/backup/runtime-restore.v1.json`.
+2. Run `node --experimental-strip-types qa/fixtures/src/ssi/mt1-mt2-runtime-apply.ts --mode assert-quiesced --runtime-db ./data/ssi-demo.sqlite --ports 3000,3100,4600 --out qa/fixtures/ssi/mt1-mt2/generated/backup/quiesce.v1.json`.
+3. Run `node --experimental-strip-types qa/fixtures/src/ssi/mt1-mt2-runtime-apply.ts --mode runtime-restore --runtime-db ./data/ssi-demo.sqlite --quiesce-evidence qa/fixtures/ssi/mt1-mt2/generated/backup/quiesce.v1.json --backup-manifest qa/fixtures/ssi/mt1-mt2/generated/backup/backup-verify.v1.json --authorization qa/fixtures/ssi/mt1-mt2/gate-4c-authorization.v1.json --expected-restored-sha <GATE_4C_BEFORE_SHA> --out qa/fixtures/ssi/mt1-mt2/generated/backup/runtime-restore.v1.json`.
 4. Restart with `npm run dev:all`, then execute read-only health and logical snapshot verification.
 
 The restore tool must fail unless services are quiesced and all SQLite connections are closed. It acquires an exclusive restore lock, handles WAL/SHM through SQLite's WAL-aware backup/restore APIs, runs `integrity_check`, closes the restored DB before releasing the lock, and rejects stale quiesce/authorization/snapshot identities. Tests inject open connections, WAL content, lock contention, corrupt backup and restart failure.
@@ -1057,7 +1057,7 @@ Expected after restore: exit `0`; runtime DB logical SHA equals `<GATE_4C_BEFORE
 
 **Step 4: After isolated Reload PASS, stop again until separate Gate 4C authorization; then perform the uniquely named governed Runtime operation**
 
-Run only after recorded Gate 4C approval: `node --experimental-strip-types qa/FIX_DATA/src/ssi/mt1-mt2-runtime-apply.ts --mode development-runtime-apply --endpoint http://localhost:3100/api/settings/development-data/reload --seed qa/FIX_DATA/ssi/reload-test-data/ssi-demo.mt1-mt2.v1.approved.canonical.seed.json --authorization qa/FIX_DATA/ssi/mt1-mt2/gate-4c-authorization.v1.json --out qa/FIX_DATA/ssi/mt1-mt2/generated/runtime-apply.v1.json`
+Run only after recorded Gate 4C approval: `node --experimental-strip-types qa/fixtures/src/ssi/mt1-mt2-runtime-apply.ts --mode development-runtime-apply --endpoint http://localhost:3100/api/settings/development-data/reload --seed qa/fixtures/ssi/reload-test-data/ssi-demo.mt1-mt2.v1.approved.canonical.seed.json --authorization qa/fixtures/ssi/mt1-mt2/gate-4c-authorization.v1.json --out qa/fixtures/ssi/mt1-mt2/generated/runtime-apply.v1.json`
 
 Expected: exit `0`. The first explicitly authorized full Reload may physically delete/reinsert tables, but Historical, runtime-drift, MT347 and all other non-target IDs/payloads/FKs/lifecycles must remain logically and bit-content identical. `POST /api/settings/development-data/reload` is the sole governed Development Runtime operation; direct SQLite writing and any separate INSERT-only endpoint are prohibited. The endpoint accepts only the control password: before calling it, the tool must verify that the service-configured seed path and SHA equal the Gate 4C approved full seed; CLI `--seed` does not override runtime configuration. On any invariant failure, stop and execute the verified restore procedure.
 
@@ -1069,10 +1069,10 @@ Expected: exit `0`; response is `DEMO_DATA_ALREADY_CURRENT`, no write transactio
 
 **Files:**
 
-- Create: `qa/FIX_DATA/ssi/mt1-mt2/ui-acceptance.v1.json`
-- Create: `qa/FIX_DATA/ssi/mt1-mt2/final-reconciliation.v1.md`
-- Create: `qa/FIX_DATA/src/ssi/mt1-mt2-browser-uat.ts`
-- Test: `qa/FIX_DATA/src/ssi/mt1-mt2-ui-reload.test.ts`
+- Create: `qa/fixtures/ssi/mt1-mt2/ui-acceptance.v1.json`
+- Create: `qa/fixtures/ssi/mt1-mt2/final-reconciliation.v1.md`
+- Create: `qa/fixtures/src/ssi/mt1-mt2-browser-uat.ts`
+- Test: `qa/fixtures/src/ssi/mt1-mt2-ui-reload.test.ts`
 
 **Step 1: Test UI at `http://localhost:4600`**
 
@@ -1082,13 +1082,13 @@ Expected: exit `0`. Verify SSI Add/Edit/Inquire/Suppress, Revise -> WIP, Save Dr
 
 Index regression is mandatory for RMA and SSI: true server-side page-by-page retrieval, DB-side filter/search and stable whitelisted `ORDER BY` with immutable unique-key tie-breaker; every sortable title supports mouse and keyboard ASC/DESC and correct `aria-sort`; no browser/BFF full-table fetch or current-page-only sort. Checker and Audit preserve the originating Index column names/order/search/sort contract and may only append Maker/Checker and their datetimes. Search and lookup results must remain exact across pages and Reload.
 
-Run: `node --experimental-strip-types qa/FIX_DATA/src/ssi/mt1-mt2-browser-uat.ts --base-url http://localhost:4600 --rules qa/FIX_DATA/ssi/mt1-mt2/repair-rule-table.v1.json --oracle qa/FIX_DATA/ssi/mt1-mt2/test-oracle.v1.json --out qa/FIX_DATA/ssi/mt1-mt2/ui-acceptance.v1.json`
+Run: `node --experimental-strip-types qa/fixtures/src/ssi/mt1-mt2-browser-uat.ts --base-url http://localhost:4600 --rules qa/fixtures/ssi/mt1-mt2/repair-rule-table.v1.json --oracle qa/fixtures/ssi/mt1-mt2/test-oracle.v1.json --out qa/fixtures/ssi/mt1-mt2/ui-acceptance.v1.json`
 
 Expected: exit `0`; report binds exact code, UI build, OAS/Page Definition, Rule Table, Oracle, fixture, configured seed and DB logical snapshot SHAs. Denominator is every executable scenario × currency × enabled counterparty/receiver-account combination; PASS/FAIL/BLOCKED/NOT_EXECUTED are retained and no case is removed from the denominator.
 
 **Step 2: Test Reload Test Data from UI**
 
-Run only after Gate 4C for Development Runtime UI: `node --experimental-strip-types --test qa/FIX_DATA/src/ssi/mt1-mt2-ui-reload.test.ts`
+Run only after Gate 4C for Development Runtime UI: `node --experimental-strip-types --test qa/fixtures/src/ssi/mt1-mt2-ui-reload.test.ts`
 
 Expected: exit `0`; Runtime `POST /api/settings/development-data/reload` was never called during Gate 4B. After Gate 4C, UI Reload preserves the approved snapshot, lifecycle transitions, target counts, runtime-only drift and visibility policy; before/after Page Definition, fixture and DB snapshot identities are recorded.
 
@@ -1104,7 +1104,7 @@ Run: `npx nx run-many -t test --configuration=ci --coverage --runInBand`
 
 Run: `npx nx run-many -t typecheck lint build`
 
-Run: `rg -n "pacs\\.00[89]\\.001\\.(12|012)|\.001\.08|ACTIVE|DRAFT|approved\.canonical" qa/FIX_DATA/src qa/FIX_DATA/ssi apps/ssi-service apps/ssi-portal`
+Run: `rg -n "pacs\\.00[89]\\.001\\.(12|012)|\.001\.08|ACTIVE|DRAFT|approved\.canonical" qa/fixtures/src qa/fixtures/ssi apps/ssi-service apps/ssi-portal`
 
 Run: `git diff --check`
 

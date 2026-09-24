@@ -10,13 +10,13 @@ from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[2]
-SEED = ROOT / "qa/FIX_DATA/rma/reload-test-data/ssi-demo.v15.8.pacs009-repaired-isolated.canonical.seed.json"
+SEED = ROOT / "qa/fixtures/rma/reload-test-data/ssi-demo.v15.8.pacs009-repaired-isolated.canonical.seed.json"
 FIXTURE_MANIFEST = (
     ROOT / "parameters/resolution-page-fixtures.mt2-pacs009.sr2026.json"
 )
 OVERLAY = (
     ROOT
-    / "qa/mt2/mt2-final/fixtures/overlays/ssi-demo.v15.3-mt2-ui-parity-v1.sqlite"
+    / "qa/fixtures/mt2/overlays/ssi-demo.v15.3-mt2-ui-parity-v1.sqlite"
 )
 TIMESTAMP = "2026-09-15T00:00:00.000Z"
 FIXTURE_FAMILY = "MT2-UI-PARITY-V1"

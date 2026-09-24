@@ -2,7 +2,7 @@ import { chromium } from "@playwright/test";
 import { readFileSync } from "node:fs";
 
 const config = JSON.parse(
-  readFileSync("qa/mt2/mt2-final/ui-journeys.json", "utf8"),
+  readFileSync("qa/tests/mt2/final/ui-journeys.json", "utf8"),
 );
 const portalUrl = process.env.PORTAL_URL ?? config.portalUrl;
 const browserPath =

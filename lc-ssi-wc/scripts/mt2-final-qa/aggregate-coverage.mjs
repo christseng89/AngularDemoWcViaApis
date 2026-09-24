@@ -7,7 +7,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const workspace = path.resolve(here, "../..");
 const config = loadConfig(
   process.env.MT2_QA_CONFIG ??
-    path.resolve(workspace, "qa/mt2/mt2-final/mt2-final-qa.config.json"),
+    path.resolve(workspace, "qa/tests/mt2/final/mt2-final-qa.config.json"),
 );
 const projects = config.coverageProjects.map((project) => {
   const file = path.resolve(

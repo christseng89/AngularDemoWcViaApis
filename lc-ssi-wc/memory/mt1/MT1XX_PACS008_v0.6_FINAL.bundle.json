@@ -32,7 +32,7 @@
     },
     {
       "role": "memoryReview",
-      "path": "qa/mt1/reports/latest/MT1XX_PACS008_MEMORY_V2_REVIEW.md",
+      "path": "qa/reports/latest/mt1/MT1XX_PACS008_MEMORY_V2_REVIEW.md",
       "sha256": "89760231E4FBB071EC0AC9F4B9E0948CF291581B1373D3F0CFCF69A2A7B304B4"
     }
   ],

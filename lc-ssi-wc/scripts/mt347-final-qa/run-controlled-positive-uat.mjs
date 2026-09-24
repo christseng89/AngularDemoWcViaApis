@@ -4,10 +4,10 @@ import { dirname, resolve } from "node:path";
 const endpoint = process.env.MT347_UAT_ENDPOINT ??
   "http://localhost:3100/api/reference/fin-controlled-resolutions";
 const fixturePath = resolve(
-  "qa/mt347/fixtures/mt347-positive.v1.json",
+  "qa/fixtures/mt347/mt347-positive.v1.json",
 );
 const reportPath = resolve(
-  "qa/mt347/reports/latest/controlled-positive-uat.json",
+  "qa/reports/latest/mt347/controlled-positive-uat.json",
 );
 
 const fixture = JSON.parse(await readFile(fixturePath, "utf8"));

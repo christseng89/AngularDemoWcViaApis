@@ -10,8 +10,8 @@ from openpyxl import load_workbook
 
 ROOT = Path(__file__).resolve().parents[2]
 FILES = (
-    ROOT / "qa/mt2/tdd/MT2XX_測試案例_SSI與NOSTRO_v6.xlsx",
-    ROOT / "qa/mt2/mt2-final/fixtures/MT2XX_測試案例_SSI與NOSTRO_v6.xlsx",
+    ROOT / "qa/tdd/mt2/MT2XX_測試案例_SSI與NOSTRO_v6.xlsx",
+    ROOT / "qa/fixtures/mt2/MT2XX_測試案例_SSI與NOSTRO_v6.xlsx",
 )
 EXPECTED_SOURCE_SHA256 = {
     "49A0B3B82D5C0CE5B6FE791B30E6122E7B1838070AB7E153B2BEE49C2DB50EA7",

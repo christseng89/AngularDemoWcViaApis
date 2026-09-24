@@ -6,11 +6,11 @@ const root = process.cwd();
 const apiBase = process.env.SSI_BFF_URL ?? "http://localhost:3100/api";
 const expectationPath = resolve(
   root,
-  "qa/mt2/reports/MT2XX_v15.3_migration_expected_20260912.json",
+  "qa/reports/latest/mt2/MT2XX_v15.3_migration_expected_20260912.json",
 );
 const outputPath = resolve(
   root,
-  "qa/mt2/reports/MT2XX_v15.3_api_UAT_20260912.json",
+  "qa/reports/latest/mt2/MT2XX_v15.3_api_UAT_20260912.json",
 );
 const sha256 = (value) =>
   createHash("sha256").update(value).digest("hex").toUpperCase();
@@ -146,7 +146,7 @@ const report = {
   reportType: "V15.3_API_UAT",
   generatedAt: new Date().toISOString(),
   apiBase,
-  expectationPath: "qa/mt2/reports/MT2XX_v15.3_migration_expected_20260912.json",
+  expectationPath: "qa/reports/latest/mt2/MT2XX_v15.3_migration_expected_20260912.json",
   expectationSha256: sha256(await readFile(expectationPath)),
   logicalSnapshotSha256: expectation.overlayLogicalSnapshotSha256,
   totals,

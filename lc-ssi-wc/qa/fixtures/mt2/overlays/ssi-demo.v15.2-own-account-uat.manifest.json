@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "1.0",
+  "fixtureId": "QA-OWN-57A-V15.2",
+  "status": "PROPOSED_QA_ONLY",
+  "mustNotExistInBaseline": true,
+  "baseSnapshot": {
+    "path": "qa/fixtures/mt2/baselines/ssi-demo.v15.1-post-migration.sqlite",
+    "sha256": "52A58C19901F1FBD6A3EE964968A14164EDA89DF22B284282C88D05C3D5CEEF6"
+  },
+  "overlaySnapshot": {
+    "path": "qa/fixtures/mt2/overlays/ssi-demo.v15.2-own-account-uat.sqlite",
+    "sha256": "C7C07A2DD74DD223CE8D0354DCA85B78816793B4C65D7163D5CDD1EC3B8C7F21"
+  },
+  "scenario": "CREDIT_ONE_OF_SEVERAL_AT_57A",
+  "receiverBankServiceId": "BANK-SVC-CITIUS33",
+  "accountWithInstitutionBankServiceId": "BANK-SVC-BARCGB22",
+  "senderBankServiceId": "BANK-SVC-DEMOHKHH",
+  "records": [
+    {
+      "nostroId": "570a0000-0000-4000-8000-000000000001",
+      "version": 1,
+      "accountReference": "QA-OWN-57A-USD-PRIMARY"
+    },
+    {
+      "nostroId": "570a0000-0000-4000-8000-000000000002",
+      "version": 1,
+      "accountReference": "QA-OWN-57A-USD-SECONDARY"
+    }
+  ],
+  "controls": {
+    "baselineSsiRowsMustRemainByteEquivalent": true,
+    "original48CaseDecisionChosenAndCandidatesDifferences": 0,
+    "aggregateCrossCheck": "44 RESOLVED + 4 SSI_AMBIGUOUS"
+  },
+  "regressionEvidence": {
+    "path": "qa/reports/latest/mt2/MT2XX_v15.2_overlay_regression_20260911.json",
+    "sha256": "60E94223EC1BE703415FDC8667E04539CD5EAEAE2314C40CDA112AAA80C105BE",
+    "cases": 48,
+    "differences": 0
+  }
+}

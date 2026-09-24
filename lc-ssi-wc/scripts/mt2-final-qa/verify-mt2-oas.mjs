@@ -3,7 +3,7 @@ import path from "node:path";
 import { loadConfig } from "./config-loader.mjs";
 import { verifyMt2OasContract } from "./oas-contract-verifier.mjs";
 
-const configPath = process.argv[2] ?? "qa/mt2/mt2-final/mt2-final-qa.config.json";
+const configPath = process.argv[2] ?? "qa/tests/mt2/final/mt2-final-qa.config.json";
 const config = loadConfig(configPath);
 const oasArtifact = config.baselineArtifacts.find(
   ({ role }) => role === "CURRENT_OAS",

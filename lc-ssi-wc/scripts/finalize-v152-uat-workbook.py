@@ -10,12 +10,12 @@ from pathlib import Path
 from openpyxl import load_workbook
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "qa/mt2/uat/MT2xx_SSI_Resolution_UAT執行清單_v15.2_DRAFT_R7.xlsx"
-OUTPUT = ROOT / "qa/mt2/uat/MT2xx_SSI_Resolution_UAT執行清單_v15.2_DRAFT_R8.xlsx"
-REPORT = ROOT / "qa/mt2/reports/MT2XX_v15.2_api_evidence_20260911.json"
-BROWSER_REPORT = ROOT / "qa/mt2/reports/MT2XX_v15.2_browser_UAT_full_postfix_20260911.json"
-ADDENDUM = ROOT / "qa/mt2/reports/MT2XX_v15.1_48_CASE_SCOPE_ADDENDUM_ZH_20260911.md"
-OVERLAY_REGRESSION = ROOT / "qa/mt2/reports/MT2XX_v15.2_overlay_regression_20260911.json"
+SOURCE = ROOT / "qa/reports/latest/mt2/MT2xx_SSI_Resolution_UAT執行清單_v15.2_DRAFT_R7.xlsx"
+OUTPUT = ROOT / "qa/reports/latest/mt2/MT2xx_SSI_Resolution_UAT執行清單_v15.2_DRAFT_R8.xlsx"
+REPORT = ROOT / "qa/reports/latest/mt2/MT2XX_v15.2_api_evidence_20260911.json"
+BROWSER_REPORT = ROOT / "qa/reports/latest/mt2/MT2XX_v15.2_browser_UAT_full_postfix_20260911.json"
+ADDENDUM = ROOT / "qa/reports/latest/mt2/MT2XX_v15.1_48_CASE_SCOPE_ADDENDUM_ZH_20260911.md"
+OVERLAY_REGRESSION = ROOT / "qa/reports/latest/mt2/MT2XX_v15.2_overlay_regression_20260911.json"
 
 
 def sha256(path: Path) -> str:

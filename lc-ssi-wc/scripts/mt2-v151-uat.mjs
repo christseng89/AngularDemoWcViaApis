@@ -154,7 +154,7 @@ const report = {
   reportVersion: '15.1',
   generatedAt: new Date().toISOString(),
   apiBase,
-  snapshotPath: 'qa/mt2/mt2-final/fixtures/baselines/ssi-demo.v15.1-post-migration.sqlite',
+  snapshotPath: 'qa/fixtures/mt2/baselines/ssi-demo.v15.1-post-migration.sqlite',
   snapshotSha256,
   groupingKeys: [
     'counterpartyBic',

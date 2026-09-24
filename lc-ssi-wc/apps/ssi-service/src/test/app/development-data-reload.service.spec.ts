@@ -110,7 +110,19 @@ describe("DevelopmentDataReloadService", () => {
 
   it("reloads the approved MT1/MT2 seed twice into an isolated Development DB", async () => {
     const canonicalPath = join(directory, "canonical.sqlite");
-    const seed = JSON.parse(readFileSync(join(process.cwd(), "qa", "FIX_DATA", "ssi", "reload-test-data", "ssi-demo.mt1-mt2.v1.approved.canonical.seed.json"), "utf8")) as {
+    const seed = JSON.parse(
+      readFileSync(
+        join(
+          process.cwd(),
+          "qa",
+          "fixtures",
+          "ssi",
+          "reload-test-data",
+          "ssi-demo.mt1-mt2.v1.approved.canonical.seed.json",
+        ),
+        "utf8",
+      ),
+    ) as {
       schema: { sql: string }[];
     };
     const source = new DatabaseSync(canonicalPath);
@@ -120,13 +132,23 @@ describe("DevelopmentDataReloadService", () => {
       source.close();
     }
     const service = new DevelopmentDataReloadService(
-      environment({ SSI_DATABASE_PATH: canonicalPath, SSI_DEMO_SEED_PATH: undefined }),
+      environment({
+        SSI_DATABASE_PATH: canonicalPath,
+        SSI_DEMO_SEED_PATH: undefined,
+      }),
     );
     const first = service.reload("secret");
     const coverageDb = new DatabaseSync(canonicalPath, { readOnly: true });
     try {
-      expect((coverageDb.prepare("SELECT COUNT(*) AS count FROM resolution_currency_coverage WHERE status='ACTIVE'").get() as { count: number }).count)
-        .toBe(20);
+      expect(
+        (
+          coverageDb
+            .prepare(
+              "SELECT COUNT(*) AS count FROM resolution_currency_coverage WHERE status='ACTIVE'",
+            )
+            .get() as { count: number }
+        ).count,
+      ).toBe(20);
     } finally {
       coverageDb.close();
     }

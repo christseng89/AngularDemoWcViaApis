@@ -30,7 +30,7 @@ const baseline = {
 };
 const body = `${JSON.stringify(baseline, null, 2)}\n`;
 const output = resolve(
-  "qa/mt2/mt2-final/fixtures/baselines/bank-service.current.json",
+  "qa/fixtures/mt2/baselines/bank-service.current.json",
 );
 writeFileSync(output, body, "utf8");
 console.log(

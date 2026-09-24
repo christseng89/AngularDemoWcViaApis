@@ -4,12 +4,12 @@ import test from "node:test";
 import { evaluateMt2Pacs009Gate } from "./mt2-pacs009-rework-gate.mjs";
 
 const contract = JSON.parse(
-  fs.readFileSync("qa/mt2/mt2-final/mt2-pacs009-rework-gate.json", "utf8"),
+  fs.readFileSync("qa/tests/mt2/final/mt2-pacs009-rework-gate.json", "utf8"),
 );
 
 const canonicalSeed = JSON.parse(
   fs.readFileSync(
-    "qa/FIX_DATA/rma/reload-test-data/ssi-demo.v15.8.pacs009-repaired-isolated.canonical.seed.json",
+    "qa/fixtures/rma/reload-test-data/ssi-demo.v15.8.pacs009-repaired-isolated.canonical.seed.json",
     "utf8",
   ),
 );
@@ -80,7 +80,7 @@ test("acceptance requires referenced PASS evidence for every requirement", () =>
     results: contract.requirements.map(({ id }) => ({
       id,
       status: "PASS",
-      evidence: [`qa/mt2/evidence/${id}.json`],
+      evidence: [`qa/reports/latest/mt2/${id}.json`],
     })),
   });
   assert.equal(report.status, "ACCEPTED");

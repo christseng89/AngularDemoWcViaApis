@@ -10,12 +10,12 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "qa/mt2/mt2-final/fixtures/overlays/ssi-demo.v15.2-own-account-uat.sqlite"
-OUT_DIR = ROOT / "qa/mt2/mt2-final/fixtures/overlays"
+SOURCE = ROOT / "qa/fixtures/mt2/overlays/ssi-demo.v15.2-own-account-uat.sqlite"
+OUT_DIR = ROOT / "qa/fixtures/mt2/overlays"
 OVERLAY = OUT_DIR / "ssi-demo.v15.3-unified-qa-uat.sqlite"
 MANIFEST = OUT_DIR / "ssi-demo.v15.3-unified-qa-uat.manifest.json"
-PLAN = ROOT / "qa/mt2/reports/MT2XX_v15.3_migration_expected_20260912.json"
-BASE_RESULTS = ROOT / "qa/mt2/reports/MT2XX_v15.1_post_migration_tie_scan_20260911.json"
+PLAN = ROOT / "qa/reports/latest/mt2/MT2XX_v15.3_migration_expected_20260912.json"
+BASE_RESULTS = ROOT / "qa/reports/latest/mt2/MT2XX_v15.1_post_migration_tie_scan_20260911.json"
 TIMESTAMP = "2026-09-12T00:00:00.000Z"
 IDENTITY_METHOD = "SQLITE_WAL_AWARE_LOGICAL_SNAPSHOT_V1"
 NAMESPACE = uuid.UUID("6c0ac631-937c-4abd-9018-a85b6c44d153")

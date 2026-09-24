@@ -251,12 +251,12 @@ The HTTP split is product policy, not a SWIFT MRG rule.
 
 Durable rulings:
 
-- `qa/mt2/reports/BA-MRG-MT202-53A-RULING-20260912.md`
-- `qa/mt2/reports/BA-DQ-NOSTRO-CONFIRMATION-20260912.md`
+- `qa/reports/latest/mt2/BA-MRG-MT202-53A-RULING-20260912.md`
+- `qa/reports/latest/mt2/BA-DQ-NOSTRO-CONFIRMATION-20260912.md`
 
 Independent product observations and raw JSON are maintained under:
 
-- `qa/mt2/reports/claude-independent-20260912/`
+- `qa/reports/latest/mt2/claude-independent-20260912/`
 
 Product findings such as K1–K8 are time-bound observations, not permanent MRG knowledge. They must remain in a build/commit-specific report with its evidence SHA and must not be copied into the normative sections of this memory.
 

@@ -9,9 +9,9 @@ from openpyxl import load_workbook
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "qa/mt2/mt2-final/fixtures/MT2XX_測試案例_SSI與NOSTRO_v6.xlsx"
-TARGET = ROOT / "qa/mt2/mt2-final/fixtures/MT2XX_測試案例_SSI與NOSTRO_v6.1_DRAFT.xlsx"
-SEED = ROOT / "qa/FIX_DATA/rma/reload-test-data/ssi-demo.v15.8.pacs009-repaired-isolated.canonical.seed.json"
+SOURCE = ROOT / "qa/fixtures/mt2/MT2XX_測試案例_SSI與NOSTRO_v6.xlsx"
+TARGET = ROOT / "qa/fixtures/mt2/MT2XX_測試案例_SSI與NOSTRO_v6.1_DRAFT.xlsx"
+SEED = ROOT / "qa/fixtures/rma/reload-test-data/ssi-demo.v15.8.pacs009-repaired-isolated.canonical.seed.json"
 
 DEBIT = {
     "id": "7520b02e-ec7c-4c50-a9b8-4f78056a05e7",

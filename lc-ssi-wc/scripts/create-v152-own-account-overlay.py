@@ -8,12 +8,12 @@ import sqlite3
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-BASE = ROOT / "qa/mt2/mt2-final/fixtures/baselines/ssi-demo.v15.1-post-migration.sqlite"
-OUT_DIR = ROOT / "qa/mt2/mt2-final/fixtures/overlays"
+BASE = ROOT / "qa/fixtures/mt2/baselines/ssi-demo.v15.1-post-migration.sqlite"
+OUT_DIR = ROOT / "qa/fixtures/mt2/overlays"
 OVERLAY = OUT_DIR / "ssi-demo.v15.2-own-account-uat.sqlite"
 MANIFEST = OUT_DIR / "ssi-demo.v15.2-own-account-uat.manifest.json"
-BASE_REPORT = ROOT / "qa/mt2/reports/MT2XX_v15.1_post_migration_tie_scan_20260911.json"
-REGRESSION_REPORT = ROOT / "qa/mt2/reports/MT2XX_v15.2_overlay_regression_20260911.json"
+BASE_REPORT = ROOT / "qa/reports/latest/mt2/MT2XX_v15.1_post_migration_tie_scan_20260911.json"
+REGRESSION_REPORT = ROOT / "qa/reports/latest/mt2/MT2XX_v15.2_overlay_regression_20260911.json"
 BASE_SHA = "52A58C19901F1FBD6A3EE964968A14164EDA89DF22B284282C88D05C3D5CEEF6"
 
 

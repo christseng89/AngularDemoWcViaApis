@@ -11,7 +11,7 @@ import { executePreparedCases } from "./execute-prepared-cases.mjs";
 const workspace = path.resolve(import.meta.dirname, "../..");
 const controlledConfig = () =>
   loadConfig(
-    path.join(workspace, "qa/mt2/mt2-final/mt2-final-qa.config.json"),
+    path.join(workspace, "qa/tests/mt2/final/mt2-final-qa.config.json"),
   );
 const runtimeBody = (config) => ({
   fixtureId: config.expectedRuntime.fixtureId,

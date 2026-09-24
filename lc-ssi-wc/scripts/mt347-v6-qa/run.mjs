@@ -17,7 +17,7 @@ const valueAfter = (name) => {
 };
 const controlledWorkbook = path.join(
   workspace,
-  "qa/mt347/tdd/MT347_SR2026_SSI_TDD_CONTROLLED_v6.xlsx",
+  "qa/tdd/mt347/MT347_SR2026_SSI_TDD_CONTROLLED_v6.xlsx",
 );
 const workbookResult = await evaluateWorkbook({
   workbook: controlledWorkbook,

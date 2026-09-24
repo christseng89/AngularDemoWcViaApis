@@ -13,9 +13,9 @@
 ### Task 1: Pin and load the frozen Oracle
 
 **Files:**
-- Create: `qa/FIX_DATA/src/ssi/oracle-contract.ts`
-- Create: `qa/FIX_DATA/src/ssi/oracle.repository.ts`
-- Test: `qa/FIX_DATA/src/ssi/oracle.repository.test.ts`
+- Create: `qa/fixtures/src/ssi/oracle-contract.ts`
+- Create: `qa/fixtures/src/ssi/oracle.repository.ts`
+- Test: `qa/fixtures/src/ssi/oracle.repository.test.ts`
 
 1. Write failing tests for exact SHA verification, schema/version checks and tamper rejection.
 2. Run the focused test and confirm RED.
@@ -25,8 +25,8 @@
 ### Task 2: Generate deterministic Demo fixtures
 
 **Files:**
-- Create: `qa/FIX_DATA/src/ssi/mt347-demo.generator.ts`
-- Test: `qa/FIX_DATA/src/ssi/mt347-demo.generator.test.ts`
+- Create: `qa/fixtures/src/ssi/mt347-demo.generator.ts`
+- Test: `qa/fixtures/src/ssi/mt347-demo.generator.test.ts`
 
 1. Write failing tests asserting 208 groups, 3,120 unique contexts, 2,580 SSI-owned contexts and 540 OOS contexts.
 2. Assert that the 36 OOS groups perform no SSI lookup and generate zero SSI route candidates.
@@ -37,8 +37,8 @@
 ### Task 3: Compare generated data against the Oracle
 
 **Files:**
-- Create: `qa/FIX_DATA/src/ssi/oracle-comparator.ts`
-- Test: `qa/FIX_DATA/src/ssi/oracle-comparator.test.ts`
+- Create: `qa/fixtures/src/ssi/oracle-comparator.ts`
+- Test: `qa/fixtures/src/ssi/oracle-comparator.test.ts`
 
 1. Write failing tests for exact-match PASS and one-field mismatch FAIL.
 2. Implement deterministic comparison and reconciliation metrics.
@@ -47,13 +47,13 @@
 ### Task 4: Add zero-write dry-run CLI
 
 **Files:**
-- Create: `qa/FIX_DATA/src/ssi/dry-run.ts`
-- Modify: `qa/FIX_DATA/src/ssi/README.md`
+- Create: `qa/fixtures/src/ssi/dry-run.ts`
+- Modify: `qa/fixtures/src/ssi/README.md`
 - Modify: `package.json`
 
 1. Add `demo:dry-run:ssi-mt347` invoking the TypeScript CLI with Node strip-types.
 2. Pin the v1.1 Oracle path and SHA in configuration.
-3. Emit a JSON report under `qa/FIX_DATA/ssi/generated/` containing `databaseWrites=0`, exact reconciliation and mismatch list.
+3. Emit a JSON report under `qa/fixtures/ssi/generated/` containing `databaseWrites=0`, exact reconciliation and mismatch list.
 4. Document Gate 1 boundaries and explicitly state that DB/runtime apply is unsupported.
 
 ### Task 5: Validate

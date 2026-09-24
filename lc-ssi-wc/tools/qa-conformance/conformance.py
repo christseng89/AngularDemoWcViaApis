@@ -29,7 +29,7 @@ REG = {
                  "CBA6D5D0704CC37788251D8DDCA0D987C6F8404AD19B32FC7C51BDAA67AAB2CB"),
 }
 WORKBOOK_V15 = REG["controlled_workbook"][0]
-WORKBOOK_QA  = P("qa/mt2/mt2-final/fixtures/MT2XX_測試案例_SSI與NOSTRO_v6.2_FINAL.xlsx")
+WORKBOOK_QA  = P("qa/fixtures/mt2/MT2XX_測試案例_SSI與NOSTRO_v6.2_FINAL.xlsx")
 MAPPINGS     = P("parameters", "ssi-mappings.sr2026.json")
 MT202_57A_FIXTURE = P("qa", "mt2", "mt2-final", "fixtures", "mt202-57a-option-selection.v15.1.json")
 PARETO_CONTRACT = P("qa", "mt2", "test_cases", "mt2-pareto-selection.json")
@@ -848,7 +848,7 @@ def h3_workbook_evidence_gate():
 
 @test("H v15.2 Evidence", "Evidence 路徑必須留在 repository，禁止絕對路徑與 traversal")
 def h4_evidence_path_gate():
-    for unsafe in ("../outside.json", "qa/mt2/reports/evidence/v15.2/../../../../../outside.json"):
+    for unsafe in ("../outside.json", "qa/reports/latest/mt2/evidence/v15.2/../../../../../outside.json"):
         try:
             repo_path(unsafe)
             raise AssertionError(f"unsafe path was accepted: {unsafe}")

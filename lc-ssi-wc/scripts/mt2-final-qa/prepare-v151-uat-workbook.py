@@ -234,9 +234,9 @@ def refresh_evidence(
         f"passed={report['totals']['passed']}/{report['totals']['planned']}。"
     )
     evidence["A18"] = "BA review gate"
-    evidence["B18"] = "候選版須經獨立 BA 覆核接受後才可置入 qa/mt2/uat；不得以自動執行成功取代業務驗收。"
+    evidence["B18"] = "候選版須經獨立 BA 覆核接受後才可置入 qa/reports/latest/mt2；不得以自動執行成功取代業務驗收。"
     evidence["A19"] = "受控 v15.1 baseline"
-    evidence["B19"] = "qa/mt2/tdd/MT2XX_支援標準SSI_SR2026_MRG與ISO20022對應覆核版_v15.1.xlsx；SHA-256 0493C1D44D55A48B369AF6C6198BEE6943C1E17FC3A76AC93DE22C1D2A69A3D5。"
+    evidence["B19"] = "qa/tdd/mt2/MT2XX_支援標準SSI_SR2026_MRG與ISO20022對應覆核版_v15.1.xlsx；SHA-256 0493C1D44D55A48B369AF6C6198BEE6943C1E17FC3A76AC93DE22C1D2A69A3D5。"
     evidence["A20"] = "COV allow-list"
     evidence["B20"] = f"parameters/cov-profile-allow-list.v15.1.json；SHA-256 {sha256(allow_list_path)}。"
 
