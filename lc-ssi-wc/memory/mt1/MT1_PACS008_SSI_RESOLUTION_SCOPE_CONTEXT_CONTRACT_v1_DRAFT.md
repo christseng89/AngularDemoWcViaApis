@@ -1,9 +1,12 @@
 # MT1 / pacs.008 SSI Resolution Scope and Context Contract v1
 
-**Status:** CONTROLLED CANDIDATE DRAFT — IMPLEMENTATION NOT AUTHORIZED  
-**Scope:** `OUTWARD_SSI_ONLY`  
-**Product type:** `SSI_RESOLUTION_ONLY`  
-**BA Maker:** `/root/mt1_ba_review`  
+**Status:** CONTROLLED CANDIDATE DRAFT — IMPLEMENTATION NOT AUTHORIZED
+
+**Scope:** `OUTWARD_SSI_ONLY`
+
+**Product type:** `SSI_RESOLUTION_ONLY`
+
+**BA Maker:** `/root/mt1_ba_review`
 **Independent BA / QA / Product Owner:** PENDING
 
 ## 1. Purpose

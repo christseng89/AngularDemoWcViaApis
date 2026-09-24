@@ -1,12 +1,18 @@
 # MT1 / pacs.008 SSI Resolution Memory — v3
 
-**Status:** CONTROLLED CANDIDATE — IMPLEMENTATION NOT AUTHORIZED  
-**Scope classification:** `OUTWARD_SSI_ONLY`  
-**Product type:** `SSI_RESOLUTION_ONLY`  
-**Prepared:** 2026-09-24  
-**BA Maker:** `/root/mt1_ba_review`  
-**Independent BA Checker:** PENDING  
-**QA Checker:** PENDING  
+**Status:** CONTROLLED CANDIDATE — IMPLEMENTATION NOT AUTHORIZED
+
+**Scope classification:** `OUTWARD_SSI_ONLY`
+
+**Product type:** `SSI_RESOLUTION_ONLY`
+
+**Prepared:** 2026-09-24
+
+**BA Maker:** `/root/mt1_ba_review`
+
+**Independent BA Checker:** PENDING
+
+**QA Checker:** PENDING
 **Product Owner:** PENDING
 
 This is the active controlled candidate for the MT1 / pacs.008 prototype. It does not authorize implementation until Independent BA, QA and Product Owner approve the same externally recorded exact Git candidate commit.

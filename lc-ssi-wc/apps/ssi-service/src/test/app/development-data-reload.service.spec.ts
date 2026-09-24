@@ -104,7 +104,7 @@ describe("DevelopmentDataReloadService", () => {
       fixtureId: "SSI-DEMO-MT1-MT2-PACS008-PACS009-V1",
     });
     expect(status.seedSha256).toBe(
-      "f9ebdf0a06cb2f9f269f7a9f0c73c2bddb568f6e45c9f93c34680422e681f662",
+      "4d17a179eccb45212dac6bff5e242aff1388f490486a67072ea49e4605cbc1aa",
     );
   });
 

@@ -1,4 +1,10 @@
-import { HttpException, Inject, Injectable, Optional, type OnModuleInit } from "@nestjs/common";
+import {
+  HttpException,
+  Inject,
+  Injectable,
+  Optional,
+  type OnModuleInit,
+} from "@nestjs/common";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -130,7 +136,8 @@ const failure = (status: number, code: string): never => {
 @Injectable()
 export class DevelopmentDataReloadService implements OnModuleInit {
   private reloading = false;
-  private seedDescriptor: { fixtureId: string; seedSha256: string } | null | undefined;
+  private seedDescriptor:
+    { fixtureId: string; seedSha256: string } | null | undefined;
 
   constructor(
     @Optional()
@@ -142,10 +149,16 @@ export class DevelopmentDataReloadService implements OnModuleInit {
     this.seedDescriptor = this.loadSeedDescriptor();
   }
 
-  private loadSeedDescriptor(): { fixtureId: string; seedSha256: string } | null {
+  private loadSeedDescriptor(): {
+    fixtureId: string;
+    seedSha256: string;
+  } | null {
     try {
       const raw = readFileSync(this.seedPath());
-      return { fixtureId: parseSeed(raw.toString("utf8")).fixtureId, seedSha256: digest(raw) };
+      return {
+        fixtureId: parseSeed(raw.toString("utf8")).fixtureId,
+        seedSha256: digest(raw),
+      };
     } catch {
       return null;
     }
@@ -210,14 +223,23 @@ export class DevelopmentDataReloadService implements OnModuleInit {
         );
         if (integrity !== "ok")
           throw new Error("SQLite integrity check failed");
-        const canonicalIdentity = databaseSnapshotIdentity(database, Object.keys(seed.tables));
-        if (canonicalIdentity.sha256.toLowerCase() !== expectedIdentity.toLowerCase())
+        const canonicalIdentity = databaseSnapshotIdentity(
+          database,
+          Object.keys(seed.tables),
+        );
+        if (
+          canonicalIdentity.sha256.toLowerCase() !==
+          expectedIdentity.toLowerCase()
+        )
           throw new Error("logical snapshot identity mismatch");
         if (seed.tables["ssi"] && seed.tables["ssi_applicability"])
           this.rebuildResolutionCurrencyCoverage(database);
         const identity = databaseSnapshotIdentity(database);
         database.exec("COMMIT");
-        this.seedDescriptor = { fixtureId: seed.fixtureId, seedSha256: digest(raw) };
+        this.seedDescriptor = {
+          fixtureId: seed.fixtureId,
+          seedSha256: digest(raw),
+        };
         return {
           ...this.status(),
           code: "DEMO_DATA_RELOADED",
@@ -256,9 +278,15 @@ export class DevelopmentDataReloadService implements OnModuleInit {
       left.localeCompare(right),
     );
     const controlledDerived = new Set([
-      "resolution_currency_coverage", "resolution_currency_sync_control",
+      "resolution_currency_coverage",
+      "resolution_currency_sync_control",
     ]);
-    if (JSON.stringify(actual.filter((name) => !controlledDerived.has(name))) !== JSON.stringify(expected))
+    const nonDerived = (names: readonly string[]) =>
+      names.filter((name) => !controlledDerived.has(name));
+    if (
+      JSON.stringify(nonDerived(actual)) !==
+      JSON.stringify(nonDerived(expected))
+    )
       throw new Error(
         "active database schema does not match the canonical seed",
       );
@@ -277,7 +305,9 @@ export class DevelopmentDataReloadService implements OnModuleInit {
 
   private rebuildResolutionCurrencyCoverage(database: DatabaseSync): void {
     ResolutionCurrencyStore.ensureSchema(database);
-    database.exec("DELETE FROM resolution_currency_coverage; DELETE FROM resolution_currency_sync_control;");
+    database.exec(
+      "DELETE FROM resolution_currency_coverage; DELETE FROM resolution_currency_sync_control;",
+    );
     const repository = new SqliteSsiRepository(database);
     const policy = new ResolutionCurrencyCoveragePolicy();
     const discovery = new ResolutionCurrencyCoverageDiscoveryService(
@@ -286,7 +316,10 @@ export class DevelopmentDataReloadService implements OnModuleInit {
       repository,
     );
     const result = discovery.discover(policy.asOfDate);
-    repository.reconcileResolutionCurrenciesWithinTransaction(result.pairs, policy.asOfDate);
+    repository.reconcileResolutionCurrenciesWithinTransaction(
+      result.pairs,
+      policy.asOfDate,
+    );
   }
 
   private insertTable(

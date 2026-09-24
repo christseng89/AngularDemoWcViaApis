@@ -1,9 +1,12 @@
 # MT1 / pacs.008 Settlement Context, SSI Role and Atomic Route Matrix v1
 
-**Status:** CONTROLLED CANDIDATE DRAFT — IMPLEMENTATION NOT AUTHORIZED  
-**Scope:** `OUTWARD_SSI_ONLY` for approved outward MT103 and pacs.008.001.08 profiles  
-**Product type:** `SSI_RESOLUTION_ONLY`  
-**BA Maker:** `/root/mt1_ba_review`  
+**Status:** CONTROLLED CANDIDATE DRAFT — IMPLEMENTATION NOT AUTHORIZED
+
+**Scope:** `OUTWARD_SSI_ONLY` for approved outward MT103 and pacs.008.001.08 profiles
+
+**Product type:** `SSI_RESOLUTION_ONLY`
+
+**BA Maker:** `/root/mt1_ba_review`
 **Independent BA / QA / Product Owner:** PENDING
 
 ## 1. Outcome dimensions
