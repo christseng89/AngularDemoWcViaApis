@@ -89,4 +89,44 @@ describe("Mt1SsiResolutionPageSubmissionAdapter", () => {
       outputs: [],
     });
   });
+
+  it("rejects a stale selected route identity as unavailable", () => {
+    const lookup = routes.lookup({
+      definitionId: definition.definitionId,
+      definitionVersion: definition.definitionVersion,
+      fixtureBindingId: scenario.fixture.bindingId,
+      scenarioId: scenario.scenarioId,
+      messageType: definition.messageType,
+      sequence: definition.sequences[0]!.sequenceId,
+      currency: "USD",
+      bookingEntity: "HK01",
+      valueDate: "2026-09-24",
+    });
+    const result = adapter.execute({
+      definition,
+      scenario,
+      submission: {
+        definitionId: definition.definitionId,
+        definitionVersion: definition.definitionVersion,
+        scenarioId: scenario.scenarioId,
+        fixtureBindingId: scenario.fixture.bindingId,
+        contractSha256: "a".repeat(64),
+        eligibilitySnapshot: {
+          ...lookup.eligibilitySnapshot!,
+          snapshotId: "stale-snapshot",
+        },
+        selectedRouteIdentity: lookup.items[0]!.selectedRouteIdentity,
+        values: {
+          ...values,
+          "context.counterpartyBankServiceId": "BANK-SVC-CITIUS33",
+        },
+      },
+    });
+
+    expect(result).toMatchObject({
+      outcome: "NO_ELIGIBLE_SSI",
+      resolutionOutcome: "NO_ELIGIBLE_SSI",
+      payloadGenerated: false,
+    });
+  });
 });

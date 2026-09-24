@@ -30,6 +30,14 @@ const text = (
   return typeof value === "string" ? value.trim() : "";
 };
 
+const executionOutcome = (
+  resolutionOutcome: string,
+): ResolutionPageExecutionOutcome => {
+  if (resolutionOutcome === "ELIGIBLE_COMPLETE_ROUTE") return "RESOLVED";
+  if (resolutionOutcome === "NO_ELIGIBLE_SSI") return "NO_ELIGIBLE_SSI";
+  return "VALIDATION_REJECTED";
+};
+
 @Injectable()
 export class Mt1SsiResolutionPageSubmissionAdapter {
   private readonly routes: Mt1SsiDemoRouteRepository;
@@ -57,12 +65,7 @@ export class Mt1SsiResolutionPageSubmissionAdapter {
     ).resolve(request);
     const requestSha256 = hashCanonical(request);
     const responseSha256 = hashCanonical(resolved);
-    const outcome: ResolutionPageExecutionOutcome =
-      resolved.resolutionOutcome === "ELIGIBLE_COMPLETE_ROUTE"
-        ? "RESOLVED"
-        : resolved.resolutionOutcome === "NO_ELIGIBLE_SSI"
-          ? "NO_ELIGIBLE_SSI"
-          : "VALIDATION_REJECTED";
+    const outcome = executionOutcome(resolved.resolutionOutcome);
     return {
       definitionId: definition.definitionId,
       definitionVersion: definition.definitionVersion,

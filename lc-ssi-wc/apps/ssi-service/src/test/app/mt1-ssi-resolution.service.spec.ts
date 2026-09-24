@@ -83,6 +83,37 @@ describe("Mt1SsiResolutionService", () => {
     expect(candidates.discover).not.toHaveBeenCalled();
   });
 
+  it.each([
+    [
+      "non-instructing local role",
+      { localBankRole: "INSTRUCTED_AGENT" },
+      "INVALID_CONTEXT_TOPOLOGY",
+    ],
+    [
+      "missing route topology identity",
+      { routeTopology: { id: "", version: 1 } },
+      "INVALID_CONTEXT_TOPOLOGY",
+    ],
+    [
+      "unvalidated destination version",
+      { upstreamValidatedDestination: { id: "BANK-CITI", version: 0 } },
+      "INVALID_UPSTREAM_CONTEXT",
+    ],
+  ])("fails closed for %s before SSI discovery", (_label, override, outcome) => {
+    const candidates = repository();
+    const result = new Mt1SsiResolutionService(
+      new Mt1SsiProfileRegistry(),
+      candidates.port,
+    ).resolve({ ...request, ...override });
+
+    expect(result).toMatchObject({
+      ssiApplicability: "NOT_EVALUATED",
+      resolutionOutcome: outcome,
+      payloadGenerated: false,
+    });
+    expect(candidates.discover).not.toHaveBeenCalled();
+  });
+
   it("returns one atomic SSI route without composing a payment message", () => {
     const candidates = repository();
     const result = new Mt1SsiResolutionService(

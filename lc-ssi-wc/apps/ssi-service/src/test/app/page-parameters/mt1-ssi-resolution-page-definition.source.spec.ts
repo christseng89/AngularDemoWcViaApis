@@ -95,4 +95,21 @@ describe("MT1/pacs.008 OAS-driven Payment SSI page definitions", () => {
       "swift.cbprplus.stp.04",
     ]);
   });
+
+  it("finds an exact governed profile and scenario", () => {
+    const source = new Mt1SsiResolutionPageDefinitionSource();
+    const selected = source.find({
+      standardsRelease: "SR2026",
+      messageFamily: "MT1_PACS008",
+      messageType: "pacs.008.001.08",
+      direction: "OUTGOING",
+      businessDomain: "PAYMENT",
+      businessService: "swift.cbprplus.stp.04",
+      businessScenarioId: "PACS008-STP-SR2026:MT1-COVE-SSI",
+    });
+
+    expect(selected).toHaveLength(1);
+    expect(selected[0]!.profile.profileId).toBe("PACS008-STP-SR2026");
+    expect(source.all("SR2025")).toEqual([]);
+  });
 });

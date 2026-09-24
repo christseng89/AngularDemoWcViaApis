@@ -207,6 +207,8 @@ describe("ResolutionPageAggregationService", () => {
   });
 
   it.each([
+    ["MT103", "Single Customer Credit Transfer"],
+    ["pacs.008.001.08", "FI To FI Customer Credit Transfer"],
     ["MT202", "General Financial Institution Transfer"],
     ["MT202COV", "General Financial Institution Transfer"],
     ["MT205", "Financial Institution Transfer Execution"],

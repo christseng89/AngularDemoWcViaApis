@@ -29,6 +29,8 @@ const requiredQueryText = (value: string | undefined, code: string): string => {
 };
 const SCHEMA_VERSION = "1.0" as const;
 const SWIFT_DESCRIPTION: Readonly<Record<string, string>> = {
+  MT103: "Single Customer Credit Transfer",
+  "pacs.008.001.08": "FI To FI Customer Credit Transfer",
   MT202: "General Financial Institution Transfer",
   MT202COV: "General Financial Institution Transfer",
   MT205: "Financial Institution Transfer Execution",
