@@ -54,6 +54,44 @@ describe("Mt1SsiDemoRouteRepository", () => {
     );
   });
 
+  it("projects an MT settlement field to the governed servicer BIC", () => {
+    const repository = new Mt1SsiDemoRouteRepository();
+    const lookup = repository.lookup({
+      definitionId: "PAYMENT-MT103-BASE-SR2026",
+      definitionVersion: "V1",
+      fixtureBindingId: "FIXTURE-1",
+      scenarioId: "MT103-BASE-SR2026:MT1-INGA-SSI",
+      messageType: "MT103",
+      sequence: "SSI_ROUTE",
+      currency: "USD",
+      bookingEntity: "HK01",
+      valueDate: "2026-09-24",
+    });
+
+    const route = repository.settlementRoute(
+      lookup.items[0]!.selectedRouteIdentity!,
+      lookup.eligibilitySnapshot!.snapshotId,
+      {
+        settlementContext: "INGA",
+        currency: "USD",
+        messageType: "MT103",
+      },
+    );
+
+    expect(route?.legs[0]).toMatchObject({
+      accountOwner: { bic: "CITIUS33", name: "Citibank Demo" },
+      accountServicer: { bic: "DEMOHKHH", name: "Demo Bank Hong Kong" },
+    });
+    expect(route?.projections).toEqual([
+      expect.objectContaining({
+        kind: "SWIFT_MT_FIELD",
+        identifier: "54",
+        option: "A",
+        value: "DEMOHKHH",
+      }),
+    ]);
+  });
+
   it("rejects an invalid controlled demo fixture", () => {
     const fixturePath = join(process.cwd(), "tmp", "mt1-invalid-route.json");
     writeFileSync(

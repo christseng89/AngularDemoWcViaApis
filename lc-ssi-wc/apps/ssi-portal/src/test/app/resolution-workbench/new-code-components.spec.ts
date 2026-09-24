@@ -488,6 +488,106 @@ describe("Portal new-code component behavior", () => {
     expect(component.emptyMessage()).toContain("not required");
   });
 
+  it("uses the MT result grid and leaves MX evidence to the ISO 20022 card", async () => {
+    const { ResolutionResultTableComponent } =
+      await import("../../../app/resolution-workbench/resolution-result-table.component");
+    const component = new ResolutionResultTableComponent();
+    component.result.set({
+      outcome: "RESOLVED",
+      fields: [],
+      outputs: [],
+      settlementRoute: {
+        routeBindingId: "ROUTE-MT1",
+        counterparty: {
+          bankServiceId: "BANK-SVC-CITIUS33",
+          bic: "CITIUS33",
+          name: "Citibank Demo",
+        },
+        ssi: { id: "MT1-SSI-CITI", version: 1 },
+        applicability: { id: "MT1-APP-CITI", version: 1 },
+        nostro: { id: "MT1-NOSTRO-CITI", version: 1 },
+        rma: { id: "MT1-RMA-CITI", version: 1 },
+        roles: [],
+        legs: [
+          {
+            order: 1,
+            relationship: "INGA",
+            role: "INGA_SETTLEMENT_ACCOUNT_RELATIONSHIP",
+            accountOwner: {
+              bankServiceId: "BANK-SVC-CITIUS33",
+              bic: "CITIUS33",
+              name: "Citibank Demo",
+            },
+            accountServicer: {
+              bankServiceId: "BANK-SVC-DEMOHKHH",
+              bic: "DEMOHKHH",
+              name: "Demo Bank Hong Kong",
+            },
+            accountReference: "DEMO-USD-CITI-INGA",
+            currency: "USD",
+            source: "MT1_SSI_DEMO_ROUTE_FIXTURE",
+            sourceRecordId: "MT1-SSI-CITI-INGA",
+            version: 1,
+          },
+        ],
+        projections: [
+          {
+            kind: "SWIFT_MT_FIELD",
+            identifier: "54",
+            option: "A",
+            label: "Receiver's Correspondent",
+            role: "INGA_SETTLEMENT_ACCOUNT_RELATIONSHIP",
+            value: "CITIUS33",
+            accountReference: "DEMO-USD-CITI-INGA",
+            sourceRecordId: "MT1-SSI-CITI-INGA",
+            version: 1,
+          },
+        ],
+      },
+    } as never);
+
+    expect(component.rows()).toEqual([
+      expect.objectContaining({
+        tagAndOption: "54A",
+        displayFieldName: "Receiver's Correspondent",
+        bic: "CITIUS33",
+        institutionName: "Citibank Demo",
+        accountReference: "DEMO-USD-CITI-INGA",
+        statusLabel: "RESOLVED",
+      }),
+    ]);
+
+    component.result.set({
+      ...component.result(),
+      outputs: [
+        {
+          outputId: "ssi-resolution-iso-20022",
+          format: "ISO_20022",
+          label: "pacs.008.001.08",
+          messageIdentity: "pacs.008.001.08",
+          mediaType: "application/json",
+          document: { scope: "SSI_RESOLUTION_EVIDENCE_ONLY" },
+        },
+      ],
+      settlementRoute: {
+        ...component.result().settlementRoute,
+        projections: [
+          {
+            kind: "ISO_20022_ELEMENT",
+            identifier: "SttlmMtd",
+            label: "Settlement Method",
+            role: "INGA_SETTLEMENT_ACCOUNT_RELATIONSHIP",
+            value: "INGA",
+            accountReference: "DEMO-USD-CITI-INGA",
+            sourceRecordId: "MT1-SSI-CITI-INGA",
+            version: 1,
+          },
+        ],
+      },
+    } as never);
+    expect(component.rows()).toEqual([]);
+  });
+
   it("covers result dialog close and focus containment", async () => {
     const focus = jest.fn();
     mockViewChildren.push(undefined, { nativeElement: { focus } });

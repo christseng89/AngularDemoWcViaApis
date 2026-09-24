@@ -34,7 +34,10 @@ import { ResolutionResultTableComponent } from "./resolution-result-table.compon
         }
       </div>
       <ssi-resolution-result-table [result]="result()" />
-      <ssi-resolution-generated-outputs [outputs]="result().outputs" />
+      <ssi-resolution-generated-outputs
+        [outputs]="result().outputs"
+        [payloadGenerated]="result().payloadGenerated"
+      />
       <details class="audit-details outcome-audit">
         <summary>Technical audit details</summary>
         <dl class="evidence-list">

@@ -8,6 +8,7 @@ import type { ResolutionPageExecutionResult } from "@ssi/contracts";
 import {
   emptyResolutionMessage,
   resolutionResultRows,
+  resolutionRouteProjectionRows,
   resolutionRouteSummary,
 } from "./resolution-result.presenter";
 
@@ -20,7 +21,13 @@ import {
 })
 export class ResolutionResultTableComponent {
   readonly result = input.required<ResolutionPageExecutionResult>();
-  readonly rows = computed(() => resolutionResultRows(this.result().fields));
+  readonly rows = computed(() => {
+    const fieldRows = resolutionResultRows(this.result().fields);
+    if (fieldRows.length > 0) return fieldRows;
+    if (this.result().outputs.some(({ format }) => format === "ISO_20022"))
+      return [];
+    return resolutionRouteProjectionRows(this.result().settlementRoute);
+  });
   readonly route = computed(() =>
     resolutionRouteSummary(
       this.result().outputs,

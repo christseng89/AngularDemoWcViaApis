@@ -63,21 +63,6 @@
         }
       </ol>
     }
-    @if (selectedRoute.projections.length > 0) {
-      <div class="resolution-results__heading">
-        <div>
-          <span class="eyebrow">Governed projection</span>
-          <h3>Resolved SSI values</h3>
-        </div>
-      </div>
-      <ul class="evidence-list" aria-label="Resolved SSI projections">
-        @for (projection of selectedRoute.projections; track projection) {
-          <li>
-            <code>{{ projection }}</code>
-          </li>
-        }
-      </ul>
-    }
   }
 
   @if (rows().length > 0) {

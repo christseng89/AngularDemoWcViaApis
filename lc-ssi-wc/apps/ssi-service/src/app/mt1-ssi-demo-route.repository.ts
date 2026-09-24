@@ -226,8 +226,8 @@ export class Mt1SsiDemoRouteRepository {
     const relationship = route.settlementRelationships[query.settlementContext];
     if (!relationship) return undefined;
     const inda = query.settlementContext === "INDA";
-    const local = this.fixture.localBank;
-    const counterparty = this.bank(route);
+    const local = this.settlementInstitution(this.fixture.localBank);
+    const counterparty = this.settlementInstitution(this.bank(route));
     const owner = inda ? local : counterparty;
     const servicer = inda ? counterparty : local;
     const role = `${query.settlementContext}_SETTLEMENT_ACCOUNT_RELATIONSHIP`;
@@ -275,7 +275,10 @@ export class Mt1SsiDemoRouteRepository {
         {
           ...projection,
           role,
-          value: query.settlementContext,
+          value:
+            projection.kind === "SWIFT_MT_FIELD"
+              ? servicer.bic
+              : query.settlementContext,
           accountReference,
           sourceRecordId: relationship.sourceRecordId,
           version: relationship.version,
@@ -291,8 +294,8 @@ export class Mt1SsiDemoRouteRepository {
     | Pick<ResolutionPageSettlementRoute, "roles" | "legs" | "projections">
     | undefined {
     if (!route.coveRelationships.length) return undefined;
-    const local = this.fixture.localBank;
-    const counterparty = this.bank(route);
+    const local = this.settlementInstitution(this.fixture.localBank);
+    const counterparty = this.settlementInstitution(this.bank(route));
     return {
       roles: route.coveRelationships.map((relationship) => ({
         role: relationship.role,
@@ -352,6 +355,18 @@ export class Mt1SsiDemoRouteRepository {
       bankServiceId: route.bankServiceId,
       bic: route.bic,
       bankName: route.bankName,
+    };
+  }
+
+  private settlementInstitution(bank: DemoBank): {
+    readonly bankServiceId: string;
+    readonly bic: string;
+    readonly name: string;
+  } {
+    return {
+      bankServiceId: bank.bankServiceId,
+      bic: bank.bic,
+      name: bank.bankName,
     };
   }
 

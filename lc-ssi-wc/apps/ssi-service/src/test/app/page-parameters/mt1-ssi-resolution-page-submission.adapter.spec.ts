@@ -24,7 +24,7 @@ describe("Mt1SsiResolutionPageSubmissionAdapter", () => {
     routes,
   );
 
-  it("returns typed SSI dimensions and never generates MT/MX outputs", () => {
+  it("returns SSI-only MX resolution evidence without generating a payment payload", () => {
     const lookup = routes.lookup({
       definitionId: definition.definitionId,
       definitionVersion: definition.definitionVersion,
@@ -98,7 +98,39 @@ describe("Mt1SsiResolutionPageSubmissionAdapter", () => {
           },
         ],
       },
-      outputs: [],
+      outputs: [
+        {
+          outputId: "ssi-resolution-iso-20022",
+          format: "ISO_20022",
+          label: "pacs.008.001.08",
+          messageIdentity: "pacs.008.001.08",
+          mediaType: "application/json",
+          document: {
+            decision: "RESOLVED",
+            code: "ELIGIBLE_COMPLETE_ROUTE",
+            resolutionDomain: "OUTWARD_SSI_ONLY",
+            payloadGenerated: false,
+            messageDefinitionId: "pacs.008.001.08",
+            businessService: "swift.cbprplus.04",
+            scope: "SSI_RESOLUTION_EVIDENCE_ONLY",
+            settlementContext: "INDA",
+            settlementRoute: {
+              counterparty: { bic: "CITIUS33" },
+              legs: [
+                expect.objectContaining({
+                  accountReference: "DEMO-USD-CITI-INDA",
+                }),
+              ],
+              projections: [
+                expect.objectContaining({
+                  identifier: "SttlmMtd",
+                  value: "INDA",
+                }),
+              ],
+            },
+          },
+        },
+      ],
     });
   });
 

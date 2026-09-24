@@ -70,8 +70,18 @@ export class Mt1SsiResolutionPageSubmissionAdapter {
       repository,
     ).resolve(request);
     const requestSha256 = hashCanonical(request);
-    const responseSha256 = hashCanonical(resolved);
     const outcome = executionOutcome(resolved.resolutionOutcome);
+    const outputs = this.outputs(
+      definition,
+      request,
+      resolved.resolutionOutcome,
+      settlementRoute,
+    );
+    const responseSha256 = hashCanonical({
+      resolved,
+      outputs,
+      ...(settlementRoute ? { settlementRoute } : {}),
+    });
     return {
       definitionId: definition.definitionId,
       definitionVersion: definition.definitionVersion,
@@ -92,7 +102,7 @@ export class Mt1SsiResolutionPageSubmissionAdapter {
         : {}),
       ...(resolved.route && settlementRoute ? { settlementRoute } : {}),
       fields: [],
-      outputs: [],
+      outputs,
       evidence: {
         correlationId: requestSha256.slice(0, 32),
         owner: "SSI_FIELD_RESOLUTION_API",
@@ -112,6 +122,43 @@ export class Mt1SsiResolutionPageSubmissionAdapter {
           : {}),
       },
     };
+  }
+
+  private outputs(
+    definition: ResolutionPageDefinition,
+    request: Mt1SsiResolutionRequest,
+    resolutionOutcome: string,
+    settlementRoute: ResolutionPageSettlementRoute | undefined,
+  ): ResolutionPageExecutionResult["outputs"] {
+    if (
+      resolutionOutcome !== "ELIGIBLE_COMPLETE_ROUTE" ||
+      !settlementRoute ||
+      !definition.messageType.startsWith("pacs.008")
+    )
+      return [];
+    const messageIdentity =
+      request.messageDefinitionId || definition.profile.messageDefinitionId;
+    if (!messageIdentity) return [];
+    return [
+      {
+        outputId: "ssi-resolution-iso-20022",
+        format: "ISO_20022",
+        label: messageIdentity,
+        messageIdentity,
+        mediaType: "application/json",
+        document: {
+          decision: "RESOLVED",
+          code: resolutionOutcome,
+          resolutionDomain: "OUTWARD_SSI_ONLY",
+          payloadGenerated: false,
+          messageDefinitionId: messageIdentity,
+          businessService: request.businessService,
+          scope: "SSI_RESOLUTION_EVIDENCE_ONLY",
+          settlementContext: request.settlementContext,
+          settlementRoute,
+        },
+      },
+    ];
   }
 
   private request(

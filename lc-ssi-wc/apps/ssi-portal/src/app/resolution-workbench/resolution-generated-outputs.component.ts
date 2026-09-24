@@ -12,8 +12,16 @@ import type { ResolutionPageGeneratedOutput } from "@ssi/contracts";
       >
         <div class="resolution-results__heading">
           <div>
-            <span class="eyebrow">Generated messages</span>
-            <h3 id="generated-outputs-title">MT and ISO 20022 outputs</h3>
+            <span class="eyebrow">
+              {{ payloadGenerated() ? "Generated messages" : "Resolution evidence" }}
+            </span>
+            <h3 id="generated-outputs-title">
+              {{
+                payloadGenerated()
+                  ? "MT and ISO 20022 outputs"
+                  : "ISO 20022 SSI resolution"
+              }}
+            </h3>
           </div>
           <span class="result-count">{{ outputs().length }} formats</span>
         </div>
@@ -42,6 +50,7 @@ import type { ResolutionPageGeneratedOutput } from "@ssi/contracts";
 })
 export class ResolutionGeneratedOutputsComponent {
   readonly outputs = input.required<readonly ResolutionPageGeneratedOutput[]>();
+  readonly payloadGenerated = input(false);
 
   serialise(output: ResolutionPageGeneratedOutput): string {
     return JSON.stringify(output.document, null, 2);

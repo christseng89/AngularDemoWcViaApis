@@ -177,6 +177,51 @@ export const resolutionResultRows = (
     provenance: provenanceSummary(field.provenance),
   }));
 
+export const resolutionRouteProjectionRows = (
+  settlementRoute?: ResolutionPageSettlementRoute,
+): readonly ResolutionResultRow[] => {
+  if (!settlementRoute) return [];
+  const institutions = settlementRoute.legs.flatMap((leg) => [
+    leg.accountOwner,
+    leg.accountServicer,
+  ]);
+  return settlementRoute.projections.map((projection, index) => {
+    const leg = settlementRoute.legs.find(
+      (candidate) =>
+        candidate.role === projection.role &&
+        candidate.accountReference === projection.accountReference,
+    );
+    const institution = institutions.find(
+      ({ bic }) => bic === projection.value,
+    );
+    const tagAndOption =
+      projection.kind === "SWIFT_MT_FIELD"
+        ? `${projection.identifier}${projection.option ?? ""}`
+        : projection.identifier;
+    return {
+      key: `${projection.kind}:${tagAndOption}:${projection.role}:${index}`,
+      sequenceId: "",
+      settlementLeg: leg?.relationship ?? "",
+      swiftTag: projection.identifier,
+      swiftOption: projection.option ?? "",
+      tagAndOption,
+      role: projection.role,
+      fieldName: projection.label,
+      displayFieldName: projection.label,
+      renderedValue: projection.value,
+      bic: institution?.bic ?? "",
+      institutionName: institution?.name ?? "",
+      accountReference: projection.accountReference,
+      partyIdentifier: "",
+      status: "RESOLVED",
+      statusLabel: "RESOLVED",
+      reasonCode: "",
+      statusDetail: `Source: ${projection.sourceRecordId} v${projection.version}`,
+      provenance: `${projection.sourceRecordId} · ${projection.version}`,
+    };
+  });
+};
+
 export const emptyResolutionMessage = (
   outcome: ResolutionPageExecutionOutcome,
 ): string =>
