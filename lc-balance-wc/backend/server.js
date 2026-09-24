@@ -14,6 +14,8 @@ const { randomUUID } = require('node:crypto');
 const { URLSearchParams } = require('node:url');
 const { rateLimit } = require('express-rate-limit');
 const { buildRegistry } = require('./data/businessCases');
+const VIRTUAL_FX = require('./data/virtual-booking-rates.json');
+const { buildVirtualBookingQuote } = require('./virtual-booking-rate');
 
 const app = express();
 app.use(helmet());
@@ -449,6 +451,85 @@ app.post('/api/excess-preview', async (req, res, next) => {
   } catch (error) {
     next(error);
   }
+});
+
+// Non-production virtual Currency Exchange owned by the Balance demo. Keeping the provider
+// behind HTTP preserves the production adapter boundary while removing the former runtime
+// dependency on lc-payment-wc. Production rejects responses carrying this virtual marker.
+app.get('/api/fx/booking-rate', (req, res) => {
+  const {
+    fromCurrency: from,
+    toCurrency: to,
+    amount,
+    decisionTime,
+    correlationId,
+    requestAttemptId,
+    policyVersion,
+    maxStalenessSeconds,
+  } = req.query;
+  const attemptEcho =
+    typeof requestAttemptId === 'string' && requestAttemptId.trim() !== '' ? { requestAttemptId } : {};
+  if (
+    typeof from !== 'string' ||
+    typeof to !== 'string' ||
+    typeof amount !== 'string' ||
+    typeof decisionTime !== 'string' ||
+    typeof correlationId !== 'string' ||
+    typeof requestAttemptId !== 'string' ||
+    typeof policyVersion !== 'string' ||
+    typeof maxStalenessSeconds !== 'string'
+  ) {
+    return res.status(400).json({
+      code: 'INVALID_FX_REQUEST',
+      ...attemptEcho,
+      message:
+        'fromCurrency, toCurrency, amount, decisionTime, correlationId, requestAttemptId, policyVersion and maxStalenessSeconds are required.',
+    });
+  }
+
+  const fromCurrency = from.trim().toUpperCase();
+  const toCurrency = to.trim().toUpperCase();
+  if (fromCurrency !== 'USD') {
+    return res.status(400).json({
+      code: 'INVALID_FX_REQUEST',
+      ...attemptEcho,
+      message: 'fromCurrency must be USD for the virtual allowance quote.',
+    });
+  }
+
+  const configuredQuote = VIRTUAL_FX.bookingQuotes[`${fromCurrency}/${toCurrency}`];
+  const quote =
+    configuredQuote?.rollingFreshness === true
+      ? { ...configuredQuote, rateTimestamp: decisionTime }
+      : configuredQuote;
+  const result = buildVirtualBookingQuote({
+    quote,
+    fromCurrency,
+    toCurrency,
+    expectedTargetMinorUnits: VIRTUAL_FX.minorUnits[toCurrency],
+    amount,
+    decisionTime,
+    correlationId,
+    requestAttemptId,
+    policyVersion,
+    maxStalenessSeconds,
+  });
+  if (result.error === 'INVALID_FX_REQUEST') {
+    return res
+      .status(400)
+      .json({ code: result.error, ...attemptEcho, message: 'The virtual FX request contains an invalid value.' });
+  }
+  if (result.error) {
+    return res.status(503).json({
+      code: result.error,
+      requestAttemptId,
+      message: result.message,
+      ...(result.reason ? { reason: result.reason } : {}),
+    });
+  }
+
+  res.set('X-Virtual-FX-Adapter', 'true');
+  return res.json(result);
 });
 
 app.get('/healthz', (_req, res) => res.json({ status: 'ok', balanceServiceUrl: BALANCE_SERVICE_URL }));

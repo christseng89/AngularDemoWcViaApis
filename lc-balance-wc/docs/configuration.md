@@ -22,6 +22,11 @@ The Balance microservice start and development scripts load the same root `.env`
 | `BALANCE_ACCOUNT_NUMBER_REGEX` | `^.+$` | `^.+$` | valid JavaScript regular expression | Balance microservice Account Number validation |
 | `BALANCE_ACCOUNT_NUMBER_MIN_LEN` | `1` | `1` | non-negative integer, not above maximum | Balance microservice Account Number validation |
 | `BALANCE_ACCOUNT_NUMBER_MAX_LEN` | `128` | `128` | non-negative integer, not below minimum | Balance microservice Account Number validation |
+| `APP_ENV` | `development` | none | `development`／`test` for the virtual demo adapter | Balance microservice runtime guard |
+| `CURRENCY_EXCHANGE_ADAPTER` | `VIRTUAL` | none | virtual adapter is non-production only | Balance microservice FX adapter |
+| `CURRENCY_EXCHANGE_ENDPOINT` | `http://localhost:4300/api/fx/booking-rate` | none | absolute HTTP URL | Balance-owned demo BOOKING-rate provider |
+| `CURRENCY_EXCHANGE_TIMEOUT_MS` | `1000` | none | positive integer milliseconds | Balance microservice FX timeout |
+| `EXCESS_POLICY_CONFIG_PATH` | `config/excess-policy.non-production.json` | none | readable policy JSON path | Balance microservice Excess policy |
 
 Run `npm run prepare:app` after changing generated Angular settings, then restart a running Angular process. Restart the Balance microservice after changing its startup environment.
 
@@ -38,6 +43,10 @@ Sensitive values must never be copied into documentation. If an environment name
 | Business Case backend | `ALLOWED_ORIGINS` | `http://localhost:4200` | comma-separated CORS allowlist |
 
 The Business Case backend reads the process environment it inherits; its package script does not load `.env` directly. Restart the affected process for a runtime environment change.
+
+For the demo, the Business Case backend itself provides `GET /api/fx/booking-rate` on port 4300. Therefore
+`npm run dev:all` is self-contained and does not require the LC Payment backend or port 3001. This virtual provider
+is test/demo data only and must not be used as a production Currency Exchange source.
 
 ## Source-controlled configuration
 

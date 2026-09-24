@@ -4,7 +4,7 @@ module.exports = {
   roots: ['<rootDir>/test'],
   testMatch: ['**/*.test.js'],
   collectCoverage: true,
-  collectCoverageFrom: ['server.js', 'data/**/*.js'],
+  collectCoverageFrom: ['server.js', 'virtual-booking-rate.js', 'data/**/*.js'],
   coverageReporters: ['text', 'text-summary', 'lcov'],
   coverageThreshold: {
     global: {
