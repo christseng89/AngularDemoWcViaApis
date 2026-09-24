@@ -6,12 +6,14 @@ import type {
 
 export interface MessageDefinitionGroup {
   readonly id: string;
+  readonly familyLabel: string;
   readonly messageCode: string;
   readonly description: string;
   readonly inputFields: readonly string[];
   readonly profileSlots: readonly string[];
   readonly mappingStatus: ResolutionPageDefinitionIndexItem["mappingStatus"];
   readonly processingStatus: ResolutionPageDefinitionIndexItem["processingStatus"];
+  readonly profileCount: number;
   readonly scenarioCount: number;
   readonly operationalScenarioCount: number;
   readonly qaScenarioCount: number;
@@ -19,8 +21,16 @@ export interface MessageDefinitionGroup {
   readonly definitions: readonly ResolutionPageDefinitionIndexItem[];
 }
 
+const messageFamilyLabel = (messageFamily: string): string => {
+  const pairedFamily = /^MT(\d+)_PACS(\d{3})$/.exec(messageFamily);
+  return pairedFamily
+    ? `MT${pairedFamily[1]} / pacs.${pairedFamily[2]}`
+    : messageFamily;
+};
+
 export interface ScenarioIndexRow {
   readonly scenarioId: string;
+  readonly profileLabel: string;
   readonly label: string;
   readonly polarity: PageParameterPolarity;
   readonly audience: ResolutionPageDefinitionIndexItem["scenarioDetails"][number]["audience"];
@@ -72,6 +82,7 @@ export const groupPageDefinitions = (
 ): readonly MessageDefinitionGroup[] => {
   const groups = new Map<string, MessageDefinitionGroup>();
   for (const item of items) {
+    const familyLabel = messageFamilyLabel(item.query.messageFamily);
     if (
       !item.transactionGroupId.trim() ||
       !item.transactionGroupLabel.trim() ||
@@ -87,7 +98,8 @@ export const groupPageDefinitions = (
     const existing = groups.get(item.transactionGroupId);
     if (
       existing &&
-      (existing.messageCode !== item.messageCode ||
+      (existing.familyLabel !== familyLabel ||
+        existing.messageCode !== item.messageCode ||
         existing.description !== item.swiftDescription ||
         existing.order !== item.originalOrder ||
         existing.scenarioCount !== item.scenarioCount ||
@@ -97,6 +109,7 @@ export const groupPageDefinitions = (
       throw new Error("PAGE_DEFINITION_GROUP_MISMATCH");
     groups.set(item.transactionGroupId, {
       id: item.transactionGroupId,
+      familyLabel,
       messageCode: item.messageCode,
       description: item.swiftDescription,
       inputFields: [
@@ -110,6 +123,7 @@ export const groupPageDefinitions = (
       ],
       mappingStatus: item.mappingStatus,
       processingStatus: item.processingStatus,
+      profileCount: (existing?.profileCount ?? 0) + 1,
       scenarioCount: item.scenarioCount,
       operationalScenarioCount:
         (existing?.operationalScenarioCount ?? 0) +
@@ -145,6 +159,7 @@ export const scenarioRows = (
         throw new Error("PAGE_DEFINITION_SCENARIO_DUPLICATE");
       rows.set(scenario.scenarioId, {
         scenarioId: scenario.scenarioId,
+        profileLabel: definition.query.businessService ?? definition.title,
         label: scenario.label,
         polarity: scenario.polarity,
         audience: scenario.audience,
@@ -185,6 +200,7 @@ export const filterPageDefinitions = (
       item.scenarioLabel,
       item.scenarioDescription,
       item.messageCode,
+      messageFamilyLabel(item.query.messageFamily),
       item.swiftDescription,
       ...item.inputFields,
       ...item.profileSlots,

@@ -21,7 +21,12 @@ import {
 export class ResolutionResultTableComponent {
   readonly result = input.required<ResolutionPageExecutionResult>();
   readonly rows = computed(() => resolutionResultRows(this.result().fields));
-  readonly route = computed(() => resolutionRouteSummary(this.result().outputs));
+  readonly route = computed(() =>
+    resolutionRouteSummary(
+      this.result().outputs,
+      this.result().settlementRoute,
+    ),
+  );
   readonly emptyMessage = computed(() =>
     emptyResolutionMessage(this.result().outcome),
   );

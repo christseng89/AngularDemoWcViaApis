@@ -60,6 +60,26 @@ describe("Mt1SsiResolutionPageSubmissionAdapter", () => {
       resolutionOutcome: "ELIGIBLE_COMPLETE_ROUTE",
       payloadGenerated: false,
       routeBindingId: lookup.items[0]!.selectedRouteIdentity!.routeId,
+      settlementRoute: {
+        routeBindingId: lookup.items[0]!.selectedRouteIdentity!.routeId,
+        counterparty: {
+          bankServiceId: "BANK-SVC-CITIUS33",
+          bic: "CITIUS33",
+          name: "Citibank Demo",
+        },
+        ssi: { id: "MT1-SSI-CITI", version: 1 },
+        applicability: { id: "MT1-APP-CITI", version: 1 },
+        nostro: { id: "MT1-NOSTRO-CITI", version: 1 },
+        rma: { id: "MT1-RMA-CITI", version: 1 },
+        roles: [
+          {
+            role: "INDA_SETTLEMENT_ACCOUNT_RELATIONSHIP",
+            owner: "COUNTERPARTY_SSI",
+            recordId: "MT1-SSI-CITI",
+            version: 1,
+          },
+        ],
+      },
       outputs: [],
     });
   });
@@ -88,6 +108,48 @@ describe("Mt1SsiResolutionPageSubmissionAdapter", () => {
       payloadGenerated: false,
       outputs: [],
     });
+  });
+
+  it("identifies the governed INGA settlement relationship without calling it a reimbursement agent", () => {
+    const ingaScenario = definition.scenarios.find(({ scenarioId }) =>
+      scenarioId.endsWith(":MT1-INGA-SSI"),
+    )!;
+    const lookup = routes.lookup({
+      definitionId: definition.definitionId,
+      definitionVersion: definition.definitionVersion,
+      fixtureBindingId: ingaScenario.fixture.bindingId,
+      scenarioId: ingaScenario.scenarioId,
+      messageType: definition.messageType,
+      sequence: definition.sequences[0]!.sequenceId,
+      currency: "USD",
+      bookingEntity: "HK01",
+      valueDate: "2026-09-24",
+    });
+    const result = adapter.execute({
+      definition,
+      scenario: ingaScenario,
+      submission: {
+        definitionId: definition.definitionId,
+        definitionVersion: definition.definitionVersion,
+        scenarioId: ingaScenario.scenarioId,
+        fixtureBindingId: ingaScenario.fixture.bindingId,
+        contractSha256: "a".repeat(64),
+        eligibilitySnapshot: lookup.eligibilitySnapshot,
+        selectedRouteIdentity: lookup.items[0]!.selectedRouteIdentity,
+        values: {
+          ...values,
+          ...ingaScenario.inputValues,
+          "context.counterpartyBankServiceId": "BANK-SVC-CITIUS33",
+        },
+      },
+    });
+
+    expect(result.settlementRoute?.roles).toEqual([
+      expect.objectContaining({
+        role: "INGA_SETTLEMENT_ACCOUNT_RELATIONSHIP",
+        owner: "COUNTERPARTY_SSI",
+      }),
+    ]);
   });
 
   it("rejects a stale selected route identity as unavailable", () => {

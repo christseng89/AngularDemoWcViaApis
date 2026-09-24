@@ -51,6 +51,7 @@ type IndexSortKey =
 
 type ScenarioSortKey =
   | "label"
+  | "profileLabel"
   | "description"
   | "sequence"
   | "flowKind"
@@ -150,6 +151,7 @@ export class PageDefinitionIndexWorkspaceComponent {
       ? audienceRows.filter((row) =>
           [
             row.label,
+            row.profileLabel,
             row.description,
             row.sequence,
             row.ssiScope,

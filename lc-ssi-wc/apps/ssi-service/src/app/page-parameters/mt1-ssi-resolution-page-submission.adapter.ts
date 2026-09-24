@@ -66,6 +66,16 @@ export class Mt1SsiResolutionPageSubmissionAdapter {
     const requestSha256 = hashCanonical(request);
     const responseSha256 = hashCanonical(resolved);
     const outcome = executionOutcome(resolved.resolutionOutcome);
+    const settlementRoute =
+      resolved.route &&
+      submission.selectedRouteIdentity &&
+      submission.eligibilitySnapshot
+        ? this.routes.settlementRoute(
+            submission.selectedRouteIdentity,
+            submission.eligibilitySnapshot.snapshotId,
+            resolved.route.roles,
+          )
+        : undefined;
     return {
       definitionId: definition.definitionId,
       definitionVersion: definition.definitionVersion,
@@ -84,6 +94,7 @@ export class Mt1SsiResolutionPageSubmissionAdapter {
       ...(resolved.route
         ? { routeBindingId: resolved.route.routeBindingId }
         : {}),
+      ...(settlementRoute ? { settlementRoute } : {}),
       fields: [],
       outputs: [],
       evidence: {
@@ -190,7 +201,9 @@ export class Mt1SsiResolutionPageSubmissionAdapter {
           ]
         : [
             {
-              role: "INSTRUCTED_REIMBURSEMENT_AGENT",
+              role: scenario.scenarioId.endsWith(":MT1-INDA-SSI")
+                ? "INDA_SETTLEMENT_ACCOUNT_RELATIONSHIP"
+                : "INGA_SETTLEMENT_ACCOUNT_RELATIONSHIP",
               owner: "COUNTERPARTY_SSI",
               recordId: selected.ssi.id,
               version: selected.ssi.version,

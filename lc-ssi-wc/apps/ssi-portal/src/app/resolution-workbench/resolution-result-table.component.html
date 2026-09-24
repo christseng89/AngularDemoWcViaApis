@@ -7,11 +7,47 @@
       </div>
     </div>
     <dl class="evidence-list">
-      <div><dt>SSI</dt><dd>{{ selectedRoute.ssiCode || selectedRoute.ssiId }}</dd></div>
-      <div><dt>Nostro</dt><dd>{{ selectedRoute.nostroId || "—" }}</dd></div>
-      <div><dt>Account</dt><dd>{{ selectedRoute.accountId || "—" }}</dd></div>
-      <div><dt>Settlement route</dt><dd>{{ selectedRoute.settlementRouteId || "—" }}</dd></div>
+      <div>
+        <dt>Counterparty</dt>
+        <dd>
+          <code>{{ selectedRoute.counterpartyBic || "—" }}</code>
+          {{ selectedRoute.counterpartyName }}
+        </dd>
+      </div>
+      <div>
+        <dt>SSI</dt>
+        <dd>{{ selectedRoute.ssiCode || selectedRoute.ssiId }}</dd>
+      </div>
+      <div>
+        <dt>Nostro</dt>
+        <dd>{{ selectedRoute.nostroId || "—" }}</dd>
+      </div>
+      <div>
+        <dt>Account</dt>
+        <dd>{{ selectedRoute.accountId || "—" }}</dd>
+      </div>
+      <div>
+        <dt>Applicability</dt>
+        <dd>{{ selectedRoute.applicabilityId || "—" }}</dd>
+      </div>
+      <div>
+        <dt>RMA</dt>
+        <dd>{{ selectedRoute.rmaId || "—" }}</dd>
+      </div>
+      <div>
+        <dt>Settlement route</dt>
+        <dd>{{ selectedRoute.settlementRouteId || "—" }}</dd>
+      </div>
     </dl>
+    @if (selectedRoute.roles.length > 0) {
+      <ul class="evidence-list" aria-label="Resolved settlement roles">
+        @for (role of selectedRoute.roles; track role) {
+          <li>
+            <code>{{ role }}</code>
+          </li>
+        }
+      </ul>
+    }
   }
   <div class="resolution-results__heading">
     <div>

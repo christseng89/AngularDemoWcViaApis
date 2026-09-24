@@ -330,8 +330,8 @@ export class Mt1SsiResolutionPageDefinitionSource implements ResolutionPageDefin
         ],
       },
       fixture: {
-        bindingId: `${scenario.fixtureBindingId}:${profileId}`,
-        fixtureSet: OAS_ARTIFACT,
+        bindingId: scenario.fixtureBindingId,
+        fixtureSet: "MT1-PACS008-SR2026",
         fixtureVersion: "MT1-SSI-SR2026-V1",
         sourceSha256: createHash("sha256")
           .update(readFileSync(this.oasPath))

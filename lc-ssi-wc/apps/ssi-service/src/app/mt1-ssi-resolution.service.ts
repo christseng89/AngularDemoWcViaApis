@@ -46,6 +46,8 @@ export interface Mt1SsiResolutionRequest {
 
 export interface Mt1SsiRouteRole {
   readonly role:
+    | "INDA_SETTLEMENT_ACCOUNT_RELATIONSHIP"
+    | "INGA_SETTLEMENT_ACCOUNT_RELATIONSHIP"
     | "INSTRUCTING_REIMBURSEMENT_AGENT"
     | "INSTRUCTED_REIMBURSEMENT_AGENT"
     | "THIRD_REIMBURSEMENT_AGENT";

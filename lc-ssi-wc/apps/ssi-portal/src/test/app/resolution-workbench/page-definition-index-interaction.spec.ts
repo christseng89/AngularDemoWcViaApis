@@ -33,6 +33,13 @@ describe("payment message index interaction contract", () => {
   });
 
   it("shows only SSI-generated tags while keeping a separate tag-only input column", () => {
+    expect(template).toContain("MESSAGE FAMILY");
+    expect(template).toContain("MESSAGE TYPE");
+    expect(template).not.toContain("MT TYPE");
+    expect(template).toContain("group.familyLabel");
+    expect(template).toContain("group.profileCount");
+    expect(template).toContain("PROFILE / BIZSVC");
+    expect(template).toContain("row.profileLabel");
     expect(template).toContain("SSI GENERATED TAGS");
     expect(template).toContain("INPUT FIELDS");
     expect(template).toContain('group.profileSlots.join(" · ")');

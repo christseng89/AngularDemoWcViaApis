@@ -22,6 +22,12 @@ describe("Mt1SsiDemoRouteRepository", () => {
     expect(lookup.eligibilitySnapshot).toMatchObject({
       snapshotIdentityMethod: "SHA256_CANONICAL_DEMO_FIXTURE_V1",
     });
+    expect(lookup.defaultSelection).toEqual({
+      valueField: "bankServiceId",
+      value: "BANK-SVC-CITIUS33",
+      reasonCode: "GOVERNED_PRIORITY_DEFAULT",
+      dependency: { fieldId: "context.currency", value: "USD" },
+    });
     expect(
       repository.accepts(identity, lookup.eligibilitySnapshot!.snapshotId),
     ).toBe(true);

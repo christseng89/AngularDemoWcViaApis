@@ -526,6 +526,25 @@ export interface ResolutionPageGeneratedOutput {
   readonly document: Readonly<Record<string, unknown>>;
 }
 
+export interface ResolutionPageSettlementRoute {
+  readonly routeBindingId: string;
+  readonly counterparty: {
+    readonly bankServiceId: string;
+    readonly bic: string;
+    readonly name?: string;
+  };
+  readonly ssi: { readonly id: string; readonly version: number };
+  readonly applicability: { readonly id: string; readonly version: number };
+  readonly nostro: { readonly id: string; readonly version: number };
+  readonly rma: { readonly id: string; readonly version: number };
+  readonly roles: readonly {
+    readonly role: string;
+    readonly owner: string;
+    readonly recordId: string;
+    readonly version: number;
+  }[];
+}
+
 export interface ResolutionPageExecutionResult {
   readonly definitionId: string;
   readonly definitionVersion: string;
@@ -552,6 +571,8 @@ export interface ResolutionPageExecutionResult {
     | "UNSUPPORTED_DIRECTION"
     | "UNSUPPORTED_PROFILE";
   readonly routeBindingId?: string;
+  /** Bank-controlled atomic route selected by SSI resolution; never customer CPI. */
+  readonly settlementRoute?: ResolutionPageSettlementRoute;
   readonly fields: readonly ResolutionPageFieldResult[];
   readonly outputs: readonly ResolutionPageGeneratedOutput[];
   readonly evidence: ResolutionPageExecutionEvidence;

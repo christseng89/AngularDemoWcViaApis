@@ -2698,6 +2698,59 @@
           "document": { "type": "object", "additionalProperties": true }
         }
       },
+      "ResolutionPageSettlementRoute": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "The bank-controlled atomic SSI settlement route selected by resolution; it never represents customer payment instructions.",
+        "required": [
+          "routeBindingId",
+          "counterparty",
+          "ssi",
+          "applicability",
+          "nostro",
+          "rma",
+          "roles"
+        ],
+        "properties": {
+          "routeBindingId": { "type": "string", "minLength": 1 },
+          "counterparty": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["bankServiceId", "bic"],
+            "properties": {
+              "bankServiceId": { "type": "string", "minLength": 1 },
+              "bic": { "$ref": "#/components/schemas/Bic" },
+              "name": { "type": "string" }
+            }
+          },
+          "ssi": {
+            "$ref": "#/components/schemas/PageParameterVersionedRecordIdentity"
+          },
+          "applicability": {
+            "$ref": "#/components/schemas/PageParameterVersionedRecordIdentity"
+          },
+          "nostro": {
+            "$ref": "#/components/schemas/PageParameterVersionedRecordIdentity"
+          },
+          "rma": {
+            "$ref": "#/components/schemas/PageParameterVersionedRecordIdentity"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["role", "owner", "recordId", "version"],
+              "properties": {
+                "role": { "type": "string", "minLength": 1 },
+                "owner": { "type": "string", "minLength": 1 },
+                "recordId": { "type": "string", "minLength": 1 },
+                "version": { "type": "integer", "minimum": 1 }
+              }
+            }
+          }
+        }
+      },
       "ResolutionPageExecutionResult": {
         "type": "object",
         "required": [
@@ -2734,6 +2787,9 @@
           "repairQueueCreated": { "type": "boolean" },
           "nvrOutcome": {
             "$ref": "#/components/schemas/PageParameterCompatibleNvrOutcome"
+          },
+          "settlementRoute": {
+            "$ref": "#/components/schemas/ResolutionPageSettlementRoute"
           },
           "fields": { "type": "array", "items": { "type": "object" } },
           "outputs": {

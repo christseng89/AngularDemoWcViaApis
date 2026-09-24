@@ -2,6 +2,7 @@ import type {
   ResolutionPageExecutionOutcome,
   ResolutionPageFieldResult,
   ResolutionPageGeneratedOutput,
+  ResolutionPageSettlementRoute,
 } from "@ssi/contracts";
 
 export interface ResolutionResultRow {
@@ -72,17 +73,42 @@ export interface ResolutionRouteSummary {
   readonly nostroId: string;
   readonly accountId: string;
   readonly applicabilityId: string;
+  readonly rmaId: string;
+  readonly counterpartyBic: string;
+  readonly counterpartyName: string;
+  readonly roles: readonly string[];
 }
 
 export const resolutionRouteSummary = (
   outputs: readonly ResolutionPageGeneratedOutput[],
+  settlementRoute?: ResolutionPageSettlementRoute,
 ): ResolutionRouteSummary | undefined => {
-  const document = outputs.find((output) => output.format === "ISO_20022")?.document;
+  if (settlementRoute) {
+    return {
+      ssiId: `${settlementRoute.ssi.id} v${settlementRoute.ssi.version}`,
+      ssiCode: "",
+      settlementRouteId: settlementRoute.routeBindingId,
+      nostroId: `${settlementRoute.nostro.id} v${settlementRoute.nostro.version}`,
+      accountId: "",
+      applicabilityId: `${settlementRoute.applicability.id} v${settlementRoute.applicability.version}`,
+      rmaId: `${settlementRoute.rma.id} v${settlementRoute.rma.version}`,
+      counterpartyBic: settlementRoute.counterparty.bic,
+      counterpartyName: settlementRoute.counterparty.name ?? "",
+      roles: settlementRoute.roles.map(
+        ({ role, owner, recordId, version }) =>
+          `${role} · ${owner} · ${recordId} v${version}`,
+      ),
+    };
+  }
+  const document = outputs.find(
+    (output) => output.format === "ISO_20022",
+  )?.document;
   const route = document?.["chosenRoute"];
-  if (!route || typeof route !== "object" || Array.isArray(route)) return undefined;
+  if (!route || typeof route !== "object" || Array.isArray(route))
+    return undefined;
   const selected = route as Record<string, unknown>;
   const value = (key: string): string =>
-    typeof selected[key] === "string" ? selected[key] as string : "";
+    typeof selected[key] === "string" ? (selected[key] as string) : "";
   const ssiId = value("ssiId");
   if (!ssiId) return undefined;
   return {
@@ -92,6 +118,10 @@ export const resolutionRouteSummary = (
     nostroId: value("nostroId"),
     accountId: value("accountId"),
     applicabilityId: value("matchedApplicabilityId"),
+    rmaId: "",
+    counterpartyBic: "",
+    counterpartyName: "",
+    roles: [],
   };
 };
 

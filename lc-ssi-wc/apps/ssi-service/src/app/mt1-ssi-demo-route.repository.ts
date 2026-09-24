@@ -5,6 +5,7 @@ import { Injectable, Optional } from "@nestjs/common";
 import type {
   PageParameterLookupEnvelope,
   PageParameterSelectedRouteIdentity,
+  ResolutionPageSettlementRoute,
 } from "@ssi/contracts";
 import { hashCanonical } from "./canonical-json";
 
@@ -85,6 +86,15 @@ export class Mt1SsiDemoRouteRepository {
             value.toUpperCase().includes(term),
           )),
     );
+    const items = routes.map((route) => ({
+      provider: "SSI_COUNTERPARTY" as const,
+      action: "SSI_COUNTERPARTY" as const,
+      bankServiceId: route.bankServiceId,
+      bic: route.bic,
+      bankName: route.bankName,
+      displayValue: `${route.bic} — ${route.bankName}`,
+      selectedRouteIdentity: this.identity(input, route, contextSha256),
+    }));
     return {
       provider: "SSI_COUNTERPARTY",
       action: "SSI_COUNTERPARTY",
@@ -93,15 +103,20 @@ export class Mt1SsiDemoRouteRepository {
         contextSha256,
         snapshotIdentityMethod: "SHA256_CANONICAL_DEMO_FIXTURE_V1",
       },
-      items: routes.map((route) => ({
-        provider: "SSI_COUNTERPARTY",
-        action: "SSI_COUNTERPARTY",
-        bankServiceId: route.bankServiceId,
-        bic: route.bic,
-        bankName: route.bankName,
-        displayValue: `${route.bic} — ${route.bankName}`,
-        selectedRouteIdentity: this.identity(input, route, contextSha256),
-      })),
+      items,
+      ...(!term && items.length === 1
+        ? {
+            defaultSelection: {
+              valueField: "bankServiceId" as const,
+              value: items[0]!.bankServiceId,
+              reasonCode: "GOVERNED_PRIORITY_DEFAULT" as const,
+              dependency: {
+                fieldId: "context.currency" as const,
+                value: input.currency,
+              },
+            },
+          }
+        : {}),
     };
   }
 
@@ -129,6 +144,32 @@ export class Mt1SsiDemoRouteRepository {
         identity.rma.version === route.rma.version
       );
     });
+  }
+
+  settlementRoute(
+    identity: PageParameterSelectedRouteIdentity,
+    snapshotId: string,
+    roles: ResolutionPageSettlementRoute["roles"],
+  ): ResolutionPageSettlementRoute | undefined {
+    if (!this.accepts(identity, snapshotId)) return undefined;
+    const route = this.fixture.routes.find(
+      ({ ssi }) =>
+        ssi.id === identity.ssi.id && ssi.version === identity.ssi.version,
+    );
+    if (!route) return undefined;
+    return {
+      routeBindingId: identity.routeId,
+      counterparty: {
+        bankServiceId: route.bankServiceId,
+        bic: route.bic,
+        name: route.bankName,
+      },
+      ssi: route.ssi,
+      applicability: route.applicability,
+      nostro: route.nostro,
+      rma: route.rma,
+      roles,
+    };
   }
 
   private identity(

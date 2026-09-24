@@ -110,12 +110,14 @@ describe("filterPageDefinitions", () => {
     expect(groups).toEqual([
       {
         id: "TREASURY:MSG-X",
+        familyLabel: "UNSEEN",
         messageCode: "MSG-X",
         description: "Synthetic transaction",
         inputFields: [],
         profileSlots: ["57A"],
         mappingStatus: "PROFILE_VERIFIED",
         processingStatus: "PROFILE_VERIFIED",
+        profileCount: 2,
         scenarioCount: 2,
         operationalScenarioCount: 1,
         qaScenarioCount: 1,
@@ -124,12 +126,14 @@ describe("filterPageDefinitions", () => {
       },
       {
         id: "TREASURY:MSG-Y",
+        familyLabel: "UNSEEN",
         messageCode: "MSG-Y",
         description: "Synthetic transaction",
         inputFields: [],
         profileSlots: ["57A"],
         mappingStatus: "PROFILE_VERIFIED",
         processingStatus: "PROFILE_VERIFIED",
+        profileCount: 1,
         scenarioCount: 1,
         operationalScenarioCount: 1,
         qaScenarioCount: 0,
@@ -140,6 +144,26 @@ describe("filterPageDefinitions", () => {
     expect(scenarioRows(groups[0]!)).toHaveLength(2);
     expect(scenarioNavigation(groups[0]!)).toBe("DRAWER");
     expect(scenarioNavigation(groups[1]!)).toBe("DIRECT");
+  });
+
+  it("identifies the governed profile or BizSvc for every scenario row", () => {
+    const profiled = {
+      ...item,
+      query: { ...item.query, businessService: "swift.cbprplus.stp.04" },
+    };
+    const [row] = scenarioRows(groupPageDefinitions([profiled])[0]!);
+
+    expect(row?.profileLabel).toBe("swift.cbprplus.stp.04");
+  });
+
+  it.each([
+    ["MT1_PACS008", "MT1 / pacs.008"],
+    ["MT2_PACS009", "MT2 / pacs.009"],
+  ])("labels the %s family without classifying MX as an MT", (messageFamily, expected) => {
+    const [group] = groupPageDefinitions([
+      { ...item, query: { ...item.query, messageFamily } },
+    ]);
+    expect(group?.familyLabel).toBe(expected);
   });
 
   it("fails closed when API scenario count does not reconcile", () => {

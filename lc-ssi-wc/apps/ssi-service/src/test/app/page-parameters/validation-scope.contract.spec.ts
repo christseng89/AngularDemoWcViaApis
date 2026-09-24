@@ -6,6 +6,7 @@ import type {
   PageParameterValidationDisposition,
   PageParameterValidationScope,
   ResolutionPageGeneratedOutput,
+  ResolutionPageSettlementRoute,
 } from "@ssi/contracts";
 
 interface OasSchema {
@@ -109,6 +110,34 @@ describe("resolution-page NVR validation scope contract", () => {
     ]);
     expect(execution?.required).toContain("outputs");
     expect(execution?.properties).toHaveProperty("outputs");
+  });
+
+  it("publishes the bank-controlled settlement route independently from message output", () => {
+    const route: ResolutionPageSettlementRoute = {
+      routeBindingId: "ROUTE-MT1",
+      counterparty: { bankServiceId: "BANK-1", bic: "CITIUS33" },
+      ssi: { id: "SSI-1", version: 1 },
+      applicability: { id: "APP-1", version: 1 },
+      nostro: { id: "NOSTRO-1", version: 1 },
+      rma: { id: "RMA-1", version: 1 },
+      roles: [],
+    };
+    const schemas = readOas("openapi/swift-data-service.v1.json").components
+      .schemas;
+
+    expect(route.counterparty.bic).toBe("CITIUS33");
+    expect(schemas["ResolutionPageSettlementRoute"]?.required).toEqual([
+      "routeBindingId",
+      "counterparty",
+      "ssi",
+      "applicability",
+      "nostro",
+      "rma",
+      "roles",
+    ]);
+    expect(schemas["ResolutionPageExecutionResult"]?.properties).toHaveProperty(
+      "settlementRoute",
+    );
   });
 
   it("adds the governed .08 message definition without fabricating profile suffixes", () => {

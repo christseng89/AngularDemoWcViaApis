@@ -58,6 +58,11 @@ export class ResolutionPageFixtureManifestService {
             "parameters",
             "resolution-page-fixtures.mt2-pacs009.sr2026.json",
           ),
+          join(
+            process.cwd(),
+            "parameters",
+            "resolution-page-fixtures.mt1-pacs008.sr2026.json",
+          ),
         ];
     const bindings = paths
       .flatMap((path) => this.load(path))

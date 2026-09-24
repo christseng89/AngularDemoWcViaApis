@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "1.0",
+  "fixtureVersion": "MT1-SSI-SR2026-V1",
+  "standardsRelease": "SR2026",
+  "messageFamily": "MT1_PACS008",
+  "executionStatus": "NOT_EXECUTED",
+  "purpose": "Governed outward MT1 and pacs.008 SSI-only scenario bindings. Execution outcomes are recorded separately.",
+  "scenarioIds": ["MT1-INDA-SSI", "MT1-INGA-SSI", "MT1-COVE-SSI"],
+  "bindings": [
+    {
+      "bindingId": "FIXTURE-MT1-INDA-SSI",
+      "fixtureSet": "MT1-PACS008-SR2026",
+      "fixtureVersion": "MT1-SSI-SR2026-V1",
+      "sourceFile": "openapi/swift-data-service.v1.json",
+      "sourceFileSha256": "EECA1D18CE1C5BCABB6DCE6F930EE61BBEB766CAB4727E0FF8A5D6C1EA1619D5",
+      "polarity": "POSITIVE"
+    },
+    {
+      "bindingId": "FIXTURE-MT1-INGA-SSI",
+      "fixtureSet": "MT1-PACS008-SR2026",
+      "fixtureVersion": "MT1-SSI-SR2026-V1",
+      "sourceFile": "openapi/swift-data-service.v1.json",
+      "sourceFileSha256": "EECA1D18CE1C5BCABB6DCE6F930EE61BBEB766CAB4727E0FF8A5D6C1EA1619D5",
+      "polarity": "POSITIVE"
+    },
+    {
+      "bindingId": "FIXTURE-MT1-COVE-SSI",
+      "fixtureSet": "MT1-PACS008-SR2026",
+      "fixtureVersion": "MT1-SSI-SR2026-V1",
+      "sourceFile": "openapi/swift-data-service.v1.json",
+      "sourceFileSha256": "EECA1D18CE1C5BCABB6DCE6F930EE61BBEB766CAB4727E0FF8A5D6C1EA1619D5",
+      "polarity": "POSITIVE"
+    }
+  ]
+}

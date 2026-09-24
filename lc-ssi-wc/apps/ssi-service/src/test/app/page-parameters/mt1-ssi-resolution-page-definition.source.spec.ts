@@ -1,4 +1,5 @@
 import { Mt1SsiResolutionPageDefinitionSource } from "../../../app/page-parameters/mt1-ssi-resolution-page-definition.source";
+import { ResolutionPageFixtureManifestService } from "../../../app/page-parameters/resolution-page-fixture-manifest.service";
 
 describe("MT1/pacs.008 OAS-driven Payment SSI page definitions", () => {
   const definitions = () =>
@@ -111,5 +112,28 @@ describe("MT1/pacs.008 OAS-driven Payment SSI page definitions", () => {
     expect(selected).toHaveLength(1);
     expect(selected[0]!.profile.profileId).toBe("PACS008-STP-SR2026");
     expect(source.all("SR2025")).toEqual([]);
+  });
+
+  it("uses the OAS fixture bindings and registers each one in the controlled manifest", () => {
+    const manifest = new ResolutionPageFixtureManifestService();
+    const bindings = new Set(
+      definitions().flatMap(({ scenarios }) =>
+        scenarios.map(({ fixture }) => fixture.bindingId),
+      ),
+    );
+
+    expect(bindings).toEqual(
+      new Set([
+        "FIXTURE-MT1-INDA-SSI",
+        "FIXTURE-MT1-INGA-SSI",
+        "FIXTURE-MT1-COVE-SSI",
+      ]),
+    );
+    for (const bindingId of bindings)
+      expect(manifest.require(bindingId)).toMatchObject({
+        bindingId,
+        fixtureSet: "MT1-PACS008-SR2026",
+        isolation: "CANONICAL",
+      });
   });
 });

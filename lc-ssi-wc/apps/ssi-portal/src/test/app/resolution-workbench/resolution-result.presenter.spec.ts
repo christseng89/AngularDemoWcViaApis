@@ -40,24 +40,72 @@ const resolved: ResolutionPageFieldResult = {
 
 describe("resolution result presenter", () => {
   it("shows the chosen SSI and Nostro even when no governed 5x field was emitted", () => {
-    const outputs: ResolutionPageGeneratedOutput[] = [{
-      outputId: "iso-20022",
-      format: "ISO_20022",
-      label: "pacs.009.001.08",
-      messageIdentity: "pacs.009.001.08",
-      mediaType: "application/json",
-      document: {
-        chosenRoute: {
-          ssiId: "SSI-1", ssiCode: "MT2-USD-CITI-DEBIT-V1",
-          settlementRouteId: "ROUTE-1", nostroId: "NOSTRO-1",
-          accountId: "ACCOUNT-1", matchedApplicabilityId: "APP-1",
+    const outputs: ResolutionPageGeneratedOutput[] = [
+      {
+        outputId: "iso-20022",
+        format: "ISO_20022",
+        label: "pacs.009.001.08",
+        messageIdentity: "pacs.009.001.08",
+        mediaType: "application/json",
+        document: {
+          chosenRoute: {
+            ssiId: "SSI-1",
+            ssiCode: "MT2-USD-CITI-DEBIT-V1",
+            settlementRouteId: "ROUTE-1",
+            nostroId: "NOSTRO-1",
+            accountId: "ACCOUNT-1",
+            matchedApplicabilityId: "APP-1",
+          },
         },
       },
-    }];
+    ];
     expect(resolutionRouteSummary(outputs)).toEqual({
-      ssiId: "SSI-1", ssiCode: "MT2-USD-CITI-DEBIT-V1",
-      settlementRouteId: "ROUTE-1", nostroId: "NOSTRO-1",
-      accountId: "ACCOUNT-1", applicabilityId: "APP-1",
+      ssiId: "SSI-1",
+      ssiCode: "MT2-USD-CITI-DEBIT-V1",
+      settlementRouteId: "ROUTE-1",
+      nostroId: "NOSTRO-1",
+      accountId: "ACCOUNT-1",
+      applicabilityId: "APP-1",
+      rmaId: "",
+      counterpartyBic: "",
+      counterpartyName: "",
+      roles: [],
+    });
+  });
+
+  it("shows the bank-controlled MT1 settlement route without generating a message", () => {
+    expect(
+      resolutionRouteSummary([], {
+        routeBindingId: "ROUTE-MT1",
+        counterparty: {
+          bankServiceId: "BANK-SVC-CITIUS33",
+          bic: "CITIUS33",
+          name: "Citibank Demo",
+        },
+        ssi: { id: "MT1-SSI-CITI", version: 1 },
+        applicability: { id: "MT1-APP-CITI", version: 1 },
+        nostro: { id: "MT1-NOSTRO-CITI", version: 1 },
+        rma: { id: "MT1-RMA-CITI", version: 1 },
+        roles: [
+          {
+            role: "INDA_SETTLEMENT_ACCOUNT_RELATIONSHIP",
+            owner: "COUNTERPARTY_SSI",
+            recordId: "MT1-SSI-CITI",
+            version: 1,
+          },
+        ],
+      }),
+    ).toMatchObject({
+      ssiId: "MT1-SSI-CITI v1",
+      settlementRouteId: "ROUTE-MT1",
+      nostroId: "MT1-NOSTRO-CITI v1",
+      applicabilityId: "MT1-APP-CITI v1",
+      rmaId: "MT1-RMA-CITI v1",
+      counterpartyBic: "CITIUS33",
+      counterpartyName: "Citibank Demo",
+      roles: [
+        "INDA_SETTLEMENT_ACCOUNT_RELATIONSHIP · COUNTERPARTY_SSI · MT1-SSI-CITI v1",
+      ],
     });
   });
   it("maps every API result field without looking it up in input controls", () => {

@@ -29,7 +29,7 @@
         <input
           type="search"
           [value]="search()"
-          placeholder="MT code or message description"
+          placeholder="Message family, type or description"
           (input)="searchIndex($any($event.target).value)"
         />
       </label>
@@ -50,13 +50,14 @@
             </caption>
             <thead>
               <tr>
+                <th>MESSAGE FAMILY</th>
                 <th [attr.aria-sort]="ariaSort('messageCode')">
                   <button
                     type="button"
                     class="sort-heading"
                     (click)="sortBy('messageCode')"
                   >
-                    MT TYPE
+                    MESSAGE TYPE
                     @if (sortKey() === "messageCode") {
                       <span aria-hidden="true">{{
                         sortDirection() === "asc" ? "↑" : "↓"
@@ -148,7 +149,10 @@
                     $event.preventDefault(); activateGroup(group, $event)
                   "
                 >
-                  <td data-label="MT TYPE">
+                  <td data-label="MESSAGE FAMILY">
+                    {{ group.familyLabel }}
+                  </td>
+                  <td data-label="MESSAGE TYPE">
                     <strong>{{ group.messageCode }}</strong>
                   </td>
                   <td data-label="SWIFT DESCRIPTION">
@@ -168,6 +172,8 @@
                         $event.stopPropagation(); activateGroup(group, $event)
                       "
                     >
+                      {{ group.profileCount }}
+                      {{ group.profileCount === 1 ? "profile" : "profiles" }} ·
                       {{ group.operationalScenarioCount }} operational ·
                       {{ group.qaScenarioCount }} QA
                       <span class="sr-only">
@@ -194,7 +200,7 @@
                 </tr>
               } @empty {
                 <tr>
-                  <td colspan="5" class="empty-state">
+                  <td colspan="7" class="empty-state">
                     No SSI-supported message matches this search.
                   </td>
                 </tr>
@@ -276,7 +282,9 @@
       <header class="scenario-drawer-header">
         <div>
           <span class="eyebrow"
-            >{{ group.messageCode }} · {{ group.scenarioCount }} scenarios</span
+            >{{ group.messageCode }} · {{ group.profileCount }}
+            {{ group.profileCount === 1 ? "profile" : "profiles" }} ·
+            {{ group.scenarioCount }} scenarios</span
           >
           <h2 [id]="'scenario-drawer-title-' + group.id">Select a scenario</h2>
           <p>{{ group.description }}</p>
@@ -341,6 +349,20 @@
                 >
                   SCENARIO
                   @if (scenarioSortKey() === "label") {
+                    <span aria-hidden="true">{{
+                      scenarioSortDirection() === "asc" ? "↑" : "↓"
+                    }}</span>
+                  }
+                </button>
+              </th>
+              <th [attr.aria-sort]="scenarioAriaSort('profileLabel')">
+                <button
+                  type="button"
+                  class="sort-heading"
+                  (click)="sortScenarioBy('profileLabel')"
+                >
+                  PROFILE / BIZSVC
+                  @if (scenarioSortKey() === "profileLabel") {
                     <span aria-hidden="true">{{
                       scenarioSortDirection() === "asc" ? "↑" : "↓"
                     }}</span>
@@ -451,6 +473,7 @@
                 <td data-label="SCENARIO">
                   <strong>{{ row.label }}</strong>
                 </td>
+                <td data-label="PROFILE / BIZSVC">{{ row.profileLabel }}</td>
                 <td data-label="DESCRIPTION">{{ row.description }}</td>
                 <td data-label="SEQUENCE">{{ row.sequence }}</td>
                 <td data-label="FLOW">
@@ -478,7 +501,7 @@
               </tr>
             } @empty {
               <tr>
-                <td colspan="7" class="empty-state">
+                <td colspan="8" class="empty-state">
                   No scenario matches this search.
                 </td>
               </tr>
