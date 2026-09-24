@@ -284,12 +284,14 @@ export class ResolutionPageAggregationService {
     const primaryScenario = contract.scenarios[0]!;
     const outOfScope = primaryScenario.execution.action !== "RESOLVE_SSI";
     const profileSlots = profileSlotsFor(contract);
-    const targetProfileSlots = contract.profile.index
-      ? contract.profile.index.generatedFields
-      : contract.businessDomain === "PAYMENT"
-        ? (this.paymentMessageIndex?.findSelectable(contract.messageType)
-            ?.mtCompatibility.ssiFields ?? profileSlots)
-        : profileSlots;
+    let targetProfileSlots = profileSlots;
+    if (contract.profile.index) {
+      targetProfileSlots = contract.profile.index.generatedFields;
+    } else if (contract.businessDomain === "PAYMENT") {
+      targetProfileSlots =
+        this.paymentMessageIndex?.findSelectable(contract.messageType)
+          ?.mtCompatibility.ssiFields ?? profileSlots;
+    }
     const scenarioSequence = contract.sequences
       .map(({ sequenceId }) => sequenceId)
       .join(" / ");
