@@ -1,3 +1,5 @@
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { Mt1SsiProfileRegistry } from "../../../app/mt1-ssi-profile.registry";
 import { Mt1SsiResolutionPageDefinitionSource } from "../../../app/page-parameters/mt1-ssi-resolution-page-definition.source";
 import { Mt1SsiResolutionPageSubmissionAdapter } from "../../../app/page-parameters/mt1-ssi-resolution-page-submission.adapter";
@@ -539,7 +541,6 @@ describe("Mt1SsiResolutionPageSubmissionAdapter", () => {
             ssi: { id: "MT1-SSI-CITI", version: 1 },
             applicability: { id: "MT1-APP-CITI", version: 1 },
             nostro: { id: "MT1-NOSTRO-CITI", version: 1 },
-            rma: { id: "MT1-RMA-CITI", version: 1 },
             settlementRelationships: {},
             coveRelationships: [],
           },
@@ -592,7 +593,3 @@ describe("Mt1SsiResolutionPageSubmissionAdapter", () => {
     }
   });
 });
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
