@@ -1,18 +1,29 @@
-# MT1／pacs.008 Controlled Artifact Index
+# MT1 / pacs.008 Controlled Artifact Index
 
-This folder is the single current entry point for MT1／pacs.008 Customer Payment Instructions and Bank SSI governance. Only latest artifacts remain here; predecessors are retained under `qa-archived/mt1/`.
+## Active outward-SSI-only candidate
 
-| Artifact | Purpose | Current SHA-256 |
-|---|---|---|
-| [Proposal v0.6](MT1XX_PACS008_CUSTOMER_PAYMENT_INSTRUCTIONS_PROPOSAL_v0.6_DRAFT.md) | Frozen scope and CPI／Bank SSI boundary | `3FD37199BAAB210B17BEED96DDD1143995454308C73D218B1DBA798EE84D88A5` |
-| [OPEN-01 Matrix](MT1XX_PACS008_CREDITOR_DESTINATION_AUTHORITY_REPAIR_MATRIX_v0.1_DRAFT.md) | Creditor Destination authority, conflict and repair | `F18FEC54B2A61B2DFF9607543294D447BB323F31A95F75A572A49FDED68998D2` |
-| [OPEN-02 Matrix](MT1XX_PACS008_SCENARIO_CONTEXT_SSI_ROLE_MATRIX_v0.1_DRAFT.md) | Profile／Context／Topology／SSI-role oracle | `E409BE0882A1D3FB9873AE3D5C835A097D4D9CFE8DB13D4E81A048824F760C0F` |
-| [Matrix Review](MT1XX_PACS008_v0.6_MATRIX_REVIEW.md) | BA／Independent BA／QA same-SHA results | `23F87D36C696F6C5D4B70B76A36E9CA2BD85E88A27ECF9E82A6AF2D764A80092` |
-| [Final Bundle](MT1XX_PACS008_v0.6_FINAL.bundle.json) | Exact final bundle for Product Owner approval | `4C8283ED009C3FF1BF02974326686C2FFE0A34803989FAFDADB9D40074FE6761` |
-| [Integrity manifest](sha.txt) | Local hashes and archive trace | Rehashed after final-bundle creation |
+The active proposed knowledge entry point is [MT1 / pacs.008 SSI Memory v3](../swift-mt1xx-pacs008-ssi-v3.md). Its scope is `OUTWARD_SSI_ONLY`; `INWARD` and received-payment contexts are excluded before SSI discovery. Implementation remains unauthorized until Independent BA, QA and Product Owner approve the same externally recorded exact Git candidate commit.
 
-Canonical Memory: [`../swift-mt1xx-pacs008-v2.md`](../swift-mt1xx-pacs008-v2.md).
+| Active artifact                                                                                                                   | Purpose                                                             |
+| --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| [SSI Memory v3](../swift-mt1xx-pacs008-ssi-v3.md)                                                                                 | Active boundary, Phase-1 scope, source register and approval status |
+| [Scope and Context Contract v1](MT1_PACS008_SSI_RESOLUTION_SCOPE_CONTEXT_CONTRACT_v1_DRAFT.md)                                    | Minimum governed adapter input and explicit ownership exclusions    |
+| [Settlement Context / SSI Role / Atomic Route Matrix v1](MT1_PACS008_SETTLEMENT_CONTEXT_SSI_ROLE_ATOMIC_ROUTE_MATRIX_v1_DRAFT.md) | INDA, INGA and COVE role, route, ambiguity and stale decisions      |
 
-Local Angular／Browser UAT endpoint: `http://localhost:4600`. Port `4400` is obsolete.
+BA Maker: `/root/mt1_ba_review`. Independent BA Checker, QA Checker and Product Owner are pending.
 
-Implementation remains unauthorized until Product Owner approves the exact final bundle.
+## Historical / superseded v0.6 evidence
+
+The following files are preserved unchanged for audit history. They are **historical / superseded**, are not active implementation authority and must not be used to expand the SSI-only product boundary:
+
+| Historical artifact                                                                                                                | Disposition                                                                                        |
+| ---------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| [Customer Payment Instructions Proposal v0.6](MT1XX_PACS008_CUSTOMER_PAYMENT_INSTRUCTIONS_PROPOSAL_v0.6_DRAFT.md)                  | Superseded scope proposal                                                                          |
+| [OPEN-01 Creditor Destination Authority & Repair Matrix](MT1XX_PACS008_CREDITOR_DESTINATION_AUTHORITY_REPAIR_MATRIX_v0.1_DRAFT.md) | **Upstream interface reference** only; CPI authority and repair are outside SSI Resolver ownership |
+| [Old Scenario / Context / SSI Role Matrix](MT1XX_PACS008_SCENARIO_CONTEXT_SSI_ROLE_MATRIX_v0.1_DRAFT.md)                           | Superseded by the active SSI-only atomic-route matrix                                              |
+| [v0.6 Matrix Review](MT1XX_PACS008_v0.6_MATRIX_REVIEW.md)                                                                          | Historical review; does not approve v3                                                             |
+| [v0.6 Final Bundle](MT1XX_PACS008_v0.6_FINAL.bundle.json)                                                                          | Historical bundle; not current identity or approval evidence                                       |
+| [v0.6 Integrity Manifest](sha.txt)                                                                                                 | Historical local hash record                                                                       |
+| [Memory v2](../swift-mt1xx-pacs008-v2.md)                                                                                          | Superseded controlled candidate; not implementation authority                                      |
+
+Local Angular / Browser UAT endpoint remains `http://localhost:4600`; port `4400` is obsolete.

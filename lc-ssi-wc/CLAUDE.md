@@ -4,7 +4,7 @@
 
 - 開工、分派、設計、DB Reload、QA、SonarQube、Excel TDD、封存及 Block 回報，一律遵守 `memory/lc-ssi-wc-operating-model-zh-v2.md`。Active Git-tracked governance 以 repository path＋外部任務交接／review evidence 所記錄的 exact Git commit 識別；exact commit 不寫回本檔或 manifest。Semantic version 若存在，只是可選的人類／release label，不是身分或每次修改 Gate。
 - SSI Resolver 的產品責任與結案邊界一律遵守 `memory/ssi-resolver-service-boundary-v1.md`：第三方 FIN Validator／完整 FIN NVR／SWIFT Network 為 `OUT_OF_SCOPE — CLOSED`，不得建立 SSI Open／Block，禁止 scope creeping。
-- MT1／pacs.008 的受控知識入口為 `memory/swift-mt1xx-pacs008-v2.md`；未完成 BA/QA 簽認的 OPEN 不得當作已核准規則。
+- MT1／pacs.008 的受控知識入口為 `memory/swift-mt1xx-pacs008-ssi-v3.md`，範圍固定為 `OUTWARD_SSI_ONLY`；`INWARD`／received-payment context 不進行 SSI discovery。`memory/swift-mt1xx-pacs008-v2.md` 與 `memory/mt1/` 下的 v0.6 CPI／repair artifacts 只作歷史或 upstream interface reference，不是實作權威。v3 在 Independent BA／QA／Product Owner 對同一 exact Git candidate commit 核准前仍為 `IMPLEMENTATION NOT AUTHORIZED`。
 
 ## 全專案強制架構要求
 
@@ -161,10 +161,10 @@ MT300/304/305/306/320/330/340/341/350/360/361/362/364/365；MT400；MT730/734/74
 
 ## 受控件與 SHA-256
 
-| 檔案                                                        | SHA-256                                                            |
-| ----------------------------------------------------------- | ------------------------------------------------------------------ |
-| `memory/swift-mt347.md`                                     | `F1B413E13253432E5153CA9EEC9D082460A897CAC4640E1288D8A2DDF1CCF490` |
-| `qa/tdd/mt347/MT347_SR2026_SSI_TDD_CONTROLLED_v1.xlsx`      | `D586C86E61641CA3563771EA2AB937E3F15BA96A92F1F314007BCCE3BEA149D2` |
+| 檔案                                                            | SHA-256                                                            |
+| --------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `memory/swift-mt347.md`                                         | `F1B413E13253432E5153CA9EEC9D082460A897CAC4640E1288D8A2DDF1CCF490` |
+| `qa/tdd/mt347/MT347_SR2026_SSI_TDD_CONTROLLED_v1.xlsx`          | `D586C86E61641CA3563771EA2AB937E3F15BA96A92F1F314007BCCE3BEA149D2` |
 | `qa/tdd/mt347/MT347_SR2026_SSI_QA_Test_Plan_v4.xlsx`            | `1FDF15CFF1E78B0A6A3813163E6ADDD76517C0A045B240665003B249F2C5EFF5` |
 | `qa/tdd/mt347/SWIFT_SR2026_MT3_MT4_MT7_SSI_分析_中文版_v5.xlsx` | `C3EC8EB1A5B256C51D707BE342C079DB9DEBE304B03B562046CBAF1C459BECD2` |
 
