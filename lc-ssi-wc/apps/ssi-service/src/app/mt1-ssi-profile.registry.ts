@@ -194,9 +194,8 @@ export class Mt1SsiProfileRegistry {
       const counterpartEvidence = counterpart?.["resolutionEvidence"] as
         Record<string, unknown> | undefined;
       return Boolean(
-        counterpart &&
-        counterpart["messageType"] === "pacs.008.001.08" &&
-        counterpart["businessService"] === counterpartService &&
+        counterpart?.["messageType"] === "pacs.008.001.08" &&
+        counterpart?.["businessService"] === counterpartService &&
         Array.isArray(counterpartEvidence?.["formats"]) &&
         counterpartEvidence["formats"].includes("ISO_20022"),
       );

@@ -11,9 +11,9 @@ for (const scenario of catalogue.scenarios ?? []) {
   const match = scenario.traceability?.rawInputContract?.match(optionPattern);
   if (!match) continue;
   scenario.executionContext = {
-    ...(scenario.executionContext ?? {}),
+    ...scenario.executionContext,
     fieldOptions: {
-      ...(scenario.executionContext?.fieldOptions ?? {}),
+      ...scenario.executionContext?.fieldOptions,
       [match[1]]: match[2],
     },
   };
@@ -21,7 +21,13 @@ for (const scenario of catalogue.scenarios ?? []) {
 }
 
 if (governed !== 108)
-  throw new Error(`Expected 108 governed FIN option scenarios, found ${governed}`);
+  throw new Error(
+    `Expected 108 governed FIN option scenarios, found ${governed}`,
+  );
 
-await writeFile(cataloguePath, `${JSON.stringify(catalogue, null, 2)}\n`, "utf8");
+await writeFile(
+  cataloguePath,
+  `${JSON.stringify(catalogue, null, 2)}\n`,
+  "utf8",
+);
 console.log(JSON.stringify({ cataloguePath, governed }, null, 2));

@@ -60,8 +60,10 @@ const object = (value: unknown): Json =>
 const numeric = (value: unknown): number | undefined =>
   typeof value === "number" && Number.isInteger(value) ? value : undefined;
 
-const jsonWireRepresentation = (value: Json): unknown =>
-  JSON.parse(JSON.stringify(value)) as unknown;
+const jsonWireRepresentation = (value: Json): unknown => {
+  const serialized = JSON.stringify(value);
+  return JSON.parse(serialized) as unknown;
+};
 
 const previousMessageType = (
   messageType: string,
@@ -106,7 +108,9 @@ export class PaymentResolutionPageSubmissionAdapter {
   ): void {
     const selected = submission.selectedRouteIdentity;
     if (!selected) return;
-    const chosen = object(raw["chosenRoute"] ?? object(raw["mx"])["chosenRoute"]);
+    const chosen = object(
+      raw["chosenRoute"] ?? object(raw["mx"])["chosenRoute"],
+    );
     if (
       chosen["ssiId"] === selected.ssi.id &&
       chosen["ssiVersion"] === selected.ssi.version &&

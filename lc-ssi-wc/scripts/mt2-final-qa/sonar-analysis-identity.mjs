@@ -24,7 +24,10 @@ const parseProperties = (text) =>
       .filter((line) => line && !line.startsWith("#") && line.includes("="))
       .map((line) => {
         const separator = line.indexOf("=");
-        return [line.slice(0, separator).trim(), line.slice(separator + 1).trim()];
+        return [
+          line.slice(0, separator).trim(),
+          line.slice(separator + 1).trim(),
+        ];
       }),
   );
 
@@ -36,7 +39,7 @@ const globToRegExp = (glob) => {
       if (token === "**") return ".*";
       if (token === "*") return "[^/]*";
       if (token === "?") return "[^/]";
-      return token.replace(/[|\\{}()[\]^$+?.]/g, "\\$&");
+      return token.replace(/[|\\{}()[\]^$+?.]/g, String.raw`\$&`);
     })
     .join("");
   return new RegExp(`^${expression}$`);
@@ -62,7 +65,9 @@ const createManifest = (workspace, relativePaths) => {
   const files = [...new Set(relativePaths)]
     .sort((left, right) => left.localeCompare(right))
     .map((relativePath) => {
-      const content = fs.readFileSync(path.resolve(absoluteWorkspace, relativePath));
+      const content = fs.readFileSync(
+        path.resolve(absoluteWorkspace, relativePath),
+      );
       return {
         path: relativePath,
         bytes: content.byteLength,
@@ -83,13 +88,19 @@ export const buildSourceManifest = (
   const sourceRoots = propertyList(properties, "sonar.sources");
   if (!sourceRoots.length)
     throw new Error("sonar.sources must identify at least one source root");
-  const exclusions = propertyList(properties, "sonar.exclusions").map(globToRegExp);
+  const exclusions = propertyList(properties, "sonar.exclusions").map(
+    globToRegExp,
+  );
   const absoluteWorkspace = path.resolve(workspace);
   const relativePaths = sourceRoots
-    .flatMap((sourceRoot) => walkFiles(path.resolve(absoluteWorkspace, sourceRoot)))
+    .flatMap((sourceRoot) =>
+      walkFiles(path.resolve(absoluteWorkspace, sourceRoot)),
+    )
     .map((absolute) => ({
       absolute,
-      path: path.relative(absoluteWorkspace, absolute).replaceAll(path.sep, "/"),
+      path: path
+        .relative(absoluteWorkspace, absolute)
+        .replaceAll(path.sep, "/"),
     }))
     .filter(({ path: relativePath }) =>
       exclusions.every((exclusion) => !exclusion.test(relativePath)),
@@ -113,7 +124,8 @@ export const buildTypeScriptAnalysisManifest = (
       .filter((relativePath) => /\.tsx?$/.test(relativePath))
       .filter(
         (relativePath) =>
-          (!inclusions.length || inclusions.some((pattern) => pattern.test(relativePath))) &&
+          (!inclusions.length ||
+            inclusions.some((pattern) => pattern.test(relativePath))) &&
           exclusions.every((pattern) => !pattern.test(relativePath)),
       );
   const sourceFiles = collect(

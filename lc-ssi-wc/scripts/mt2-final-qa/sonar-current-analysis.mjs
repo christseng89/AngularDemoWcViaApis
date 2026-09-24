@@ -17,11 +17,11 @@ import {
 const TRUSTED_EXECUTABLE_PATHS = Object.freeze({
   win32: Object.freeze({
     git: Object.freeze([
-      "C:\\Program Files\\Git\\cmd\\git.exe",
-      "C:\\Program Files\\Git\\bin\\git.exe",
+      String.raw`C:\Program Files\Git\cmd\git.exe`,
+      String.raw`C:\Program Files\Git\bin\git.exe`,
     ]),
     docker: Object.freeze([
-      "C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe",
+      String.raw`C:\Program Files\Docker\Docker\resources\bin\docker.exe`,
     ]),
   }),
   linux: Object.freeze({
@@ -57,13 +57,12 @@ export const redactToken = (value, token) => {
 
 export const parseScannerTask = (output) => {
   const text = String(output ?? "");
-  const ceTaskUrl = text.match(
-    /https?:\/\/[^\s]+\/api\/ce\/task\?id=([A-Za-z0-9_-]+)/,
-  );
+  const ceTaskUrl =
+    /https?:\/\/[^\s]+\/api\/ce\/task\?id=([A-Za-z0-9_-]+)/.exec(text);
   const ceTaskId =
-    ceTaskUrl?.[1] ?? text.match(/\bceTaskId=([A-Za-z0-9_-]+)/)?.[1];
-  const dashboardUrl = text.match(
-    /https?:\/\/[^\s]+\/dashboard\?id=[^\s]+/,
+    ceTaskUrl?.[1] ?? /\bceTaskId=([A-Za-z0-9_-]+)/.exec(text)?.[1];
+  const dashboardUrl = /https?:\/\/[^\s]+\/dashboard\?id=[^\s]+/.exec(
+    text,
   )?.[0];
   return {
     ...(ceTaskId ? { ceTaskId } : {}),
@@ -102,7 +101,7 @@ export const createScannerEnvironment = ({
   typeScriptFiles,
   workspace = process.cwd(),
 }) => {
-  if ([host, token].some((value) => String(value ?? "").match(/[\r\n]/)))
+  if ([host, token].some((value) => /[\r\n]/.exec(String(value ?? ""))))
     throw new Error("Sonar environment values must not contain line breaks");
   const temporaryRoot = path.resolve(workspace, "tmp", "sonar");
   fs.mkdirSync(temporaryRoot, { recursive: true });

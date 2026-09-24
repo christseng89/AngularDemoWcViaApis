@@ -32,6 +32,8 @@ export interface GovernedRecord {
   rejectionReason?: string;
 }
 
+type SqliteParameter = string | number | null;
+
 export interface PagedResult<T> {
   items: T[];
   page: number;
@@ -185,10 +187,7 @@ export abstract class SqliteGovernedRepository<
   protected executeSchema(sql: string): void {
     this.db.exec(sql);
   }
-  protected selectPayloads(
-    sql: string,
-    ...parameters: (string | number | null)[]
-  ): T[] {
+  protected selectPayloads(sql: string, ...parameters: SqliteParameter[]): T[] {
     return this.db
       .prepare(sql)
       .all(...parameters)
@@ -198,7 +197,7 @@ export abstract class SqliteGovernedRepository<
   }
   protected queryRows(
     sql: string,
-    ...parameters: (string | number | null)[]
+    ...parameters: SqliteParameter[]
   ): Record<string, unknown>[] {
     return this.db.prepare(sql).all(...parameters) as Record<string, unknown>[];
   }
@@ -212,7 +211,7 @@ export abstract class SqliteGovernedRepository<
   }
   protected explainQueryPlan(
     sql: string,
-    ...parameters: (string | number | null)[]
+    ...parameters: SqliteParameter[]
   ): string[] {
     return this.db
       .prepare(`EXPLAIN QUERY PLAN ${sql}`)
@@ -391,9 +390,12 @@ export abstract class SqliteGovernedRepository<
     parameters.push(...statuses);
     const search = request.search?.trim();
     if (search) {
-      clauses.push("payload LIKE ? ESCAPE '\\'");
+      clauses.push(String.raw`payload LIKE ? ESCAPE '\'`);
       parameters.push(
-        `%${search.replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_")}%`,
+        `%${search
+          .replaceAll(/\\/g, String.raw`\\`)
+          .replaceAll("%", String.raw`\%`)
+          .replaceAll("_", String.raw`\_`)}%`,
       );
     }
     const where = clauses.length ? ` WHERE ${clauses.join(" AND ")}` : "";

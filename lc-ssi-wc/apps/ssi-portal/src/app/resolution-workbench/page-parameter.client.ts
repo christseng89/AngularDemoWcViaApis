@@ -100,7 +100,7 @@ const lookupEnvelope = (
         response.items.some(
           (item) =>
             !item.selectedRouteIdentity ||
-            item.selectedRouteIdentity.contextSha256 !==
+            item.selectedRouteIdentity?.contextSha256 !==
               response.eligibilitySnapshot!.contextSha256,
         )
       )

@@ -39,7 +39,7 @@ export type PinnedNostroResult =
   | { readonly decision: "REJECTED"; readonly reasonCode: string };
 const BIC = /^[A-Z0-9]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?$/;
 const CCY = /^[A-Z]{3}$/;
-const MASKED_ACCOUNT_REF = /^(?:DEMO|MT[0-9]{1,3})-[A-Z0-9-]{4,60}$/;
+const MASKED_ACCOUNT_REF = /^(?:DEMO|MT\d{1,3})-[A-Z0-9-]{4,60}$/;
 @Injectable()
 export class NostroApplicationService {
   constructor(private readonly repository: NostroRepository) {}

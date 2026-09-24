@@ -141,7 +141,7 @@ export class ResolutionWorkbenchFacade {
           scenarioId: model.selectedScenarioId,
           fixtureBindingId: model.fixtureBindingId,
           contractSha256: model.contractSha256,
-          ...(routeBinding ?? {}),
+          ...routeBinding,
           values,
         }),
       );

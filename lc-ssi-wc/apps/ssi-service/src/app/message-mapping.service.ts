@@ -998,8 +998,7 @@ export class MessageMappingService {
     contract: { ownerSide: OwnerSide; sourceTypes: EvidenceSource[] },
   ): evidence is RoleEvidence {
     return Boolean(
-      evidence &&
-      evidence.ownerSide === contract.ownerSide &&
+      evidence?.ownerSide === contract.ownerSide &&
       (contract.sourceTypes.includes(evidence.sourceType) ||
         evidence.sourceType === "SYNTHETIC_DEMO"),
     );

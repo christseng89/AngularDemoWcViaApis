@@ -232,7 +232,6 @@ def main() -> None:
                     created["nostro_account"] += 1
 
                 ssi_id = deterministic_uuid(f"ssi-{currency}-{bic}")
-                ssi_code = f"SSI-MT2-UI-{currency}-{index:02d}"
                 route = build_mt2_route(
                     currency=currency,
                     bic=bic,
