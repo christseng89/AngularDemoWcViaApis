@@ -1,4 +1,4 @@
-<section class="resolution-results" aria-labelledby="resolution-results-title">
+<section class="resolution-results" aria-label="Resolution results">
   @if (route(); as selectedRoute) {
     <div class="resolution-results__heading">
       <div>
@@ -48,16 +48,46 @@
         }
       </ul>
     }
+    @if (selectedRoute.legs.length > 0) {
+      <div class="resolution-results__heading">
+        <div>
+          <span class="eyebrow">Ordered route legs</span>
+          <h3>Actionable settlement path</h3>
+        </div>
+      </div>
+      <ol class="evidence-list" aria-label="Ordered settlement route legs">
+        @for (leg of selectedRoute.legs; track leg) {
+          <li>
+            <code>{{ leg }}</code>
+          </li>
+        }
+      </ol>
+    }
+    @if (selectedRoute.projections.length > 0) {
+      <div class="resolution-results__heading">
+        <div>
+          <span class="eyebrow">Governed projection</span>
+          <h3>Resolved SSI values</h3>
+        </div>
+      </div>
+      <ul class="evidence-list" aria-label="Resolved SSI projections">
+        @for (projection of selectedRoute.projections; track projection) {
+          <li>
+            <code>{{ projection }}</code>
+          </li>
+        }
+      </ul>
+    }
   }
-  <div class="resolution-results__heading">
-    <div>
-      <span class="eyebrow">Resolved SSI fields</span>
-      <h3 id="resolution-results-title">Actual resolution result</h3>
-    </div>
-    <span class="result-count">{{ rows().length }} fields</span>
-  </div>
 
   @if (rows().length > 0) {
+    <div class="resolution-results__heading">
+      <div>
+        <span class="eyebrow">Resolved SSI fields</span>
+        <h3 id="resolution-results-title">Actual resolution result</h3>
+      </div>
+      <span class="result-count">{{ rows().length }} fields</span>
+    </div>
     <div class="resolution-results__scroll">
       <table class="resolution-result-table">
         <caption class="sr-only">
@@ -106,13 +136,9 @@
         </tbody>
       </table>
     </div>
-  } @else {
+  } @else if (!route()) {
     <output class="resolution-results__empty">
-      @if (route()) {
-        No governed SWIFT 5x field was emitted for this route.
-      } @else {
-        {{ emptyMessage() }}
-      }
+      {{ emptyMessage() }}
     </output>
   }
 </section>

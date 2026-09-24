@@ -543,6 +543,38 @@ export interface ResolutionPageSettlementRoute {
     readonly recordId: string;
     readonly version: number;
   }[];
+  readonly legs: readonly {
+    readonly order: number;
+    readonly relationship: "INDA" | "INGA" | "COVE";
+    readonly role: string;
+    readonly accountOwner: {
+      readonly bankServiceId: string;
+      readonly bic: string;
+      readonly name?: string;
+    };
+    readonly accountServicer: {
+      readonly bankServiceId: string;
+      readonly bic: string;
+      readonly name?: string;
+    };
+    readonly accountReference: string;
+    readonly currency: string;
+    readonly source: string;
+    readonly sourceRecordId: string;
+    readonly version: number;
+  }[];
+  readonly projections: readonly {
+    readonly kind:
+      "SETTLEMENT_RELATIONSHIP" | "SWIFT_MT_FIELD" | "ISO_20022_ELEMENT";
+    readonly identifier: string;
+    readonly option?: string;
+    readonly label: string;
+    readonly role: string;
+    readonly value: string;
+    readonly accountReference: string;
+    readonly sourceRecordId: string;
+    readonly version: number;
+  }[];
 }
 
 export interface ResolutionPageExecutionResult {

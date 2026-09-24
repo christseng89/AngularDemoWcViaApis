@@ -77,7 +77,19 @@ export interface ResolutionRouteSummary {
   readonly counterpartyBic: string;
   readonly counterpartyName: string;
   readonly roles: readonly string[];
+  readonly legs: readonly string[];
+  readonly projections: readonly string[];
 }
+
+const projectionIdentifier = (
+  projection: ResolutionPageSettlementRoute["projections"][number],
+): string => {
+  if (projection.kind === "SWIFT_MT_FIELD")
+    return `SWIFT ${projection.identifier}${projection.option ?? ""}`;
+  if (projection.kind === "ISO_20022_ELEMENT")
+    return `ISO 20022 ${projection.identifier}`;
+  return projection.identifier;
+};
 
 export const resolutionRouteSummary = (
   outputs: readonly ResolutionPageGeneratedOutput[],
@@ -89,7 +101,7 @@ export const resolutionRouteSummary = (
       ssiCode: "",
       settlementRouteId: settlementRoute.routeBindingId,
       nostroId: `${settlementRoute.nostro.id} v${settlementRoute.nostro.version}`,
-      accountId: "",
+      accountId: settlementRoute.legs[0]?.accountReference ?? "",
       applicabilityId: `${settlementRoute.applicability.id} v${settlementRoute.applicability.version}`,
       rmaId: `${settlementRoute.rma.id} v${settlementRoute.rma.version}`,
       counterpartyBic: settlementRoute.counterparty.bic,
@@ -97,6 +109,14 @@ export const resolutionRouteSummary = (
       roles: settlementRoute.roles.map(
         ({ role, owner, recordId, version }) =>
           `${role} · ${owner} · ${recordId} v${version}`,
+      ),
+      legs: settlementRoute.legs.map(
+        (leg) =>
+          `${leg.order} · ${leg.relationship} · ${leg.accountOwner.bic} → ${leg.accountServicer.bic} · ${leg.accountReference} · ${leg.currency}`,
+      ),
+      projections: settlementRoute.projections.map(
+        (projection) =>
+          `${projectionIdentifier(projection)} · ${projection.label} · ${projection.value} · ${projection.accountReference}`,
       ),
     };
   }
@@ -122,6 +142,8 @@ export const resolutionRouteSummary = (
     counterpartyBic: "",
     counterpartyName: "",
     roles: [],
+    legs: [],
+    projections: [],
   };
 };
 

@@ -121,6 +121,33 @@ describe("resolution-page NVR validation scope contract", () => {
       nostro: { id: "NOSTRO-1", version: 1 },
       rma: { id: "RMA-1", version: 1 },
       roles: [],
+      legs: [
+        {
+          order: 1,
+          relationship: "INDA",
+          role: "INDA_SETTLEMENT_ACCOUNT_RELATIONSHIP",
+          accountOwner: { bankServiceId: "LOCAL", bic: "DEMOHKHH" },
+          accountServicer: { bankServiceId: "BANK-1", bic: "CITIUS33" },
+          accountReference: "DEMO-USD-CITI-INDA",
+          currency: "USD",
+          source: "FIXTURE",
+          sourceRecordId: "ACCOUNT-1",
+          version: 1,
+        },
+      ],
+      projections: [
+        {
+          kind: "SWIFT_MT_FIELD",
+          identifier: "53",
+          option: "A",
+          label: "Sender's Correspondent",
+          role: "INDA_SETTLEMENT_ACCOUNT_RELATIONSHIP",
+          value: "INDA",
+          accountReference: "DEMO-USD-CITI-INDA",
+          sourceRecordId: "ACCOUNT-1",
+          version: 1,
+        },
+      ],
     };
     const schemas = readOas("openapi/swift-data-service.v1.json").components
       .schemas;
@@ -134,6 +161,8 @@ describe("resolution-page NVR validation scope contract", () => {
       "nostro",
       "rma",
       "roles",
+      "legs",
+      "projections",
     ]);
     expect(schemas["ResolutionPageExecutionResult"]?.properties).toHaveProperty(
       "settlementRoute",

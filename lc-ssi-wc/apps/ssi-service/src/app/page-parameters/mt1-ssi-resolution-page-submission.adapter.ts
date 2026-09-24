@@ -3,6 +3,7 @@ import type {
   ResolutionPageDefinition,
   ResolutionPageExecutionOutcome,
   ResolutionPageExecutionResult,
+  ResolutionPageSettlementRoute,
   ResolutionPageScenario,
   ResolutionPageSubmission,
 } from "@ssi/contracts";
@@ -55,7 +56,12 @@ export class Mt1SsiResolutionPageSubmissionAdapter {
     submission,
   }: Mt1SsiResolutionPageExecutionContext): ResolutionPageExecutionResult {
     const request = this.request(definition, scenario, submission);
-    const candidate = this.candidate(scenario, submission);
+    const settlementRoute = this.settlementRoute(
+      definition,
+      request,
+      submission,
+    );
+    const candidate = this.candidate(submission, settlementRoute);
     const repository: Mt1SsiCandidateRepository = {
       discover: () => (candidate ? [candidate] : []),
     };
@@ -66,16 +72,6 @@ export class Mt1SsiResolutionPageSubmissionAdapter {
     const requestSha256 = hashCanonical(request);
     const responseSha256 = hashCanonical(resolved);
     const outcome = executionOutcome(resolved.resolutionOutcome);
-    const settlementRoute =
-      resolved.route &&
-      submission.selectedRouteIdentity &&
-      submission.eligibilitySnapshot
-        ? this.routes.settlementRoute(
-            submission.selectedRouteIdentity,
-            submission.eligibilitySnapshot.snapshotId,
-            resolved.route.roles,
-          )
-        : undefined;
     return {
       definitionId: definition.definitionId,
       definitionVersion: definition.definitionVersion,
@@ -94,7 +90,7 @@ export class Mt1SsiResolutionPageSubmissionAdapter {
       ...(resolved.route
         ? { routeBindingId: resolved.route.routeBindingId }
         : {}),
-      ...(settlementRoute ? { settlementRoute } : {}),
+      ...(resolved.route && settlementRoute ? { settlementRoute } : {}),
       fields: [],
       outputs: [],
       evidence: {
@@ -161,54 +157,45 @@ export class Mt1SsiResolutionPageSubmissionAdapter {
     };
   }
 
-  private candidate(
-    scenario: ResolutionPageScenario,
+  private settlementRoute(
+    definition: ResolutionPageDefinition,
+    request: Mt1SsiResolutionRequest,
     submission: ResolutionPageSubmission,
-  ): Mt1SsiRouteCandidate | undefined {
+  ): ResolutionPageSettlementRoute | undefined {
     const selected = submission.selectedRouteIdentity;
     if (!selected || !submission.eligibilitySnapshot) return undefined;
     if (
-      !this.routes.accepts(selected, submission.eligibilitySnapshot.snapshotId)
+      !(["INDA", "INGA", "COVE"] as const).includes(
+        request.settlementContext as "INDA" | "INGA" | "COVE",
+      )
     )
       return undefined;
-    const cove = scenario.scenarioId.endsWith(":MT1-COVE-SSI");
+    return this.routes.settlementRoute(
+      selected,
+      submission.eligibilitySnapshot.snapshotId,
+      {
+        settlementContext: request.settlementContext as
+          "INDA" | "INGA" | "COVE",
+        currency: request.currency,
+        messageType: definition.messageType,
+      },
+    );
+  }
+
+  private candidate(
+    submission: ResolutionPageSubmission,
+    settlementRoute: ResolutionPageSettlementRoute | undefined,
+  ): Mt1SsiRouteCandidate | undefined {
+    const selected = submission.selectedRouteIdentity;
+    if (!selected || !submission.eligibilitySnapshot || !settlementRoute)
+      return undefined;
     return {
       routeBindingId: selected.routeId,
       snapshotToken: submission.eligibilitySnapshot.contextSha256,
       rank: [0],
       optionCompatible: true,
       complete: true,
-      roles: cove
-        ? [
-            {
-              role: "INSTRUCTING_REIMBURSEMENT_AGENT",
-              owner: "OWN_SSI_OR_ACCOUNT_MASTER",
-              recordId: selected.nostro.id,
-              version: selected.nostro.version,
-            },
-            {
-              role: "INSTRUCTED_REIMBURSEMENT_AGENT",
-              owner: "COUNTERPARTY_SSI",
-              recordId: selected.ssi.id,
-              version: selected.ssi.version,
-            },
-            {
-              role: "THIRD_REIMBURSEMENT_AGENT",
-              owner: "THIRD_PARTY_SSI",
-              recordId: selected.applicability.id,
-              version: selected.applicability.version,
-            },
-          ]
-        : [
-            {
-              role: scenario.scenarioId.endsWith(":MT1-INDA-SSI")
-                ? "INDA_SETTLEMENT_ACCOUNT_RELATIONSHIP"
-                : "INGA_SETTLEMENT_ACCOUNT_RELATIONSHIP",
-              owner: "COUNTERPARTY_SSI",
-              recordId: selected.ssi.id,
-              version: selected.ssi.version,
-            },
-          ],
+      roles: settlementRoute.roles as Mt1SsiRouteCandidate["roles"],
     };
   }
 }

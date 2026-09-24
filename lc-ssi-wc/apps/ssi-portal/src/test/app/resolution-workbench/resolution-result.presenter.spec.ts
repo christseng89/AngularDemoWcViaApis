@@ -70,6 +70,8 @@ describe("resolution result presenter", () => {
       counterpartyBic: "",
       counterpartyName: "",
       roles: [],
+      legs: [],
+      projections: [],
     });
   });
 
@@ -94,6 +96,36 @@ describe("resolution result presenter", () => {
             version: 1,
           },
         ],
+        legs: [
+          {
+            order: 1,
+            relationship: "INDA",
+            role: "INDA_SETTLEMENT_ACCOUNT_RELATIONSHIP",
+            accountOwner: { bankServiceId: "LOCAL", bic: "DEMOHKHH" },
+            accountServicer: {
+              bankServiceId: "BANK-SVC-CITIUS33",
+              bic: "CITIUS33",
+            },
+            accountReference: "DEMO-USD-CITI-INDA",
+            currency: "USD",
+            source: "MT1_SSI_DEMO_ROUTE_FIXTURE",
+            sourceRecordId: "MT1-NOSTRO-CITI-INDA",
+            version: 1,
+          },
+        ],
+        projections: [
+          {
+            kind: "SWIFT_MT_FIELD",
+            identifier: "53",
+            option: "A",
+            label: "Sender's Correspondent",
+            role: "INDA_SETTLEMENT_ACCOUNT_RELATIONSHIP",
+            value: "INDA",
+            accountReference: "DEMO-USD-CITI-INDA",
+            sourceRecordId: "MT1-NOSTRO-CITI-INDA",
+            version: 1,
+          },
+        ],
       }),
     ).toMatchObject({
       ssiId: "MT1-SSI-CITI v1",
@@ -105,6 +137,10 @@ describe("resolution result presenter", () => {
       counterpartyName: "Citibank Demo",
       roles: [
         "INDA_SETTLEMENT_ACCOUNT_RELATIONSHIP · COUNTERPARTY_SSI · MT1-SSI-CITI v1",
+      ],
+      legs: ["1 · INDA · DEMOHKHH → CITIUS33 · DEMO-USD-CITI-INDA · USD"],
+      projections: [
+        "SWIFT 53A · Sender's Correspondent · INDA · DEMO-USD-CITI-INDA",
       ],
     });
   });

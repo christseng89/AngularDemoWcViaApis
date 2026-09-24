@@ -2698,6 +2698,16 @@
           "document": { "type": "object", "additionalProperties": true }
         }
       },
+      "ResolutionPageSettlementInstitution": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["bankServiceId", "bic"],
+        "properties": {
+          "bankServiceId": { "type": "string", "minLength": 1 },
+          "bic": { "$ref": "#/components/schemas/Bic" },
+          "name": { "type": "string" }
+        }
+      },
       "ResolutionPageSettlementRoute": {
         "type": "object",
         "additionalProperties": false,
@@ -2709,7 +2719,9 @@
           "applicability",
           "nostro",
           "rma",
-          "roles"
+          "roles",
+          "legs",
+          "projections"
         ],
         "properties": {
           "routeBindingId": { "type": "string", "minLength": 1 },
@@ -2745,6 +2757,77 @@
                 "role": { "type": "string", "minLength": 1 },
                 "owner": { "type": "string", "minLength": 1 },
                 "recordId": { "type": "string", "minLength": 1 },
+                "version": { "type": "integer", "minimum": 1 }
+              }
+            }
+          },
+          "legs": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "order",
+                "relationship",
+                "role",
+                "accountOwner",
+                "accountServicer",
+                "accountReference",
+                "currency",
+                "source",
+                "sourceRecordId",
+                "version"
+              ],
+              "properties": {
+                "order": { "type": "integer", "minimum": 1 },
+                "relationship": { "enum": ["INDA", "INGA", "COVE"] },
+                "role": { "type": "string", "minLength": 1 },
+                "accountOwner": {
+                  "$ref": "#/components/schemas/ResolutionPageSettlementInstitution"
+                },
+                "accountServicer": {
+                  "$ref": "#/components/schemas/ResolutionPageSettlementInstitution"
+                },
+                "accountReference": { "type": "string", "minLength": 1 },
+                "currency": { "$ref": "#/components/schemas/Currency" },
+                "source": { "type": "string", "minLength": 1 },
+                "sourceRecordId": { "type": "string", "minLength": 1 },
+                "version": { "type": "integer", "minimum": 1 }
+              }
+            }
+          },
+          "projections": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "kind",
+                "identifier",
+                "label",
+                "role",
+                "value",
+                "accountReference",
+                "sourceRecordId",
+                "version"
+              ],
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "SETTLEMENT_RELATIONSHIP",
+                    "SWIFT_MT_FIELD",
+                    "ISO_20022_ELEMENT"
+                  ]
+                },
+                "identifier": { "type": "string", "minLength": 1 },
+                "option": { "type": "string" },
+                "label": { "type": "string", "minLength": 1 },
+                "role": { "type": "string", "minLength": 1 },
+                "value": { "type": "string", "minLength": 1 },
+                "accountReference": { "type": "string", "minLength": 1 },
+                "sourceRecordId": { "type": "string", "minLength": 1 },
                 "version": { "type": "integer", "minimum": 1 }
               }
             }

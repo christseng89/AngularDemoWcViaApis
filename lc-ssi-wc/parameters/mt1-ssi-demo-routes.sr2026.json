@@ -2,6 +2,11 @@
   "schemaVersion": "1.0",
   "fixtureVersion": "MT1-SSI-DEMO-V1",
   "standardsRelease": "SR2026",
+  "localBank": {
+    "bankServiceId": "BANK-SVC-DEMOHKHH",
+    "bic": "DEMOHKHH",
+    "bankName": "Demo Bank Hong Kong"
+  },
   "routes": [
     {
       "bankServiceId": "BANK-SVC-CITIUS33",
@@ -25,7 +30,47 @@
       "ssi": { "id": "MT1-SSI-CITI", "version": 1 },
       "applicability": { "id": "MT1-APP-CITI", "version": 1 },
       "nostro": { "id": "MT1-NOSTRO-CITI", "version": 1 },
-      "rma": { "id": "MT1-RMA-CITI", "version": 1 }
+      "rma": { "id": "MT1-RMA-CITI", "version": 1 },
+      "settlementRelationships": {
+        "INDA": {
+          "accountReferenceTemplate": "DEMO-{currency}-CITI-INDA",
+          "sourceRecordId": "MT1-NOSTRO-CITI-INDA",
+          "version": 1
+        },
+        "INGA": {
+          "accountReferenceTemplate": "DEMO-{currency}-CITI-INGA",
+          "sourceRecordId": "MT1-SSI-CITI-INGA",
+          "version": 1
+        }
+      },
+      "coveRelationships": [
+        {
+          "role": "INSTRUCTING_REIMBURSEMENT_AGENT",
+          "owner": "OWN_SSI_OR_ACCOUNT_MASTER",
+          "institutionSide": "LOCAL",
+          "accountReferenceTemplate": "DEMO-{currency}-CITI-COVE-INSTRUCTING",
+          "sourceRecordId": "MT1-NOSTRO-CITI-COVE-INSTRUCTING",
+          "version": 1,
+          "mtTag": "53",
+          "mtOption": "A",
+          "mtOfficialDescription": "Sender's Correspondent",
+          "mxAgentElement": "InstgRmbrsmntAgt",
+          "mxAccountElement": "InstgRmbrsmntAgtAcct"
+        },
+        {
+          "role": "INSTRUCTED_REIMBURSEMENT_AGENT",
+          "owner": "COUNTERPARTY_SSI",
+          "institutionSide": "COUNTERPARTY",
+          "accountReferenceTemplate": "DEMO-{currency}-CITI-COVE-INSTRUCTED",
+          "sourceRecordId": "MT1-SSI-CITI-COVE-INSTRUCTED",
+          "version": 1,
+          "mtTag": "54",
+          "mtOption": "A",
+          "mtOfficialDescription": "Receiver's Correspondent",
+          "mxAgentElement": "InstdRmbrsmntAgt",
+          "mxAccountElement": "InstdRmbrsmntAgtAcct"
+        }
+      ]
     }
   ]
 }

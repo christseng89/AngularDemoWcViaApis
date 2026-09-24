@@ -12,7 +12,7 @@
       "fixtureSet": "MT1-PACS008-SR2026",
       "fixtureVersion": "MT1-SSI-SR2026-V1",
       "sourceFile": "openapi/swift-data-service.v1.json",
-      "sourceFileSha256": "EECA1D18CE1C5BCABB6DCE6F930EE61BBEB766CAB4727E0FF8A5D6C1EA1619D5",
+      "sourceFileSha256": "A74F93F1B4F3BA8DAF7BE6213F138CAD5DC1EA69BECD5B39CF9195C15C883404",
       "polarity": "POSITIVE"
     },
     {
@@ -20,7 +20,7 @@
       "fixtureSet": "MT1-PACS008-SR2026",
       "fixtureVersion": "MT1-SSI-SR2026-V1",
       "sourceFile": "openapi/swift-data-service.v1.json",
-      "sourceFileSha256": "EECA1D18CE1C5BCABB6DCE6F930EE61BBEB766CAB4727E0FF8A5D6C1EA1619D5",
+      "sourceFileSha256": "A74F93F1B4F3BA8DAF7BE6213F138CAD5DC1EA69BECD5B39CF9195C15C883404",
       "polarity": "POSITIVE"
     },
     {
@@ -28,7 +28,7 @@
       "fixtureSet": "MT1-PACS008-SR2026",
       "fixtureVersion": "MT1-SSI-SR2026-V1",
       "sourceFile": "openapi/swift-data-service.v1.json",
-      "sourceFileSha256": "EECA1D18CE1C5BCABB6DCE6F930EE61BBEB766CAB4727E0FF8A5D6C1EA1619D5",
+      "sourceFileSha256": "A74F93F1B4F3BA8DAF7BE6213F138CAD5DC1EA69BECD5B39CF9195C15C883404",
       "polarity": "POSITIVE"
     }
   ]
