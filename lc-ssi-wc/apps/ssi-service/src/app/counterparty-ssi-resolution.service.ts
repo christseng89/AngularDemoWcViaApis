@@ -9,6 +9,21 @@ const SCOPE =
   "canonical route + MRG; full serialized XML requires controlled Translation Portal golden fixture";
 const RENDERER =
   "MT compatibility view from the same confirmed canonical snapshot";
+const OUT_OF_SCOPE_MESSAGE_KEYS = new Set([
+  "21",
+  "121",
+  "uetr",
+  "incoming21",
+  "incoming121",
+  "block3",
+  "sequenceB",
+  "coverPurpose",
+  "underlyingCustomerCreditTransfer",
+  "previousMessage",
+  "before",
+  "after",
+  "modified",
+]);
 
 const isObject = (value: unknown): value is Context =>
   Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -53,10 +68,7 @@ export class CounterpartySsiResolutionService {
         "Bank BIC must be resolved from Bank Service ID",
       );
     if (raw["selectedRouteVersionChanged"] === true)
-      return this.failure(409, "STALE", {
-        confirmation: "BLOCKED",
-        payloadGenerated: false,
-      });
+      return this.outcome(409, "STALE", "NOT_EVALUATED");
     if (raw["paymentBeneficiaryInstitutionInput"] === null)
       return this.failure(
         422,
@@ -189,10 +201,11 @@ export class CounterpartySsiResolutionService {
   }
 
   resolve(request: RouteResolutionRequest, raw: Context): Context {
+    const context = this.governedResolverContext(raw);
     const source = request.sourceMessageType ?? "";
     const is205 = source.startsWith("MT205");
     const isCover = source.endsWith("COV");
-    const beneficiary = this.beneficiary(request, raw);
+    const beneficiary = this.beneficiary(request, context);
     const base = {
       httpStatus: 200,
       decision: "RESOLVED",
@@ -203,24 +216,37 @@ export class CounterpartySsiResolutionService {
       validationScope: SCOPE,
     };
 
-    const error = this.validateContext(request, raw);
+    const error = this.validateContext(request, context);
     if (error) return error;
 
-    if (raw["bilateralRelationshipConfirmed"] === true)
+    if (context["bilateralRelationshipConfirmed"] === true)
       return this.outcome(
         200,
         "BILATERAL_RELATIONSHIP_CONFIRMED",
         "NOT_REQUIRED",
       );
-    if (raw["eligibleCandidateCount"] === 0)
+    if (context["eligibleCandidateCount"] === 0)
       return this.outcome(422, "NO_ELIGIBLE_SSI", "REQUIRED");
-    if (raw["eligibleCandidateCount"] === 2)
-      return this.outcome(422, "AMBIGUOUS_ROUTE", "REQUIRED");
+    if (context["eligibleCandidateCount"] === 2)
+      return this.outcome(409, "AMBIGUOUS_ROUTE", "REQUIRED");
 
-    if (isCover)
-      return is205 ? this.mt205Cover(base, raw) : this.mt202Cover(base, raw);
-    if (is205) return this.mt205(base, raw, beneficiary);
-    return this.mt202(base, raw, beneficiary);
+    const routeSelection = this.c81RouteSelection(context);
+    if (routeSelection?.eligibleCandidateIds.length === 0)
+      return this.outcome(422, "NO_ELIGIBLE_SSI", "REQUIRED");
+
+    const rmaError = this.rmaValidationError(context);
+    if (rmaError) return rmaError;
+
+    const resolved = isCover
+      ? is205
+        ? this.mt205Cover(base, context)
+        : this.mt202Cover(base, context)
+      : is205
+        ? this.mt205(base, context, beneficiary)
+        : this.mt202(base, context, beneficiary);
+    return routeSelection
+      ? { ...resolved, routeSelectionEvidence: routeSelection }
+      : resolved;
   }
 
   validateContext(
@@ -228,7 +254,10 @@ export class CounterpartySsiResolutionService {
     raw: Context,
   ): Context | undefined {
     const source = request.sourceMessageType ?? "";
-    const governedContext: Context = { ...request, ...raw };
+    const governedContext: Context = {
+      ...request,
+      ...this.governedResolverContext(raw),
+    };
     if (
       governedContext["paymentDirection"] !== undefined &&
       governedContext["paymentDirection"] !== "OUTWARD"
@@ -250,6 +279,10 @@ export class CounterpartySsiResolutionService {
       return this.failure(422, "UNSUPPORTED_PROFILE", {
         validation: "FAIL",
       });
+    if (governedContext["governedConfigurationComplete"] === false)
+      return this.outcome(422, "PROFILE_INCOMPLETE", "NOT_EVALUATED");
+    if (governedContext["requiredMappingRegistered"] === false)
+      return this.outcome(422, "PROFILE_INCOMPLETE", "REQUIRED");
     if (governedContext["topologyInvalid"] === true)
       return this.failure(422, "INVALID_CONTEXT_TOPOLOGY", {
         validation: "FAIL",
@@ -257,6 +290,17 @@ export class CounterpartySsiResolutionService {
     return source.endsWith("COV")
       ? this.coverValidationError(source, governedContext)
       : this.validationError(source, governedContext);
+  }
+
+  private governedResolverContext(raw: Context): Context {
+    return Object.fromEntries(
+      Object.entries(raw)
+        .filter(([key]) => !OUT_OF_SCOPE_MESSAGE_KEYS.has(key))
+        .map(([key, value]) => [
+          key,
+          isObject(value) ? this.governedResolverContext(value) : value,
+        ]),
+    );
   }
 
   private beneficiary(request: RouteResolutionRequest, raw: Context): string {
@@ -333,9 +377,12 @@ export class CounterpartySsiResolutionService {
 
   private validationError(source: string, raw: Context): Context | undefined {
     const validations = [
+      () =>
+        source.startsWith("MT205")
+          ? this.upstreamAttestationError(source, raw)
+          : undefined,
       () => this.messageOptionError(source, raw),
       () => this.profileValidationError(source, raw),
-      () => this.rmaValidationError(raw),
       () => this.missingBeneficiaryValidationError(raw),
     ];
     for (const validation of validations) {
@@ -435,6 +482,17 @@ export class CounterpartySsiResolutionService {
         },
         "Governed location source conflicts with the BIC country",
       );
+    if (
+      typeof raw["senderCountry"] === "string" &&
+      typeof raw["receiverCountry"] === "string" &&
+      raw["senderCountry"] !== raw["receiverCountry"]
+    )
+      return this.failure(
+        422,
+        "JURISDICTION_NOT_PERMITTED",
+        { validation: "FAIL", payloadGenerated: false },
+        "MT205 and MT205COV require a same-country selected receiver",
+      );
     return undefined;
   }
 
@@ -443,6 +501,7 @@ export class CounterpartySsiResolutionService {
     raw: Context,
   ): Context | undefined {
     if (!source.startsWith("MT205")) return undefined;
+    if (isObject(raw["upstreamAttestation"])) return undefined;
     const previous = isObject(raw["previousMessage"])
       ? raw["previousMessage"]
       : undefined;
@@ -496,6 +555,33 @@ export class CounterpartySsiResolutionService {
   }
 
   private rmaValidationError(raw: Context): Context | undefined {
+    const decision = isObject(raw["rmaDecision"])
+      ? raw["rmaDecision"]
+      : undefined;
+    if (decision) {
+      const authorized =
+        decision["state"] === "AUTHORIZED" &&
+        decision["active"] === true &&
+        decision["authorized"] === true &&
+        decision["receiverMatches"] === true &&
+        decision["businessServiceMatches"] === true &&
+        decision["pairedEvidenceProfileMatches"] !== false &&
+        decision["profileBizSvcBindingMatches"] !== false &&
+        decision["finMessageTypeMatches"] !== false &&
+        (decision["channel"] !== "FIN" ||
+          decision["contingencyAuthorized"] === true);
+      if (!authorized)
+        return this.failure(
+          422,
+          "RMA_NOT_AUTHORIZED",
+          {
+            confirmation: "BLOCKED",
+            payloadGenerated: false,
+            rmaState: decision["state"],
+          },
+          "The selected route has no exact active governed RMA authorization",
+        );
+    }
     if (raw["availableRmaVersions"])
       return this.failure(
         422,
@@ -513,6 +599,26 @@ export class CounterpartySsiResolutionService {
           : "",
       );
     return undefined;
+  }
+
+  private c81RouteSelection(
+    raw: Context,
+  ):
+    | { evaluatedCandidateIds: string[]; eligibleCandidateIds: string[] }
+    | undefined {
+    if (!Array.isArray(raw["routeCandidates"])) return undefined;
+    const candidates = raw["routeCandidates"].filter(isObject);
+    const candidateId = (candidate: Context, index: number) =>
+      scalarText(candidate["id"]) || `CANDIDATE-${index + 1}`;
+    return {
+      evaluatedCandidateIds: candidates.map(candidateId),
+      eligibleCandidateIds: candidates
+        .filter(
+          (candidate) =>
+            !(candidate["has56"] === true && candidate["has57"] !== true),
+        )
+        .map(candidateId),
+    };
   }
 
   private missingBeneficiaryValidationError(raw: Context): Context | undefined {
@@ -534,191 +640,39 @@ export class CounterpartySsiResolutionService {
     source: string,
     raw: Context,
   ): Context | undefined {
-    const cover205 = source === "MT205COV";
-    const validations = [
-      () => this.coverInputError(raw),
-      () => this.coverSequenceBError(raw),
-      () => this.coverOptionError(cover205, raw),
-      () => this.coverInvariantError(cover205, raw),
-      () => this.coverPreviousMessageError(source, raw),
-    ];
-    for (const validation of validations) {
-      const error = validation();
-      if (error) return error;
-    }
-    return undefined;
+    return (
+      this.upstreamAttestationError(source, raw) ??
+      this.mt205ScenarioError(source, raw)
+    );
   }
 
-  private coverInputError(raw: Context): Context | undefined {
-    const missing = raw["missing"];
-    if (Array.isArray(missing))
-      return this.failure(422, "MESSAGE_CONTEXT_MISSING", {
-        validation: "FAIL",
-        missing,
-      });
-    if (raw["coverSequenceB"] === null)
-      return this.failure(
-        422,
-        "INVALID_UPSTREAM_CONTEXT",
-        { validation: "FAIL", payloadGenerated: false },
-        "Cover Sequence B is mandatory upstream context",
-      );
-    if (
-      !isObject(raw["block3"]) ||
-      raw["block3"]["119"] !== "COV" ||
-      typeof raw["incoming121"] !== "string" ||
-      !raw["incoming121"] ||
-      !isObject(raw["sequenceB"]) ||
-      raw["underlyingCustomerCreditTransfer"] !== true
-    )
-      return this.failure(
-        422,
-        "INVALID_UPSTREAM_CONTEXT",
-        { validation: "FAIL", payloadGenerated: false },
-        "Genuine-cover context is mandatory",
-      );
-    if (
-      raw["block3"] &&
-      isObject(raw["block3"]) &&
-      raw["block3"]["119"] !== "COV"
-    )
-      return this.failure(422, "INVALID_UPSTREAM_CONTEXT", {
-        validation: "FAIL",
-        missing: ["119:COV"],
-      });
-    return undefined;
-  }
-
-  private coverSequenceBError(raw: Context): Context | undefined {
-    const sequenceB = isObject(raw["sequenceB"]) ? raw["sequenceB"] : undefined;
-    if (sequenceB && !sequenceB["50A"])
-      return this.failure(422, "MESSAGE_CONTEXT_MISSING", {
-        validation: "FAIL",
-        missing: ["B.50a"],
-      });
-    if (sequenceB && !sequenceB["59"])
-      return this.failure(422, "MESSAGE_CONTEXT_MISSING", {
-        validation: "FAIL",
-        missing: ["B.59a"],
-      });
-    return undefined;
-  }
-
-  private coverOptionError(
-    cover205: boolean,
-    raw: Context,
-  ): Context | undefined {
-    if (raw["A.56A"] && raw["A.57A"] === null)
-      return this.failure(422, "OPTION_CONSTRAINT_VIOLATION", {
-        validation: "FAIL",
-        error: "C81",
-      });
-    if (raw["B.56A"] && raw["B.57A"] === null)
-      return this.failure(422, "OPTION_CONSTRAINT_VIOLATION", {
-        validation: "FAIL",
-        error: "C68",
-      });
-    if (raw["A.56C"])
-      return this.failure(422, "OPTION_CONSTRAINT_VIOLATION", {
-        validation: "FAIL",
-        reason: "Option C only permitted in Seq B",
-      });
-    if (cover205 && raw["A.54A"])
-      return this.failure(422, "OPTION_CONSTRAINT_VIOLATION", {
-        validation: "FAIL",
-        reason: "MT205 COV has no 54a",
-      });
-    return undefined;
-  }
-
-  private coverInvariantError(
-    cover205: boolean,
-    raw: Context,
-  ): Context | undefined {
-    if (raw["underlyingCustomerCreditTransfer"] === false)
-      return this.failure(
-        422,
-        "INVALID_UPSTREAM_CONTEXT",
-        {
-          validation: "FAIL",
-          reason:
-            "Cover purpose must be an underlying customer credit transfer",
-        },
-        "Genuine-cover purpose attestation is invalid",
-      );
-    if (raw["before"] && raw["after"])
-      return this.failure(422, "OPTION_CONSTRAINT_VIOLATION", {
-        validation: "FAIL",
-        reason: "Seq B must be copied unchanged",
-      });
-    if (Array.isArray(raw["modified"]))
-      return this.failure(422, "OPTION_CONSTRAINT_VIOLATION", {
-        validation: "FAIL",
-        reason: "underlying data must be unchanged",
-      });
-    if (
-      cover205 &&
-      raw["senderCountry"] &&
-      raw["receiverCountry"] &&
-      raw["senderCountry"] !== raw["receiverCountry"]
-    )
-      return this.failure(422, "JURISDICTION_NOT_PERMITTED", {
-        validation: "FAIL",
-        reason: "MT205 COV must be domestic onward cover",
-        payloadGenerated: false,
-      });
-    return undefined;
-  }
-
-  private coverPreviousMessageError(
+  private upstreamAttestationError(
     source: string,
     raw: Context,
   ): Context | undefined {
-    const previous = isObject(raw["previousMessage"])
-      ? raw["previousMessage"]
+    const attestation = isObject(raw["upstreamAttestation"])
+      ? raw["upstreamAttestation"]
       : undefined;
-    if (source === "MT205COV") {
-      const permitted = new Set([
-        "MT202COV",
-        "MT205COV",
-        "GOVERNED_EQUIVALENT_COVER",
-      ]);
-      if (
-        !previous ||
-        !permitted.has(scalarText(previous["type"])) ||
-        !previous["20"] ||
-        !previous["21"] ||
-        !previous["121"] ||
-        !previous["A.52A"] ||
-        !previous["A.58A"] ||
-        !isObject(previous["sequenceB"]) ||
-        !previous["sequenceB"]["50A"] ||
-        !previous["sequenceB"]["59"] ||
-        !/^[a-f\d]{64}$/i.test(scalarText(previous["artifactSha256"])) ||
-        typeof previous["artifactVersion"] !== "string" ||
-        (previous["type"] === "GOVERNED_EQUIVALENT_COVER" &&
-          (typeof previous["equivalentCoverRuleRecordId"] !== "string" ||
-            typeof previous["equivalentCoverRuleRecordVersion"] !== "string"))
-      )
-        return this.failure(
-          422,
-          "INVALID_UPSTREAM_CONTEXT",
-          { validation: "FAIL", payloadGenerated: false },
-          "MT205COV requires complete governed cover-predecessor evidence",
-        );
-    }
-    if (previous?.["type"] === "MT202COV" && previous["A.58A"] === null)
-      return this.failure(
-        422,
-        "MESSAGE_CONTEXT_MISSING",
-        {
-          validation: "FAIL",
-          mustNotRead: ["SSI.beneficiaryBic"],
-          payloadGenerated: false,
-        },
-        "Upstream beneficiary institution is missing",
-      );
-    return undefined;
+    const valid =
+      attestation !== undefined &&
+      typeof attestation["attestationId"] === "string" &&
+      typeof attestation["attestationVersion"] === "string" &&
+      /^[a-f\d]{64}$/i.test(scalarText(attestation["evidenceSha256"])) &&
+      attestation["validity"] === "VALID" &&
+      attestation["scope"] === source &&
+      attestation["stale"] === false &&
+      attestation["hashMatches"] === true;
+    if (valid) return undefined;
+    return this.failure(
+      422,
+      "INVALID_UPSTREAM_CONTEXT",
+      {
+        validation: "FAIL",
+        payloadGenerated: false,
+        attestationAccepted: false,
+      },
+      "A current, scope-bound governed attestation is required",
+    );
   }
 
   private success(

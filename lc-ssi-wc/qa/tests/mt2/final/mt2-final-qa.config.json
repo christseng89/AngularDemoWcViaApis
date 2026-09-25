@@ -1,7 +1,15 @@
 {
   "schemaVersion": 1,
-  "expectedCaseCount": 101,
+  "expectedCaseCount": 57,
   "proposalCaseFile": "../../../../data/qa/mt2/mt2-pacs009-proposal-case-groups.json",
+  "reviewContract": {
+    "policy": "SINGLE_GENERATED_NEW_RULE_CASE_SET",
+    "reviewers": ["BA", "QA", "DBA"],
+    "caseCatalogueRole": "PROPOSAL_CASE_CATALOGUE",
+    "fixtureSetRole": "PROPOSAL_EXECUTABLE_FIXTURES",
+    "allowReviewerPrivateCases": false,
+    "allowArchivedCases": false
+  },
   "runtimeBinding": {
     "policy": "CAPTURE_CURRENT_AND_HOLD",
     "snapshotMethod": "SQLITE_WAL_AWARE_LOGICAL_SNAPSHOT_V1",
@@ -15,12 +23,12 @@
     },
     {
       "file": "../../../../data/qa/mt2/mt2-pacs009-proposal-case-groups.json",
-      "sha256": "67666338F971E24A994760B721F507FF49319CF6773557A3161406F5839C7B8F",
+      "sha256": "4210C5EF5D76D07E8434DAEDCCA2EEDFD9199A09631920F3577328A24A540C6A",
       "role": "PROPOSAL_CASE_CATALOGUE"
     },
     {
       "file": "../../../../data/qa/mt2/mt2-pacs009-proposal-fixtures.json",
-      "sha256": "9B31F52565096B2732D509988792F3AC60F54F179551273B3799E6604048943F",
+      "sha256": "CEC2EAA2AE05CD61F506CF631AC15138E0E2713FF8A09768E07E1505BFF2D4AD",
       "role": "PROPOSAL_EXECUTABLE_FIXTURES"
     },
     {

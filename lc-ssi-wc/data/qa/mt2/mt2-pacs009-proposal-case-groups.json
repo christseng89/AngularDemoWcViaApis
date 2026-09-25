@@ -9,7 +9,7 @@
     "MT2-MT205-PLAIN-SR2026",
     "MT2-MT205COV-COV-SR2026"
   ],
-  "expectedExpandedCaseCount": 101,
+  "expectedExpandedCaseCount": 57,
   "sideEffects": {
     "paymentExecutable": false,
     "payloadGenerated": false,
@@ -18,145 +18,415 @@
   },
   "groups": [
     {
-      "id": "MT2-V1-DIR-001",
-      "variants": "A..B",
-      "outcomes": ["UNSUPPORTED_DIRECTION"]
-    },
-    {
-      "id": "MT2-V1-PROFILE-002",
-      "variants": "A..G",
-      "outcomes": ["ELIGIBLE_COMPLETE_ROUTE", "UNSUPPORTED_PROFILE"]
-    },
-    {
-      "id": "MT2-V1-RMA-003",
-      "variants": "A..L",
-      "outcomes": ["ELIGIBLE_COMPLETE_ROUTE", "RMA_NOT_AUTHORIZED"]
-    },
-    {
-      "id": "MT2-V1-202COV-004",
-      "variants": "A..D",
-      "outcomes": ["INVALID_UPSTREAM_CONTEXT"]
-    },
-    {
-      "id": "MT2-V1-205-005",
-      "variants": "A..H",
-      "outcomes": ["ELIGIBLE_COMPLETE_ROUTE", "INVALID_UPSTREAM_CONTEXT"]
-    },
-    {
-      "id": "MT2-V1-205COV-006",
-      "variants": "A..G",
-      "outcomes": ["ELIGIBLE_COMPLETE_ROUTE", "INVALID_UPSTREAM_CONTEXT"]
-    },
-    {
-      "id": "MT2-V1-CUSTOMER-007",
+      "id": "MT2-SSI-DIRECTION-001",
       "variants": "SINGLE",
-      "outcomes": ["ELIGIBLE_COMPLETE_ROUTE"]
-    },
-    {
-      "id": "MT2-V1-PRESENCE-007",
-      "variants": "A",
-      "outcomes": ["PROFILE_INCOMPLETE"]
-    },
-    {
-      "id": "MT2-V1-STTLM-008",
-      "variants": "A..D",
-      "outcomes": ["ELIGIBLE_COMPLETE_ROUTE", "INVALID_CONTEXT_TOPOLOGY"]
-    },
-    {
-      "id": "MT2-V1-ACCOUNT-009",
-      "variants": "SINGLE",
-      "outcomes": ["PROFILE_INCOMPLETE"]
-    },
-    {
-      "id": "MT2-V1-PICKER-010",
-      "variants": "SINGLE",
-      "outcomes": ["ELIGIBLE_COMPLETE_ROUTE", "STALE"]
-    },
-    {
-      "id": "MT2-V1-ROUTE-011",
-      "variants": "A..C",
       "outcomes": [
-        "NO_ELIGIBLE_SSI",
-        "AMBIGUOUS_ROUTE",
+        "UNSUPPORTED_DIRECTION"
+      ]
+    },
+    {
+      "id": "MT2-SSI-PROFILE-002",
+      "variants": "SINGLE",
+      "outcomes": [
+        "UNSUPPORTED_PROFILE"
+      ]
+    },
+    {
+      "id": "MT2-SSI-ATTESTATION-MISSING",
+      "variants": "SINGLE",
+      "outcomes": [
+        "INVALID_UPSTREAM_CONTEXT"
+      ]
+    },
+    {
+      "id": "MT2-SSI-ATTESTATION-INVALID",
+      "variants": "SINGLE",
+      "outcomes": [
+        "INVALID_UPSTREAM_CONTEXT"
+      ]
+    },
+    {
+      "id": "MT2-SSI-ATTESTATION-STALE",
+      "variants": "SINGLE",
+      "outcomes": [
+        "INVALID_UPSTREAM_CONTEXT"
+      ]
+    },
+    {
+      "id": "MT2-SSI-ATTESTATION-HASH-MISMATCH",
+      "variants": "SINGLE",
+      "outcomes": [
+        "INVALID_UPSTREAM_CONTEXT"
+      ]
+    },
+    {
+      "id": "MT2-SSI-ATTESTATION-SCOPE-MISMATCH",
+      "variants": "SINGLE",
+      "outcomes": [
+        "INVALID_UPSTREAM_CONTEXT"
+      ]
+    },
+    {
+      "id": "MT2-SSI-ATTESTATION-VALID",
+      "variants": "SINGLE",
+      "outcomes": [
         "ELIGIBLE_COMPLETE_ROUTE"
       ]
     },
     {
-      "id": "MT2-V1-MAP-012",
+      "id": "MT2-SSI-COMPLETENESS-005",
       "variants": "SINGLE",
-      "outcomes": ["PROFILE_INCOMPLETE"]
+      "outcomes": [
+        "PROFILE_INCOMPLETE"
+      ]
     },
     {
-      "id": "MT2-V1-NOTREQ-013",
-      "variants": "A..D",
+      "id": "MT2-SSI-TOPOLOGY-006",
+      "variants": "SINGLE",
       "outcomes": [
-        "BILATERAL_RELATIONSHIP_CONFIRMED",
-        "INVALID_UPSTREAM_CONTEXT"
+        "INVALID_CONTEXT_TOPOLOGY"
+      ]
+    },
+    {
+      "id": "MT2-SSI-STALE-007",
+      "variants": "SINGLE",
+      "outcomes": [
+        "STALE"
+      ]
+    },
+    {
+      "id": "MT2-SSI-NO-ROUTE-008",
+      "variants": "SINGLE",
+      "outcomes": [
+        "NO_ELIGIBLE_SSI"
+      ]
+    },
+    {
+      "id": "MT2-SSI-AMBIGUOUS-009",
+      "variants": "SINGLE",
+      "outcomes": [
+        "AMBIGUOUS_ROUTE"
+      ]
+    },
+    {
+      "id": "MT2-SSI-ROUTE-010",
+      "variants": "SINGLE",
+      "outcomes": [
+        "ELIGIBLE_COMPLETE_ROUTE"
+      ]
+    },
+    {
+      "id": "MT2-SSI-BILATERAL-011",
+      "variants": "SINGLE",
+      "outcomes": [
+        "BILATERAL_RELATIONSHIP_CONFIRMED"
+      ]
+    },
+    {
+      "id": "MT2-SSI-JURISDICTION-012",
+      "variants": "SINGLE",
+      "outcomes": [
+        "JURISDICTION_NOT_PERMITTED"
+      ]
+    },
+    {
+      "id": "MT2-SSI-JURISDICTION-EVIDENCE-013",
+      "variants": "SINGLE",
+      "outcomes": [
+        "JURISDICTION_EVIDENCE_CONFLICT"
+      ]
+    },
+    {
+      "id": "MT2-V1-RMA-MISSING",
+      "variants": "SINGLE",
+      "outcomes": [
+        "RMA_NOT_AUTHORIZED"
+      ]
+    },
+    {
+      "id": "MT2-V1-RMA-EXPIRED",
+      "variants": "SINGLE",
+      "outcomes": [
+        "RMA_NOT_AUTHORIZED"
+      ]
+    },
+    {
+      "id": "MT2-V1-RMA-WRONG-RECEIVER",
+      "variants": "SINGLE",
+      "outcomes": [
+        "RMA_NOT_AUTHORIZED"
+      ]
+    },
+    {
+      "id": "MT2-V1-RMA-WRONG-BIZSVC",
+      "variants": "SINGLE",
+      "outcomes": [
+        "RMA_NOT_AUTHORIZED"
+      ]
+    },
+    {
+      "id": "MT2-V1-RMA-INACTIVE",
+      "variants": "SINGLE",
+      "outcomes": [
+        "RMA_NOT_AUTHORIZED"
+      ]
+    },
+    {
+      "id": "MT2-V1-RMA-DENIED",
+      "variants": "SINGLE",
+      "outcomes": [
+        "RMA_NOT_AUTHORIZED"
+      ]
+    },
+    {
+      "id": "MT2-V1-RMA-VALID-DUAL-CHANNEL",
+      "variants": "SINGLE",
+      "outcomes": [
+        "ELIGIBLE_COMPLETE_ROUTE"
+      ]
+    },
+    {
+      "id": "MT2-V1-RMA-FIN-NO-CONTINGENCY",
+      "variants": "SINGLE",
+      "outcomes": [
+        "RMA_NOT_AUTHORIZED"
+      ]
+    },
+    {
+      "id": "MT2-V1-RMA-VALID-FIN-CONTINGENCY",
+      "variants": "SINGLE",
+      "outcomes": [
+        "ELIGIBLE_COMPLETE_ROUTE"
+      ]
+    },
+    {
+      "id": "MT2-V1-RMA-WRONG-PAIRED-PROFILE",
+      "variants": "SINGLE",
+      "outcomes": [
+        "RMA_NOT_AUTHORIZED"
+      ]
+    },
+    {
+      "id": "MT2-V1-RMA-WRONG-PROFILE-BIZSVC-BINDING",
+      "variants": "SINGLE",
+      "outcomes": [
+        "RMA_NOT_AUTHORIZED"
+      ]
+    },
+    {
+      "id": "MT2-V1-RMA-WRONG-FIN-MESSAGE-TYPE",
+      "variants": "SINGLE",
+      "outcomes": [
+        "RMA_NOT_AUTHORIZED"
+      ]
+    },
+    {
+      "id": "MT2-V1-C81-MT202-56-57",
+      "variants": "SINGLE",
+      "outcomes": [
+        "ELIGIBLE_COMPLETE_ROUTE"
+      ]
+    },
+    {
+      "id": "MT2-V1-C81-MT202-56-ONLY",
+      "variants": "SINGLE",
+      "outcomes": [
+        "NO_ELIGIBLE_SSI"
+      ]
+    },
+    {
+      "id": "MT2-V1-C81-MT202-57-ONLY",
+      "variants": "SINGLE",
+      "outcomes": [
+        "ELIGIBLE_COMPLETE_ROUTE"
+      ]
+    },
+    {
+      "id": "MT2-V1-C81-MT202-NEITHER",
+      "variants": "SINGLE",
+      "outcomes": [
+        "ELIGIBLE_COMPLETE_ROUTE"
+      ]
+    },
+    {
+      "id": "MT2-V1-C81-MT202-MIXED",
+      "variants": "SINGLE",
+      "outcomes": [
+        "ELIGIBLE_COMPLETE_ROUTE"
+      ]
+    },
+    {
+      "id": "MT2-V1-C81-MT202-ALL-INVALID",
+      "variants": "SINGLE",
+      "outcomes": [
+        "NO_ELIGIBLE_SSI"
+      ]
+    },
+    {
+      "id": "MT2-V1-C81-MT202COV-56-57",
+      "variants": "SINGLE",
+      "outcomes": [
+        "ELIGIBLE_COMPLETE_ROUTE"
+      ]
+    },
+    {
+      "id": "MT2-V1-C81-MT202COV-56-ONLY",
+      "variants": "SINGLE",
+      "outcomes": [
+        "NO_ELIGIBLE_SSI"
+      ]
+    },
+    {
+      "id": "MT2-V1-C81-MT202COV-57-ONLY",
+      "variants": "SINGLE",
+      "outcomes": [
+        "ELIGIBLE_COMPLETE_ROUTE"
+      ]
+    },
+    {
+      "id": "MT2-V1-C81-MT202COV-NEITHER",
+      "variants": "SINGLE",
+      "outcomes": [
+        "ELIGIBLE_COMPLETE_ROUTE"
+      ]
+    },
+    {
+      "id": "MT2-V1-C81-MT202COV-MIXED",
+      "variants": "SINGLE",
+      "outcomes": [
+        "ELIGIBLE_COMPLETE_ROUTE"
+      ]
+    },
+    {
+      "id": "MT2-V1-C81-MT202COV-ALL-INVALID",
+      "variants": "SINGLE",
+      "outcomes": [
+        "NO_ELIGIBLE_SSI"
+      ]
+    },
+    {
+      "id": "MT2-V1-C81-MT205-56-57",
+      "variants": "SINGLE",
+      "outcomes": [
+        "ELIGIBLE_COMPLETE_ROUTE"
+      ]
+    },
+    {
+      "id": "MT2-V1-C81-MT205-56-ONLY",
+      "variants": "SINGLE",
+      "outcomes": [
+        "NO_ELIGIBLE_SSI"
+      ]
+    },
+    {
+      "id": "MT2-V1-C81-MT205-57-ONLY",
+      "variants": "SINGLE",
+      "outcomes": [
+        "ELIGIBLE_COMPLETE_ROUTE"
+      ]
+    },
+    {
+      "id": "MT2-V1-C81-MT205-NEITHER",
+      "variants": "SINGLE",
+      "outcomes": [
+        "ELIGIBLE_COMPLETE_ROUTE"
+      ]
+    },
+    {
+      "id": "MT2-V1-C81-MT205-MIXED",
+      "variants": "SINGLE",
+      "outcomes": [
+        "ELIGIBLE_COMPLETE_ROUTE"
+      ]
+    },
+    {
+      "id": "MT2-V1-C81-MT205-ALL-INVALID",
+      "variants": "SINGLE",
+      "outcomes": [
+        "NO_ELIGIBLE_SSI"
+      ]
+    },
+    {
+      "id": "MT2-V1-C81-MT205COV-56-57",
+      "variants": "SINGLE",
+      "outcomes": [
+        "ELIGIBLE_COMPLETE_ROUTE"
+      ]
+    },
+    {
+      "id": "MT2-V1-C81-MT205COV-56-ONLY",
+      "variants": "SINGLE",
+      "outcomes": [
+        "NO_ELIGIBLE_SSI"
+      ]
+    },
+    {
+      "id": "MT2-V1-C81-MT205COV-57-ONLY",
+      "variants": "SINGLE",
+      "outcomes": [
+        "ELIGIBLE_COMPLETE_ROUTE"
+      ]
+    },
+    {
+      "id": "MT2-V1-C81-MT205COV-NEITHER",
+      "variants": "SINGLE",
+      "outcomes": [
+        "ELIGIBLE_COMPLETE_ROUTE"
+      ]
+    },
+    {
+      "id": "MT2-V1-C81-MT205COV-MIXED",
+      "variants": "SINGLE",
+      "outcomes": [
+        "ELIGIBLE_COMPLETE_ROUTE"
+      ]
+    },
+    {
+      "id": "MT2-V1-C81-MT205COV-ALL-INVALID",
+      "variants": "SINGLE",
+      "outcomes": [
+        "NO_ELIGIBLE_SSI"
       ]
     },
     {
       "id": "MT2-V1-CONFIG-014",
       "variants": "SINGLE",
-      "outcomes": ["PROFILE_INCOMPLETE"]
-    },
-    {
-      "id": "MT2-V1-PRECEDENCE-015",
-      "variants": "A..B",
-      "outcomes": ["PROFILE_INCOMPLETE", "JURISDICTION_NOT_PERMITTED"]
-    },
-    {
-      "id": "MT2-V1-OPTIONS-016",
-      "variants": "SINGLE",
-      "outcomes": ["ELIGIBLE_COMPLETE_ROUTE", "PROFILE_INCOMPLETE"]
-    },
-    {
-      "id": "MT2-V1-SNAPSHOT-017",
-      "variants": "SINGLE",
-      "outcomes": ["STALE"]
-    },
-    {
-      "id": "MT2-V1-JURIS-018",
-      "variants": "A..G",
       "outcomes": [
-        "ELIGIBLE_COMPLETE_ROUTE",
-        "JURISDICTION_NOT_PERMITTED",
+        "PROFILE_INCOMPLETE"
+      ]
+    },
+    {
+      "id": "MT2-V1-MAP-012",
+      "variants": "SINGLE",
+      "outcomes": [
+        "PROFILE_INCOMPLETE"
+      ]
+    },
+    {
+      "id": "MT2-V1-JURIS-018G",
+      "variants": "SINGLE",
+      "outcomes": [
         "JURISDICTION_EVIDENCE_CONFLICT"
       ]
     },
     {
-      "id": "MT2-V1-NONCOVER-019",
-      "variants": "A..C",
-      "outcomes": ["ELIGIBLE_COMPLETE_ROUTE", "INVALID_UPSTREAM_CONTEXT"]
-    },
-    {
-      "id": "MT2-V1-OWNACCT-020",
-      "variants": "A..F",
-      "outcomes": ["ELIGIBLE_COMPLETE_ROUTE", "PROFILE_INCOMPLETE"]
-    },
-    {
-      "id": "MT2-V1-C81-021",
-      "variants": "A..D",
-      "profileMatrix": true,
-      "outcomes": ["ELIGIBLE_COMPLETE_ROUTE", "NO_ELIGIBLE_SSI"]
-    },
-    {
-      "id": "MT2-V1-C81-021",
-      "variants": "E..F",
-      "profileMatrix": true,
-      "outcomes": ["ELIGIBLE_COMPLETE_ROUTE", "NO_ELIGIBLE_SSI"]
+      "id": "MT2-V1-JURIS-018F",
+      "variants": "SINGLE",
+      "outcomes": [
+        "JURISDICTION_NOT_PERMITTED"
+      ]
     }
   ],
   "cases": [
     {
-      "caseId": "MT2-V1-DIR-001A",
-      "scenarioGroupId": "MT2-V1-DIR-001",
-      "fixtureBindingId": "FIXTURE-MT2-V1-DIR-001A",
+      "caseId": "MT2-SSI-DIRECTION-001",
+      "scenarioGroupId": "MT2-SSI-DIRECTION-001",
+      "fixtureBindingId": "FIXTURE-MT2-SSI-DIRECTION-001",
       "request": {
-        "caseId": "MT2-V1-DIR-001A",
+        "caseId": "MT2-SSI-DIRECTION-001",
         "direction": "INWARD",
         "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-DIR-001",
-        "variant": "A"
+        "sourceMessageType": "MT202"
       },
       "expected": {
         "httpStatus": 422,
@@ -170,125 +440,14 @@
       "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
     },
     {
-      "caseId": "MT2-V1-DIR-001B",
-      "scenarioGroupId": "MT2-V1-DIR-001",
-      "fixtureBindingId": "FIXTURE-MT2-V1-DIR-001B",
+      "caseId": "MT2-SSI-PROFILE-002",
+      "scenarioGroupId": "MT2-SSI-PROFILE-002",
+      "fixtureBindingId": "FIXTURE-MT2-SSI-PROFILE-002",
       "request": {
-        "caseId": "MT2-V1-DIR-001B",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTED_AGENT",
-        "scenarioGroupId": "MT2-V1-DIR-001",
-        "variant": "B"
-      },
-      "expected": {
-        "httpStatus": 422,
-        "ssiApplicability": "NOT_EVALUATED",
-        "resolutionOutcome": "UNSUPPORTED_DIRECTION",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-PROFILE-002A",
-      "scenarioGroupId": "MT2-V1-PROFILE-002",
-      "fixtureBindingId": "FIXTURE-MT2-V1-PROFILE-002A",
-      "request": {
-        "caseId": "MT2-V1-PROFILE-002A",
+        "caseId": "MT2-SSI-PROFILE-002",
         "direction": "OUTWARD",
         "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-PROFILE-002",
-        "variant": "A"
-      },
-      "expected": {
-        "httpStatus": 200,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-PROFILE-002B",
-      "scenarioGroupId": "MT2-V1-PROFILE-002",
-      "fixtureBindingId": "FIXTURE-MT2-V1-PROFILE-002B",
-      "request": {
-        "caseId": "MT2-V1-PROFILE-002B",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-PROFILE-002",
-        "variant": "B"
-      },
-      "expected": {
-        "httpStatus": 200,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-PROFILE-002C",
-      "scenarioGroupId": "MT2-V1-PROFILE-002",
-      "fixtureBindingId": "FIXTURE-MT2-V1-PROFILE-002C",
-      "request": {
-        "caseId": "MT2-V1-PROFILE-002C",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-PROFILE-002",
-        "variant": "C"
-      },
-      "expected": {
-        "httpStatus": 200,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-PROFILE-002D",
-      "scenarioGroupId": "MT2-V1-PROFILE-002",
-      "fixtureBindingId": "FIXTURE-MT2-V1-PROFILE-002D",
-      "request": {
-        "caseId": "MT2-V1-PROFILE-002D",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-PROFILE-002",
-        "variant": "D"
-      },
-      "expected": {
-        "httpStatus": 200,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-PROFILE-002E",
-      "scenarioGroupId": "MT2-V1-PROFILE-002",
-      "fixtureBindingId": "FIXTURE-MT2-V1-PROFILE-002E",
-      "request": {
-        "caseId": "MT2-V1-PROFILE-002E",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-PROFILE-002",
-        "variant": "E"
+        "sourceMessageType": "MT202"
       },
       "expected": {
         "httpStatus": 422,
@@ -302,323 +461,14 @@
       "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
     },
     {
-      "caseId": "MT2-V1-PROFILE-002F",
-      "scenarioGroupId": "MT2-V1-PROFILE-002",
-      "fixtureBindingId": "FIXTURE-MT2-V1-PROFILE-002F",
+      "caseId": "MT2-SSI-ATTESTATION-MISSING",
+      "scenarioGroupId": "MT2-SSI-ATTESTATION-MISSING",
+      "fixtureBindingId": "FIXTURE-MT2-SSI-ATTESTATION-MISSING",
       "request": {
-        "caseId": "MT2-V1-PROFILE-002F",
+        "caseId": "MT2-SSI-ATTESTATION-MISSING",
         "direction": "OUTWARD",
         "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-PROFILE-002",
-        "variant": "F"
-      },
-      "expected": {
-        "httpStatus": 422,
-        "ssiApplicability": "NOT_EVALUATED",
-        "resolutionOutcome": "UNSUPPORTED_PROFILE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-PROFILE-002G",
-      "scenarioGroupId": "MT2-V1-PROFILE-002",
-      "fixtureBindingId": "FIXTURE-MT2-V1-PROFILE-002G",
-      "request": {
-        "caseId": "MT2-V1-PROFILE-002G",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-PROFILE-002",
-        "variant": "G"
-      },
-      "expected": {
-        "httpStatus": 422,
-        "ssiApplicability": "NOT_EVALUATED",
-        "resolutionOutcome": "UNSUPPORTED_PROFILE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-RMA-003A",
-      "scenarioGroupId": "MT2-V1-RMA-003",
-      "fixtureBindingId": "FIXTURE-MT2-V1-RMA-003A",
-      "request": {
-        "caseId": "MT2-V1-RMA-003A",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-RMA-003",
-        "variant": "A"
-      },
-      "expected": {
-        "httpStatus": 422,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "RMA_NOT_AUTHORIZED",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-RMA-003B",
-      "scenarioGroupId": "MT2-V1-RMA-003",
-      "fixtureBindingId": "FIXTURE-MT2-V1-RMA-003B",
-      "request": {
-        "caseId": "MT2-V1-RMA-003B",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-RMA-003",
-        "variant": "B"
-      },
-      "expected": {
-        "httpStatus": 422,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "RMA_NOT_AUTHORIZED",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-RMA-003C",
-      "scenarioGroupId": "MT2-V1-RMA-003",
-      "fixtureBindingId": "FIXTURE-MT2-V1-RMA-003C",
-      "request": {
-        "caseId": "MT2-V1-RMA-003C",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-RMA-003",
-        "variant": "C"
-      },
-      "expected": {
-        "httpStatus": 422,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "RMA_NOT_AUTHORIZED",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-RMA-003D",
-      "scenarioGroupId": "MT2-V1-RMA-003",
-      "fixtureBindingId": "FIXTURE-MT2-V1-RMA-003D",
-      "request": {
-        "caseId": "MT2-V1-RMA-003D",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-RMA-003",
-        "variant": "D"
-      },
-      "expected": {
-        "httpStatus": 422,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "RMA_NOT_AUTHORIZED",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-RMA-003E",
-      "scenarioGroupId": "MT2-V1-RMA-003",
-      "fixtureBindingId": "FIXTURE-MT2-V1-RMA-003E",
-      "request": {
-        "caseId": "MT2-V1-RMA-003E",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-RMA-003",
-        "variant": "E"
-      },
-      "expected": {
-        "httpStatus": 422,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "RMA_NOT_AUTHORIZED",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-RMA-003F",
-      "scenarioGroupId": "MT2-V1-RMA-003",
-      "fixtureBindingId": "FIXTURE-MT2-V1-RMA-003F",
-      "request": {
-        "caseId": "MT2-V1-RMA-003F",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-RMA-003",
-        "variant": "F"
-      },
-      "expected": {
-        "httpStatus": 422,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "RMA_NOT_AUTHORIZED",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-RMA-003G",
-      "scenarioGroupId": "MT2-V1-RMA-003",
-      "fixtureBindingId": "FIXTURE-MT2-V1-RMA-003G",
-      "request": {
-        "caseId": "MT2-V1-RMA-003G",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-RMA-003",
-        "variant": "G"
-      },
-      "expected": {
-        "httpStatus": 200,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-RMA-003H",
-      "scenarioGroupId": "MT2-V1-RMA-003",
-      "fixtureBindingId": "FIXTURE-MT2-V1-RMA-003H",
-      "request": {
-        "caseId": "MT2-V1-RMA-003H",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-RMA-003",
-        "variant": "H"
-      },
-      "expected": {
-        "httpStatus": 422,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "RMA_NOT_AUTHORIZED",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-RMA-003I",
-      "scenarioGroupId": "MT2-V1-RMA-003",
-      "fixtureBindingId": "FIXTURE-MT2-V1-RMA-003I",
-      "request": {
-        "caseId": "MT2-V1-RMA-003I",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-RMA-003",
-        "variant": "I"
-      },
-      "expected": {
-        "httpStatus": 200,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-RMA-003J",
-      "scenarioGroupId": "MT2-V1-RMA-003",
-      "fixtureBindingId": "FIXTURE-MT2-V1-RMA-003J",
-      "request": {
-        "caseId": "MT2-V1-RMA-003J",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-RMA-003",
-        "variant": "J"
-      },
-      "expected": {
-        "httpStatus": 422,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "RMA_NOT_AUTHORIZED",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-RMA-003K",
-      "scenarioGroupId": "MT2-V1-RMA-003",
-      "fixtureBindingId": "FIXTURE-MT2-V1-RMA-003K",
-      "request": {
-        "caseId": "MT2-V1-RMA-003K",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-RMA-003",
-        "variant": "K"
-      },
-      "expected": {
-        "httpStatus": 422,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "RMA_NOT_AUTHORIZED",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-RMA-003L",
-      "scenarioGroupId": "MT2-V1-RMA-003",
-      "fixtureBindingId": "FIXTURE-MT2-V1-RMA-003L",
-      "request": {
-        "caseId": "MT2-V1-RMA-003L",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-RMA-003",
-        "variant": "L"
-      },
-      "expected": {
-        "httpStatus": 422,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "RMA_NOT_AUTHORIZED",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-202COV-004A",
-      "scenarioGroupId": "MT2-V1-202COV-004",
-      "fixtureBindingId": "FIXTURE-MT2-V1-202COV-004A",
-      "request": {
-        "caseId": "MT2-V1-202COV-004A",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-202COV-004",
-        "variant": "A"
+        "sourceMessageType": "MT205"
       },
       "expected": {
         "httpStatus": 422,
@@ -632,15 +482,14 @@
       "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
     },
     {
-      "caseId": "MT2-V1-202COV-004B",
-      "scenarioGroupId": "MT2-V1-202COV-004",
-      "fixtureBindingId": "FIXTURE-MT2-V1-202COV-004B",
+      "caseId": "MT2-SSI-ATTESTATION-INVALID",
+      "scenarioGroupId": "MT2-SSI-ATTESTATION-INVALID",
+      "fixtureBindingId": "FIXTURE-MT2-SSI-ATTESTATION-INVALID",
       "request": {
-        "caseId": "MT2-V1-202COV-004B",
+        "caseId": "MT2-SSI-ATTESTATION-INVALID",
         "direction": "OUTWARD",
         "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-202COV-004",
-        "variant": "B"
+        "sourceMessageType": "MT205"
       },
       "expected": {
         "httpStatus": 422,
@@ -654,15 +503,14 @@
       "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
     },
     {
-      "caseId": "MT2-V1-202COV-004C",
-      "scenarioGroupId": "MT2-V1-202COV-004",
-      "fixtureBindingId": "FIXTURE-MT2-V1-202COV-004C",
+      "caseId": "MT2-SSI-ATTESTATION-STALE",
+      "scenarioGroupId": "MT2-SSI-ATTESTATION-STALE",
+      "fixtureBindingId": "FIXTURE-MT2-SSI-ATTESTATION-STALE",
       "request": {
-        "caseId": "MT2-V1-202COV-004C",
+        "caseId": "MT2-SSI-ATTESTATION-STALE",
         "direction": "OUTWARD",
         "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-202COV-004",
-        "variant": "C"
+        "sourceMessageType": "MT205"
       },
       "expected": {
         "httpStatus": 422,
@@ -676,15 +524,14 @@
       "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
     },
     {
-      "caseId": "MT2-V1-202COV-004D",
-      "scenarioGroupId": "MT2-V1-202COV-004",
-      "fixtureBindingId": "FIXTURE-MT2-V1-202COV-004D",
+      "caseId": "MT2-SSI-ATTESTATION-HASH-MISMATCH",
+      "scenarioGroupId": "MT2-SSI-ATTESTATION-HASH-MISMATCH",
+      "fixtureBindingId": "FIXTURE-MT2-SSI-ATTESTATION-HASH-MISMATCH",
       "request": {
-        "caseId": "MT2-V1-202COV-004D",
+        "caseId": "MT2-SSI-ATTESTATION-HASH-MISMATCH",
         "direction": "OUTWARD",
         "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-202COV-004",
-        "variant": "D"
+        "sourceMessageType": "MT205"
       },
       "expected": {
         "httpStatus": 422,
@@ -698,169 +545,14 @@
       "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
     },
     {
-      "caseId": "MT2-V1-205-005A",
-      "scenarioGroupId": "MT2-V1-205-005",
-      "fixtureBindingId": "FIXTURE-MT2-V1-205-005A",
+      "caseId": "MT2-SSI-ATTESTATION-SCOPE-MISMATCH",
+      "scenarioGroupId": "MT2-SSI-ATTESTATION-SCOPE-MISMATCH",
+      "fixtureBindingId": "FIXTURE-MT2-SSI-ATTESTATION-SCOPE-MISMATCH",
       "request": {
-        "caseId": "MT2-V1-205-005A",
+        "caseId": "MT2-SSI-ATTESTATION-SCOPE-MISMATCH",
         "direction": "OUTWARD",
         "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-205-005",
-        "variant": "A"
-      },
-      "expected": {
-        "httpStatus": 200,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-205-005B",
-      "scenarioGroupId": "MT2-V1-205-005",
-      "fixtureBindingId": "FIXTURE-MT2-V1-205-005B",
-      "request": {
-        "caseId": "MT2-V1-205-005B",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-205-005",
-        "variant": "B"
-      },
-      "expected": {
-        "httpStatus": 200,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-205-005C",
-      "scenarioGroupId": "MT2-V1-205-005",
-      "fixtureBindingId": "FIXTURE-MT2-V1-205-005C",
-      "request": {
-        "caseId": "MT2-V1-205-005C",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-205-005",
-        "variant": "C"
-      },
-      "expected": {
-        "httpStatus": 200,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-205-005D",
-      "scenarioGroupId": "MT2-V1-205-005",
-      "fixtureBindingId": "FIXTURE-MT2-V1-205-005D",
-      "request": {
-        "caseId": "MT2-V1-205-005D",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-205-005",
-        "variant": "D"
-      },
-      "expected": {
-        "httpStatus": 200,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-205-005E",
-      "scenarioGroupId": "MT2-V1-205-005",
-      "fixtureBindingId": "FIXTURE-MT2-V1-205-005E",
-      "request": {
-        "caseId": "MT2-V1-205-005E",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-205-005",
-        "variant": "E"
-      },
-      "expected": {
-        "httpStatus": 200,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-205-005F",
-      "scenarioGroupId": "MT2-V1-205-005",
-      "fixtureBindingId": "FIXTURE-MT2-V1-205-005F",
-      "request": {
-        "caseId": "MT2-V1-205-005F",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-205-005",
-        "variant": "F"
-      },
-      "expected": {
-        "httpStatus": 200,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-205-005G",
-      "scenarioGroupId": "MT2-V1-205-005",
-      "fixtureBindingId": "FIXTURE-MT2-V1-205-005G",
-      "request": {
-        "caseId": "MT2-V1-205-005G",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-205-005",
-        "variant": "G"
-      },
-      "expected": {
-        "httpStatus": 200,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-205-005H",
-      "scenarioGroupId": "MT2-V1-205-005",
-      "fixtureBindingId": "FIXTURE-MT2-V1-205-005H",
-      "request": {
-        "caseId": "MT2-V1-205-005H",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-205-005",
-        "variant": "H"
+        "sourceMessageType": "MT205"
       },
       "expected": {
         "httpStatus": 422,
@@ -874,15 +566,14 @@
       "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
     },
     {
-      "caseId": "MT2-V1-205COV-006A",
-      "scenarioGroupId": "MT2-V1-205COV-006",
-      "fixtureBindingId": "FIXTURE-MT2-V1-205COV-006A",
+      "caseId": "MT2-SSI-ATTESTATION-VALID",
+      "scenarioGroupId": "MT2-SSI-ATTESTATION-VALID",
+      "fixtureBindingId": "FIXTURE-MT2-SSI-ATTESTATION-VALID",
       "request": {
-        "caseId": "MT2-V1-205COV-006A",
+        "caseId": "MT2-SSI-ATTESTATION-VALID",
         "direction": "OUTWARD",
         "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-205COV-006",
-        "variant": "A"
+        "sourceMessageType": "MT205"
       },
       "expected": {
         "httpStatus": 200,
@@ -896,169 +587,14 @@
       "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
     },
     {
-      "caseId": "MT2-V1-205COV-006B",
-      "scenarioGroupId": "MT2-V1-205COV-006",
-      "fixtureBindingId": "FIXTURE-MT2-V1-205COV-006B",
+      "caseId": "MT2-SSI-COMPLETENESS-005",
+      "scenarioGroupId": "MT2-SSI-COMPLETENESS-005",
+      "fixtureBindingId": "FIXTURE-MT2-SSI-COMPLETENESS-005",
       "request": {
-        "caseId": "MT2-V1-205COV-006B",
+        "caseId": "MT2-SSI-COMPLETENESS-005",
         "direction": "OUTWARD",
         "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-205COV-006",
-        "variant": "B"
-      },
-      "expected": {
-        "httpStatus": 200,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-205COV-006C",
-      "scenarioGroupId": "MT2-V1-205COV-006",
-      "fixtureBindingId": "FIXTURE-MT2-V1-205COV-006C",
-      "request": {
-        "caseId": "MT2-V1-205COV-006C",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-205COV-006",
-        "variant": "C"
-      },
-      "expected": {
-        "httpStatus": 200,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-205COV-006D",
-      "scenarioGroupId": "MT2-V1-205COV-006",
-      "fixtureBindingId": "FIXTURE-MT2-V1-205COV-006D",
-      "request": {
-        "caseId": "MT2-V1-205COV-006D",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-205COV-006",
-        "variant": "D"
-      },
-      "expected": {
-        "httpStatus": 422,
-        "ssiApplicability": "NOT_EVALUATED",
-        "resolutionOutcome": "INVALID_UPSTREAM_CONTEXT",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-205COV-006E",
-      "scenarioGroupId": "MT2-V1-205COV-006",
-      "fixtureBindingId": "FIXTURE-MT2-V1-205COV-006E",
-      "request": {
-        "caseId": "MT2-V1-205COV-006E",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-205COV-006",
-        "variant": "E"
-      },
-      "expected": {
-        "httpStatus": 422,
-        "ssiApplicability": "NOT_EVALUATED",
-        "resolutionOutcome": "INVALID_UPSTREAM_CONTEXT",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-205COV-006F",
-      "scenarioGroupId": "MT2-V1-205COV-006",
-      "fixtureBindingId": "FIXTURE-MT2-V1-205COV-006F",
-      "request": {
-        "caseId": "MT2-V1-205COV-006F",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-205COV-006",
-        "variant": "F"
-      },
-      "expected": {
-        "httpStatus": 422,
-        "ssiApplicability": "NOT_EVALUATED",
-        "resolutionOutcome": "INVALID_UPSTREAM_CONTEXT",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-205COV-006G",
-      "scenarioGroupId": "MT2-V1-205COV-006",
-      "fixtureBindingId": "FIXTURE-MT2-V1-205COV-006G",
-      "request": {
-        "caseId": "MT2-V1-205COV-006G",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-205COV-006",
-        "variant": "G"
-      },
-      "expected": {
-        "httpStatus": 422,
-        "ssiApplicability": "NOT_EVALUATED",
-        "resolutionOutcome": "INVALID_UPSTREAM_CONTEXT",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-CUSTOMER-007",
-      "scenarioGroupId": "MT2-V1-CUSTOMER-007",
-      "fixtureBindingId": "FIXTURE-MT2-V1-CUSTOMER-007",
-      "request": {
-        "caseId": "MT2-V1-CUSTOMER-007",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-CUSTOMER-007",
-        "variant": "SINGLE"
-      },
-      "expected": {
-        "httpStatus": 200,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-PRESENCE-007A",
-      "scenarioGroupId": "MT2-V1-PRESENCE-007",
-      "fixtureBindingId": "FIXTURE-MT2-V1-PRESENCE-007A",
-      "request": {
-        "caseId": "MT2-V1-PRESENCE-007A",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-PRESENCE-007",
-        "variant": "A"
+        "sourceMessageType": "MT202"
       },
       "expected": {
         "httpStatus": 422,
@@ -1072,59 +608,14 @@
       "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
     },
     {
-      "caseId": "MT2-V1-STTLM-008A",
-      "scenarioGroupId": "MT2-V1-STTLM-008",
-      "fixtureBindingId": "FIXTURE-MT2-V1-STTLM-008A",
+      "caseId": "MT2-SSI-TOPOLOGY-006",
+      "scenarioGroupId": "MT2-SSI-TOPOLOGY-006",
+      "fixtureBindingId": "FIXTURE-MT2-SSI-TOPOLOGY-006",
       "request": {
-        "caseId": "MT2-V1-STTLM-008A",
+        "caseId": "MT2-SSI-TOPOLOGY-006",
         "direction": "OUTWARD",
         "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-STTLM-008",
-        "variant": "A"
-      },
-      "expected": {
-        "httpStatus": 200,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-STTLM-008B",
-      "scenarioGroupId": "MT2-V1-STTLM-008",
-      "fixtureBindingId": "FIXTURE-MT2-V1-STTLM-008B",
-      "request": {
-        "caseId": "MT2-V1-STTLM-008B",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-STTLM-008",
-        "variant": "B"
-      },
-      "expected": {
-        "httpStatus": 200,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-STTLM-008C",
-      "scenarioGroupId": "MT2-V1-STTLM-008",
-      "fixtureBindingId": "FIXTURE-MT2-V1-STTLM-008C",
-      "request": {
-        "caseId": "MT2-V1-STTLM-008C",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-STTLM-008",
-        "variant": "C"
+        "sourceMessageType": "MT202"
       },
       "expected": {
         "httpStatus": 422,
@@ -1138,63 +629,18 @@
       "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
     },
     {
-      "caseId": "MT2-V1-STTLM-008D",
-      "scenarioGroupId": "MT2-V1-STTLM-008",
-      "fixtureBindingId": "FIXTURE-MT2-V1-STTLM-008D",
+      "caseId": "MT2-SSI-STALE-007",
+      "scenarioGroupId": "MT2-SSI-STALE-007",
+      "fixtureBindingId": "FIXTURE-MT2-SSI-STALE-007",
       "request": {
-        "caseId": "MT2-V1-STTLM-008D",
+        "caseId": "MT2-SSI-STALE-007",
         "direction": "OUTWARD",
         "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-STTLM-008",
-        "variant": "D"
-      },
-      "expected": {
-        "httpStatus": 200,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-ACCOUNT-009",
-      "scenarioGroupId": "MT2-V1-ACCOUNT-009",
-      "fixtureBindingId": "FIXTURE-MT2-V1-ACCOUNT-009",
-      "request": {
-        "caseId": "MT2-V1-ACCOUNT-009",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-ACCOUNT-009",
-        "variant": "SINGLE"
-      },
-      "expected": {
-        "httpStatus": 422,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "PROFILE_INCOMPLETE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-PICKER-010",
-      "scenarioGroupId": "MT2-V1-PICKER-010",
-      "fixtureBindingId": "FIXTURE-MT2-V1-PICKER-010",
-      "request": {
-        "caseId": "MT2-V1-PICKER-010",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-PICKER-010",
-        "variant": "SINGLE"
+        "sourceMessageType": "MT202"
       },
       "expected": {
         "httpStatus": 409,
-        "ssiApplicability": "REQUIRED",
+        "ssiApplicability": "NOT_EVALUATED",
         "resolutionOutcome": "STALE",
         "paymentExecutable": false,
         "payloadGenerated": false,
@@ -1204,15 +650,14 @@
       "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
     },
     {
-      "caseId": "MT2-V1-ROUTE-011A",
-      "scenarioGroupId": "MT2-V1-ROUTE-011",
-      "fixtureBindingId": "FIXTURE-MT2-V1-ROUTE-011A",
+      "caseId": "MT2-SSI-NO-ROUTE-008",
+      "scenarioGroupId": "MT2-SSI-NO-ROUTE-008",
+      "fixtureBindingId": "FIXTURE-MT2-SSI-NO-ROUTE-008",
       "request": {
-        "caseId": "MT2-V1-ROUTE-011A",
+        "caseId": "MT2-SSI-NO-ROUTE-008",
         "direction": "OUTWARD",
         "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-ROUTE-011",
-        "variant": "A"
+        "sourceMessageType": "MT202"
       },
       "expected": {
         "httpStatus": 422,
@@ -1226,18 +671,17 @@
       "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
     },
     {
-      "caseId": "MT2-V1-ROUTE-011B",
-      "scenarioGroupId": "MT2-V1-ROUTE-011",
-      "fixtureBindingId": "FIXTURE-MT2-V1-ROUTE-011B",
+      "caseId": "MT2-SSI-AMBIGUOUS-009",
+      "scenarioGroupId": "MT2-SSI-AMBIGUOUS-009",
+      "fixtureBindingId": "FIXTURE-MT2-SSI-AMBIGUOUS-009",
       "request": {
-        "caseId": "MT2-V1-ROUTE-011B",
+        "caseId": "MT2-SSI-AMBIGUOUS-009",
         "direction": "OUTWARD",
         "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-ROUTE-011",
-        "variant": "B"
+        "sourceMessageType": "MT202"
       },
       "expected": {
-        "httpStatus": 422,
+        "httpStatus": 409,
         "ssiApplicability": "REQUIRED",
         "resolutionOutcome": "AMBIGUOUS_ROUTE",
         "paymentExecutable": false,
@@ -1248,15 +692,14 @@
       "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
     },
     {
-      "caseId": "MT2-V1-ROUTE-011C",
-      "scenarioGroupId": "MT2-V1-ROUTE-011",
-      "fixtureBindingId": "FIXTURE-MT2-V1-ROUTE-011C",
+      "caseId": "MT2-SSI-ROUTE-010",
+      "scenarioGroupId": "MT2-SSI-ROUTE-010",
+      "fixtureBindingId": "FIXTURE-MT2-SSI-ROUTE-010",
       "request": {
-        "caseId": "MT2-V1-ROUTE-011C",
+        "caseId": "MT2-SSI-ROUTE-010",
         "direction": "OUTWARD",
         "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-ROUTE-011",
-        "variant": "C"
+        "sourceMessageType": "MT202"
       },
       "expected": {
         "httpStatus": 200,
@@ -1270,37 +713,14 @@
       "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
     },
     {
-      "caseId": "MT2-V1-MAP-012",
-      "scenarioGroupId": "MT2-V1-MAP-012",
-      "fixtureBindingId": "FIXTURE-MT2-V1-MAP-012",
+      "caseId": "MT2-SSI-BILATERAL-011",
+      "scenarioGroupId": "MT2-SSI-BILATERAL-011",
+      "fixtureBindingId": "FIXTURE-MT2-SSI-BILATERAL-011",
       "request": {
-        "caseId": "MT2-V1-MAP-012",
+        "caseId": "MT2-SSI-BILATERAL-011",
         "direction": "OUTWARD",
         "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-MAP-012",
-        "variant": "SINGLE"
-      },
-      "expected": {
-        "httpStatus": 422,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "PROFILE_INCOMPLETE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-NOTREQ-013A",
-      "scenarioGroupId": "MT2-V1-NOTREQ-013",
-      "fixtureBindingId": "FIXTURE-MT2-V1-NOTREQ-013A",
-      "request": {
-        "caseId": "MT2-V1-NOTREQ-013A",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-NOTREQ-013",
-        "variant": "A"
+        "sourceMessageType": "MT202"
       },
       "expected": {
         "httpStatus": 200,
@@ -1314,20 +734,19 @@
       "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
     },
     {
-      "caseId": "MT2-V1-NOTREQ-013B",
-      "scenarioGroupId": "MT2-V1-NOTREQ-013",
-      "fixtureBindingId": "FIXTURE-MT2-V1-NOTREQ-013B",
+      "caseId": "MT2-SSI-JURISDICTION-012",
+      "scenarioGroupId": "MT2-SSI-JURISDICTION-012",
+      "fixtureBindingId": "FIXTURE-MT2-SSI-JURISDICTION-012",
       "request": {
-        "caseId": "MT2-V1-NOTREQ-013B",
+        "caseId": "MT2-SSI-JURISDICTION-012",
         "direction": "OUTWARD",
         "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-NOTREQ-013",
-        "variant": "B"
+        "sourceMessageType": "MT205COV"
       },
       "expected": {
         "httpStatus": 422,
-        "ssiApplicability": "NOT_EVALUATED",
-        "resolutionOutcome": "INVALID_UPSTREAM_CONTEXT",
+        "ssiApplicability": "REQUIRED",
+        "resolutionOutcome": "JURISDICTION_NOT_PERMITTED",
         "paymentExecutable": false,
         "payloadGenerated": false,
         "confirmedResolutionCreated": false,
@@ -1336,20 +755,19 @@
       "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
     },
     {
-      "caseId": "MT2-V1-NOTREQ-013C",
-      "scenarioGroupId": "MT2-V1-NOTREQ-013",
-      "fixtureBindingId": "FIXTURE-MT2-V1-NOTREQ-013C",
+      "caseId": "MT2-SSI-JURISDICTION-EVIDENCE-013",
+      "scenarioGroupId": "MT2-SSI-JURISDICTION-EVIDENCE-013",
+      "fixtureBindingId": "FIXTURE-MT2-SSI-JURISDICTION-EVIDENCE-013",
       "request": {
-        "caseId": "MT2-V1-NOTREQ-013C",
+        "caseId": "MT2-SSI-JURISDICTION-EVIDENCE-013",
         "direction": "OUTWARD",
         "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-NOTREQ-013",
-        "variant": "C"
+        "sourceMessageType": "MT205"
       },
       "expected": {
         "httpStatus": 422,
-        "ssiApplicability": "NOT_EVALUATED",
-        "resolutionOutcome": "INVALID_UPSTREAM_CONTEXT",
+        "ssiApplicability": "REQUIRED",
+        "resolutionOutcome": "JURISDICTION_EVIDENCE_CONFLICT",
         "paymentExecutable": false,
         "payloadGenerated": false,
         "confirmedResolutionCreated": false,
@@ -1358,20 +776,754 @@
       "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
     },
     {
-      "caseId": "MT2-V1-NOTREQ-013D",
-      "scenarioGroupId": "MT2-V1-NOTREQ-013",
-      "fixtureBindingId": "FIXTURE-MT2-V1-NOTREQ-013D",
+      "caseId": "MT2-V1-RMA-MISSING",
+      "scenarioGroupId": "MT2-V1-RMA-MISSING",
+      "fixtureBindingId": "FIXTURE-MT2-V1-RMA-MISSING",
       "request": {
-        "caseId": "MT2-V1-NOTREQ-013D",
+        "caseId": "MT2-V1-RMA-MISSING",
         "direction": "OUTWARD",
         "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-NOTREQ-013",
-        "variant": "D"
+        "sourceMessageType": "MT202"
       },
       "expected": {
         "httpStatus": 422,
-        "ssiApplicability": "NOT_EVALUATED",
-        "resolutionOutcome": "INVALID_UPSTREAM_CONTEXT",
+        "ssiApplicability": "REQUIRED",
+        "resolutionOutcome": "RMA_NOT_AUTHORIZED",
+        "paymentExecutable": false,
+        "payloadGenerated": false,
+        "confirmedResolutionCreated": false,
+        "repairQueueCreated": false
+      },
+      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
+    },
+    {
+      "caseId": "MT2-V1-RMA-EXPIRED",
+      "scenarioGroupId": "MT2-V1-RMA-EXPIRED",
+      "fixtureBindingId": "FIXTURE-MT2-V1-RMA-EXPIRED",
+      "request": {
+        "caseId": "MT2-V1-RMA-EXPIRED",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "sourceMessageType": "MT202"
+      },
+      "expected": {
+        "httpStatus": 422,
+        "ssiApplicability": "REQUIRED",
+        "resolutionOutcome": "RMA_NOT_AUTHORIZED",
+        "paymentExecutable": false,
+        "payloadGenerated": false,
+        "confirmedResolutionCreated": false,
+        "repairQueueCreated": false
+      },
+      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
+    },
+    {
+      "caseId": "MT2-V1-RMA-WRONG-RECEIVER",
+      "scenarioGroupId": "MT2-V1-RMA-WRONG-RECEIVER",
+      "fixtureBindingId": "FIXTURE-MT2-V1-RMA-WRONG-RECEIVER",
+      "request": {
+        "caseId": "MT2-V1-RMA-WRONG-RECEIVER",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "sourceMessageType": "MT202"
+      },
+      "expected": {
+        "httpStatus": 422,
+        "ssiApplicability": "REQUIRED",
+        "resolutionOutcome": "RMA_NOT_AUTHORIZED",
+        "paymentExecutable": false,
+        "payloadGenerated": false,
+        "confirmedResolutionCreated": false,
+        "repairQueueCreated": false
+      },
+      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
+    },
+    {
+      "caseId": "MT2-V1-RMA-WRONG-BIZSVC",
+      "scenarioGroupId": "MT2-V1-RMA-WRONG-BIZSVC",
+      "fixtureBindingId": "FIXTURE-MT2-V1-RMA-WRONG-BIZSVC",
+      "request": {
+        "caseId": "MT2-V1-RMA-WRONG-BIZSVC",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "sourceMessageType": "MT202"
+      },
+      "expected": {
+        "httpStatus": 422,
+        "ssiApplicability": "REQUIRED",
+        "resolutionOutcome": "RMA_NOT_AUTHORIZED",
+        "paymentExecutable": false,
+        "payloadGenerated": false,
+        "confirmedResolutionCreated": false,
+        "repairQueueCreated": false
+      },
+      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
+    },
+    {
+      "caseId": "MT2-V1-RMA-INACTIVE",
+      "scenarioGroupId": "MT2-V1-RMA-INACTIVE",
+      "fixtureBindingId": "FIXTURE-MT2-V1-RMA-INACTIVE",
+      "request": {
+        "caseId": "MT2-V1-RMA-INACTIVE",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "sourceMessageType": "MT202"
+      },
+      "expected": {
+        "httpStatus": 422,
+        "ssiApplicability": "REQUIRED",
+        "resolutionOutcome": "RMA_NOT_AUTHORIZED",
+        "paymentExecutable": false,
+        "payloadGenerated": false,
+        "confirmedResolutionCreated": false,
+        "repairQueueCreated": false
+      },
+      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
+    },
+    {
+      "caseId": "MT2-V1-RMA-DENIED",
+      "scenarioGroupId": "MT2-V1-RMA-DENIED",
+      "fixtureBindingId": "FIXTURE-MT2-V1-RMA-DENIED",
+      "request": {
+        "caseId": "MT2-V1-RMA-DENIED",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "sourceMessageType": "MT202"
+      },
+      "expected": {
+        "httpStatus": 422,
+        "ssiApplicability": "REQUIRED",
+        "resolutionOutcome": "RMA_NOT_AUTHORIZED",
+        "paymentExecutable": false,
+        "payloadGenerated": false,
+        "confirmedResolutionCreated": false,
+        "repairQueueCreated": false
+      },
+      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
+    },
+    {
+      "caseId": "MT2-V1-RMA-VALID-DUAL-CHANNEL",
+      "scenarioGroupId": "MT2-V1-RMA-VALID-DUAL-CHANNEL",
+      "fixtureBindingId": "FIXTURE-MT2-V1-RMA-VALID-DUAL-CHANNEL",
+      "request": {
+        "caseId": "MT2-V1-RMA-VALID-DUAL-CHANNEL",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "sourceMessageType": "MT202"
+      },
+      "expected": {
+        "httpStatus": 200,
+        "ssiApplicability": "REQUIRED",
+        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
+        "paymentExecutable": false,
+        "payloadGenerated": false,
+        "confirmedResolutionCreated": false,
+        "repairQueueCreated": false
+      },
+      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
+    },
+    {
+      "caseId": "MT2-V1-RMA-FIN-NO-CONTINGENCY",
+      "scenarioGroupId": "MT2-V1-RMA-FIN-NO-CONTINGENCY",
+      "fixtureBindingId": "FIXTURE-MT2-V1-RMA-FIN-NO-CONTINGENCY",
+      "request": {
+        "caseId": "MT2-V1-RMA-FIN-NO-CONTINGENCY",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "sourceMessageType": "MT202"
+      },
+      "expected": {
+        "httpStatus": 422,
+        "ssiApplicability": "REQUIRED",
+        "resolutionOutcome": "RMA_NOT_AUTHORIZED",
+        "paymentExecutable": false,
+        "payloadGenerated": false,
+        "confirmedResolutionCreated": false,
+        "repairQueueCreated": false
+      },
+      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
+    },
+    {
+      "caseId": "MT2-V1-RMA-VALID-FIN-CONTINGENCY",
+      "scenarioGroupId": "MT2-V1-RMA-VALID-FIN-CONTINGENCY",
+      "fixtureBindingId": "FIXTURE-MT2-V1-RMA-VALID-FIN-CONTINGENCY",
+      "request": {
+        "caseId": "MT2-V1-RMA-VALID-FIN-CONTINGENCY",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "sourceMessageType": "MT202"
+      },
+      "expected": {
+        "httpStatus": 200,
+        "ssiApplicability": "REQUIRED",
+        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
+        "paymentExecutable": false,
+        "payloadGenerated": false,
+        "confirmedResolutionCreated": false,
+        "repairQueueCreated": false
+      },
+      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
+    },
+    {
+      "caseId": "MT2-V1-RMA-WRONG-PAIRED-PROFILE",
+      "scenarioGroupId": "MT2-V1-RMA-WRONG-PAIRED-PROFILE",
+      "fixtureBindingId": "FIXTURE-MT2-V1-RMA-WRONG-PAIRED-PROFILE",
+      "request": {
+        "caseId": "MT2-V1-RMA-WRONG-PAIRED-PROFILE",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "sourceMessageType": "MT202"
+      },
+      "expected": {
+        "httpStatus": 422,
+        "ssiApplicability": "REQUIRED",
+        "resolutionOutcome": "RMA_NOT_AUTHORIZED",
+        "paymentExecutable": false,
+        "payloadGenerated": false,
+        "confirmedResolutionCreated": false,
+        "repairQueueCreated": false
+      },
+      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
+    },
+    {
+      "caseId": "MT2-V1-RMA-WRONG-PROFILE-BIZSVC-BINDING",
+      "scenarioGroupId": "MT2-V1-RMA-WRONG-PROFILE-BIZSVC-BINDING",
+      "fixtureBindingId": "FIXTURE-MT2-V1-RMA-WRONG-PROFILE-BIZSVC-BINDING",
+      "request": {
+        "caseId": "MT2-V1-RMA-WRONG-PROFILE-BIZSVC-BINDING",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "sourceMessageType": "MT202"
+      },
+      "expected": {
+        "httpStatus": 422,
+        "ssiApplicability": "REQUIRED",
+        "resolutionOutcome": "RMA_NOT_AUTHORIZED",
+        "paymentExecutable": false,
+        "payloadGenerated": false,
+        "confirmedResolutionCreated": false,
+        "repairQueueCreated": false
+      },
+      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
+    },
+    {
+      "caseId": "MT2-V1-RMA-WRONG-FIN-MESSAGE-TYPE",
+      "scenarioGroupId": "MT2-V1-RMA-WRONG-FIN-MESSAGE-TYPE",
+      "fixtureBindingId": "FIXTURE-MT2-V1-RMA-WRONG-FIN-MESSAGE-TYPE",
+      "request": {
+        "caseId": "MT2-V1-RMA-WRONG-FIN-MESSAGE-TYPE",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "sourceMessageType": "MT202"
+      },
+      "expected": {
+        "httpStatus": 422,
+        "ssiApplicability": "REQUIRED",
+        "resolutionOutcome": "RMA_NOT_AUTHORIZED",
+        "paymentExecutable": false,
+        "payloadGenerated": false,
+        "confirmedResolutionCreated": false,
+        "repairQueueCreated": false
+      },
+      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
+    },
+    {
+      "caseId": "MT2-V1-C81-MT202-56-57",
+      "scenarioGroupId": "MT2-V1-C81-MT202-56-57",
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-MT202-56-57",
+      "request": {
+        "caseId": "MT2-V1-C81-MT202-56-57",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "sourceMessageType": "MT202"
+      },
+      "expected": {
+        "httpStatus": 200,
+        "ssiApplicability": "REQUIRED",
+        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
+        "paymentExecutable": false,
+        "payloadGenerated": false,
+        "confirmedResolutionCreated": false,
+        "repairQueueCreated": false
+      },
+      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
+    },
+    {
+      "caseId": "MT2-V1-C81-MT202-56-ONLY",
+      "scenarioGroupId": "MT2-V1-C81-MT202-56-ONLY",
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-MT202-56-ONLY",
+      "request": {
+        "caseId": "MT2-V1-C81-MT202-56-ONLY",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "sourceMessageType": "MT202"
+      },
+      "expected": {
+        "httpStatus": 422,
+        "ssiApplicability": "REQUIRED",
+        "resolutionOutcome": "NO_ELIGIBLE_SSI",
+        "paymentExecutable": false,
+        "payloadGenerated": false,
+        "confirmedResolutionCreated": false,
+        "repairQueueCreated": false
+      },
+      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
+    },
+    {
+      "caseId": "MT2-V1-C81-MT202-57-ONLY",
+      "scenarioGroupId": "MT2-V1-C81-MT202-57-ONLY",
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-MT202-57-ONLY",
+      "request": {
+        "caseId": "MT2-V1-C81-MT202-57-ONLY",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "sourceMessageType": "MT202"
+      },
+      "expected": {
+        "httpStatus": 200,
+        "ssiApplicability": "REQUIRED",
+        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
+        "paymentExecutable": false,
+        "payloadGenerated": false,
+        "confirmedResolutionCreated": false,
+        "repairQueueCreated": false
+      },
+      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
+    },
+    {
+      "caseId": "MT2-V1-C81-MT202-NEITHER",
+      "scenarioGroupId": "MT2-V1-C81-MT202-NEITHER",
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-MT202-NEITHER",
+      "request": {
+        "caseId": "MT2-V1-C81-MT202-NEITHER",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "sourceMessageType": "MT202"
+      },
+      "expected": {
+        "httpStatus": 200,
+        "ssiApplicability": "REQUIRED",
+        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
+        "paymentExecutable": false,
+        "payloadGenerated": false,
+        "confirmedResolutionCreated": false,
+        "repairQueueCreated": false
+      },
+      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
+    },
+    {
+      "caseId": "MT2-V1-C81-MT202-MIXED",
+      "scenarioGroupId": "MT2-V1-C81-MT202-MIXED",
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-MT202-MIXED",
+      "request": {
+        "caseId": "MT2-V1-C81-MT202-MIXED",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "sourceMessageType": "MT202"
+      },
+      "expected": {
+        "httpStatus": 200,
+        "ssiApplicability": "REQUIRED",
+        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
+        "paymentExecutable": false,
+        "payloadGenerated": false,
+        "confirmedResolutionCreated": false,
+        "repairQueueCreated": false
+      },
+      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
+    },
+    {
+      "caseId": "MT2-V1-C81-MT202-ALL-INVALID",
+      "scenarioGroupId": "MT2-V1-C81-MT202-ALL-INVALID",
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-MT202-ALL-INVALID",
+      "request": {
+        "caseId": "MT2-V1-C81-MT202-ALL-INVALID",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "sourceMessageType": "MT202"
+      },
+      "expected": {
+        "httpStatus": 422,
+        "ssiApplicability": "REQUIRED",
+        "resolutionOutcome": "NO_ELIGIBLE_SSI",
+        "paymentExecutable": false,
+        "payloadGenerated": false,
+        "confirmedResolutionCreated": false,
+        "repairQueueCreated": false
+      },
+      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
+    },
+    {
+      "caseId": "MT2-V1-C81-MT202COV-56-57",
+      "scenarioGroupId": "MT2-V1-C81-MT202COV-56-57",
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-MT202COV-56-57",
+      "request": {
+        "caseId": "MT2-V1-C81-MT202COV-56-57",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "sourceMessageType": "MT202COV"
+      },
+      "expected": {
+        "httpStatus": 200,
+        "ssiApplicability": "REQUIRED",
+        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
+        "paymentExecutable": false,
+        "payloadGenerated": false,
+        "confirmedResolutionCreated": false,
+        "repairQueueCreated": false
+      },
+      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
+    },
+    {
+      "caseId": "MT2-V1-C81-MT202COV-56-ONLY",
+      "scenarioGroupId": "MT2-V1-C81-MT202COV-56-ONLY",
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-MT202COV-56-ONLY",
+      "request": {
+        "caseId": "MT2-V1-C81-MT202COV-56-ONLY",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "sourceMessageType": "MT202COV"
+      },
+      "expected": {
+        "httpStatus": 422,
+        "ssiApplicability": "REQUIRED",
+        "resolutionOutcome": "NO_ELIGIBLE_SSI",
+        "paymentExecutable": false,
+        "payloadGenerated": false,
+        "confirmedResolutionCreated": false,
+        "repairQueueCreated": false
+      },
+      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
+    },
+    {
+      "caseId": "MT2-V1-C81-MT202COV-57-ONLY",
+      "scenarioGroupId": "MT2-V1-C81-MT202COV-57-ONLY",
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-MT202COV-57-ONLY",
+      "request": {
+        "caseId": "MT2-V1-C81-MT202COV-57-ONLY",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "sourceMessageType": "MT202COV"
+      },
+      "expected": {
+        "httpStatus": 200,
+        "ssiApplicability": "REQUIRED",
+        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
+        "paymentExecutable": false,
+        "payloadGenerated": false,
+        "confirmedResolutionCreated": false,
+        "repairQueueCreated": false
+      },
+      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
+    },
+    {
+      "caseId": "MT2-V1-C81-MT202COV-NEITHER",
+      "scenarioGroupId": "MT2-V1-C81-MT202COV-NEITHER",
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-MT202COV-NEITHER",
+      "request": {
+        "caseId": "MT2-V1-C81-MT202COV-NEITHER",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "sourceMessageType": "MT202COV"
+      },
+      "expected": {
+        "httpStatus": 200,
+        "ssiApplicability": "REQUIRED",
+        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
+        "paymentExecutable": false,
+        "payloadGenerated": false,
+        "confirmedResolutionCreated": false,
+        "repairQueueCreated": false
+      },
+      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
+    },
+    {
+      "caseId": "MT2-V1-C81-MT202COV-MIXED",
+      "scenarioGroupId": "MT2-V1-C81-MT202COV-MIXED",
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-MT202COV-MIXED",
+      "request": {
+        "caseId": "MT2-V1-C81-MT202COV-MIXED",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "sourceMessageType": "MT202COV"
+      },
+      "expected": {
+        "httpStatus": 200,
+        "ssiApplicability": "REQUIRED",
+        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
+        "paymentExecutable": false,
+        "payloadGenerated": false,
+        "confirmedResolutionCreated": false,
+        "repairQueueCreated": false
+      },
+      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
+    },
+    {
+      "caseId": "MT2-V1-C81-MT202COV-ALL-INVALID",
+      "scenarioGroupId": "MT2-V1-C81-MT202COV-ALL-INVALID",
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-MT202COV-ALL-INVALID",
+      "request": {
+        "caseId": "MT2-V1-C81-MT202COV-ALL-INVALID",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "sourceMessageType": "MT202COV"
+      },
+      "expected": {
+        "httpStatus": 422,
+        "ssiApplicability": "REQUIRED",
+        "resolutionOutcome": "NO_ELIGIBLE_SSI",
+        "paymentExecutable": false,
+        "payloadGenerated": false,
+        "confirmedResolutionCreated": false,
+        "repairQueueCreated": false
+      },
+      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
+    },
+    {
+      "caseId": "MT2-V1-C81-MT205-56-57",
+      "scenarioGroupId": "MT2-V1-C81-MT205-56-57",
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-MT205-56-57",
+      "request": {
+        "caseId": "MT2-V1-C81-MT205-56-57",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "sourceMessageType": "MT205"
+      },
+      "expected": {
+        "httpStatus": 200,
+        "ssiApplicability": "REQUIRED",
+        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
+        "paymentExecutable": false,
+        "payloadGenerated": false,
+        "confirmedResolutionCreated": false,
+        "repairQueueCreated": false
+      },
+      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
+    },
+    {
+      "caseId": "MT2-V1-C81-MT205-56-ONLY",
+      "scenarioGroupId": "MT2-V1-C81-MT205-56-ONLY",
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-MT205-56-ONLY",
+      "request": {
+        "caseId": "MT2-V1-C81-MT205-56-ONLY",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "sourceMessageType": "MT205"
+      },
+      "expected": {
+        "httpStatus": 422,
+        "ssiApplicability": "REQUIRED",
+        "resolutionOutcome": "NO_ELIGIBLE_SSI",
+        "paymentExecutable": false,
+        "payloadGenerated": false,
+        "confirmedResolutionCreated": false,
+        "repairQueueCreated": false
+      },
+      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
+    },
+    {
+      "caseId": "MT2-V1-C81-MT205-57-ONLY",
+      "scenarioGroupId": "MT2-V1-C81-MT205-57-ONLY",
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-MT205-57-ONLY",
+      "request": {
+        "caseId": "MT2-V1-C81-MT205-57-ONLY",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "sourceMessageType": "MT205"
+      },
+      "expected": {
+        "httpStatus": 200,
+        "ssiApplicability": "REQUIRED",
+        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
+        "paymentExecutable": false,
+        "payloadGenerated": false,
+        "confirmedResolutionCreated": false,
+        "repairQueueCreated": false
+      },
+      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
+    },
+    {
+      "caseId": "MT2-V1-C81-MT205-NEITHER",
+      "scenarioGroupId": "MT2-V1-C81-MT205-NEITHER",
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-MT205-NEITHER",
+      "request": {
+        "caseId": "MT2-V1-C81-MT205-NEITHER",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "sourceMessageType": "MT205"
+      },
+      "expected": {
+        "httpStatus": 200,
+        "ssiApplicability": "REQUIRED",
+        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
+        "paymentExecutable": false,
+        "payloadGenerated": false,
+        "confirmedResolutionCreated": false,
+        "repairQueueCreated": false
+      },
+      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
+    },
+    {
+      "caseId": "MT2-V1-C81-MT205-MIXED",
+      "scenarioGroupId": "MT2-V1-C81-MT205-MIXED",
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-MT205-MIXED",
+      "request": {
+        "caseId": "MT2-V1-C81-MT205-MIXED",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "sourceMessageType": "MT205"
+      },
+      "expected": {
+        "httpStatus": 200,
+        "ssiApplicability": "REQUIRED",
+        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
+        "paymentExecutable": false,
+        "payloadGenerated": false,
+        "confirmedResolutionCreated": false,
+        "repairQueueCreated": false
+      },
+      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
+    },
+    {
+      "caseId": "MT2-V1-C81-MT205-ALL-INVALID",
+      "scenarioGroupId": "MT2-V1-C81-MT205-ALL-INVALID",
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-MT205-ALL-INVALID",
+      "request": {
+        "caseId": "MT2-V1-C81-MT205-ALL-INVALID",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "sourceMessageType": "MT205"
+      },
+      "expected": {
+        "httpStatus": 422,
+        "ssiApplicability": "REQUIRED",
+        "resolutionOutcome": "NO_ELIGIBLE_SSI",
+        "paymentExecutable": false,
+        "payloadGenerated": false,
+        "confirmedResolutionCreated": false,
+        "repairQueueCreated": false
+      },
+      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
+    },
+    {
+      "caseId": "MT2-V1-C81-MT205COV-56-57",
+      "scenarioGroupId": "MT2-V1-C81-MT205COV-56-57",
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-MT205COV-56-57",
+      "request": {
+        "caseId": "MT2-V1-C81-MT205COV-56-57",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "sourceMessageType": "MT205COV"
+      },
+      "expected": {
+        "httpStatus": 200,
+        "ssiApplicability": "REQUIRED",
+        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
+        "paymentExecutable": false,
+        "payloadGenerated": false,
+        "confirmedResolutionCreated": false,
+        "repairQueueCreated": false
+      },
+      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
+    },
+    {
+      "caseId": "MT2-V1-C81-MT205COV-56-ONLY",
+      "scenarioGroupId": "MT2-V1-C81-MT205COV-56-ONLY",
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-MT205COV-56-ONLY",
+      "request": {
+        "caseId": "MT2-V1-C81-MT205COV-56-ONLY",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "sourceMessageType": "MT205COV"
+      },
+      "expected": {
+        "httpStatus": 422,
+        "ssiApplicability": "REQUIRED",
+        "resolutionOutcome": "NO_ELIGIBLE_SSI",
+        "paymentExecutable": false,
+        "payloadGenerated": false,
+        "confirmedResolutionCreated": false,
+        "repairQueueCreated": false
+      },
+      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
+    },
+    {
+      "caseId": "MT2-V1-C81-MT205COV-57-ONLY",
+      "scenarioGroupId": "MT2-V1-C81-MT205COV-57-ONLY",
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-MT205COV-57-ONLY",
+      "request": {
+        "caseId": "MT2-V1-C81-MT205COV-57-ONLY",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "sourceMessageType": "MT205COV"
+      },
+      "expected": {
+        "httpStatus": 200,
+        "ssiApplicability": "REQUIRED",
+        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
+        "paymentExecutable": false,
+        "payloadGenerated": false,
+        "confirmedResolutionCreated": false,
+        "repairQueueCreated": false
+      },
+      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
+    },
+    {
+      "caseId": "MT2-V1-C81-MT205COV-NEITHER",
+      "scenarioGroupId": "MT2-V1-C81-MT205COV-NEITHER",
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-MT205COV-NEITHER",
+      "request": {
+        "caseId": "MT2-V1-C81-MT205COV-NEITHER",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "sourceMessageType": "MT205COV"
+      },
+      "expected": {
+        "httpStatus": 200,
+        "ssiApplicability": "REQUIRED",
+        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
+        "paymentExecutable": false,
+        "payloadGenerated": false,
+        "confirmedResolutionCreated": false,
+        "repairQueueCreated": false
+      },
+      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
+    },
+    {
+      "caseId": "MT2-V1-C81-MT205COV-MIXED",
+      "scenarioGroupId": "MT2-V1-C81-MT205COV-MIXED",
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-MT205COV-MIXED",
+      "request": {
+        "caseId": "MT2-V1-C81-MT205COV-MIXED",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "sourceMessageType": "MT205COV"
+      },
+      "expected": {
+        "httpStatus": 200,
+        "ssiApplicability": "REQUIRED",
+        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
+        "paymentExecutable": false,
+        "payloadGenerated": false,
+        "confirmedResolutionCreated": false,
+        "repairQueueCreated": false
+      },
+      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
+    },
+    {
+      "caseId": "MT2-V1-C81-MT205COV-ALL-INVALID",
+      "scenarioGroupId": "MT2-V1-C81-MT205COV-ALL-INVALID",
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-MT205COV-ALL-INVALID",
+      "request": {
+        "caseId": "MT2-V1-C81-MT205COV-ALL-INVALID",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "sourceMessageType": "MT205COV"
+      },
+      "expected": {
+        "httpStatus": 422,
+        "ssiApplicability": "REQUIRED",
+        "resolutionOutcome": "NO_ELIGIBLE_SSI",
         "paymentExecutable": false,
         "payloadGenerated": false,
         "confirmedResolutionCreated": false,
@@ -1387,12 +1539,11 @@
         "caseId": "MT2-V1-CONFIG-014",
         "direction": "OUTWARD",
         "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-CONFIG-014",
-        "variant": "SINGLE"
+        "sourceMessageType": "MT202"
       },
       "expected": {
         "httpStatus": 422,
-        "ssiApplicability": "REQUIRED",
+        "ssiApplicability": "NOT_EVALUATED",
         "resolutionOutcome": "PROFILE_INCOMPLETE",
         "paymentExecutable": false,
         "payloadGenerated": false,
@@ -1402,218 +1553,19 @@
       "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
     },
     {
-      "caseId": "MT2-V1-PRECEDENCE-015A",
-      "scenarioGroupId": "MT2-V1-PRECEDENCE-015",
-      "fixtureBindingId": "FIXTURE-MT2-V1-PRECEDENCE-015A",
+      "caseId": "MT2-V1-MAP-012",
+      "scenarioGroupId": "MT2-V1-MAP-012",
+      "fixtureBindingId": "FIXTURE-MT2-V1-MAP-012",
       "request": {
-        "caseId": "MT2-V1-PRECEDENCE-015A",
+        "caseId": "MT2-V1-MAP-012",
         "direction": "OUTWARD",
         "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-PRECEDENCE-015",
-        "variant": "A"
+        "sourceMessageType": "MT202"
       },
       "expected": {
         "httpStatus": 422,
         "ssiApplicability": "REQUIRED",
         "resolutionOutcome": "PROFILE_INCOMPLETE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-PRECEDENCE-015B",
-      "scenarioGroupId": "MT2-V1-PRECEDENCE-015",
-      "fixtureBindingId": "FIXTURE-MT2-V1-PRECEDENCE-015B",
-      "request": {
-        "caseId": "MT2-V1-PRECEDENCE-015B",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-PRECEDENCE-015",
-        "variant": "B"
-      },
-      "expected": {
-        "httpStatus": 422,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "JURISDICTION_NOT_PERMITTED",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-OPTIONS-016",
-      "scenarioGroupId": "MT2-V1-OPTIONS-016",
-      "fixtureBindingId": "FIXTURE-MT2-V1-OPTIONS-016",
-      "request": {
-        "caseId": "MT2-V1-OPTIONS-016",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-OPTIONS-016",
-        "variant": "SINGLE"
-      },
-      "expected": {
-        "httpStatus": 422,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "PROFILE_INCOMPLETE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-SNAPSHOT-017",
-      "scenarioGroupId": "MT2-V1-SNAPSHOT-017",
-      "fixtureBindingId": "FIXTURE-MT2-V1-SNAPSHOT-017",
-      "request": {
-        "caseId": "MT2-V1-SNAPSHOT-017",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-SNAPSHOT-017",
-        "variant": "SINGLE"
-      },
-      "expected": {
-        "httpStatus": 409,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "STALE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-JURIS-018A",
-      "scenarioGroupId": "MT2-V1-JURIS-018",
-      "fixtureBindingId": "FIXTURE-MT2-V1-JURIS-018A",
-      "request": {
-        "caseId": "MT2-V1-JURIS-018A",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-JURIS-018",
-        "variant": "A"
-      },
-      "expected": {
-        "httpStatus": 200,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-JURIS-018B",
-      "scenarioGroupId": "MT2-V1-JURIS-018",
-      "fixtureBindingId": "FIXTURE-MT2-V1-JURIS-018B",
-      "request": {
-        "caseId": "MT2-V1-JURIS-018B",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-JURIS-018",
-        "variant": "B"
-      },
-      "expected": {
-        "httpStatus": 200,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-JURIS-018C",
-      "scenarioGroupId": "MT2-V1-JURIS-018",
-      "fixtureBindingId": "FIXTURE-MT2-V1-JURIS-018C",
-      "request": {
-        "caseId": "MT2-V1-JURIS-018C",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-JURIS-018",
-        "variant": "C"
-      },
-      "expected": {
-        "httpStatus": 422,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "JURISDICTION_NOT_PERMITTED",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-JURIS-018D",
-      "scenarioGroupId": "MT2-V1-JURIS-018",
-      "fixtureBindingId": "FIXTURE-MT2-V1-JURIS-018D",
-      "request": {
-        "caseId": "MT2-V1-JURIS-018D",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-JURIS-018",
-        "variant": "D"
-      },
-      "expected": {
-        "httpStatus": 422,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "JURISDICTION_EVIDENCE_CONFLICT",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-JURIS-018E",
-      "scenarioGroupId": "MT2-V1-JURIS-018",
-      "fixtureBindingId": "FIXTURE-MT2-V1-JURIS-018E",
-      "request": {
-        "caseId": "MT2-V1-JURIS-018E",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-JURIS-018",
-        "variant": "E"
-      },
-      "expected": {
-        "httpStatus": 422,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "JURISDICTION_NOT_PERMITTED",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-JURIS-018F",
-      "scenarioGroupId": "MT2-V1-JURIS-018",
-      "fixtureBindingId": "FIXTURE-MT2-V1-JURIS-018F",
-      "request": {
-        "caseId": "MT2-V1-JURIS-018F",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-JURIS-018",
-        "variant": "F"
-      },
-      "expected": {
-        "httpStatus": 200,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
         "paymentExecutable": false,
         "payloadGenerated": false,
         "confirmedResolutionCreated": false,
@@ -1623,14 +1575,13 @@
     },
     {
       "caseId": "MT2-V1-JURIS-018G",
-      "scenarioGroupId": "MT2-V1-JURIS-018",
+      "scenarioGroupId": "MT2-V1-JURIS-018G",
       "fixtureBindingId": "FIXTURE-MT2-V1-JURIS-018G",
       "request": {
         "caseId": "MT2-V1-JURIS-018G",
         "direction": "OUTWARD",
         "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-JURIS-018",
-        "variant": "G"
+        "sourceMessageType": "MT205"
       },
       "expected": {
         "httpStatus": 422,
@@ -1644,748 +1595,19 @@
       "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
     },
     {
-      "caseId": "MT2-V1-NONCOVER-019A",
-      "scenarioGroupId": "MT2-V1-NONCOVER-019",
-      "fixtureBindingId": "FIXTURE-MT2-V1-NONCOVER-019A",
+      "caseId": "MT2-V1-JURIS-018F",
+      "scenarioGroupId": "MT2-V1-JURIS-018F",
+      "fixtureBindingId": "FIXTURE-MT2-V1-JURIS-018F",
       "request": {
-        "caseId": "MT2-V1-NONCOVER-019A",
+        "caseId": "MT2-V1-JURIS-018F",
         "direction": "OUTWARD",
         "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-NONCOVER-019",
-        "variant": "A"
-      },
-      "expected": {
-        "httpStatus": 200,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-NONCOVER-019B",
-      "scenarioGroupId": "MT2-V1-NONCOVER-019",
-      "fixtureBindingId": "FIXTURE-MT2-V1-NONCOVER-019B",
-      "request": {
-        "caseId": "MT2-V1-NONCOVER-019B",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-NONCOVER-019",
-        "variant": "B"
-      },
-      "expected": {
-        "httpStatus": 422,
-        "ssiApplicability": "NOT_EVALUATED",
-        "resolutionOutcome": "INVALID_UPSTREAM_CONTEXT",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-NONCOVER-019C",
-      "scenarioGroupId": "MT2-V1-NONCOVER-019",
-      "fixtureBindingId": "FIXTURE-MT2-V1-NONCOVER-019C",
-      "request": {
-        "caseId": "MT2-V1-NONCOVER-019C",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-NONCOVER-019",
-        "variant": "C"
-      },
-      "expected": {
-        "httpStatus": 422,
-        "ssiApplicability": "NOT_EVALUATED",
-        "resolutionOutcome": "INVALID_UPSTREAM_CONTEXT",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-OWNACCT-020A",
-      "scenarioGroupId": "MT2-V1-OWNACCT-020",
-      "fixtureBindingId": "FIXTURE-MT2-V1-OWNACCT-020A",
-      "request": {
-        "caseId": "MT2-V1-OWNACCT-020A",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-OWNACCT-020",
-        "variant": "A"
-      },
-      "expected": {
-        "httpStatus": 200,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-OWNACCT-020B",
-      "scenarioGroupId": "MT2-V1-OWNACCT-020",
-      "fixtureBindingId": "FIXTURE-MT2-V1-OWNACCT-020B",
-      "request": {
-        "caseId": "MT2-V1-OWNACCT-020B",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-OWNACCT-020",
-        "variant": "B"
-      },
-      "expected": {
-        "httpStatus": 200,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-OWNACCT-020C",
-      "scenarioGroupId": "MT2-V1-OWNACCT-020",
-      "fixtureBindingId": "FIXTURE-MT2-V1-OWNACCT-020C",
-      "request": {
-        "caseId": "MT2-V1-OWNACCT-020C",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-OWNACCT-020",
-        "variant": "C"
-      },
-      "expected": {
-        "httpStatus": 200,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-OWNACCT-020D",
-      "scenarioGroupId": "MT2-V1-OWNACCT-020",
-      "fixtureBindingId": "FIXTURE-MT2-V1-OWNACCT-020D",
-      "request": {
-        "caseId": "MT2-V1-OWNACCT-020D",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-OWNACCT-020",
-        "variant": "D"
-      },
-      "expected": {
-        "httpStatus": 200,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-OWNACCT-020E",
-      "scenarioGroupId": "MT2-V1-OWNACCT-020",
-      "fixtureBindingId": "FIXTURE-MT2-V1-OWNACCT-020E",
-      "request": {
-        "caseId": "MT2-V1-OWNACCT-020E",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-OWNACCT-020",
-        "variant": "E"
+        "sourceMessageType": "MT205COV"
       },
       "expected": {
         "httpStatus": 422,
         "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "PROFILE_INCOMPLETE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-OWNACCT-020F",
-      "scenarioGroupId": "MT2-V1-OWNACCT-020",
-      "fixtureBindingId": "FIXTURE-MT2-V1-OWNACCT-020F",
-      "request": {
-        "caseId": "MT2-V1-OWNACCT-020F",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "scenarioGroupId": "MT2-V1-OWNACCT-020",
-        "variant": "F"
-      },
-      "expected": {
-        "httpStatus": 422,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "PROFILE_INCOMPLETE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-C81-021A-MT202",
-      "scenarioGroupId": "MT2-V1-C81-021",
-      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021A-MT202",
-      "request": {
-        "caseId": "MT2-V1-C81-021A-MT202",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "profileId": "MT2-MT202-PLAIN-SR2026",
-        "scenarioGroupId": "MT2-V1-C81-021",
-        "variant": "A"
-      },
-      "expected": {
-        "httpStatus": 200,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-C81-021A-MT202COV",
-      "scenarioGroupId": "MT2-V1-C81-021",
-      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021A-MT202COV",
-      "request": {
-        "caseId": "MT2-V1-C81-021A-MT202COV",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "profileId": "MT2-MT202COV-COV-SR2026",
-        "scenarioGroupId": "MT2-V1-C81-021",
-        "variant": "A"
-      },
-      "expected": {
-        "httpStatus": 200,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-C81-021A-MT205",
-      "scenarioGroupId": "MT2-V1-C81-021",
-      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021A-MT205",
-      "request": {
-        "caseId": "MT2-V1-C81-021A-MT205",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "profileId": "MT2-MT205-PLAIN-SR2026",
-        "scenarioGroupId": "MT2-V1-C81-021",
-        "variant": "A"
-      },
-      "expected": {
-        "httpStatus": 200,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-C81-021A-MT205COV",
-      "scenarioGroupId": "MT2-V1-C81-021",
-      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021A-MT205COV",
-      "request": {
-        "caseId": "MT2-V1-C81-021A-MT205COV",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "profileId": "MT2-MT205COV-COV-SR2026",
-        "scenarioGroupId": "MT2-V1-C81-021",
-        "variant": "A"
-      },
-      "expected": {
-        "httpStatus": 200,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-C81-021B-MT202",
-      "scenarioGroupId": "MT2-V1-C81-021",
-      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021B-MT202",
-      "request": {
-        "caseId": "MT2-V1-C81-021B-MT202",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "profileId": "MT2-MT202-PLAIN-SR2026",
-        "scenarioGroupId": "MT2-V1-C81-021",
-        "variant": "B"
-      },
-      "expected": {
-        "httpStatus": 422,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "NO_ELIGIBLE_SSI",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-C81-021B-MT202COV",
-      "scenarioGroupId": "MT2-V1-C81-021",
-      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021B-MT202COV",
-      "request": {
-        "caseId": "MT2-V1-C81-021B-MT202COV",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "profileId": "MT2-MT202COV-COV-SR2026",
-        "scenarioGroupId": "MT2-V1-C81-021",
-        "variant": "B"
-      },
-      "expected": {
-        "httpStatus": 422,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "NO_ELIGIBLE_SSI",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-C81-021B-MT205",
-      "scenarioGroupId": "MT2-V1-C81-021",
-      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021B-MT205",
-      "request": {
-        "caseId": "MT2-V1-C81-021B-MT205",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "profileId": "MT2-MT205-PLAIN-SR2026",
-        "scenarioGroupId": "MT2-V1-C81-021",
-        "variant": "B"
-      },
-      "expected": {
-        "httpStatus": 422,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "NO_ELIGIBLE_SSI",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-C81-021B-MT205COV",
-      "scenarioGroupId": "MT2-V1-C81-021",
-      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021B-MT205COV",
-      "request": {
-        "caseId": "MT2-V1-C81-021B-MT205COV",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "profileId": "MT2-MT205COV-COV-SR2026",
-        "scenarioGroupId": "MT2-V1-C81-021",
-        "variant": "B"
-      },
-      "expected": {
-        "httpStatus": 422,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "NO_ELIGIBLE_SSI",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-C81-021C-MT202",
-      "scenarioGroupId": "MT2-V1-C81-021",
-      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021C-MT202",
-      "request": {
-        "caseId": "MT2-V1-C81-021C-MT202",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "profileId": "MT2-MT202-PLAIN-SR2026",
-        "scenarioGroupId": "MT2-V1-C81-021",
-        "variant": "C"
-      },
-      "expected": {
-        "httpStatus": 200,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-C81-021C-MT202COV",
-      "scenarioGroupId": "MT2-V1-C81-021",
-      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021C-MT202COV",
-      "request": {
-        "caseId": "MT2-V1-C81-021C-MT202COV",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "profileId": "MT2-MT202COV-COV-SR2026",
-        "scenarioGroupId": "MT2-V1-C81-021",
-        "variant": "C"
-      },
-      "expected": {
-        "httpStatus": 200,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-C81-021C-MT205",
-      "scenarioGroupId": "MT2-V1-C81-021",
-      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021C-MT205",
-      "request": {
-        "caseId": "MT2-V1-C81-021C-MT205",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "profileId": "MT2-MT205-PLAIN-SR2026",
-        "scenarioGroupId": "MT2-V1-C81-021",
-        "variant": "C"
-      },
-      "expected": {
-        "httpStatus": 200,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-C81-021C-MT205COV",
-      "scenarioGroupId": "MT2-V1-C81-021",
-      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021C-MT205COV",
-      "request": {
-        "caseId": "MT2-V1-C81-021C-MT205COV",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "profileId": "MT2-MT205COV-COV-SR2026",
-        "scenarioGroupId": "MT2-V1-C81-021",
-        "variant": "C"
-      },
-      "expected": {
-        "httpStatus": 200,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-C81-021D-MT202",
-      "scenarioGroupId": "MT2-V1-C81-021",
-      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021D-MT202",
-      "request": {
-        "caseId": "MT2-V1-C81-021D-MT202",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "profileId": "MT2-MT202-PLAIN-SR2026",
-        "scenarioGroupId": "MT2-V1-C81-021",
-        "variant": "D"
-      },
-      "expected": {
-        "httpStatus": 200,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-C81-021D-MT202COV",
-      "scenarioGroupId": "MT2-V1-C81-021",
-      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021D-MT202COV",
-      "request": {
-        "caseId": "MT2-V1-C81-021D-MT202COV",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "profileId": "MT2-MT202COV-COV-SR2026",
-        "scenarioGroupId": "MT2-V1-C81-021",
-        "variant": "D"
-      },
-      "expected": {
-        "httpStatus": 200,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-C81-021D-MT205",
-      "scenarioGroupId": "MT2-V1-C81-021",
-      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021D-MT205",
-      "request": {
-        "caseId": "MT2-V1-C81-021D-MT205",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "profileId": "MT2-MT205-PLAIN-SR2026",
-        "scenarioGroupId": "MT2-V1-C81-021",
-        "variant": "D"
-      },
-      "expected": {
-        "httpStatus": 200,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-C81-021D-MT205COV",
-      "scenarioGroupId": "MT2-V1-C81-021",
-      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021D-MT205COV",
-      "request": {
-        "caseId": "MT2-V1-C81-021D-MT205COV",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "profileId": "MT2-MT205COV-COV-SR2026",
-        "scenarioGroupId": "MT2-V1-C81-021",
-        "variant": "D"
-      },
-      "expected": {
-        "httpStatus": 200,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-C81-021E-MT202",
-      "scenarioGroupId": "MT2-V1-C81-021",
-      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021E-MT202",
-      "request": {
-        "caseId": "MT2-V1-C81-021E-MT202",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "profileId": "MT2-MT202-PLAIN-SR2026",
-        "scenarioGroupId": "MT2-V1-C81-021",
-        "variant": "E"
-      },
-      "expected": {
-        "httpStatus": 200,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-C81-021E-MT202COV",
-      "scenarioGroupId": "MT2-V1-C81-021",
-      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021E-MT202COV",
-      "request": {
-        "caseId": "MT2-V1-C81-021E-MT202COV",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "profileId": "MT2-MT202COV-COV-SR2026",
-        "scenarioGroupId": "MT2-V1-C81-021",
-        "variant": "E"
-      },
-      "expected": {
-        "httpStatus": 200,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-C81-021E-MT205",
-      "scenarioGroupId": "MT2-V1-C81-021",
-      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021E-MT205",
-      "request": {
-        "caseId": "MT2-V1-C81-021E-MT205",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "profileId": "MT2-MT205-PLAIN-SR2026",
-        "scenarioGroupId": "MT2-V1-C81-021",
-        "variant": "E"
-      },
-      "expected": {
-        "httpStatus": 200,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-C81-021E-MT205COV",
-      "scenarioGroupId": "MT2-V1-C81-021",
-      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021E-MT205COV",
-      "request": {
-        "caseId": "MT2-V1-C81-021E-MT205COV",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "profileId": "MT2-MT205COV-COV-SR2026",
-        "scenarioGroupId": "MT2-V1-C81-021",
-        "variant": "E"
-      },
-      "expected": {
-        "httpStatus": 200,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "ELIGIBLE_COMPLETE_ROUTE",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-C81-021F-MT202",
-      "scenarioGroupId": "MT2-V1-C81-021",
-      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021F-MT202",
-      "request": {
-        "caseId": "MT2-V1-C81-021F-MT202",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "profileId": "MT2-MT202-PLAIN-SR2026",
-        "scenarioGroupId": "MT2-V1-C81-021",
-        "variant": "F"
-      },
-      "expected": {
-        "httpStatus": 422,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "NO_ELIGIBLE_SSI",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-C81-021F-MT202COV",
-      "scenarioGroupId": "MT2-V1-C81-021",
-      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021F-MT202COV",
-      "request": {
-        "caseId": "MT2-V1-C81-021F-MT202COV",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "profileId": "MT2-MT202COV-COV-SR2026",
-        "scenarioGroupId": "MT2-V1-C81-021",
-        "variant": "F"
-      },
-      "expected": {
-        "httpStatus": 422,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "NO_ELIGIBLE_SSI",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-C81-021F-MT205",
-      "scenarioGroupId": "MT2-V1-C81-021",
-      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021F-MT205",
-      "request": {
-        "caseId": "MT2-V1-C81-021F-MT205",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "profileId": "MT2-MT205-PLAIN-SR2026",
-        "scenarioGroupId": "MT2-V1-C81-021",
-        "variant": "F"
-      },
-      "expected": {
-        "httpStatus": 422,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "NO_ELIGIBLE_SSI",
-        "paymentExecutable": false,
-        "payloadGenerated": false,
-        "confirmedResolutionCreated": false,
-        "repairQueueCreated": false
-      },
-      "executableTest": "mt2-pacs009-proposal-cases.spec.ts"
-    },
-    {
-      "caseId": "MT2-V1-C81-021F-MT205COV",
-      "scenarioGroupId": "MT2-V1-C81-021",
-      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021F-MT205COV",
-      "request": {
-        "caseId": "MT2-V1-C81-021F-MT205COV",
-        "direction": "OUTWARD",
-        "localRole": "INSTRUCTING_AGENT",
-        "profileId": "MT2-MT205COV-COV-SR2026",
-        "scenarioGroupId": "MT2-V1-C81-021",
-        "variant": "F"
-      },
-      "expected": {
-        "httpStatus": 422,
-        "ssiApplicability": "REQUIRED",
-        "resolutionOutcome": "NO_ELIGIBLE_SSI",
+        "resolutionOutcome": "JURISDICTION_NOT_PERMITTED",
         "paymentExecutable": false,
         "payloadGenerated": false,
         "confirmedResolutionCreated": false,

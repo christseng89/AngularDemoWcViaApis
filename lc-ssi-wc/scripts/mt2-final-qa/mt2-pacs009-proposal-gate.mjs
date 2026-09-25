@@ -19,6 +19,30 @@ const REQUIRED_OUTCOMES = new Set([
   "JURISDICTION_EVIDENCE_CONFLICT",
   "JURISDICTION_NOT_PERMITTED",
 ]);
+const FORBIDDEN_RAW_KEYS = new Set([
+  "119",
+  "21",
+  "121",
+  "uetr",
+  "incoming121",
+  "block3",
+  "sequenceB",
+  "coverPurpose",
+  "underlyingCustomerCreditTransfer",
+  "previousMessage",
+]);
+
+const forbiddenRawPaths = (value, path = "execution.raw") => {
+  if (!value || typeof value !== "object") return [];
+  if (Array.isArray(value))
+    return value.flatMap((item, index) =>
+      forbiddenRawPaths(item, `${path}[${index}]`),
+    );
+  return Object.entries(value).flatMap(([key, child]) => [
+    ...(FORBIDDEN_RAW_KEYS.has(key) ? [`${path}.${key}`] : []),
+    ...forbiddenRawPaths(child, `${path}.${key}`),
+  ]);
+};
 
 const variantCount = ({ variants, profileMatrix }) => {
   if (variants === "SINGLE") return 1;
@@ -56,12 +80,14 @@ export const validateProposalCases = (catalogue, proposalHash, fixtures) => {
       `Explicit executable case count ${catalogue.cases?.length ?? 0} does not match ${catalogue.expectedExpandedCaseCount}.`,
     );
   const caseIds = new Set();
+  const referencedBindings = new Set();
   for (const proposalCase of catalogue.cases ?? []) {
     if (!proposalCase.caseId || caseIds.has(proposalCase.caseId))
       errors.push(
         `Missing or duplicate explicit caseId: ${proposalCase.caseId}.`,
       );
     caseIds.add(proposalCase.caseId);
+    referencedBindings.add(proposalCase.fixtureBindingId);
     if (
       !proposalCase.fixtureBindingId ||
       !proposalCase.executableTest ||
@@ -71,10 +97,29 @@ export const validateProposalCases = (catalogue, proposalHash, fixtures) => {
       errors.push(
         `Explicit case ${proposalCase.caseId} lacks fixture/request/expected/test binding.`,
       );
-    if (!fixtures?.bindings?.[proposalCase.fixtureBindingId])
+    const fixture = fixtures?.bindings?.[proposalCase.fixtureBindingId];
+    if (!fixture)
       errors.push(
         `Explicit case ${proposalCase.caseId} has no controlled fixture binding.`,
       );
+    else {
+      const forbidden = forbiddenRawPaths(fixture.execution?.raw);
+      if (forbidden.length)
+        errors.push(
+          `Explicit case ${proposalCase.caseId} contains prohibited raw-message stimuli: ${forbidden.join(", ")}.`,
+        );
+      if (fixture.stimulus?.caseId !== proposalCase.caseId)
+        errors.push(
+          `Explicit case ${proposalCase.caseId} stimulus trace does not match its case ID.`,
+        );
+      if (
+        fixture.execution?.resolverRequest?.sourceMessageType !==
+        proposalCase.request?.sourceMessageType
+      )
+        errors.push(
+          `Explicit case ${proposalCase.caseId} request and fixture profile do not match.`,
+        );
+    }
     if (
       !proposalCase.expected?.resolutionOutcome ||
       Array.isArray(proposalCase.expected?.resolutionOutcome) ||
@@ -89,6 +134,25 @@ export const validateProposalCases = (catalogue, proposalHash, fixtures) => {
           `Explicit case ${proposalCase.caseId} does not assert ${sideEffect}=false.`,
         );
   }
+  for (const fixtureBindingId of Object.keys(fixtures?.bindings ?? {}))
+    if (!referencedBindings.has(fixtureBindingId))
+      errors.push(`Controlled fixture ${fixtureBindingId} is orphaned.`);
+
+  const matrixCount = (prefix) =>
+    [...caseIds].filter((caseId) => caseId.startsWith(prefix)).length;
+  if (matrixCount("MT2-V1-RMA-") !== 12)
+    errors.push("Frozen RMA matrix must contain exactly 12 independent cases.");
+  if (matrixCount("MT2-V1-C81-") !== 24)
+    errors.push(
+      "Frozen C81 matrix must contain exactly 24 cases across four profiles.",
+    );
+  for (const profile of ["MT202", "MT202COV", "MT205", "MT205COV"])
+    if (matrixCount(`MT2-V1-C81-${profile}-`) !== 6)
+      errors.push(`Frozen C81 ${profile} matrix must contain exactly 6 cases.`);
+  if (matrixCount("MT2-SSI-ATTESTATION-") !== 6)
+    errors.push(
+      "Frozen attestation matrix must contain exactly 6 independent cases.",
+    );
   const outcomes = new Set(
     catalogue.groups.flatMap(({ outcomes }) => outcomes),
   );

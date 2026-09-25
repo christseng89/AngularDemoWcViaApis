@@ -137,7 +137,14 @@ test("metric boundaries are strictly greater than 95 and less than 1", async () 
 
 test("production config loads only the current Proposal case catalogue", () => {
   const config = loadConfig("qa/tests/mt2/final/mt2-final-qa.config.json");
-  assert.equal(config.expectedCaseCount, 101);
+  assert.equal(config.expectedCaseCount, 57);
+  assert.deepEqual(config.reviewContract.reviewers, ["BA", "QA", "DBA"]);
+  assert.equal(
+    config.reviewContract.policy,
+    "SINGLE_GENERATED_NEW_RULE_CASE_SET",
+  );
+  assert.equal(config.reviewContract.allowReviewerPrivateCases, false);
+  assert.equal(config.reviewContract.allowArchivedCases, false);
   assert.match(
     config.proposalCaseFile,
     /data[\\/]qa[\\/]mt2[\\/]mt2-pacs009-proposal-case-groups\.json$/,

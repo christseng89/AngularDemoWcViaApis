@@ -303,6 +303,8 @@ MT347 已實作且可供所有 Message Family 重用的完整 normative pattern�
 - `qa` 只保留各 family 最新受控 TDD、現行 test program／config 與必要 contract；active test data 只在 `data/qa`。DRAFT、superseded、舊 run 與 migration backup 送 `qa-archived`。
 - 封存前後產生 archive manifest，記錄原路徑、新路徑、SHA-256、狀態、原因與日期；不得刪除稽核軌跡。
 - `qa-archived` 是 repo-local 但 Git-ignored 的本機封存區，不得被追蹤或提交；各 family 使用獨立子目錄。封存內容不得參與 build、runtime、Gate 或測試分母。
+- `qa-archived` 同時是審查隔離區。除 Product Owner 明確指定的 archive 管理作業外，BA、QA、DBA、Checker 與臨時專家不得讀取、搜尋、比較、引用或以其內容提出 active finding；所有審查 prompt、工具範圍與 evidence manifest 必須排除該目錄。四眼簽認只依 active workspace、同一 exact candidate commit 與對應 logical snapshot。第一次把 archived／已關閉舊案例重新帶回 active 審查，記錄 Reviewer 警告且該輪不得 PASS；第二次再犯必須更換 Reviewer。
+- BA、QA、DBA 必須共同使用同一份由現行新規則生成的 active case catalogue 與 executable fixture set，並綁定同一 exact candidate commit、logical snapshot 與 artifact SHA。禁止三方各自建立私有案例、沿用舊 workbook／舊 expected outcome，或使用不同案例分母；任一 identity 不一致即不得簽認。
 
 ### 11.1 Settings／Development Test Data Reload 的現行驗證規則
 

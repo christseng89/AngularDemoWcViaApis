@@ -5,12 +5,12 @@ Proposal. Its controlled case catalogue is:
 
 `data/qa/mt2/mt2-pacs009-proposal-case-groups.json`
 
-Each of its 101 cases has one deterministic oracle and a distinct controlled
+Each SSI routing decision case has one deterministic oracle and a distinct controlled
 execution binding in:
 
 `data/qa/mt2/mt2-pacs009-proposal-fixtures.json`
 
-`npm run qa:mt2:cases` runs all 101 named Jest assertions without the Nx cache
+`npm run qa:mt2:cases` runs all named Jest assertions without the Nx cache
 and records each assertion's own PASS/FAIL result. A suite-level exit code is
 never expanded into case-level evidence.
 

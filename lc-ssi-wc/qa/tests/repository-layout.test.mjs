@@ -4,9 +4,9 @@ import path from "node:path";
 import test from "node:test";
 
 const workspace = path.resolve(import.meta.dirname, "../..");
-const approvedQaEntries = ["README.md", "fixtures", "reports", "tdd", "tests"];
+const approvedQaEntries = ["README.md", "reports", "tdd", "tests"];
 const legacyQaReference =
-  /FIX_DATA|qa\/(?:docker|mt1|mt2|mt347|ssi-[^/]+|test_cases)(?:\/|\b)/g;
+  /FIX_DATA|qa-archived(?:\/|\\)|(?:^|["'\s])qa\/(?:docker|mt1|mt2|mt347|ssi-[^/]+|test_cases)(?:\/|\b)/gm;
 const referenceRoots = [
   "package.json",
   "apps",
@@ -14,7 +14,12 @@ const referenceRoots = [
   "scripts",
   "parameters",
   "openapi",
+  "data/qa",
+  "qa/reports/latest",
 ];
+const archiveManagementFiles = new Set([
+  "scripts/build-qa-archive-manifest.mjs",
+]);
 const textExtensions = new Set([
   ".cjs",
   ".js",
@@ -50,9 +55,30 @@ test("active source and configuration do not reference legacy QA paths", () => {
   const violations = referenceRoots
     .flatMap((root) => walk(path.resolve(workspace, root)))
     .filter((file) => textExtensions.has(path.extname(file)))
+    .filter(
+      (file) =>
+        !archiveManagementFiles.has(
+          path.relative(workspace, file).replaceAll(path.sep, "/"),
+        ),
+    )
     .flatMap((file) => {
       const content = fs.readFileSync(file, "utf8");
       return [...content.matchAll(legacyQaReference)].map((match) => ({
+        file: path.relative(workspace, file).replaceAll(path.sep, "/"),
+        reference: match[0],
+      }));
+    });
+  assert.deepEqual(violations, []);
+});
+
+test("BA QA DBA active review inputs are isolated from the archive", () => {
+  const reviewRoots = ["data/qa", "qa/reports/latest"];
+  const violations = reviewRoots
+    .flatMap((root) => walk(path.resolve(workspace, root)))
+    .filter((file) => textExtensions.has(path.extname(file)))
+    .flatMap((file) => {
+      const content = fs.readFileSync(file, "utf8");
+      return [...content.matchAll(/qa-archived(?:\/|\\)/g)].map((match) => ({
         file: path.relative(workspace, file).replaceAll(path.sep, "/"),
         reference: match[0],
       }));

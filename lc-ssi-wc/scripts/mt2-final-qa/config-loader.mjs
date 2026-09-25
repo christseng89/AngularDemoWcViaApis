@@ -13,6 +13,25 @@ export const loadConfig = (configPath) => {
   assert(config.schemaVersion === 1, "schemaVersion must be 1");
   assert(config.expectedCaseCount > 0, "expectedCaseCount must be positive");
   assert(
+    config.reviewContract?.policy === "SINGLE_GENERATED_NEW_RULE_CASE_SET",
+    "reviewContract.policy must require one generated new-rule case set",
+  );
+  assert(
+    JSON.stringify(config.reviewContract?.reviewers) ===
+      JSON.stringify(["BA", "QA", "DBA"]),
+    "reviewContract.reviewers must be BA, QA and DBA",
+  );
+  assert(
+    config.reviewContract?.caseCatalogueRole === "PROPOSAL_CASE_CATALOGUE" &&
+      config.reviewContract?.fixtureSetRole === "PROPOSAL_EXECUTABLE_FIXTURES",
+    "reviewContract must bind the active catalogue and fixture roles",
+  );
+  assert(
+    config.reviewContract?.allowReviewerPrivateCases === false &&
+      config.reviewContract?.allowArchivedCases === false,
+    "reviewer-private and archived cases must be prohibited",
+  );
+  assert(
     config.runtimeBinding?.policy === "CAPTURE_CURRENT_AND_HOLD",
     "runtimeBinding.policy must be CAPTURE_CURRENT_AND_HOLD",
   );
@@ -60,6 +79,16 @@ export const loadConfig = (configPath) => {
     );
     return Object.freeze({ ...artifact, file, sha256 });
   });
+  for (const role of [
+    config.reviewContract.caseCatalogueRole,
+    config.reviewContract.fixtureSetRole,
+  ]) {
+    assert(
+      baselineArtifacts.filter((artifact) => artifact.role === role).length ===
+        1,
+      `review artifact role must resolve exactly once: ${role}`,
+    );
+  }
   return Object.freeze({
     ...config,
     configPath: absolute,
