@@ -20,6 +20,9 @@ export interface Mt1SsiRouteLookupQuery {
   readonly scenarioId: string;
   readonly messageType: string;
   readonly resolutionMessageType?: string;
+  readonly profileId: string;
+  readonly businessService: string;
+  readonly settlementContext: SettlementContext;
   readonly sequence: string;
   readonly currency: string;
   readonly bookingEntity: string;
@@ -466,6 +469,9 @@ export class Mt1SsiDemoRouteRepository {
     return hashCanonical({
       scenarioId: input.scenarioId,
       messageType: input.messageType,
+      profileId: input.profileId,
+      businessService: input.businessService,
+      settlementContext: input.settlementContext,
       sequence: input.sequence,
       currency: input.currency,
       bookingEntity: input.bookingEntity,

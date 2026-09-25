@@ -29,13 +29,47 @@ describe("MT1 SSI route picker", () => {
       valueDate: "2026-09-24",
     });
 
-    expect(result.items).toHaveLength(2);
+    expect(result.items).toHaveLength(1);
     expect(result.items[0]).toMatchObject({
       provider: "SSI_COUNTERPARTY",
       bankServiceId: "BANK-SVC-CITIUS33",
       bic: "CITIUS33",
     });
     expect(result.items[0]!.selectedRouteIdentity).toBeDefined();
+  });
+
+  it("selects the governed SMBC JPY route from the database", () => {
+    const source = new Mt1SsiResolutionPageDefinitionSource();
+    const definition = source.all("SR2026")[0]!;
+    const scenario = definition.scenarios[0]!;
+    const service = new PageParameterLookupService(
+      {} as never,
+      {} as never,
+      {} as never,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      source,
+      new Mt1SsiDemoRouteRepository(),
+    );
+
+    const result = service.ssiCounterparties({
+      scenarioId: scenario.scenarioId,
+      messageType: definition.messageType,
+      sequence: definition.sequences[0]!.sequenceId,
+      currency: "JPY",
+      bookingEntity: "HK01",
+      valueDate: "2026-09-25",
+      query: "SMBC",
+    });
+
+    expect(result.items).toEqual([
+      expect.objectContaining({
+        bankServiceId: "BANK-SVC-SMBCJPJT",
+        bic: "SMBCJPJT",
+      }),
+    ]);
   });
 
   it("fails closed when the MT1 route repository is unavailable", () => {

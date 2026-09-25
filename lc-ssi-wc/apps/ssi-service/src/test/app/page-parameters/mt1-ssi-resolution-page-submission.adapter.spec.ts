@@ -19,6 +19,17 @@ const values = Object.fromEntries(
   ]),
 );
 
+const governedLookupContext = (
+  selectedDefinition: typeof definition,
+  selectedScenario: typeof scenario,
+) => ({
+  profileId: selectedDefinition.profile.profileId,
+  businessService: selectedDefinition.profile.businessService ?? "",
+  settlementContext: String(
+    selectedScenario.inputValues?.["context.settlementContext"] ?? "",
+  ) as "INDA" | "INGA" | "COVE",
+});
+
 describe("Mt1SsiResolutionPageSubmissionAdapter", () => {
   const routes = new Mt1SsiDemoRouteRepository();
   const adapter = new Mt1SsiResolutionPageSubmissionAdapter(
@@ -44,6 +55,7 @@ describe("Mt1SsiResolutionPageSubmissionAdapter", () => {
       fixtureBindingId: selectedScenario.fixture.bindingId,
       scenarioId: selectedScenario.scenarioId,
       messageType: selectedDefinition.messageType,
+      ...governedLookupContext(selectedDefinition, selectedScenario),
       sequence: selectedDefinition.sequences[0]!.sequenceId,
       currency: "USD",
       bookingEntity: "HK01",
@@ -207,6 +219,7 @@ describe("Mt1SsiResolutionPageSubmissionAdapter", () => {
       fixtureBindingId: scenario.fixture.bindingId,
       scenarioId: scenario.scenarioId,
       messageType: definition.messageType,
+      ...governedLookupContext(definition, scenario),
       sequence: definition.sequences[0]!.sequenceId,
       currency: "USD",
       bookingEntity: "HK01",
@@ -330,6 +343,7 @@ describe("Mt1SsiResolutionPageSubmissionAdapter", () => {
       fixtureBindingId: coveScenario.fixture.bindingId,
       scenarioId: coveScenario.scenarioId,
       messageType: mt103.messageType,
+      ...governedLookupContext(mt103, coveScenario),
       sequence: mt103.sequences[0]!.sequenceId,
       currency: "USD",
       bookingEntity: "HK01",
@@ -437,6 +451,7 @@ describe("Mt1SsiResolutionPageSubmissionAdapter", () => {
       fixtureBindingId: ingaScenario.fixture.bindingId,
       scenarioId: ingaScenario.scenarioId,
       messageType: definition.messageType,
+      ...governedLookupContext(definition, ingaScenario),
       sequence: definition.sequences[0]!.sequenceId,
       currency: "USD",
       bookingEntity: "HK01",
@@ -476,6 +491,7 @@ describe("Mt1SsiResolutionPageSubmissionAdapter", () => {
       fixtureBindingId: scenario.fixture.bindingId,
       scenarioId: scenario.scenarioId,
       messageType: definition.messageType,
+      ...governedLookupContext(definition, scenario),
       sequence: definition.sequences[0]!.sequenceId,
       currency: "USD",
       bookingEntity: "HK01",

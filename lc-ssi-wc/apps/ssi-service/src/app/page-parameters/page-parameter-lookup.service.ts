@@ -371,6 +371,11 @@ export class PageParameterLookupService {
       definitionId: definition.definitionId,
       definitionVersion: definition.definitionVersion,
       fixtureBindingId: scenario.fixture.bindingId,
+      profileId: definition.profile.profileId,
+      businessService: definition.profile.businessService ?? "",
+      settlementContext: String(
+        scenario.inputValues?.["context.settlementContext"] ?? "",
+      ) as "INDA" | "INGA" | "COVE",
       resolutionMessageType:
         definition.profile.messageDefinitionId ?? "pacs.008.001.08",
     });

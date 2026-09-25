@@ -275,7 +275,7 @@ describe("DevelopmentDataReloadService", () => {
     expect(first).toMatchObject({
       code: "DEMO_DATA_RELOADED",
       fixtureId: "SSI-DEMO-MT1-MT2-PACS008-PACS009-V1",
-      importedRows: { ssi: 10637, ssi_applicability: 10973 },
+      importedRows: { ssi: 10643, ssi_applicability: 10986 },
     });
     expect(second.snapshotHash).toBe(first.snapshotHash);
     expect(second.importedRows).toEqual(first.importedRows);

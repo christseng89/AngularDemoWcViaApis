@@ -92,6 +92,9 @@ export interface SsiApplicabilityRecord {
   createdAt: string;
   updatedAt: string;
   fixtureBindingIds?: string[];
+  profileIds?: string[];
+  businessServices?: string[];
+  settlementContexts?: string[];
 }
 export type SsiApplicabilityInput = Omit<
   SsiApplicabilityRecord,
@@ -115,6 +118,9 @@ export interface PaymentSsiCandidateBinding {
 export interface Mt1SsiCandidateQuery {
   readonly messageType: string;
   readonly resolutionMessageType?: string;
+  readonly profileId: string;
+  readonly businessService: string;
+  readonly settlementContext: string;
   readonly fixtureBindingId: string;
   readonly currency: string;
   readonly bookingEntity: string;
@@ -1020,7 +1026,7 @@ export class SqliteSsiRepository implements OnModuleDestroy {
                   a.payload AS applicability_payload,
                   n.payload AS nostro_payload,
                   ROW_NUMBER() OVER (
-                    PARTITION BY n.id
+                     PARTITION BY json_extract(n.payload,'$.accountServicerBic')
                     ORDER BY CAST(COALESCE(json_extract(s.payload,'$.route.priority'),'999999') AS INTEGER),
                              s.id, a.id
                   ) AS route_rank
@@ -1046,17 +1052,29 @@ export class SqliteSsiRepository implements OnModuleDestroy {
              AND json_extract(s.payload,'$.route.bookingEntity') IN (?, 'ANY')
              AND COALESCE(json_extract(s.payload,'$.route.validFrom'),'0000-01-01') <= ?
              AND COALESCE(json_extract(s.payload,'$.route.validTo'),'9999-12-31') >= ?
-             AND (
-               instr(',' || replace(COALESCE(json_extract(s.payload,'$.route.messageTypes'),''),' ','') || ',', ',' || ? || ',') > 0
-             )
-             AND (
-               json_array_length(json_extract(a.payload,'$.fixtureBindingIds')) IS NULL
-               OR json_array_length(json_extract(a.payload,'$.fixtureBindingIds')) = 0
-               OR EXISTS (
-                 SELECT 1 FROM json_each(json_extract(a.payload,'$.fixtureBindingIds'))
-                 WHERE value = ?
-               )
-             )
+              AND (
+                instr(',' || replace(COALESCE(json_extract(s.payload,'$.route.messageTypes'),''),' ','') || ',', ',' || ? || ',') > 0
+              )
+              AND (
+                ? = ?
+                OR instr(',' || replace(COALESCE(json_extract(s.payload,'$.route.sourceMessageTypes'),''),' ','') || ',', ',' || ? || ',') > 0
+              )
+              AND EXISTS (
+                SELECT 1 FROM json_each(json_extract(a.payload,'$.fixtureBindingIds'))
+                WHERE value = ?
+              )
+              AND EXISTS (
+                SELECT 1 FROM json_each(json_extract(a.payload,'$.profileIds'))
+                WHERE value = ?
+              )
+              AND EXISTS (
+                SELECT 1 FROM json_each(json_extract(a.payload,'$.businessServices'))
+                WHERE value = ?
+              )
+              AND EXISTS (
+                SELECT 1 FROM json_each(json_extract(a.payload,'$.settlementContexts'))
+                WHERE value = ?
+              )
              AND json_extract(n.payload,'$.status') = 'ACTIVE'
              AND json_extract(n.payload,'$.currency') = ?
              AND json_extract(n.payload,'$.purpose') = 'SETTLEMENT'
@@ -1085,7 +1103,13 @@ export class SqliteSsiRepository implements OnModuleDestroy {
         query.valueDate,
         query.valueDate,
         query.resolutionMessageType ?? "pacs.008.001.08",
+        query.messageType,
+        query.resolutionMessageType ?? "pacs.008.001.08",
+        query.messageType,
         query.fixtureBindingId,
+        query.profileId,
+        query.businessService,
+        query.settlementContext,
         query.currency,
         query.valueDate,
         query.valueDate,
