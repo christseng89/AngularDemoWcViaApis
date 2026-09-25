@@ -1,10 +1,12 @@
 # MT2XX / pacs.009 Outward SSI-Only Revision Proposal v1
 
-**Status:** PROPOSED DRAFT — NOT IMPLEMENTATION AUTHORITY  
+**Status:** BA / QA REVIEWED — DEMO PROTOTYPE — OUTWARD SSI RESOLVE ONLY
 **Scope:** `OUTWARD_SSI_ONLY`  
 **Product type:** `SSI_RESOLUTION_ONLY`  
 **Draft author / Maker:** Codex `/root`  
-**Independent review:** initial BA, payment-domain and QA review completed; this revision requires re-check
+**Independent review:** PASS — independent BA and QA re-check completed; exact
+candidate and execution evidence are recorded in
+`docs/acceptance/2026-09-25-mt2-pacs009-outward-ssi-only-ba-qa.md`
 
 The active Git identity is the repository path plus the exact candidate commit
 recorded only in external handoff and review evidence. This document never
@@ -891,6 +893,23 @@ the exact profile/scenario IDs and attestation schemas, the controlled Sequence
 A renderer subset, every MT→MX evidence mapping, deterministic INDA/INGA rules,
 and typed outcome/HTTP mapping.
 
-This remains `PROPOSED DRAFT — NOT IMPLEMENTATION AUTHORITY` until those
-decisions and the exact candidate receive independent BA, payment-domain and QA
-approval. Earlier reviews do not approve this revision.
+Independent BA and QA have approved the implemented DEMO PROTOTYPE behavior
+against one exact candidate. The approval is limited to outward SSI resolution
+and resolution evidence. It does not approve payment execution, message entry,
+full FIN validation, payload generation, transport, production deployment or
+any later commit. Exact candidate, test, browser/API and Sonar identities remain
+in the external acceptance evidence referenced above; any relevant change
+invalidates this review and requires a new same-candidate re-check.
+
+## 14. Independent BA / QA review outcome
+
+| Reviewer       | Outcome | Reviewed behavior                                                                                                                                |
+| -------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Independent BA | PASS    | Six operational scenarios across MT202COV, MT205 and MT205COV use scope-bound governed fixture attestation; plain MT202 remains unchanged.       |
+| Independent QA | PASS    | Nine browser/API operational submissions passed; no applicable scenario returned `INVALID_UPSTREAM_CONTEXT`; focused and full regression passed. |
+
+The accepted correction binds `attestationId`, `attestationVersion`,
+`evidenceSha256`, `validity`, `scope`, `stale` and `hashMatches` from the
+server-governed scenario fixture. No attestation is created from UI values,
+raw FIN fields or customer data, and the Resolver's fail-closed validation is
+unchanged.
