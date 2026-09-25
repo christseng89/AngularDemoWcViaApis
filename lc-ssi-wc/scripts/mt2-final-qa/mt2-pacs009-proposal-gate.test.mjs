@@ -65,15 +65,16 @@ test("Proposal catalogue rejects an unbound explicit case", () => {
   assert.ok(result.errors.some((error) => error.includes("lacks fixture")));
 });
 
-test("Proposal catalogue rejects old raw-message stimuli and orphan fixtures", () => {
+test("Proposal catalogue rejects non-governed context and orphan fixtures", () => {
   const badFixtures = clone(fixtures);
   const firstBinding = Object.keys(badFixtures.bindings)[0];
-  badFixtures.bindings[firstBinding].execution.raw.block3 = { 119: "COV" };
+  badFixtures.bindings[firstBinding].execution.governedContext.unexpectedField =
+    true;
   badFixtures.bindings["FIXTURE-ORPHAN-LEGACY"] = {
-    execution: { resolverRequest: {}, raw: {} },
+    execution: { resolverRequest: {}, governedContext: {} },
   };
   const result = validateProposalCases(catalogue, proposalHash, badFixtures);
-  assert.ok(result.errors.some((error) => error.includes("raw-message")));
+  assert.ok(result.errors.some((error) => error.includes("non-governed")));
   assert.ok(result.errors.some((error) => error.includes("orphan")));
 });
 

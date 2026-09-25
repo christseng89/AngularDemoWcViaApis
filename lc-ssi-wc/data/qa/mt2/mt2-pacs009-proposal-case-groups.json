@@ -20,401 +20,287 @@
     {
       "id": "MT2-SSI-DIRECTION-001",
       "variants": "SINGLE",
-      "outcomes": [
-        "UNSUPPORTED_DIRECTION"
-      ]
+      "outcomes": ["UNSUPPORTED_DIRECTION"]
     },
     {
       "id": "MT2-SSI-PROFILE-002",
       "variants": "SINGLE",
-      "outcomes": [
-        "UNSUPPORTED_PROFILE"
-      ]
+      "outcomes": ["UNSUPPORTED_PROFILE"]
     },
     {
       "id": "MT2-SSI-ATTESTATION-MISSING",
       "variants": "SINGLE",
-      "outcomes": [
-        "INVALID_UPSTREAM_CONTEXT"
-      ]
+      "outcomes": ["INVALID_UPSTREAM_CONTEXT"]
     },
     {
       "id": "MT2-SSI-ATTESTATION-INVALID",
       "variants": "SINGLE",
-      "outcomes": [
-        "INVALID_UPSTREAM_CONTEXT"
-      ]
+      "outcomes": ["INVALID_UPSTREAM_CONTEXT"]
     },
     {
       "id": "MT2-SSI-ATTESTATION-STALE",
       "variants": "SINGLE",
-      "outcomes": [
-        "INVALID_UPSTREAM_CONTEXT"
-      ]
+      "outcomes": ["INVALID_UPSTREAM_CONTEXT"]
     },
     {
       "id": "MT2-SSI-ATTESTATION-HASH-MISMATCH",
       "variants": "SINGLE",
-      "outcomes": [
-        "INVALID_UPSTREAM_CONTEXT"
-      ]
+      "outcomes": ["INVALID_UPSTREAM_CONTEXT"]
     },
     {
       "id": "MT2-SSI-ATTESTATION-SCOPE-MISMATCH",
       "variants": "SINGLE",
-      "outcomes": [
-        "INVALID_UPSTREAM_CONTEXT"
-      ]
+      "outcomes": ["INVALID_UPSTREAM_CONTEXT"]
     },
     {
       "id": "MT2-SSI-ATTESTATION-VALID",
       "variants": "SINGLE",
-      "outcomes": [
-        "ELIGIBLE_COMPLETE_ROUTE"
-      ]
+      "outcomes": ["ELIGIBLE_COMPLETE_ROUTE"]
     },
     {
       "id": "MT2-SSI-COMPLETENESS-005",
       "variants": "SINGLE",
-      "outcomes": [
-        "PROFILE_INCOMPLETE"
-      ]
+      "outcomes": ["PROFILE_INCOMPLETE"]
     },
     {
       "id": "MT2-SSI-TOPOLOGY-006",
       "variants": "SINGLE",
-      "outcomes": [
-        "INVALID_CONTEXT_TOPOLOGY"
-      ]
+      "outcomes": ["INVALID_CONTEXT_TOPOLOGY"]
     },
     {
       "id": "MT2-SSI-STALE-007",
       "variants": "SINGLE",
-      "outcomes": [
-        "STALE"
-      ]
+      "outcomes": ["STALE"]
     },
     {
       "id": "MT2-SSI-NO-ROUTE-008",
       "variants": "SINGLE",
-      "outcomes": [
-        "NO_ELIGIBLE_SSI"
-      ]
+      "outcomes": ["NO_ELIGIBLE_SSI"]
     },
     {
       "id": "MT2-SSI-AMBIGUOUS-009",
       "variants": "SINGLE",
-      "outcomes": [
-        "AMBIGUOUS_ROUTE"
-      ]
+      "outcomes": ["AMBIGUOUS_ROUTE"]
     },
     {
       "id": "MT2-SSI-ROUTE-010",
       "variants": "SINGLE",
-      "outcomes": [
-        "ELIGIBLE_COMPLETE_ROUTE"
-      ]
+      "outcomes": ["ELIGIBLE_COMPLETE_ROUTE"]
     },
     {
       "id": "MT2-SSI-BILATERAL-011",
       "variants": "SINGLE",
-      "outcomes": [
-        "BILATERAL_RELATIONSHIP_CONFIRMED"
-      ]
+      "outcomes": ["BILATERAL_RELATIONSHIP_CONFIRMED"]
     },
     {
       "id": "MT2-SSI-JURISDICTION-012",
       "variants": "SINGLE",
-      "outcomes": [
-        "JURISDICTION_NOT_PERMITTED"
-      ]
+      "outcomes": ["JURISDICTION_NOT_PERMITTED"]
     },
     {
       "id": "MT2-SSI-JURISDICTION-EVIDENCE-013",
       "variants": "SINGLE",
-      "outcomes": [
-        "JURISDICTION_EVIDENCE_CONFLICT"
-      ]
+      "outcomes": ["JURISDICTION_EVIDENCE_CONFLICT"]
     },
     {
       "id": "MT2-V1-RMA-MISSING",
       "variants": "SINGLE",
-      "outcomes": [
-        "RMA_NOT_AUTHORIZED"
-      ]
+      "outcomes": ["RMA_NOT_AUTHORIZED"]
     },
     {
       "id": "MT2-V1-RMA-EXPIRED",
       "variants": "SINGLE",
-      "outcomes": [
-        "RMA_NOT_AUTHORIZED"
-      ]
+      "outcomes": ["RMA_NOT_AUTHORIZED"]
     },
     {
       "id": "MT2-V1-RMA-WRONG-RECEIVER",
       "variants": "SINGLE",
-      "outcomes": [
-        "RMA_NOT_AUTHORIZED"
-      ]
+      "outcomes": ["RMA_NOT_AUTHORIZED"]
     },
     {
       "id": "MT2-V1-RMA-WRONG-BIZSVC",
       "variants": "SINGLE",
-      "outcomes": [
-        "RMA_NOT_AUTHORIZED"
-      ]
+      "outcomes": ["RMA_NOT_AUTHORIZED"]
     },
     {
       "id": "MT2-V1-RMA-INACTIVE",
       "variants": "SINGLE",
-      "outcomes": [
-        "RMA_NOT_AUTHORIZED"
-      ]
+      "outcomes": ["RMA_NOT_AUTHORIZED"]
     },
     {
       "id": "MT2-V1-RMA-DENIED",
       "variants": "SINGLE",
-      "outcomes": [
-        "RMA_NOT_AUTHORIZED"
-      ]
+      "outcomes": ["RMA_NOT_AUTHORIZED"]
     },
     {
       "id": "MT2-V1-RMA-VALID-DUAL-CHANNEL",
       "variants": "SINGLE",
-      "outcomes": [
-        "ELIGIBLE_COMPLETE_ROUTE"
-      ]
+      "outcomes": ["ELIGIBLE_COMPLETE_ROUTE"]
     },
     {
       "id": "MT2-V1-RMA-FIN-NO-CONTINGENCY",
       "variants": "SINGLE",
-      "outcomes": [
-        "RMA_NOT_AUTHORIZED"
-      ]
+      "outcomes": ["RMA_NOT_AUTHORIZED"]
     },
     {
       "id": "MT2-V1-RMA-VALID-FIN-CONTINGENCY",
       "variants": "SINGLE",
-      "outcomes": [
-        "ELIGIBLE_COMPLETE_ROUTE"
-      ]
+      "outcomes": ["ELIGIBLE_COMPLETE_ROUTE"]
     },
     {
       "id": "MT2-V1-RMA-WRONG-PAIRED-PROFILE",
       "variants": "SINGLE",
-      "outcomes": [
-        "RMA_NOT_AUTHORIZED"
-      ]
+      "outcomes": ["RMA_NOT_AUTHORIZED"]
     },
     {
       "id": "MT2-V1-RMA-WRONG-PROFILE-BIZSVC-BINDING",
       "variants": "SINGLE",
-      "outcomes": [
-        "RMA_NOT_AUTHORIZED"
-      ]
+      "outcomes": ["RMA_NOT_AUTHORIZED"]
     },
     {
       "id": "MT2-V1-RMA-WRONG-FIN-MESSAGE-TYPE",
       "variants": "SINGLE",
-      "outcomes": [
-        "RMA_NOT_AUTHORIZED"
-      ]
+      "outcomes": ["RMA_NOT_AUTHORIZED"]
     },
     {
       "id": "MT2-V1-C81-MT202-56-57",
       "variants": "SINGLE",
-      "outcomes": [
-        "ELIGIBLE_COMPLETE_ROUTE"
-      ]
+      "outcomes": ["ELIGIBLE_COMPLETE_ROUTE"]
     },
     {
       "id": "MT2-V1-C81-MT202-56-ONLY",
       "variants": "SINGLE",
-      "outcomes": [
-        "NO_ELIGIBLE_SSI"
-      ]
+      "outcomes": ["NO_ELIGIBLE_SSI"]
     },
     {
       "id": "MT2-V1-C81-MT202-57-ONLY",
       "variants": "SINGLE",
-      "outcomes": [
-        "ELIGIBLE_COMPLETE_ROUTE"
-      ]
+      "outcomes": ["ELIGIBLE_COMPLETE_ROUTE"]
     },
     {
       "id": "MT2-V1-C81-MT202-NEITHER",
       "variants": "SINGLE",
-      "outcomes": [
-        "ELIGIBLE_COMPLETE_ROUTE"
-      ]
+      "outcomes": ["ELIGIBLE_COMPLETE_ROUTE"]
     },
     {
       "id": "MT2-V1-C81-MT202-MIXED",
       "variants": "SINGLE",
-      "outcomes": [
-        "ELIGIBLE_COMPLETE_ROUTE"
-      ]
+      "outcomes": ["ELIGIBLE_COMPLETE_ROUTE"]
     },
     {
       "id": "MT2-V1-C81-MT202-ALL-INVALID",
       "variants": "SINGLE",
-      "outcomes": [
-        "NO_ELIGIBLE_SSI"
-      ]
+      "outcomes": ["NO_ELIGIBLE_SSI"]
     },
     {
       "id": "MT2-V1-C81-MT202COV-56-57",
       "variants": "SINGLE",
-      "outcomes": [
-        "ELIGIBLE_COMPLETE_ROUTE"
-      ]
+      "outcomes": ["ELIGIBLE_COMPLETE_ROUTE"]
     },
     {
       "id": "MT2-V1-C81-MT202COV-56-ONLY",
       "variants": "SINGLE",
-      "outcomes": [
-        "NO_ELIGIBLE_SSI"
-      ]
+      "outcomes": ["NO_ELIGIBLE_SSI"]
     },
     {
       "id": "MT2-V1-C81-MT202COV-57-ONLY",
       "variants": "SINGLE",
-      "outcomes": [
-        "ELIGIBLE_COMPLETE_ROUTE"
-      ]
+      "outcomes": ["ELIGIBLE_COMPLETE_ROUTE"]
     },
     {
       "id": "MT2-V1-C81-MT202COV-NEITHER",
       "variants": "SINGLE",
-      "outcomes": [
-        "ELIGIBLE_COMPLETE_ROUTE"
-      ]
+      "outcomes": ["ELIGIBLE_COMPLETE_ROUTE"]
     },
     {
       "id": "MT2-V1-C81-MT202COV-MIXED",
       "variants": "SINGLE",
-      "outcomes": [
-        "ELIGIBLE_COMPLETE_ROUTE"
-      ]
+      "outcomes": ["ELIGIBLE_COMPLETE_ROUTE"]
     },
     {
       "id": "MT2-V1-C81-MT202COV-ALL-INVALID",
       "variants": "SINGLE",
-      "outcomes": [
-        "NO_ELIGIBLE_SSI"
-      ]
+      "outcomes": ["NO_ELIGIBLE_SSI"]
     },
     {
       "id": "MT2-V1-C81-MT205-56-57",
       "variants": "SINGLE",
-      "outcomes": [
-        "ELIGIBLE_COMPLETE_ROUTE"
-      ]
+      "outcomes": ["ELIGIBLE_COMPLETE_ROUTE"]
     },
     {
       "id": "MT2-V1-C81-MT205-56-ONLY",
       "variants": "SINGLE",
-      "outcomes": [
-        "NO_ELIGIBLE_SSI"
-      ]
+      "outcomes": ["NO_ELIGIBLE_SSI"]
     },
     {
       "id": "MT2-V1-C81-MT205-57-ONLY",
       "variants": "SINGLE",
-      "outcomes": [
-        "ELIGIBLE_COMPLETE_ROUTE"
-      ]
+      "outcomes": ["ELIGIBLE_COMPLETE_ROUTE"]
     },
     {
       "id": "MT2-V1-C81-MT205-NEITHER",
       "variants": "SINGLE",
-      "outcomes": [
-        "ELIGIBLE_COMPLETE_ROUTE"
-      ]
+      "outcomes": ["ELIGIBLE_COMPLETE_ROUTE"]
     },
     {
       "id": "MT2-V1-C81-MT205-MIXED",
       "variants": "SINGLE",
-      "outcomes": [
-        "ELIGIBLE_COMPLETE_ROUTE"
-      ]
+      "outcomes": ["ELIGIBLE_COMPLETE_ROUTE"]
     },
     {
       "id": "MT2-V1-C81-MT205-ALL-INVALID",
       "variants": "SINGLE",
-      "outcomes": [
-        "NO_ELIGIBLE_SSI"
-      ]
+      "outcomes": ["NO_ELIGIBLE_SSI"]
     },
     {
       "id": "MT2-V1-C81-MT205COV-56-57",
       "variants": "SINGLE",
-      "outcomes": [
-        "ELIGIBLE_COMPLETE_ROUTE"
-      ]
+      "outcomes": ["ELIGIBLE_COMPLETE_ROUTE"]
     },
     {
       "id": "MT2-V1-C81-MT205COV-56-ONLY",
       "variants": "SINGLE",
-      "outcomes": [
-        "NO_ELIGIBLE_SSI"
-      ]
+      "outcomes": ["NO_ELIGIBLE_SSI"]
     },
     {
       "id": "MT2-V1-C81-MT205COV-57-ONLY",
       "variants": "SINGLE",
-      "outcomes": [
-        "ELIGIBLE_COMPLETE_ROUTE"
-      ]
+      "outcomes": ["ELIGIBLE_COMPLETE_ROUTE"]
     },
     {
       "id": "MT2-V1-C81-MT205COV-NEITHER",
       "variants": "SINGLE",
-      "outcomes": [
-        "ELIGIBLE_COMPLETE_ROUTE"
-      ]
+      "outcomes": ["ELIGIBLE_COMPLETE_ROUTE"]
     },
     {
       "id": "MT2-V1-C81-MT205COV-MIXED",
       "variants": "SINGLE",
-      "outcomes": [
-        "ELIGIBLE_COMPLETE_ROUTE"
-      ]
+      "outcomes": ["ELIGIBLE_COMPLETE_ROUTE"]
     },
     {
       "id": "MT2-V1-C81-MT205COV-ALL-INVALID",
       "variants": "SINGLE",
-      "outcomes": [
-        "NO_ELIGIBLE_SSI"
-      ]
+      "outcomes": ["NO_ELIGIBLE_SSI"]
     },
     {
       "id": "MT2-V1-CONFIG-014",
       "variants": "SINGLE",
-      "outcomes": [
-        "PROFILE_INCOMPLETE"
-      ]
+      "outcomes": ["PROFILE_INCOMPLETE"]
     },
     {
       "id": "MT2-V1-MAP-012",
       "variants": "SINGLE",
-      "outcomes": [
-        "PROFILE_INCOMPLETE"
-      ]
+      "outcomes": ["PROFILE_INCOMPLETE"]
     },
     {
       "id": "MT2-V1-JURIS-018G",
       "variants": "SINGLE",
-      "outcomes": [
-        "JURISDICTION_EVIDENCE_CONFLICT"
-      ]
+      "outcomes": ["JURISDICTION_EVIDENCE_CONFLICT"]
     },
     {
       "id": "MT2-V1-JURIS-018F",
       "variants": "SINGLE",
-      "outcomes": [
-        "JURISDICTION_NOT_PERMITTED"
-      ]
+      "outcomes": ["JURISDICTION_NOT_PERMITTED"]
     }
   ],
   "cases": [

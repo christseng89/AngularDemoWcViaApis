@@ -19,30 +19,27 @@ const REQUIRED_OUTCOMES = new Set([
   "JURISDICTION_EVIDENCE_CONFLICT",
   "JURISDICTION_NOT_PERMITTED",
 ]);
-const FORBIDDEN_RAW_KEYS = new Set([
-  "119",
-  "21",
-  "121",
-  "uetr",
-  "incoming121",
-  "block3",
-  "sequenceB",
-  "coverPurpose",
-  "underlyingCustomerCreditTransfer",
-  "previousMessage",
+const ALLOWED_GOVERNED_CONTEXT_KEYS = new Set([
+  "accountWithBankServiceId",
+  "bicCountryConsistency",
+  "bilateralRelationshipConfirmed",
+  "eligibleCandidateCount",
+  "governedConfigurationComplete",
+  "intermediaryBankServiceId",
+  "receiverCountry",
+  "requiredMappingRegistered",
+  "rmaDecision",
+  "routeCandidates",
+  "selectedRouteVersionChanged",
+  "senderCountry",
+  "topologyInvalid",
+  "upstreamAttestation",
 ]);
 
-const forbiddenRawPaths = (value, path = "execution.raw") => {
-  if (!value || typeof value !== "object") return [];
-  if (Array.isArray(value))
-    return value.flatMap((item, index) =>
-      forbiddenRawPaths(item, `${path}[${index}]`),
-    );
-  return Object.entries(value).flatMap(([key, child]) => [
-    ...(FORBIDDEN_RAW_KEYS.has(key) ? [`${path}.${key}`] : []),
-    ...forbiddenRawPaths(child, `${path}.${key}`),
-  ]);
-};
+const unexpectedContextKeys = (value) =>
+  Object.keys(value ?? {}).filter(
+    (key) => !ALLOWED_GOVERNED_CONTEXT_KEYS.has(key),
+  );
 
 const variantCount = ({ variants, profileMatrix }) => {
   if (variants === "SINGLE") return 1;
@@ -103,10 +100,12 @@ export const validateProposalCases = (catalogue, proposalHash, fixtures) => {
         `Explicit case ${proposalCase.caseId} has no controlled fixture binding.`,
       );
     else {
-      const forbidden = forbiddenRawPaths(fixture.execution?.raw);
-      if (forbidden.length)
+      const unexpected = unexpectedContextKeys(
+        fixture.execution?.governedContext,
+      );
+      if (unexpected.length)
         errors.push(
-          `Explicit case ${proposalCase.caseId} contains prohibited raw-message stimuli: ${forbidden.join(", ")}.`,
+          `Explicit case ${proposalCase.caseId} contains non-governed context keys: ${unexpected.join(", ")}.`,
         );
       if (fixture.stimulus?.caseId !== proposalCase.caseId)
         errors.push(

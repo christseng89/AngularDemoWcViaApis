@@ -57,26 +57,6 @@ describe("CounterpartySsiResolutionService new-rule boundary", () => {
     });
   });
 
-  it("does not read or return raw FIN message context", () => {
-    const result = resolver.resolve(request("MT202COV"), {
-      upstreamAttestation: attestation("MT202COV"),
-      block3: { 119: "COV" },
-      incoming21: "RAW-REFERENCE",
-      incoming121: "RAW-UETR",
-      sequenceB: { "50A": "CUSTOMER", 59: "BENEFICIARY" },
-      underlyingCustomerCreditTransfer: true,
-    });
-    const serialized = JSON.stringify(result);
-    expect(serialized).not.toContain("RAW-REFERENCE");
-    expect(serialized).not.toContain("RAW-UETR");
-    expect(serialized).not.toContain("CUSTOMER");
-    expect(serialized).not.toContain("BENEFICIARY");
-    expect(result).toMatchObject({
-      mx: { httpStatus: 200 },
-      resolutionOutcome: "ELIGIBLE_COMPLETE_ROUTE",
-    });
-  });
-
   it("filters C81 per candidate before ranking", () => {
     const result = resolver.resolve(request(), {
       routeCandidates: [

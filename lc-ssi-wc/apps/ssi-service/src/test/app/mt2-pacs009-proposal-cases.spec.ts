@@ -25,7 +25,12 @@ const fixtureRegistry = JSON.parse(
 ) as {
   bindings: Record<
     string,
-    { execution: { resolverRequest: RouteResolutionRequest; raw: Json } }
+    {
+      execution: {
+        resolverRequest: RouteResolutionRequest;
+        governedContext: Json;
+      };
+    }
   >;
 };
 
@@ -36,10 +41,10 @@ describe("MT2/pacs.009 Proposal §11 executable cases", () => {
     const fixture = fixtureRegistry.bindings[proposalCase.fixtureBindingId];
     expect(fixture).toBeDefined();
     const result =
-      resolver.precondition(fixture.execution.raw) ??
+      resolver.precondition(fixture.execution.governedContext) ??
       resolver.resolve(
         fixture.execution.resolverRequest,
-        fixture.execution.raw,
+        fixture.execution.governedContext,
       );
     const mx = result["mx"] as Json;
     const actual = {

@@ -69,14 +69,14 @@ const previousDefinitions = [
     outcome: "UNSUPPORTED_DIRECTION",
     request: { paymentDirection: "INWARD" },
     source: "MT202",
-    raw: {},
+    governedContext: {},
   },
   {
     caseId: "MT2-SSI-PROFILE-002",
     outcome: "UNSUPPORTED_PROFILE",
     request: { profileId: "UNREGISTERED-PROFILE" },
     source: "MT202",
-    raw: {},
+    governedContext: {},
   },
   ...[
     ["MISSING", { state: "MISSING" }, "RMA_NOT_AUTHORIZED"],
@@ -95,7 +95,7 @@ const previousDefinitions = [
     caseId: `MT2-SSI-RMA-${suffix}`,
     outcome,
     source: "MT202",
-    raw: { rmaDecision: rmaDecision(decision) },
+    governedContext: { rmaDecision: rmaDecision(decision) },
   })),
   ...[
     ["MISSING", undefined],
@@ -111,7 +111,7 @@ const previousDefinitions = [
         ? "ELIGIBLE_COMPLETE_ROUTE"
         : "INVALID_UPSTREAM_CONTEXT",
     source: "MT205",
-    raw: {
+    governedContext: {
       ...(attestation ? { upstreamAttestation: attestation } : {}),
       senderCountry: "HK",
       receiverCountry: "HK",
@@ -121,7 +121,7 @@ const previousDefinitions = [
     caseId: "MT2-SSI-COMPLETENESS-005",
     outcome: "PROFILE_INCOMPLETE",
     source: "MT202",
-    raw: {
+    governedContext: {
       intermediaryBankServiceId: "BANK-SVC-INT",
       accountWithBankServiceId: null,
     },
@@ -130,19 +130,19 @@ const previousDefinitions = [
     caseId: "MT2-SSI-TOPOLOGY-006",
     outcome: "INVALID_CONTEXT_TOPOLOGY",
     source: "MT202",
-    raw: { topologyInvalid: true },
+    governedContext: { topologyInvalid: true },
   },
   {
     caseId: "MT2-SSI-STALE-007",
     outcome: "STALE",
     source: "MT202",
-    raw: { selectedRouteVersionChanged: true },
+    governedContext: { selectedRouteVersionChanged: true },
   },
   {
     caseId: "MT2-SSI-NO-ROUTE-008",
     outcome: "NO_ELIGIBLE_SSI",
     source: "MT202",
-    raw: { eligibleCandidateCount: 0 },
+    governedContext: { eligibleCandidateCount: 0 },
   },
   ...[
     [
@@ -181,37 +181,37 @@ const previousDefinitions = [
     caseId: `MT2-SSI-C81-${suffix}`,
     outcome,
     source: "MT202",
-    raw: { routeCandidates },
+    governedContext: { routeCandidates },
   })),
   {
     caseId: "MT2-SSI-AMBIGUOUS-009",
     outcome: "AMBIGUOUS_ROUTE",
     source: "MT202",
-    raw: { eligibleCandidateCount: 2 },
+    governedContext: { eligibleCandidateCount: 2 },
   },
   {
     caseId: "MT2-SSI-ROUTE-010",
     outcome: "ELIGIBLE_COMPLETE_ROUTE",
     source: "MT202",
-    raw: {},
+    governedContext: {},
   },
   {
     caseId: "MT2-SSI-BILATERAL-011",
     outcome: "BILATERAL_RELATIONSHIP_CONFIRMED",
     source: "MT202",
-    raw: { bilateralRelationshipConfirmed: true },
+    governedContext: { bilateralRelationshipConfirmed: true },
   },
   {
     caseId: "MT2-SSI-JURISDICTION-012",
     outcome: "JURISDICTION_NOT_PERMITTED",
     source: "MT205COV",
-    raw: { ...validMt205Cov, receiverCountry: "US" },
+    governedContext: { ...validMt205Cov, receiverCountry: "US" },
   },
   {
     caseId: "MT2-SSI-JURISDICTION-EVIDENCE-013",
     outcome: "JURISDICTION_EVIDENCE_CONFLICT",
     source: "MT205",
-    raw: { ...validMt205, bicCountryConsistency: "CONFLICT" },
+    governedContext: { ...validMt205, bicCountryConsistency: "CONFLICT" },
   },
 ];
 
@@ -256,7 +256,7 @@ const rmaDefinitions = [
   caseId: `MT2-V1-RMA-${suffix}`,
   outcome,
   source: "MT202",
-  raw: { rmaDecision: rmaDecision(decision) },
+  governedContext: { rmaDecision: rmaDecision(decision) },
 }));
 
 const c81Definitions = ["MT202", "MT202COV", "MT205", "MT205COV"].flatMap(
@@ -298,7 +298,7 @@ const c81Definitions = ["MT202", "MT202COV", "MT205", "MT205COV"].flatMap(
       caseId: `MT2-V1-C81-${source}-${suffix}`,
       outcome,
       source,
-      raw: {
+      governedContext: {
         ...(source === "MT205"
           ? validMt205
           : source === "MT205COV"
@@ -323,19 +323,19 @@ const definitions = [
     outcome: "PROFILE_INCOMPLETE",
     applicability: "NOT_EVALUATED",
     source: "MT202",
-    raw: { governedConfigurationComplete: false },
+    governedContext: { governedConfigurationComplete: false },
   },
   {
     caseId: "MT2-V1-MAP-012",
     outcome: "PROFILE_INCOMPLETE",
     source: "MT202",
-    raw: { requiredMappingRegistered: false },
+    governedContext: { requiredMappingRegistered: false },
   },
   {
     caseId: "MT2-V1-JURIS-018G",
     outcome: "JURISDICTION_EVIDENCE_CONFLICT",
     source: "MT205",
-    raw: {
+    governedContext: {
       ...validMt205,
       bilateralRelationshipConfirmed: true,
       bicCountryConsistency: "CONFLICT",
@@ -345,7 +345,7 @@ const definitions = [
     caseId: "MT2-V1-JURIS-018F",
     outcome: "JURISDICTION_NOT_PERMITTED",
     source: "MT205COV",
-    raw: {
+    governedContext: {
       ...validMt205Cov,
       bilateralRelationshipConfirmed: true,
       receiverCountry: "US",
@@ -413,7 +413,7 @@ catalogue.cases = definitions.map((definition) => {
       sourceMessageType: definition.source,
     },
     routeDecision: definition.outcome,
-    execution: { resolverRequest, raw: definition.raw },
+    execution: { resolverRequest, governedContext: definition.governedContext },
   };
   return {
     caseId: definition.caseId,
