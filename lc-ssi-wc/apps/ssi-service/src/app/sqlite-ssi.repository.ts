@@ -22,6 +22,7 @@ import {
   type ResolutionCurrencyApplyResult,
 } from "./resolution-currency-store";
 import type { ResolutionCurrencyCoverageRow } from "./resolution-currency-reconciliation";
+import type { NostroRecord } from "./nostro/nostro.repository";
 
 export interface SsiRecord {
   id: string;
@@ -112,9 +113,16 @@ export interface PaymentSsiCandidateBinding {
 }
 
 export interface Mt1SsiCandidateQuery {
+  readonly messageType: string;
+  readonly resolutionMessageType?: string;
+  readonly fixtureBindingId: string;
   readonly currency: string;
   readonly bookingEntity: string;
   readonly valueDate: string;
+}
+
+export interface Mt1SsiCandidateRoute extends PaymentSsiCandidateBinding {
+  readonly nostro: NostroRecord;
 }
 
 export interface FinControlledFixtureRepositoryQuery {
@@ -253,6 +261,18 @@ export class SqliteSsiRepository implements OnModuleDestroy {
         json_extract(payload,'$.paymentLeg'),
         json_extract(payload,'$.direction'),
         ssi_id
+      );
+      CREATE INDEX IF NOT EXISTS idx_ssi_applicability_mt1_candidate_lookup ON ssi_applicability(
+        json_extract(payload,'$.status'),
+        json_extract(payload,'$.direction'),
+        json_extract(payload,'$.paymentLeg'),
+        ssi_id
+      );
+      CREATE INDEX IF NOT EXISTS idx_ssi_mt1_candidate_lookup ON ssi(
+        json_extract(payload,'$.status'),
+        json_extract(payload,'$.route.currency'),
+        json_extract(payload,'$.route.bookingEntity'),
+        json_extract(payload,'$.route.accountId')
       );
       CREATE INDEX IF NOT EXISTS idx_ssi_fin_fixture_lookup ON ssi(
         json_extract(payload,'$.fixtureFamily'),
@@ -992,29 +1012,70 @@ export class SqliteSsiRepository implements OnModuleDestroy {
 
   findMt1CandidateBindings(
     query: Mt1SsiCandidateQuery,
-  ): PaymentSsiCandidateBinding[] {
+  ): Mt1SsiCandidateRoute[] {
     const rows = this.db
       .prepare(
-        `SELECT s.payload AS ssi_payload, a.payload AS applicability_payload
-         FROM ssi AS s
-         JOIN ssi_applicability AS a ON a.ssi_id = s.id
-         WHERE json_extract(s.payload,'$.status') = 'ACTIVE'
-           AND json_extract(a.payload,'$.status') = 'ACTIVE'
-           AND json_extract(a.payload,'$.validFrom') <= ?
-           AND json_extract(a.payload,'$.validTo') >= ?
-           AND json_extract(a.payload,'$.direction') IN ('OUTBOUND','ANY')
-           AND json_extract(a.payload,'$.paymentLeg') IN ('INTERBANK_SETTLEMENT','ANY')
-           AND json_extract(s.payload,'$.route.currency') = ?
-           AND json_extract(s.payload,'$.route.bookingEntity') IN (?, 'ANY')
-           AND COALESCE(json_extract(s.payload,'$.route.validFrom'),'0000-01-01') <= ?
-           AND COALESCE(json_extract(s.payload,'$.route.validTo'),'9999-12-31') >= ?
-           AND (
-             instr(',' || replace(COALESCE(json_extract(s.payload,'$.route.messageTypes'),''),' ','') || ',', ',MT103,') > 0
-             OR instr(',' || replace(COALESCE(json_extract(s.payload,'$.route.messageTypes'),''),' ','') || ',', ',pacs.008.001.12,') > 0
-             OR instr(',' || replace(COALESCE(json_extract(s.payload,'$.route.messageTypes'),''),' ','') || ',', ',pacs.008.001.08,') > 0
-           )
-         ORDER BY CAST(COALESCE(json_extract(s.payload,'$.route.priority'),'999999') AS INTEGER),
-                  json_extract(s.payload,'$.route.accountWithBic'), a.id`,
+        `WITH eligible AS (
+           SELECT s.payload AS ssi_payload,
+                  a.payload AS applicability_payload,
+                  n.payload AS nostro_payload,
+                  ROW_NUMBER() OVER (
+                    PARTITION BY n.id
+                    ORDER BY CAST(COALESCE(json_extract(s.payload,'$.route.priority'),'999999') AS INTEGER),
+                             s.id, a.id
+                  ) AS route_rank
+           FROM ssi AS s
+           JOIN ssi_applicability AS a ON a.ssi_id = s.id
+           JOIN nostro_account AS n
+             ON COALESCE(
+                  json_extract(n.payload,'$.accountReference'),
+                  json_extract(n.payload,'$.maskedAccountRef')
+                ) = json_extract(s.payload,'$.route.accountId')
+            AND json_extract(n.payload,'$.accountServicerBic') IN (
+               json_extract(s.payload,'$.route.accountWithBic'),
+               json_extract(s.payload,'$.route.bic'),
+               json_extract(s.payload,'$.route.actualReceiverBic')
+             )
+           WHERE json_extract(s.payload,'$.status') = 'ACTIVE'
+             AND json_extract(a.payload,'$.status') = 'ACTIVE'
+             AND json_extract(a.payload,'$.validFrom') <= ?
+             AND json_extract(a.payload,'$.validTo') >= ?
+             AND json_extract(a.payload,'$.direction') IN ('OUTBOUND','ANY')
+             AND json_extract(a.payload,'$.paymentLeg') IN ('INTERBANK_SETTLEMENT','ANY')
+             AND json_extract(s.payload,'$.route.currency') = ?
+             AND json_extract(s.payload,'$.route.bookingEntity') IN (?, 'ANY')
+             AND COALESCE(json_extract(s.payload,'$.route.validFrom'),'0000-01-01') <= ?
+             AND COALESCE(json_extract(s.payload,'$.route.validTo'),'9999-12-31') >= ?
+             AND (
+               instr(',' || replace(COALESCE(json_extract(s.payload,'$.route.messageTypes'),''),' ','') || ',', ',' || ? || ',') > 0
+             )
+             AND (
+               json_array_length(json_extract(a.payload,'$.fixtureBindingIds')) IS NULL
+               OR json_array_length(json_extract(a.payload,'$.fixtureBindingIds')) = 0
+               OR EXISTS (
+                 SELECT 1 FROM json_each(json_extract(a.payload,'$.fixtureBindingIds'))
+                 WHERE value = ?
+               )
+             )
+             AND json_extract(n.payload,'$.status') = 'ACTIVE'
+             AND json_extract(n.payload,'$.currency') = ?
+             AND json_extract(n.payload,'$.purpose') = 'SETTLEMENT'
+             AND json_extract(n.payload,'$.validFrom') <= ?
+             AND json_extract(n.payload,'$.validTo') >= ?
+             AND (
+               json_extract(n.payload,'$.ownLegalEntityId') = ?
+               OR EXISTS (
+                 SELECT 1 FROM json_each(json_extract(n.payload,'$.allowedBookingEntities'))
+                 WHERE value IN (?, 'ANY')
+               )
+             )
+         )
+         SELECT ssi_payload, applicability_payload, nostro_payload
+         FROM eligible
+         WHERE route_rank = 1
+         ORDER BY CAST(json_extract(nostro_payload,'$.priority') AS INTEGER),
+                  json_extract(nostro_payload,'$.accountServicerBic'),
+                  json_extract(nostro_payload,'$.id')`,
       )
       .all(
         query.valueDate,
@@ -1023,13 +1084,32 @@ export class SqliteSsiRepository implements OnModuleDestroy {
         query.bookingEntity,
         query.valueDate,
         query.valueDate,
-      ) as Array<{ ssi_payload: string; applicability_payload: string }>;
+        query.resolutionMessageType ?? "pacs.008.001.08",
+        query.fixtureBindingId,
+        query.currency,
+        query.valueDate,
+        query.valueDate,
+        query.bookingEntity,
+        query.bookingEntity,
+      ) as Array<{
+      ssi_payload: string;
+      applicability_payload: string;
+      nostro_payload: string;
+    }>;
     return rows.map((row) => ({
       ssi: JSON.parse(row.ssi_payload) as SsiRecord,
       applicability: JSON.parse(
         row.applicability_payload,
       ) as SsiApplicabilityRecord,
+      nostro: JSON.parse(row.nostro_payload) as NostroRecord,
     }));
+  }
+
+  findMt1Nostro(id: string): NostroRecord | undefined {
+    const row = this.db
+      .prepare("SELECT payload FROM nostro_account WHERE id=?")
+      .get(id) as { payload: string } | undefined;
+    return row ? (JSON.parse(row.payload) as NostroRecord) : undefined;
   }
   /** Definition discovery projects only currency; executable bindings remain separate. */
   findPaymentResolutionCurrencies(query: PaymentSsiCandidateQuery): string[] {

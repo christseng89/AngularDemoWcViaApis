@@ -327,26 +327,121 @@ describe("SQLite governed repositories", () => {
       value: "source",
     } as never;
     repository.save(source, "CREATED", "maker.source", "TEST");
-    expect(repository.saveRevisionWorkInProgress({ ...source, id: "NO-AMENDMENT" } as never, "maker", "TEST")).toBe(false);
-    expect(repository.saveRevisionWorkInProgress({ ...source, id: "MISSING-SOURCE", amendmentOfId: "UNKNOWN", status: "WIP" } as never, "maker", "TEST")).toBe(false);
-    expect(repository.approveSuppression("UNKNOWN", "checker", "TEST")).toBeUndefined();
+    expect(
+      repository.saveRevisionWorkInProgress(
+        { ...source, id: "NO-AMENDMENT" } as never,
+        "maker",
+        "TEST",
+      ),
+    ).toBe(false);
+    expect(
+      repository.saveRevisionWorkInProgress(
+        {
+          ...source,
+          id: "MISSING-SOURCE",
+          amendmentOfId: "UNKNOWN",
+          status: "WIP",
+        } as never,
+        "maker",
+        "TEST",
+      ),
+    ).toBe(false);
+    expect(
+      repository.approveSuppression("UNKNOWN", "checker", "TEST"),
+    ).toBeUndefined();
 
     const invalidRequests = [
-      { id: "NOT-SUPPRESSION", amendmentOfId: "SOURCE", changeType: "REVISION", status: "PENDING_APPROVAL", suppressionReason: "valid reason", maker: "maker" },
-      { id: "NOT-PENDING", amendmentOfId: "SOURCE", changeType: "SUPPRESSION", status: "DRAFT", suppressionReason: "valid reason", maker: "maker" },
-      { id: "NO-REASON", amendmentOfId: "SOURCE", changeType: "SUPPRESSION", status: "PENDING_APPROVAL", maker: "maker" },
-      { id: "SHORT-REASON", amendmentOfId: "SOURCE", changeType: "SUPPRESSION", status: "PENDING_APPROVAL", suppressionReason: "no", maker: "maker" },
-      { id: "NO-SOURCE", amendmentOfId: "UNKNOWN", changeType: "SUPPRESSION", status: "PENDING_APPROVAL", suppressionReason: "valid reason", maker: "maker" },
+      {
+        id: "NOT-SUPPRESSION",
+        amendmentOfId: "SOURCE",
+        changeType: "REVISION",
+        status: "PENDING_APPROVAL",
+        suppressionReason: "valid reason",
+        maker: "maker",
+      },
+      {
+        id: "NOT-PENDING",
+        amendmentOfId: "SOURCE",
+        changeType: "SUPPRESSION",
+        status: "DRAFT",
+        suppressionReason: "valid reason",
+        maker: "maker",
+      },
+      {
+        id: "NO-REASON",
+        amendmentOfId: "SOURCE",
+        changeType: "SUPPRESSION",
+        status: "PENDING_APPROVAL",
+        maker: "maker",
+      },
+      {
+        id: "SHORT-REASON",
+        amendmentOfId: "SOURCE",
+        changeType: "SUPPRESSION",
+        status: "PENDING_APPROVAL",
+        suppressionReason: "no",
+        maker: "maker",
+      },
+      {
+        id: "NO-SOURCE",
+        amendmentOfId: "UNKNOWN",
+        changeType: "SUPPRESSION",
+        status: "PENDING_APPROVAL",
+        suppressionReason: "valid reason",
+        maker: "maker",
+      },
     ];
     for (const request of invalidRequests) {
-      repository.save({ ...source, ...request } as never, "CREATED", "maker", "TEST");
-      expect(repository.approveSuppression(request.id, "checker", "TEST")).toBeUndefined();
+      repository.save(
+        { ...source, ...request } as never,
+        "CREATED",
+        "maker",
+        "TEST",
+      );
+      expect(
+        repository.approveSuppression(request.id, "checker", "TEST"),
+      ).toBeUndefined();
     }
-    repository.save({ ...source, id: "SAME-MAKER", amendmentOfId: "SOURCE", changeType: "SUPPRESSION", status: "PENDING_APPROVAL", suppressionReason: "valid reason", maker: "checker" } as never, "CREATED", "checker", "TEST");
-    expect(repository.approveSuppression("SAME-MAKER", "checker", "TEST")).toBeUndefined();
-    repository.save({ ...source, id: "INACTIVE-SOURCE", status: "REVOKED" } as never, "CREATED", "maker", "TEST");
-    repository.save({ ...source, id: "INACTIVE-REQUEST", amendmentOfId: "INACTIVE-SOURCE", changeType: "SUPPRESSION", status: "PENDING_APPROVAL", suppressionReason: "valid reason", maker: "maker" } as never, "CREATED", "maker", "TEST");
-    expect(repository.approveSuppression("INACTIVE-REQUEST", "checker", "TEST")).toBeUndefined();
+    repository.save(
+      {
+        ...source,
+        id: "SAME-MAKER",
+        amendmentOfId: "SOURCE",
+        changeType: "SUPPRESSION",
+        status: "PENDING_APPROVAL",
+        suppressionReason: "valid reason",
+        maker: "checker",
+      } as never,
+      "CREATED",
+      "checker",
+      "TEST",
+    );
+    expect(
+      repository.approveSuppression("SAME-MAKER", "checker", "TEST"),
+    ).toBeUndefined();
+    repository.save(
+      { ...source, id: "INACTIVE-SOURCE", status: "REVOKED" } as never,
+      "CREATED",
+      "maker",
+      "TEST",
+    );
+    repository.save(
+      {
+        ...source,
+        id: "INACTIVE-REQUEST",
+        amendmentOfId: "INACTIVE-SOURCE",
+        changeType: "SUPPRESSION",
+        status: "PENDING_APPROVAL",
+        suppressionReason: "valid reason",
+        maker: "maker",
+      } as never,
+      "CREATED",
+      "maker",
+      "TEST",
+    );
+    expect(
+      repository.approveSuppression("INACTIVE-REQUEST", "checker", "TEST"),
+    ).toBeUndefined();
     repository.onModuleDestroy();
   });
 
@@ -372,13 +467,24 @@ describe("SQLite governed repositories", () => {
         suppressionReason: "relationship retired",
         maker: "maker.request",
         ...(suffix === "MESSAGES"
-          ? { messageTypeChanges: { unchanged: ["MT202"], suppressed: ["MT205"] } }
+          ? {
+              messageTypeChanges: {
+                unchanged: ["MT202"],
+                suppressed: ["MT205"],
+              },
+            }
           : {}),
       };
       repository.save(source as never, "CREATED", source.maker, "TEST");
       repository.save(request as never, "CREATED", request.maker, "TEST");
-      expect(repository.approveSuppression(request.id, "checker", "TEST")).toEqual(
-        expect.objectContaining({ status: "SUPPRESSED", checker: "checker", version: 2 }),
+      expect(
+        repository.approveSuppression(request.id, "checker", "TEST"),
+      ).toEqual(
+        expect.objectContaining({
+          status: "SUPPRESSED",
+          checker: "checker",
+          version: 2,
+        }),
       );
     }
     repository.onModuleDestroy();
@@ -988,31 +1094,37 @@ describe("SQLite governed repositories", () => {
       );
       const secondDb = new DatabaseSync(process.env["SSI_DATABASE_PATH"]!);
       try {
-        secondDb.prepare(
-          "INSERT INTO ssi_applicability(id,ssi_id,payload,updated_at) VALUES(?,?,?,?)",
-        ).run(
-          "AAA-OLDER-APPLICABILITY",
-          "AAA-OLDER-INVALID-FIXTURE",
-          JSON.stringify({
-            id: "AAA-OLDER-APPLICABILITY",
-            ssiId: "AAA-OLDER-INVALID-FIXTURE",
-            fixtureFamily: "MT347-SR2026-SSI",
-            status: "ACTIVE",
-            messageType: "MT401",
-          }),
-          "2025-01-01T00:00:00.000Z",
-        );
+        secondDb
+          .prepare(
+            "INSERT INTO ssi_applicability(id,ssi_id,payload,updated_at) VALUES(?,?,?,?)",
+          )
+          .run(
+            "AAA-OLDER-APPLICABILITY",
+            "AAA-OLDER-INVALID-FIXTURE",
+            JSON.stringify({
+              id: "AAA-OLDER-APPLICABILITY",
+              ssiId: "AAA-OLDER-INVALID-FIXTURE",
+              fixtureFamily: "MT347-SR2026-SSI",
+              status: "ACTIVE",
+              messageType: "MT401",
+            }),
+            "2025-01-01T00:00:00.000Z",
+          );
       } finally {
         secondDb.close();
       }
       repository.save(
-        { ...versioned, route: { ...versioned.route, currency: "\t" }, operationalVisible: false } as SsiRecord,
+        {
+          ...versioned,
+          route: { ...versioned.route, currency: "\t" },
+          operationalVisible: false,
+        } as SsiRecord,
         "UPDATED",
         "maker.test",
       );
-      expect(() => repository.listFinControlledFixtureIndexCurrencies()).toThrow(
-        "CONTROLLED_FIXTURE_CURRENCY_MISSING",
-      );
+      expect(() =>
+        repository.listFinControlledFixtureIndexCurrencies(),
+      ).toThrow("CONTROLLED_FIXTURE_CURRENCY_MISSING");
     } finally {
       repository.onModuleDestroy();
     }
@@ -1123,6 +1235,42 @@ describe("SQLite governed repositories", () => {
     repository.onModuleDestroy();
   });
 
+  it("creates the MT1 candidate applicability index used by the DB-backed resolver", () => {
+    const repository = new SqliteSsiRepository();
+    const db = new DatabaseSync(process.env["SSI_DATABASE_PATH"]!, {
+      readOnly: true,
+    });
+    try {
+      const index = db
+        .prepare("SELECT sql FROM sqlite_master WHERE type='index' AND name=?")
+        .get("idx_ssi_applicability_mt1_candidate_lookup") as
+        { sql: string } | undefined;
+      expect(index?.sql).toContain("$.status");
+      expect(index?.sql).toContain("$.direction");
+      expect(index?.sql).toContain("$.paymentLeg");
+      expect(index?.sql).toContain("ssi_id");
+
+      const plan = db
+        .prepare(
+          `EXPLAIN QUERY PLAN
+           SELECT s.payload
+           FROM ssi AS s
+           JOIN ssi_applicability AS a ON a.ssi_id = s.id
+           WHERE json_extract(a.payload,'$.status') = 'ACTIVE'
+             AND json_extract(a.payload,'$.direction') IN ('OUTBOUND','ANY')
+             AND json_extract(a.payload,'$.paymentLeg') IN ('INTERBANK_SETTLEMENT','ANY')`,
+        )
+        .all()
+        .map((row) => String((row as { detail: unknown }).detail));
+      expect(plan.join(" ")).toContain(
+        "idx_ssi_applicability_mt1_candidate_lookup",
+      );
+    } finally {
+      db.close();
+      repository.onModuleDestroy();
+    }
+  });
+
   it("finds exact RMA authorisations inside SQLite without leaking QA fixtures", () => {
     const repository = new RmaRepository();
     const makeRecord = (
@@ -1212,14 +1360,16 @@ describe("SQLite governed repositories", () => {
     repository.save(base, "CREATED", "maker.test", "RMA");
     repository.save(qa, "CREATED", "maker.test", "RMA");
 
-    expect(repository.findAuthorised({
-      ownBic: "DEMOHKHHXXX",
-      counterpartyBic: "CITIUS33XXX",
-      service: "FINPLUS",
-      direction: "OUTBOUND",
-      messageType: "pacs.009.001.08",
-      operationalOnly: true,
-    })).toEqual([base]);
+    expect(
+      repository.findAuthorised({
+        ownBic: "DEMOHKHHXXX",
+        counterpartyBic: "CITIUS33XXX",
+        service: "FINPLUS",
+        direction: "OUTBOUND",
+        messageType: "pacs.009.001.08",
+        operationalOnly: true,
+      }),
+    ).toEqual([base]);
     repository.onModuleDestroy();
   });
 
@@ -1242,18 +1392,41 @@ describe("SQLite governed repositories", () => {
       updatedAt: "2026-01-01T00:00:00.000Z",
     };
     repository.save(base, "CREATED", "maker.test", "RMA");
-    repository.save({ ...base, id: "RMA-WRONG-SERVICE", service: "FIN", updatedAt: "2026-09-20T00:00:00.000Z" }, "CREATED", "maker.test", "RMA");
-    repository.save({ ...base, id: "RMA-EXPIRED", service: "FINPLUS", validTo: "2026-09-01", updatedAt: "2026-09-21T00:00:00.000Z" }, "CREATED", "maker.test", "RMA");
+    repository.save(
+      {
+        ...base,
+        id: "RMA-WRONG-SERVICE",
+        service: "FIN",
+        updatedAt: "2026-09-20T00:00:00.000Z",
+      },
+      "CREATED",
+      "maker.test",
+      "RMA",
+    );
+    repository.save(
+      {
+        ...base,
+        id: "RMA-EXPIRED",
+        service: "FINPLUS",
+        validTo: "2026-09-01",
+        updatedAt: "2026-09-21T00:00:00.000Z",
+      },
+      "CREATED",
+      "maker.test",
+      "RMA",
+    );
 
-    expect(repository.findAuthorised({
-      ownBic: "DEMOHKHHXXX",
-      counterpartyBic: "CITIUS33XXX",
-      service: "FINPLUS",
-      direction: "OUTBOUND",
-      messageType: "pacs.009.001.08",
-      at: "2026-09-21",
-      operationalOnly: true,
-    })).toEqual([base]);
+    expect(
+      repository.findAuthorised({
+        ownBic: "DEMOHKHHXXX",
+        counterpartyBic: "CITIUS33XXX",
+        service: "FINPLUS",
+        direction: "OUTBOUND",
+        messageType: "pacs.009.001.08",
+        at: "2026-09-21",
+        operationalOnly: true,
+      }),
+    ).toEqual([base]);
     repository.onModuleDestroy();
   });
 
@@ -1376,7 +1549,9 @@ describe("SQLite governed repositories", () => {
     const repository = new SqliteSsiRepository();
     const source = ssiRecord({ id: "SSI-SUPPRESSION-SOURCE" });
     repository.save(source, "CREATED", source.maker);
-    expect(repository.approveSuppression("UNKNOWN", "checker.test")).toBeUndefined();
+    expect(
+      repository.approveSuppression("UNKNOWN", "checker.test"),
+    ).toBeUndefined();
 
     const invalid = [
       ssiRecord({
@@ -1476,12 +1651,23 @@ describe("SQLite governed repositories", () => {
       archived: 0,
     });
     repository.save(
-      ssiRecord({ id: "SSI-COVERAGE-A", route: { counterpartyBic: "BARCGB22", currency: "GBP", accountId: "100%_\\" } }),
+      ssiRecord({
+        id: "SSI-COVERAGE-A",
+        route: {
+          counterpartyBic: "BARCGB22",
+          currency: "GBP",
+          accountId: "100%_\\",
+        },
+      }),
       "CREATED",
       "maker.test",
     );
     repository.save(
-      ssiRecord({ id: "SSI-COVERAGE-B", status: "SUPPRESSED", route: { counterpartyBic: "BARCGB22", currency: "EUR" } }),
+      ssiRecord({
+        id: "SSI-COVERAGE-B",
+        status: "SUPPRESSED",
+        route: { counterpartyBic: "BARCGB22", currency: "EUR" },
+      }),
       "SUPPRESSED",
       "maker.test",
     );
@@ -1490,15 +1676,17 @@ describe("SQLite governed repositories", () => {
       expect.objectContaining({ page: 1, pageSize: 20, totalItems: 1 }),
     );
     expect(
-      repository.listPage({
-        status: "ACTIVE",
-        counterpartyId: " BARCGB22 ",
-        search: "100%_\\",
-        sortBy: "UNKNOWN",
-        sortDirection: "DESC",
-        page: 0,
-        pageSize: 200,
-      }).items.map(({ id }) => id),
+      repository
+        .listPage({
+          status: "ACTIVE",
+          counterpartyId: " BARCGB22 ",
+          search: "100%_\\",
+          sortBy: "UNKNOWN",
+          sortDirection: "DESC",
+          page: 0,
+          pageSize: 200,
+        })
+        .items.map(({ id }) => id),
     ).toEqual(["SSI-COVERAGE-A"]);
     expect(repository.counterpartyCoverage()).toHaveLength(1);
     expect(repository.counterpartyCoverage("ALL")).toEqual([

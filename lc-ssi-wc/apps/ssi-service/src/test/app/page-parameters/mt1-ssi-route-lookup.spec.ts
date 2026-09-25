@@ -29,7 +29,7 @@ describe("MT1 SSI route picker", () => {
       valueDate: "2026-09-24",
     });
 
-    expect(result.items).toHaveLength(1);
+    expect(result.items).toHaveLength(2);
     expect(result.items[0]).toMatchObject({
       provider: "SSI_COUNTERPARTY",
       bankServiceId: "BANK-SVC-CITIUS33",

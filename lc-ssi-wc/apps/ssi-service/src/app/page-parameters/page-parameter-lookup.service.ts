@@ -371,6 +371,8 @@ export class PageParameterLookupService {
       definitionId: definition.definitionId,
       definitionVersion: definition.definitionVersion,
       fixtureBindingId: scenario.fixture.bindingId,
+      resolutionMessageType:
+        definition.profile.messageDefinitionId ?? "pacs.008.001.08",
     });
   }
 

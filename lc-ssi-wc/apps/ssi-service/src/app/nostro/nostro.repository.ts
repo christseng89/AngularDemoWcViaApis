@@ -50,6 +50,14 @@ export class NostroRepository extends SqliteGovernedRepository<NostroRecord> {
       json_extract(payload,'$.validTo'),
       CAST(json_extract(payload,'$.priority') AS INTEGER),
       json_extract(payload,'$.usageGroup')
+    );
+    CREATE INDEX IF NOT EXISTS idx_nostro_mt1_candidate_lookup ON nostro_account(
+      json_extract(payload,'$.status'),
+      json_extract(payload,'$.currency'),
+      json_extract(payload,'$.purpose'),
+      COALESCE(json_extract(payload,'$.accountReference'), json_extract(payload,'$.maskedAccountRef')),
+      json_extract(payload,'$.validFrom'),
+      json_extract(payload,'$.validTo')
     )`);
   }
 

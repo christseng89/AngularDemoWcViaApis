@@ -7,15 +7,9 @@ import type {
 import { hashCanonical } from "./canonical-json";
 import {
   SqliteSsiRepository,
-  type PaymentSsiCandidateBinding,
+  type Mt1SsiCandidateRoute,
 } from "./sqlite-ssi.repository";
-import { NostroApplicationService } from "./nostro/nostro-application.service";
-import {
-  NostroRepository,
-  type NostroRecord,
-} from "./nostro/nostro.repository";
-import { RmaApplicationService } from "./rma/rma-application.service";
-import { RmaRepository } from "./rma/rma.repository";
+import type { NostroRecord } from "./nostro/nostro.repository";
 import { DatabaseSnapshotIdentityService } from "./database-snapshot-identity.service";
 import { BankServiceDirectory } from "./bank-service-directory";
 
@@ -25,6 +19,7 @@ export interface Mt1SsiRouteLookupQuery {
   readonly fixtureBindingId: string;
   readonly scenarioId: string;
   readonly messageType: string;
+  readonly resolutionMessageType?: string;
   readonly sequence: string;
   readonly currency: string;
   readonly bookingEntity: string;
@@ -40,7 +35,7 @@ export interface Mt1SsiSettlementRouteQuery {
   readonly evidenceFormats: readonly ("SWIFT_MT" | "ISO_20022")[];
 }
 interface DbRoute {
-  readonly binding: PaymentSsiCandidateBinding;
+  readonly binding: Mt1SsiCandidateRoute;
   readonly nostro: NostroRecord;
   readonly bankServiceId: string;
   readonly bic: string;
@@ -291,16 +286,12 @@ function settlementProjections(
 @Injectable()
 export class Mt1SsiDemoRouteRepository {
   private readonly ssi: SqliteSsiRepository;
-  private readonly nostros: NostroApplicationService;
-  private readonly rma: RmaApplicationService;
   private readonly snapshots: DatabaseSnapshotIdentityService;
   private readonly directory: BankServiceDirectory;
   private readonly issuedSnapshots = new Set<string>();
 
   constructor(
     @Optional() ssi?: SqliteSsiRepository,
-    @Optional() nostros?: NostroApplicationService,
-    @Optional() rma?: RmaApplicationService,
     @Optional() snapshots?: DatabaseSnapshotIdentityService,
     @Optional() directory?: BankServiceDirectory,
   ) {
@@ -308,9 +299,6 @@ export class Mt1SsiDemoRouteRepository {
       ssi && typeof ssi.findMt1CandidateBindings === "function"
         ? ssi
         : new SqliteSsiRepository();
-    this.nostros =
-      nostros ?? new NostroApplicationService(new NostroRepository());
-    this.rma = rma ?? new RmaApplicationService(new RmaRepository());
     this.snapshots = snapshots ?? new DatabaseSnapshotIdentityService();
     this.directory = directory ?? new BankServiceDirectory();
   }
@@ -373,12 +361,12 @@ export class Mt1SsiDemoRouteRepository {
     const app = this.ssi
       .listApplicability(identity.ssi.id)
       .find(({ id }) => id === identity.applicability.id);
-    const nostro = this.nostros
-      .list()
-      .find(({ id }) => id === identity.nostro.id);
+    const nostro = this.ssi.findMt1Nostro(identity.nostro.id);
     return Boolean(
       ssi?.version === identity.ssi.version &&
+      ssi.status === "ACTIVE" &&
       app?.version === identity.applicability.version &&
+      app.status === "ACTIVE" &&
       nostro?.version === identity.nostro.version &&
       nostro.status === "ACTIVE",
     );
@@ -391,9 +379,7 @@ export class Mt1SsiDemoRouteRepository {
   ): ResolutionPageSettlementRoute | undefined {
     if (!this.accepts(identity, snapshotId)) return undefined;
     const ssi = this.ssi.find(identity.ssi.id)!;
-    const nostro = this.nostros
-      .list()
-      .find(({ id }) => id === identity.nostro.id)!;
+    const nostro = this.ssi.findMt1Nostro(identity.nostro.id)!;
     const bank = this.bank(nostro.accountServicerBic);
     const local = this.institution(
       process.env["OWN_BIC"]?.trim().toUpperCase() || "DEMOHKHH",
@@ -433,62 +419,16 @@ export class Mt1SsiDemoRouteRepository {
 
   private routes(input: Mt1SsiRouteLookupQuery): DbRoute[] {
     const bindings = this.ssi.findMt1CandidateBindings(input);
-    const nostros = this.nostros
-      .list("ACTIVE")
-      .filter(
-        (row) =>
-          row.currency === input.currency &&
-          row.purpose === "SETTLEMENT" &&
-          row.validFrom <= input.valueDate &&
-          input.valueDate <= row.validTo &&
-          (row.ownLegalEntityId === input.bookingEntity ||
-            (row.allowedBookingEntities ?? []).includes(input.bookingEntity) ||
-            (row.allowedBookingEntities ?? []).includes("ANY")),
-      )
-      .sort(
-        (left, right) =>
-          left.priority - right.priority || left.id.localeCompare(right.id),
-      );
-    const byBic = new Map<string, NostroRecord>();
-    for (const nostro of nostros)
-      if (!byBic.has(nostro.accountServicerBic))
-        byBic.set(nostro.accountServicerBic, nostro);
-    return [...byBic.values()]
-      .flatMap((nostro) => {
-        const binding = bindings.find(({ ssi }) =>
-          [
-            ssi.route["accountWithBic"],
-            ssi.route["bic"],
-            ssi.route["actualReceiverBic"],
-          ].includes(nostro.accountServicerBic),
-        );
-        if (!binding) return [];
-        const decision = this.rma.check({
-          ownBic: process.env["OWN_BIC"]?.trim().toUpperCase() || "DEMOHKHH",
-          counterpartyBic: nostro.accountServicerBic,
-          service: "FIN",
-          direction: "OUTBOUND",
-          messageType: "MT103",
-          at: input.valueDate,
-          operationalOnly: true,
-        });
-        if (!decision.authorised) return [];
-        const bank = this.bank(nostro.accountServicerBic);
-        return [
-          {
-            binding,
-            nostro,
-            bankServiceId: bank.bankServiceId,
-            bic: nostro.accountServicerBic,
-            bankName: bank.name,
-          },
-        ];
-      })
-      .sort(
-        (left, right) =>
-          left.nostro.priority - right.nostro.priority ||
-          left.bic.localeCompare(right.bic),
-      );
+    return bindings.map((binding) => {
+      const bank = this.bank(binding.nostro.accountServicerBic);
+      return {
+        binding,
+        nostro: binding.nostro,
+        bankServiceId: bank.bankServiceId,
+        bic: binding.nostro.accountServicerBic,
+        bankName: bank.name,
+      };
+    });
   }
 
   private identity(

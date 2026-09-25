@@ -9,6 +9,7 @@ describe("Mt1SsiDemoRouteRepository", () => {
       fixtureBindingId: "FIXTURE-MT1-INDA-SSI",
       scenarioId: "MT103-BASE-SR2026:MT1-INDA-SSI",
       messageType: "MT103",
+      resolutionMessageType: "pacs.008.001.08",
       sequence: "SSI_ROUTE",
       currency: "EUR",
       bookingEntity: "HK01",
@@ -32,6 +33,7 @@ describe("Mt1SsiDemoRouteRepository", () => {
       fixtureBindingId: "FIXTURE-1",
       scenarioId: "PACS008-PLAIN-SR2026:MT1-INDA-SSI",
       messageType: "pacs.008.001.08",
+      resolutionMessageType: "pacs.008.001.08",
       sequence: "SSI_ROUTE",
       currency: "USD",
       bookingEntity: "HK01",
@@ -39,7 +41,7 @@ describe("Mt1SsiDemoRouteRepository", () => {
     });
     const identity = lookup.items[0]!.selectedRouteIdentity!;
 
-    expect(lookup.items).toHaveLength(1);
+    expect(lookup.items).toHaveLength(2);
     expect(lookup.eligibilitySnapshot).toMatchObject({
       snapshotIdentityMethod: "SQLITE_WAL_AWARE_LOGICAL_SNAPSHOT_V1",
     });
@@ -63,13 +65,14 @@ describe("Mt1SsiDemoRouteRepository", () => {
       fixtureBindingId: "FIXTURE-1",
       scenarioId: "PACS008-PLAIN-SR2026:MT1-INDA-SSI",
       messageType: "pacs.008.001.08",
+      resolutionMessageType: "pacs.008.001.08",
       sequence: "SSI_ROUTE",
       currency: "USD",
       bookingEntity: "HK01",
       valueDate: "2026-09-24",
     };
 
-    expect(repository.lookup({ ...base, query: "citi" }).items).toHaveLength(1);
+    expect(repository.lookup({ ...base, query: "citi" }).items).toHaveLength(2);
     expect(repository.lookup({ ...base, query: "missing" }).items).toHaveLength(
       0,
     );
@@ -83,6 +86,7 @@ describe("Mt1SsiDemoRouteRepository", () => {
       fixtureBindingId: "FIXTURE-1",
       scenarioId: "MT103-BASE-SR2026:MT1-INGA-SSI",
       messageType: "MT103",
+      resolutionMessageType: "pacs.008.001.08",
       sequence: "SSI_ROUTE",
       currency: "USD",
       bookingEntity: "HK01",
@@ -145,6 +149,7 @@ describe("Mt1SsiDemoRouteRepository", () => {
       fixtureBindingId: "FIXTURE-1",
       scenarioId: "MT103-BASE-SR2026:MT1-INDA-SSI",
       messageType: "MT103",
+      resolutionMessageType: "pacs.008.001.08",
       sequence: "SSI_ROUTE",
       currency: "USD",
       bookingEntity: "HK01",
@@ -185,6 +190,7 @@ describe("Mt1SsiDemoRouteRepository", () => {
       fixtureBindingId: "FIXTURE-1",
       scenarioId: "MT103-STP-SR2026:MT1-COVE-SSI",
       messageType: "MT103",
+      resolutionMessageType: "pacs.008.001.08",
       sequence: "SSI_ROUTE",
       currency: "USD",
       bookingEntity: "HK01",
