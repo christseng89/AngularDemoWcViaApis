@@ -326,6 +326,45 @@ describe("PaymentResolutionPageSubmissionAdapter", () => {
     },
   );
 
+  it.each([
+    ["MT202COV", "MT202COV-OP-BOOK"],
+    ["MT205", "MT205-OP-STANDARD-DOMESTIC-ONWARD"],
+    ["MT205COV", "MT205COV-OP-CONTINUATION"],
+  ])(
+    "binds the governed scenario fixture as upstream attestation for %s",
+    (messageType, scenarioId) => {
+      const definition = definitionFor(messageType);
+      const scenario = scenarioFor(definition, scenarioId);
+      const context = harness();
+
+      context.adapter.execute({
+        definition,
+        scenario,
+        submission: submissionFor(
+          definition,
+          scenario,
+          scenarioId === "MT202COV-OP-BOOK"
+            ? { "context.receiverBankServiceId": "BANK-SVC-CITIUS33" }
+            : {},
+        ),
+      });
+
+      expect(context.resolver.resolve).toHaveBeenCalledWith(
+        expect.objectContaining({
+          upstreamAttestation: {
+            attestationId: scenario.fixture.bindingId,
+            attestationVersion: scenario.fixture.fixtureVersion,
+            evidenceSha256: scenario.fixture.sourceSha256,
+            validity: "VALID",
+            scope: messageType,
+            stale: false,
+            hashMatches: true,
+          },
+        }),
+      );
+    },
+  );
+
   it("keeps COV Sequence B customer data out of SSI evidence", () => {
     const definition = definitionFor("MT202COV");
     const scenario = scenarioFor(definition, "MT202COV-OP-STANDARD");

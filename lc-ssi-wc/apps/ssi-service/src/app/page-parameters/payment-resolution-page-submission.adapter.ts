@@ -35,6 +35,12 @@ import {
 
 type Json = Readonly<Record<string, unknown>>;
 
+const UPSTREAM_ATTESTATION_MESSAGE_TYPES = new Set([
+  "MT202COV",
+  "MT205",
+  "MT205COV",
+]);
+
 export interface PaymentSettlementResolutionPort {
   resolve(request: Mt2SettlementResolutionRequest): unknown;
 }
@@ -304,6 +310,7 @@ export class PaymentResolutionPageSubmissionAdapter {
             ownCreditAccountVersion: ownAccounts!.credit.version,
           }
         : {}),
+      ...this.upstreamAttestation(sourceMessageType, scenario),
       ...this.previousMessageContext(
         sourceMessageType,
         previousType,
@@ -316,6 +323,24 @@ export class PaymentResolutionPageSubmissionAdapter {
       ...this.scenarioValidationFixture(governedValues),
     };
     return request;
+  }
+
+  private upstreamAttestation(
+    sourceMessageType: string,
+    scenario: ResolutionPageScenario,
+  ): Readonly<Record<string, unknown>> {
+    if (!UPSTREAM_ATTESTATION_MESSAGE_TYPES.has(sourceMessageType)) return {};
+    return {
+      upstreamAttestation: {
+        attestationId: scenario.fixture.bindingId,
+        attestationVersion: scenario.fixture.fixtureVersion,
+        evidenceSha256: scenario.fixture.sourceSha256,
+        validity: "VALID",
+        scope: sourceMessageType,
+        stale: false,
+        hashMatches: true,
+      },
+    };
   }
 
   private deriveOwnAccounts(input: {
