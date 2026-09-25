@@ -612,10 +612,7 @@ export interface ResolutionPageSettlementRoute {
 export interface ResolutionPageEvidenceProjection {
   readonly projectionId: string;
   readonly classification:
-    | "SSI_DERIVED"
-    | "UPSTREAM_CONTEXT"
-    | "OMITTED_BY_RULE"
-    | "NOT_APPLICABLE";
+    "SSI_DERIVED" | "UPSTREAM_CONTEXT" | "OMITTED_BY_RULE" | "NOT_APPLICABLE";
   readonly role: string;
   readonly mtTagOption?: string;
   readonly isoPath?: string;
@@ -687,4 +684,13 @@ export interface ResolutionPageExecutionResult {
   readonly fields: readonly ResolutionPageFieldResult[];
   readonly outputs: readonly ResolutionPageGeneratedOutput[];
   readonly evidence: ResolutionPageExecutionEvidence;
+}
+
+export interface SsiOnlyResolutionPageExecutionResult extends ResolutionPageExecutionResult {
+  readonly paymentExecutable: false;
+  readonly profileKind: "SSI_RESOLUTION_ONLY";
+  readonly ssiApplicability: "NOT_EVALUATED" | "REQUIRED" | "NOT_REQUIRED";
+  readonly resolutionOutcome: NonNullable<
+    ResolutionPageExecutionResult["resolutionOutcome"]
+  >;
 }

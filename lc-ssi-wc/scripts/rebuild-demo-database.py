@@ -101,7 +101,7 @@ def logical_snapshot(connection: sqlite3.Connection) -> str:
 def export_seed(
     source_path: Path,
     seed_path: Path,
-    fixture_id: str = "SSI-DEMO-V15.3-CANONICAL",
+    fixture_id: str = "SSI-DEMO-MT1-MT2-PACS008-PACS009-V1",
     source_label: str | None = None,
 ) -> dict[str, Any]:
     source = sqlite3.connect(f"file:{source_path.as_posix()}?mode=ro", uri=True)
@@ -230,7 +230,7 @@ def main() -> None:
     export_parser.add_argument("--seed", type=Path, default=DEFAULT_SEED)
     export_parser.add_argument("--source-label")
     export_parser.add_argument(
-        "--fixture-id", default="SSI-DEMO-V15.8-PACS009-REPAIRED-ISOLATED-CANONICAL"
+        "--fixture-id", default="SSI-DEMO-MT1-MT2-PACS008-PACS009-V1"
     )
     rebuild_parser = subparsers.add_parser("rebuild")
     rebuild_parser.add_argument("--seed", type=Path, default=DEFAULT_SEED)

@@ -27,7 +27,7 @@
     "demo:api-tour": "node scripts/exercise-all-apis.mjs",
     "qa:mt2:final": "node scripts/mt2-final-qa/run.mjs",
     "qa:mt2:final:unit": "node --test --experimental-test-coverage --test-coverage-lines=95.01 scripts/mt2-final-qa/*.test.mjs qa/tests/mt2/*.test.mjs",
-    "qa:mt2:cases": "node scripts/mt2-final-qa/mt2-pacs009-proposal-gate.mjs",
+    "qa:mt2:cases": "node scripts/mt2-final-qa/mt2-pacs009-proposal-gate.cli.mjs",
     "qa:mt2:ui": "node scripts/e2e-mt2-final-ui.mjs"
   },
   "dependencies": {

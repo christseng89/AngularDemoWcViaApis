@@ -27,6 +27,28 @@ const compliantOas = {
         },
       },
     },
+    "/v1/resolution-page-definitions/execute": {
+      post: {
+        responses: {
+          200: {
+            content: {
+              "application/json": {
+                schema: {
+                  oneOf: [
+                    {
+                      $ref: "#/components/schemas/SsiOnlyResolutionPageExecutionResult",
+                    },
+                    {
+                      $ref: "#/components/schemas/ResolutionPageExecutionResult",
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        },
+      },
+    },
   },
   components: {
     schemas: {
@@ -43,6 +65,29 @@ const compliantOas = {
             enum: ["OWN_SSI_NOSTRO", "FI_DIRECT_DEBIT", "NOTIFICATION", null],
           },
         },
+      },
+      ResolutionPageExecutionResult: {
+        type: "object",
+        required: [],
+        properties: {
+          paymentExecutable: { enum: [false] },
+          profileKind: { enum: ["SSI_RESOLUTION_ONLY"] },
+          ssiApplicability: { type: "string" },
+          resolutionOutcome: { type: "string" },
+        },
+      },
+      SsiOnlyResolutionPageExecutionResult: {
+        allOf: [
+          { $ref: "#/components/schemas/ResolutionPageExecutionResult" },
+          {
+            required: [
+              "paymentExecutable",
+              "profileKind",
+              "ssiApplicability",
+              "resolutionOutcome",
+            ],
+          },
+        ],
       },
     },
   },
@@ -96,5 +141,19 @@ test("MT2 OAS verifier rejects an unsupported version and empty domain registry"
   assert.deepEqual(
     result.violations.map(({ code }) => code),
     ["OPENAPI_VERSION_UNSUPPORTED", "DOMAIN_ENDPOINTS_MISSING"],
+  );
+});
+
+test("MT2 OAS verifier rejects optional Proposal evidence fields", () => {
+  const oas = globalThis.structuredClone(compliantOas);
+  oas.components.schemas.SsiOnlyResolutionPageExecutionResult.allOf[1].required =
+    [];
+  const codes = verifyMt2OasContract({ oas, endpoints }).violations.map(
+    ({ code }) => code,
+  );
+  assert.equal(
+    codes.filter((code) => code === "RESOLUTION_PAGE_EVIDENCE_FIELD_OPTIONAL")
+      .length,
+    4,
   );
 });

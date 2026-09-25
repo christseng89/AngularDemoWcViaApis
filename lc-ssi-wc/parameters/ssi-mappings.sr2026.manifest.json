@@ -74,8 +74,7 @@
           "pages": [50, 51, 52],
           "selectionPolicy": "Option A when BIC-identifiable; Option D only for name/address or controlled bilateral exception with a reason code"
         }
-      ],
-      "goldenFixture": "data/qa/mt2/mt202-57a-option-selection.v15.1.json"
+      ]
     },
     {
       "messageType": "MT300",

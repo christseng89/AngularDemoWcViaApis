@@ -1,8 +1,9 @@
 import { Injectable } from "@nestjs/common";
 import type {
   ResolutionPageDefinition,
-  ResolutionPageExecutionOutcome,
   ResolutionPageExecutionResult,
+  ResolutionPageExecutionOutcome,
+  SsiOnlyResolutionPageExecutionResult,
   ResolutionPageSettlementRoute,
   ResolutionPageScenario,
   ResolutionPageSubmission,
@@ -54,7 +55,7 @@ export class Mt1SsiResolutionPageSubmissionAdapter {
     definition,
     scenario,
     submission,
-  }: Mt1SsiResolutionPageExecutionContext): ResolutionPageExecutionResult {
+  }: Mt1SsiResolutionPageExecutionContext): SsiOnlyResolutionPageExecutionResult {
     const request = this.request(definition, scenario, submission);
     const settlementRoute = this.settlementRoute(
       definition,
@@ -92,6 +93,8 @@ export class Mt1SsiResolutionPageSubmissionAdapter {
         ? {}
         : { reasonCode: resolved.resolutionOutcome }),
       payloadGenerated: false,
+      paymentExecutable: false,
+      profileKind: "SSI_RESOLUTION_ONLY",
       confirmedResolutionCreated: false,
       repairQueueCreated: false,
       nvrOutcome:

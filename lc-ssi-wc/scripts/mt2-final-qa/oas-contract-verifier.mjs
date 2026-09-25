@@ -51,6 +51,65 @@ const responseSchemas = (operation) =>
     return schema ? [schema] : [];
   });
 
+const schemaReferences = (schema, reference) => {
+  if (!schema || typeof schema !== "object") return false;
+  if (schema.$ref === reference) return true;
+  return [
+    ...(schema.allOf ?? []),
+    ...(schema.anyOf ?? []),
+    ...(schema.oneOf ?? []),
+    schema.items,
+  ].some((child) => schemaReferences(child, reference));
+};
+
+const collectRequiredNames = (oas, schema, seen = new Set()) => {
+  const resolved = resolveRef(oas, schema);
+  if (!resolved || typeof resolved !== "object" || seen.has(resolved))
+    return [];
+  seen.add(resolved);
+  return [
+    ...(resolved.required ?? []),
+    ...(resolved.allOf ?? []).flatMap((child) =>
+      collectRequiredNames(oas, child, seen),
+    ),
+  ];
+};
+
+const verifyResolutionPageExecutionContract = ({ oas, add }) => {
+  const path = "/v1/resolution-page-definitions/execute";
+  const operation = oas?.paths?.[path]?.post;
+  if (!operation) {
+    add(
+      "RESOLUTION_PAGE_EXECUTE_OPERATION_MISSING",
+      `POST ${path} is absent from the frozen OAS.`,
+      { path },
+    );
+    return;
+  }
+  const schemas = responseSchemas(operation);
+  const profileRef =
+    "#/components/schemas/SsiOnlyResolutionPageExecutionResult";
+  if (!schemas.some((schema) => schemaReferences(schema, profileRef)))
+    add(
+      "SSI_ONLY_EXECUTION_PROFILE_MISSING",
+      `POST ${path} does not expose the strict SSI-only response profile.`,
+      { path },
+    );
+  const required = new Set(collectRequiredNames(oas, { $ref: profileRef }));
+  for (const field of [
+    "paymentExecutable",
+    "profileKind",
+    "ssiApplicability",
+    "resolutionOutcome",
+  ])
+    if (!required.has(field))
+      add(
+        "RESOLUTION_PAGE_EVIDENCE_FIELD_OPTIONAL",
+        `POST ${path} response does not require ${field}.`,
+        { path, field },
+      );
+};
+
 const verifyRequestContract = ({ oas, operation, path, add }) => {
   const schema = requestSchema(operation);
   if (!schema) {
@@ -148,6 +207,7 @@ export const verifyMt2OasContract = ({ oas, endpoints }) => {
       add,
     });
   }
+  verifyResolutionPageExecutionContract({ oas, add });
 
   return {
     status: violations.length === 0 ? "PASS" : "FAIL",

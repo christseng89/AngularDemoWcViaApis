@@ -10,6 +10,7 @@ import {
 import type {
   ResolutionPageDefinition,
   ResolutionPageExecutionResult,
+  SsiOnlyResolutionPageExecutionResult,
   ResolutionPageEvidenceCard,
   ResolutionPageFieldResult,
   ResolutionPageScenario,
@@ -90,12 +91,6 @@ const previousMessageType = (
   return undefined;
 };
 
-const PREVIOUS_COVER_TYPES = new Set([
-  "MT202COV",
-  "MT205COV",
-  "GOVERNED_EQUIVALENT_COVER",
-]);
-
 @Injectable()
 export class PaymentResolutionPageSubmissionAdapter {
   constructor(
@@ -107,7 +102,7 @@ export class PaymentResolutionPageSubmissionAdapter {
 
   execute(
     context: PaymentResolutionPageExecutionContext,
-  ): ResolutionPageExecutionResult {
+  ): SsiOnlyResolutionPageExecutionResult {
     this.requireProfile(context.definition);
     const request = this.request(context);
     const raw = this.requireResolverSuccess(this.settlements.resolve(request));
@@ -372,22 +367,14 @@ export class PaymentResolutionPageSubmissionAdapter {
       values,
       "context.previousMessageArtifactSha256",
     );
-    if (
-      sourceMessageType === "MT205" &&
-      (nonCoverAttested !== true ||
-        !attestationId ||
-        !attestationVersion ||
-        !/^[a-f\d]{64}$/i.test(artifactSha256))
-    )
-      throw new BadRequestException({
-        code: "MT205_PREDECESSOR_ATTESTATION_REQUIRED",
-      });
     return {
       previousMessage: {
         ...identity,
         ...(sourceMessageType === "MT205"
           ? {
-              nonCoverAttested: true as const,
+              ...(nonCoverAttested === true
+                ? { nonCoverAttested: true as const }
+                : {}),
               attestationId,
               attestationVersion,
               artifactSha256,
@@ -404,19 +391,11 @@ export class PaymentResolutionPageSubmissionAdapter {
   private previousCoverMessage(
     values: ResolutionPageSubmission["values"],
   ): NonNullable<Mt2SettlementResolutionRequest["previousMessage"]> {
-    const type = this.requiredText(values, "context.previousMessageType");
-    if (!PREVIOUS_COVER_TYPES.has(type))
-      throw new BadRequestException({
-        code: "PAYMENT_PREVIOUS_COVER_TYPE_INVALID",
-      });
-    const artifactSha256 = this.requiredText(
+    const type = text(values, "context.previousMessageType");
+    const artifactSha256 = text(
       values,
       "context.previousMessageArtifactSha256",
     );
-    if (!/^[a-f\d]{64}$/i.test(artifactSha256))
-      throw new BadRequestException({
-        code: "PAYMENT_PREVIOUS_ARTIFACT_SHA256_INVALID",
-      });
     const equivalentCoverRuleRecordId = text(
       values,
       "context.equivalentCoverRuleRecordId",
@@ -425,30 +404,25 @@ export class PaymentResolutionPageSubmissionAdapter {
       values,
       "context.equivalentCoverRuleRecordVersion",
     );
-    if (
-      type === "GOVERNED_EQUIVALENT_COVER" &&
-      (!equivalentCoverRuleRecordId || !equivalentCoverRuleRecordVersion)
-    )
-      throw new BadRequestException({
-        code: "PAYMENT_EQUIVALENT_COVER_RULE_REQUIRED",
-      });
+    // Preserve incomplete or invalid governed fixture values for the domain
+    // resolver. It owns the Proposal outcome and returns the standard 422
+    // INVALID_UPSTREAM_CONTEXT evidence envelope.
     return {
       type,
-      "20": this.requiredText(values, "context.previousMessage20"),
-      "21": this.requiredText(values, "context.previousMessage21"),
-      "121": this.requiredText(values, "context.previousMessage121"),
-      "A.52A": this.requiredText(values, "context.previousMessageA52"),
-      "A.58A": this.requiredText(values, "context.previousMessageA58"),
+      "20": text(values, "context.previousMessage20"),
+      "21": text(values, "context.previousMessage21"),
+      "121": text(values, "context.previousMessage121"),
+      "A.52A": text(values, "context.previousMessageA52"),
+      "A.58A": text(values, "context.previousMessageA58"),
       sequenceB: {
-        "50A": this.requiredText(values, "context.previousMessageSequenceB50A"),
-        "59": this.requiredText(values, "context.previousMessageSequenceB59"),
+        "50A": text(values, "context.previousMessageSequenceB50A"),
+        "59": text(values, "context.previousMessageSequenceB59"),
       },
       artifactSha256,
-      artifactVersion: this.requiredText(
-        values,
-        "context.previousMessageArtifactVersion",
-      ),
-      ...(type === "GOVERNED_EQUIVALENT_COVER"
+      artifactVersion: text(values, "context.previousMessageArtifactVersion"),
+      ...(type === "GOVERNED_EQUIVALENT_COVER" &&
+      equivalentCoverRuleRecordId &&
+      equivalentCoverRuleRecordVersion
         ? {
             equivalentCoverRuleRecordId,
             equivalentCoverRuleRecordVersion,
@@ -533,7 +507,7 @@ export class PaymentResolutionPageSubmissionAdapter {
     { definition, scenario, submission }: PaymentResolutionPageExecutionContext,
     request: Mt2SettlementResolutionRequest,
     raw: Json,
-  ): ResolutionPageExecutionResult {
+  ): SsiOnlyResolutionPageExecutionResult {
     const fields = this.resolvedFields(definition, scenario, raw);
     const chosen = object(raw["chosenRoute"]);
     const selectedSsi = this.identity(chosen["ssiId"], chosen["ssiVersion"]);

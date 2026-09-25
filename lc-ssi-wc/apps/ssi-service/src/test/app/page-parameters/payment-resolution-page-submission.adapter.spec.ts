@@ -721,6 +721,51 @@ describe("PaymentResolutionPageSubmissionAdapter", () => {
     );
   });
 
+  it("lets the resolver return the Proposal 422 envelope for an incomplete MT205 predecessor", () => {
+    const definition = definitionFor("MT205");
+    const governedScenario = scenarioFor(
+      definition,
+      "MT205-OP-STANDARD-DOMESTIC-ONWARD",
+    );
+    const scenario = { ...governedScenario, inputValues: {} };
+    const rejection = {
+      httpStatus: 422,
+      ssiApplicability: "NOT_EVALUATED",
+      resolutionOutcome: "INVALID_UPSTREAM_CONTEXT",
+      payloadGenerated: false,
+      paymentExecutable: false,
+      confirmedResolutionCreated: false,
+      repairQueueCreated: false,
+    };
+    const context = harness(rejection);
+
+    expect(() =>
+      context.adapter.execute({
+        definition,
+        scenario,
+        submission: submissionFor(definition, scenario),
+      }),
+    ).toThrow(HttpException);
+    expect(context.resolver.resolve).toHaveBeenCalledWith(
+      expect.objectContaining({
+        previousMessage: expect.objectContaining({
+          type: "MT202",
+          artifactSha256: "",
+        }),
+      }),
+    );
+    try {
+      context.adapter.execute({
+        definition,
+        scenario,
+        submission: submissionFor(definition, scenario),
+      });
+    } catch (error) {
+      expect((error as HttpException).getStatus()).toBe(422);
+      expect((error as HttpException).getResponse()).toMatchObject(rejection);
+    }
+  });
+
   it("preserves governed-equivalent cover rule provenance for MT205COV", () => {
     const definition = definitionFor("MT205COV");
     const baseScenario = scenarioFor(definition, "MT205COV-OP-CONTINUATION");

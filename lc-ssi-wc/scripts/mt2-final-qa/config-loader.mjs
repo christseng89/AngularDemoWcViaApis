@@ -13,6 +13,15 @@ export const loadConfig = (configPath) => {
   assert(config.schemaVersion === 1, "schemaVersion must be 1");
   assert(config.expectedCaseCount > 0, "expectedCaseCount must be positive");
   assert(
+    config.runtimeBinding?.policy === "CAPTURE_CURRENT_AND_HOLD",
+    "runtimeBinding.policy must be CAPTURE_CURRENT_AND_HOLD",
+  );
+  assert(
+    typeof config.runtimeBinding?.snapshotMethod === "string" &&
+      config.runtimeBinding.snapshotMethod.length > 0,
+    "runtimeBinding.snapshotMethod is required",
+  );
+  assert(
     config.thresholds?.coverage >= 95,
     "coverage exclusive threshold must be >= 95",
   );

@@ -59,7 +59,10 @@ export class DatabaseMutationInterceptor implements NestInterceptor {
     const reloadRequest = request.url
       ?.split("?", 1)[0]
       ?.endsWith("/settings/development-data/reload");
-    if (["GET", "HEAD", "OPTIONS"].includes(method) || reloadRequest)
+    // Some GET repositories expire WIP reservations as part of a read. Treat
+    // every GET as a possible database mutation so Reload cannot race that
+    // server-side lifecycle write.
+    if (["HEAD", "OPTIONS"].includes(method) || reloadRequest)
       return next.handle();
     const release = this.coordinator.beginMutation();
     return next.handle().pipe(finalize(release));

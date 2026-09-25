@@ -2,9 +2,10 @@
   "schemaVersion": 1,
   "expectedCaseCount": 101,
   "proposalCaseFile": "../../../../data/qa/mt2/mt2-pacs009-proposal-case-groups.json",
-  "expectedRuntime": {
-    "snapshotSha256": "73281B77CE80995D61D635831F9963ADF183E3970FF88E0C3BF9177F3F64139F",
-    "snapshotMethod": "SQLITE_WAL_AWARE_LOGICAL_SNAPSHOT_V1"
+  "runtimeBinding": {
+    "policy": "CAPTURE_CURRENT_AND_HOLD",
+    "snapshotMethod": "SQLITE_WAL_AWARE_LOGICAL_SNAPSHOT_V1",
+    "evidenceFile": "../../../../tmp/mt2-final-qa-runtime-snapshot.json"
   },
   "baselineArtifacts": [
     {
@@ -14,12 +15,12 @@
     },
     {
       "file": "../../../../data/qa/mt2/mt2-pacs009-proposal-case-groups.json",
-      "sha256": "BDAF6CC2B73333A840161523BDC5AAFE7B298D52FE72E3FF6D72A2D0A8E58A1F",
+      "sha256": "808BDE0BC25BFD454F059579A970DB3F2D7896DC2E7743B1EDB96014E0C7F394",
       "role": "PROPOSAL_CASE_CATALOGUE"
     },
     {
       "file": "../../../../openapi/swift-data-service.v1.json",
-      "sha256": "84A11461FA83EED8AFF01346DC342887720E7C0EA4BF2FB4400F70AA24D7874B",
+      "sha256": "75C23B3EC9B5922482822178D5DF6E279C1E604CCEA31432DA7ACFDCF03A748B",
       "role": "CURRENT_OAS"
     },
     {
@@ -55,8 +56,19 @@
   },
   "gates": [
     {
+      "id": "RUNTIME_SNAPSHOT_PRE",
+      "command": [
+        "node",
+        "scripts/mt2-final-qa/runtime-snapshot-gate.cli.mjs",
+        "capture"
+      ]
+    },
+    {
       "id": "PROPOSAL_CASE_GATE",
-      "command": ["node", "scripts/mt2-final-qa/mt2-pacs009-proposal-gate.mjs"]
+      "command": [
+        "node",
+        "scripts/mt2-final-qa/mt2-pacs009-proposal-gate.cli.mjs"
+      ]
     },
     {
       "id": "LINT",
@@ -105,6 +117,14 @@
     {
       "id": "MT2_UI",
       "command": ["node", "scripts/e2e-mt2-final-ui.mjs"]
+    },
+    {
+      "id": "RUNTIME_SNAPSHOT_POST",
+      "command": [
+        "node",
+        "scripts/mt2-final-qa/runtime-snapshot-gate.cli.mjs",
+        "verify"
+      ]
     },
     {
       "id": "SONAR_CURRENT_ANALYSIS",

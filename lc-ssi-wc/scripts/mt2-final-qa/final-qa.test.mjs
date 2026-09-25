@@ -142,7 +142,7 @@ test("production config loads only the current Proposal case catalogue", () => {
     config.proposalCaseFile,
     /data[\\/]qa[\\/]mt2[\\/]mt2-pacs009-proposal-case-groups\.json$/,
   );
-  assert.equal(config.baselineArtifacts.length, 4);
+  assert.equal(config.baselineArtifacts.length, 5);
   assert.ok(
     config.baselineArtifacts.some(
       ({ role }) => role === "CANONICAL_POSITIVE_SEED",

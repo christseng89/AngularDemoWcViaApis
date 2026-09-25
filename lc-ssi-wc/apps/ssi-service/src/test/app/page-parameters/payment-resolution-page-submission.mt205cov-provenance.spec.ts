@@ -1,3 +1,4 @@
+import { HttpException } from "@nestjs/common";
 import type {
   ResolutionPageScenario,
   ResolutionPageSubmission,
@@ -75,9 +76,9 @@ const success = {
   },
 };
 
-const harness = () => {
+const harness = (response: unknown = success) => {
   const resolver: PaymentSettlementResolutionPort = {
-    resolve: jest.fn(() => success),
+    resolve: jest.fn(() => response),
   };
   const banks = {
     resolve: jest.fn(() => ({
@@ -157,6 +158,56 @@ describe("MT205COV previous-message provenance contract", () => {
         previousMessage: expect.objectContaining({
           type: "MT202COV",
           artifactSha256: "b".repeat(64),
+        }),
+      }),
+    );
+  });
+
+  it("lets the resolver return the Proposal 422 envelope for incomplete cover provenance", () => {
+    const rejection = {
+      httpStatus: 422,
+      ssiApplicability: "NOT_EVALUATED",
+      resolutionOutcome: "INVALID_UPSTREAM_CONTEXT",
+      payloadGenerated: false,
+      paymentExecutable: false,
+      confirmedResolutionCreated: false,
+      repairQueueCreated: false,
+    };
+    const context = harness(rejection);
+    const incompleteScenario = { ...scenario, inputValues: {} };
+    let caught: HttpException | undefined;
+
+    try {
+      context.adapter.execute({
+        definition,
+        scenario: incompleteScenario,
+        submission: submission({
+          "context.transactionReference": "MT205COV-CURRENT-001",
+          "context.currency": "USD",
+          "context.bookingEntity": "HK01",
+          "context.valueDate": "2026-09-14",
+          "context.amount": "1000.00",
+          "context.counterpartyBankServiceId": "BANK-SVC-DEUTDEFF",
+          "context.swift21NONE": "CURRENT-RELATED-001",
+          "context.swift32A": "260914USD1000,00",
+          "context.swift119NONE": "COV",
+          "context.swift121NONE": "123e4567-e89b-42d3-a456-426614174000",
+          "context.sequenceB50A": "CURRENT ORDERING CUSTOMER",
+          "context.sequenceB59": "CURRENT BENEFICIARY CUSTOMER",
+        }),
+      });
+    } catch (error) {
+      caught = error as HttpException;
+    }
+
+    expect(caught).toBeInstanceOf(HttpException);
+    expect(caught?.getStatus()).toBe(422);
+    expect(caught?.getResponse()).toMatchObject(rejection);
+    expect(context.resolver.resolve).toHaveBeenCalledWith(
+      expect.objectContaining({
+        previousMessage: expect.objectContaining({
+          type: "",
+          artifactSha256: "",
         }),
       }),
     );

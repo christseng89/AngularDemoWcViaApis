@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import test from "node:test";
-import { validateProposalCases } from "./mt2-pacs009-proposal-gate.mjs";
+import {
+  proposalCaseReport,
+  validateProposalCases,
+} from "./mt2-pacs009-proposal-gate.mjs";
 
 const catalogue = JSON.parse(
   fs.readFileSync("data/qa/mt2/mt2-pacs009-proposal-case-groups.json", "utf8"),
@@ -21,6 +24,15 @@ test("Proposal catalogue excludes out-of-scope messages and covers every outcome
   const result = validateProposalCases(catalogue, proposalHash);
   assert.deepEqual(result.errors, []);
   assert.equal(result.expandedCaseCount, 101);
+  assert.equal(catalogue.cases.length, 101);
+  assert.equal(new Set(catalogue.cases.map(({ caseId }) => caseId)).size, 101);
+  assert.equal(
+    catalogue.cases.every(
+      ({ fixtureBindingId, request, expected, executableTest }) =>
+        fixtureBindingId && request && expected && executableTest,
+    ),
+    true,
+  );
   assert.equal(catalogue.profiles.length, 4);
   assert.equal(JSON.stringify(catalogue).includes("MT200-"), false);
   assert.equal(JSON.stringify(catalogue).includes("MT201-"), false);
@@ -39,5 +51,29 @@ test("Proposal catalogue rejects legacy vocabulary and any side effect", () => {
   );
   assert.ok(
     result.errors.some((error) => error.includes("repairQueueCreated")),
+  );
+});
+
+test("Proposal catalogue rejects an unbound explicit case", () => {
+  const bad = structuredClone(catalogue);
+  delete bad.cases[0].executableTest;
+  const result = validateProposalCases(bad, proposalHash);
+  assert.ok(result.errors.some((error) => error.includes("lacks fixture")));
+});
+
+test("Proposal report records every explicit case result", () => {
+  const validation = validateProposalCases(catalogue, proposalHash);
+  const passed = proposalCaseReport(catalogue, validation, true);
+  const failed = proposalCaseReport(catalogue, validation, false);
+  assert.equal(passed.status, "PASS");
+  assert.equal(passed.cases.length, 101);
+  assert.equal(
+    passed.cases.every(({ actual }) => actual === "PASS"),
+    true,
+  );
+  assert.equal(failed.status, "FAIL");
+  assert.equal(
+    failed.cases.every(({ actual }) => actual === "FAIL"),
+    true,
   );
 });

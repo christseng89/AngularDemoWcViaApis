@@ -1,11 +1,3 @@
-import { spawnSync } from "node:child_process";
-import crypto from "node:crypto";
-import fs from "node:fs";
-import path from "node:path";
-
-const CASE_FILE = "data/qa/mt2/mt2-pacs009-proposal-case-groups.json";
-const PROPOSAL_FILE =
-  "memory/ssi/mt2/MT2_PACS009_OUTWARD_SSI_ONLY_REVISION_PROPOSAL_v1_DRAFT.md";
 const ALLOWED_PROFILES = new Set([
   "MT2-MT202-PLAIN-SR2026",
   "MT2-MT202COV-COV-SR2026",
@@ -27,13 +19,6 @@ const REQUIRED_OUTCOMES = new Set([
   "JURISDICTION_EVIDENCE_CONFLICT",
   "JURISDICTION_NOT_PERMITTED",
 ]);
-
-const sha256 = (file) =>
-  crypto
-    .createHash("sha256")
-    .update(fs.readFileSync(file))
-    .digest("hex")
-    .toUpperCase();
 
 const variantCount = ({ variants, profileMatrix }) => {
   if (variants === "SINGLE") return 1;
@@ -66,6 +51,32 @@ export const validateProposalCases = (catalogue, proposalHash) => {
     errors.push(
       `Expanded case count ${expandedCaseCount} does not match ${catalogue.expectedExpandedCaseCount}.`,
     );
+  if (catalogue.cases?.length !== catalogue.expectedExpandedCaseCount)
+    errors.push(
+      `Explicit executable case count ${catalogue.cases?.length ?? 0} does not match ${catalogue.expectedExpandedCaseCount}.`,
+    );
+  const caseIds = new Set();
+  for (const proposalCase of catalogue.cases ?? []) {
+    if (!proposalCase.caseId || caseIds.has(proposalCase.caseId))
+      errors.push(
+        `Missing or duplicate explicit caseId: ${proposalCase.caseId}.`,
+      );
+    caseIds.add(proposalCase.caseId);
+    if (
+      !proposalCase.fixtureBindingId ||
+      !proposalCase.executableTest ||
+      !proposalCase.request ||
+      !proposalCase.expected
+    )
+      errors.push(
+        `Explicit case ${proposalCase.caseId} lacks fixture/request/expected/test binding.`,
+      );
+    for (const sideEffect of Object.keys(catalogue.sideEffects))
+      if (proposalCase.expected?.[sideEffect] !== false)
+        errors.push(
+          `Explicit case ${proposalCase.caseId} does not assert ${sideEffect}=false.`,
+        );
+  }
   const outcomes = new Set(
     catalogue.groups.flatMap(({ outcomes }) => outcomes),
   );
@@ -80,54 +91,16 @@ export const validateProposalCases = (catalogue, proposalHash) => {
   return { errors, expandedCaseCount, outcomes: [...outcomes].sort() };
 };
 
-const run = () => {
-  const catalogue = JSON.parse(fs.readFileSync(CASE_FILE, "utf8"));
-  const validation = validateProposalCases(catalogue, sha256(PROPOSAL_FILE));
-  if (validation.errors.length) {
-    process.stderr.write(`${validation.errors.join("\n")}\n`);
-    process.exitCode = 1;
-    return;
-  }
-  const testPattern = [
-    "settlement.controller.spec.ts",
-    "counterparty-ssi-resolution.service.spec.ts",
-    "payment-resolution-page-submission.adapter.spec.ts",
-    "payment-resolution-page-submission.mt205cov-provenance.spec.ts",
-    "resolution-page-definition.controller.spec.ts",
-  ].join("|");
-  const result = spawnSync(
-    process.execPath,
-    [
-      "node_modules/nx/dist/bin/nx.js",
-      "test",
-      "ssi-service",
-      "--runInBand",
-      `--testPathPatterns=${testPattern}`,
-      "--coverage=false",
-    ],
-    { cwd: process.cwd(), encoding: "utf8", stdio: "inherit" },
-  );
-  const report = {
-    status: result.status === 0 ? "PASS" : "FAIL",
-    proposalSha256: catalogue.proposalSha256,
-    scope: { direction: catalogue.direction, profiles: catalogue.profiles },
-    expandedCaseCount: validation.expandedCaseCount,
-    outcomes: validation.outcomes,
-    sideEffects: catalogue.sideEffects,
-    legacyWorkbook: "INFORMATIONAL_ONLY",
-  };
-  const reportFile = path.resolve("tmp/mt2-pacs009-proposal-gate-report.json");
-  fs.mkdirSync(path.dirname(reportFile), { recursive: true });
-  fs.writeFileSync(reportFile, `${JSON.stringify(report, null, 2)}\n`);
-  process.stdout.write(
-    `${report.status}: ${report.expandedCaseCount} Proposal cases; legacy workbook excluded\n${reportFile}\n`,
-  );
-  process.exitCode = result.status ?? 1;
-};
-
-if (
-  process.argv[1] &&
-  path.resolve(process.argv[1]) ===
-    path.resolve(new URL(import.meta.url).pathname.replace(/^\/(.:)/, "$1"))
-)
-  run();
+export const proposalCaseReport = (catalogue, validation, passed) => ({
+  status: passed ? "PASS" : "FAIL",
+  proposalSha256: catalogue.proposalSha256,
+  scope: { direction: catalogue.direction, profiles: catalogue.profiles },
+  expandedCaseCount: validation.expandedCaseCount,
+  outcomes: validation.outcomes,
+  sideEffects: catalogue.sideEffects,
+  cases: catalogue.cases.map((proposalCase) => ({
+    ...proposalCase,
+    actual: passed ? "PASS" : "FAIL",
+  })),
+  legacyWorkbook: "INFORMATIONAL_ONLY",
+});

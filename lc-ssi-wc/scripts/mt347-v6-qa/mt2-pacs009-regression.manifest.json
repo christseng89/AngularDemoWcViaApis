@@ -6,7 +6,7 @@
   "commands": [
     "npm run qa:mt2:final",
     "npm run qa:mt2:ui",
-    "npm run qa:mt2:v153:data-quality"
+    "npm run qa:mt2:cases"
   ],
   "oracles": [
     "Profile is selected by governed scenario and BAH BizSvc, never MsgDefIdr or MT code alone",

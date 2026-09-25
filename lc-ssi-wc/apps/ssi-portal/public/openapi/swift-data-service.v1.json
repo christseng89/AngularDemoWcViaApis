@@ -2051,7 +2051,19 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResolutionPageExecutionResult"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/SsiOnlyResolutionPageExecutionResult"
+                    },
+                    {
+                      "allOf": [
+                        {
+                          "$ref": "#/components/schemas/ResolutionPageExecutionResult"
+                        },
+                        { "not": { "required": ["profileKind"] } }
+                      ]
+                    }
+                  ]
                 }
               }
             }
@@ -3275,6 +3287,24 @@
             }
           }
         }
+      },
+      "SsiOnlyResolutionPageExecutionResult": {
+        "allOf": [
+          { "$ref": "#/components/schemas/ResolutionPageExecutionResult" },
+          {
+            "type": "object",
+            "required": [
+              "paymentExecutable",
+              "profileKind",
+              "ssiApplicability",
+              "resolutionOutcome"
+            ],
+            "properties": {
+              "paymentExecutable": { "enum": [false] },
+              "profileKind": { "enum": ["SSI_RESOLUTION_ONLY"] }
+            }
+          }
+        ]
       },
       "Bic": {
         "type": "string",
