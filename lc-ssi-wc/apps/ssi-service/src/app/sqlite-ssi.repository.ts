@@ -111,6 +111,12 @@ export interface PaymentSsiCandidateBinding {
   readonly applicability: SsiApplicabilityRecord;
 }
 
+export interface Mt1SsiCandidateQuery {
+  readonly currency: string;
+  readonly bookingEntity: string;
+  readonly valueDate: string;
+}
+
 export interface FinControlledFixtureRepositoryQuery {
   readonly messageType: string;
   readonly sequence?: string;
@@ -305,11 +311,22 @@ export class SqliteSsiRepository implements OnModuleDestroy {
         if (!control?.initialized || control.asOfDate !== asOfDate)
           throw new Error("RESOLUTION_CURRENCY_BOOTSTRAP_CONTROL_MISMATCH");
         this.db.exec("COMMIT");
-        return { discovered: 0, inserted: 0, unchanged: 0, activated: 0, inactivated: 0 };
+        return {
+          discovered: 0,
+          inserted: 0,
+          unchanged: 0,
+          activated: 0,
+          inactivated: 0,
+        };
       }
       const discovered = discover();
       const result = this.currencyStore().apply(
-        "SR2026", discovered, "FULL_RESYNC", `${asOfDate}T00:00:00Z`, asOfDate, false,
+        "SR2026",
+        discovered,
+        "FULL_RESYNC",
+        `${asOfDate}T00:00:00Z`,
+        asOfDate,
+        false,
       );
       this.db.exec("COMMIT");
       return result;
@@ -328,7 +345,11 @@ export class SqliteSsiRepository implements OnModuleDestroy {
     try {
       const discovered = discover();
       const result = this.currencyStore().apply(
-        "SR2026", discovered, "FULL_RESYNC", new Date().toISOString(), asOfDate,
+        "SR2026",
+        discovered,
+        "FULL_RESYNC",
+        new Date().toISOString(),
+        asOfDate,
       );
       this.db.exec("COMMIT");
       return result;
@@ -345,7 +366,11 @@ export class SqliteSsiRepository implements OnModuleDestroy {
     asOfDate: string,
   ): ResolutionCurrencyApplyResult {
     return this.currencyStore().apply(
-      "SR2026", discovered, "APPROVAL_DISCOVERY", new Date().toISOString(), asOfDate,
+      "SR2026",
+      discovered,
+      "APPROVAL_DISCOVERY",
+      new Date().toISOString(),
+      asOfDate,
     );
   }
 
@@ -355,7 +380,12 @@ export class SqliteSsiRepository implements OnModuleDestroy {
     asOfDate: string,
   ): ResolutionCurrencyApplyResult {
     return this.currencyStore().apply(
-      "SR2026", discovered, "FULL_RESYNC", `${asOfDate}T00:00:00.000Z`, asOfDate, false,
+      "SR2026",
+      discovered,
+      "FULL_RESYNC",
+      `${asOfDate}T00:00:00.000Z`,
+      asOfDate,
+      false,
     );
   }
   list(status?: string): SsiRecord[] {
@@ -406,9 +436,7 @@ export class SqliteSsiRepository implements OnModuleDestroy {
     }
     const search = request.search?.trim();
     if (search) {
-      clauses.push(
-        `payload LIKE ? ESCAPE '${SQL_LIKE_ESCAPE_CHARACTER}'`,
-      );
+      clauses.push(`payload LIKE ? ESCAPE '${SQL_LIKE_ESCAPE_CHARACTER}'`);
       const escapedSearch = search
         .replaceAll(
           SQL_LIKE_ESCAPE_CHARACTER,
@@ -684,8 +712,9 @@ export class SqliteSsiRepository implements OnModuleDestroy {
     readonly applicability: readonly SsiApplicabilityRecord[];
   } {
     this.expireRevisionWorkInProgress();
-    const rows = this.db.prepare(
-      `SELECT s.payload AS ssi_payload, a.payload AS applicability_payload
+    const rows = this.db
+      .prepare(
+        `SELECT s.payload AS ssi_payload, a.payload AS applicability_payload
        FROM ssi_applicability AS a
        JOIN ssi AS s ON s.id=a.ssi_id
        WHERE json_extract(a.payload,'$.status')='ACTIVE'
@@ -693,7 +722,8 @@ export class SqliteSsiRepository implements OnModuleDestroy {
          AND json_extract(s.payload,'$.route.currency')=?
          AND COALESCE(json_extract(s.payload,'$.status'),'') NOT IN ('SUPERSEDED','REVOKED')
        ORDER BY s.updated_at DESC`,
-    ).all(request.businessFunction, request.currency) as Array<{
+      )
+      .all(request.businessFunction, request.currency) as Array<{
       ssi_payload: unknown;
       applicability_payload: unknown;
     }>;
@@ -703,31 +733,47 @@ export class SqliteSsiRepository implements OnModuleDestroy {
     const ssi = new Map<string, SsiRecord>();
     const applicability = new Map<string, SsiApplicabilityRecord>();
     for (const row of rows) {
-      const app = JSON.parse(String(row.applicability_payload)) as SsiApplicabilityRecord;
-      if (Date.parse(app.validFrom) > valueTime ||
-          valueTime > Date.parse(app.validTo)) continue;
-      if (!Number.isFinite(Date.parse(app.validFrom)) ||
-          !Number.isFinite(Date.parse(app.validTo))) continue;
+      const app = JSON.parse(
+        String(row.applicability_payload),
+      ) as SsiApplicabilityRecord;
+      if (
+        Date.parse(app.validFrom) > valueTime ||
+        valueTime > Date.parse(app.validTo)
+      )
+        continue;
+      if (
+        !Number.isFinite(Date.parse(app.validFrom)) ||
+        !Number.isFinite(Date.parse(app.validTo))
+      )
+        continue;
       const record = JSON.parse(String(row.ssi_payload)) as SsiRecord;
       ssi.set(record.id, record);
       applicability.set(app.id, app);
     }
-    return { ssi: [...ssi.values()], applicability: [...applicability.values()] };
+    return {
+      ssi: [...ssi.values()],
+      applicability: [...applicability.values()],
+    };
   }
 
   findRequestDataQualityBindings(
     request: RouteResolutionRequest,
   ): readonly PaymentSsiCandidateBinding[] {
     this.expireRevisionWorkInProgress();
-    const requestedCounterparty = request.counterpartyBic ?? request.counterpartyId;
-    if (!requestedCounterparty ||
-        request.consumer !== "CENTRAL_PAYMENT" ||
-        request.product !== "CENTRAL_PAYMENT" ||
-        request.businessFunction !== "INTERBANK_TRANSFER" ||
-        request.paymentLeg !== "INTERBANK_SETTLEMENT" ||
-        request.direction !== "OUTBOUND") return [];
-    const rows = this.db.prepare(
-      `SELECT s.payload AS ssi_payload, a.payload AS applicability_payload
+    const requestedCounterparty =
+      request.counterpartyBic ?? request.counterpartyId;
+    if (
+      !requestedCounterparty ||
+      request.consumer !== "CENTRAL_PAYMENT" ||
+      request.product !== "CENTRAL_PAYMENT" ||
+      request.businessFunction !== "INTERBANK_TRANSFER" ||
+      request.paymentLeg !== "INTERBANK_SETTLEMENT" ||
+      request.direction !== "OUTBOUND"
+    )
+      return [];
+    const rows = this.db
+      .prepare(
+        `SELECT s.payload AS ssi_payload, a.payload AS applicability_payload
        FROM ssi_applicability AS a
        JOIN ssi AS s ON s.id=a.ssi_id
        WHERE json_extract(a.payload,'$.status')='ACTIVE'
@@ -742,20 +788,29 @@ export class SqliteSsiRepository implements OnModuleDestroy {
                       json_extract(s.payload,'$.counterpartyId'))=?
          AND json_extract(s.payload,'$.route.bookingEntity') IN (?, 'ANY')
        ORDER BY a.id`,
-    ).all(request.currency, requestedCounterparty, request.bookingEntity) as Array<{
+      )
+      .all(
+        request.currency,
+        requestedCounterparty,
+        request.bookingEntity,
+      ) as Array<{
       ssi_payload: unknown;
       applicability_payload: unknown;
     }>;
     return rows.map((row) => ({
       ssi: JSON.parse(String(row.ssi_payload)) as SsiRecord,
-      applicability: JSON.parse(String(row.applicability_payload)) as SsiApplicabilityRecord,
+      applicability: JSON.parse(
+        String(row.applicability_payload),
+      ) as SsiApplicabilityRecord,
     }));
   }
   hasCoverProfile(request: RouteResolutionRequest): boolean {
     this.expireRevisionWorkInProgress();
-    const counterparty = request.counterpartyBic || request.counterpartyId || "";
-    const rows = this.db.prepare(
-      `SELECT json_extract(s.payload,'$.route.messageTypes') AS message_types,
+    const counterparty =
+      request.counterpartyBic || request.counterpartyId || "";
+    const rows = this.db
+      .prepare(
+        `SELECT json_extract(s.payload,'$.route.messageTypes') AS message_types,
               json_extract(s.payload,'$.route.businessService') AS business_services,
               json_extract(s.payload,'$.route.sourceMessageTypes') AS source_message_types
        FROM ssi AS s
@@ -767,25 +822,33 @@ export class SqliteSsiRepository implements OnModuleDestroy {
          AND instr(COALESCE(json_extract(s.payload,'$.route.messageTypes'),''), ?) > 0
          AND instr(COALESCE(json_extract(s.payload,'$.route.businessService'),''), ?) > 0
          AND instr(COALESCE(json_extract(s.payload,'$.route.sourceMessageTypes'),''), ?) > 0`,
-    ).all(
-      request.currency,
-      request.bookingEntity,
-      counterparty,
-      request.messageType,
-      "swift.cbprplus.cov.04",
-      request.sourceMessageType ?? "",
-    ) as Array<{
+      )
+      .all(
+        request.currency,
+        request.bookingEntity,
+        counterparty,
+        request.messageType,
+        "swift.cbprplus.cov.04",
+        request.sourceMessageType ?? "",
+      ) as Array<{
       message_types: string | null;
       business_services: string | null;
       source_message_types: string | null;
     }>;
     const hasExactToken = (value: string | null, expected: string): boolean =>
       Boolean(expected) &&
-      (value ?? "").split(",").map((token) => token.trim()).includes(expected);
-    return rows.some((row) =>
-      hasExactToken(row.message_types, request.messageType) &&
-      hasExactToken(row.business_services, "swift.cbprplus.cov.04") &&
-      hasExactToken(row.source_message_types, request.sourceMessageType ?? ""),
+      (value ?? "")
+        .split(",")
+        .map((token) => token.trim())
+        .includes(expected);
+    return rows.some(
+      (row) =>
+        hasExactToken(row.message_types, request.messageType) &&
+        hasExactToken(row.business_services, "swift.cbprplus.cov.04") &&
+        hasExactToken(
+          row.source_message_types,
+          request.sourceMessageType ?? "",
+        ),
     );
   }
   findPaymentCandidates(query: PaymentSsiCandidateQuery): SsiRecord[] {
@@ -926,10 +989,53 @@ export class SqliteSsiRepository implements OnModuleDestroy {
       };
     });
   }
+
+  findMt1CandidateBindings(
+    query: Mt1SsiCandidateQuery,
+  ): PaymentSsiCandidateBinding[] {
+    const rows = this.db
+      .prepare(
+        `SELECT s.payload AS ssi_payload, a.payload AS applicability_payload
+         FROM ssi AS s
+         JOIN ssi_applicability AS a ON a.ssi_id = s.id
+         WHERE json_extract(s.payload,'$.status') = 'ACTIVE'
+           AND json_extract(a.payload,'$.status') = 'ACTIVE'
+           AND json_extract(a.payload,'$.validFrom') <= ?
+           AND json_extract(a.payload,'$.validTo') >= ?
+           AND json_extract(a.payload,'$.direction') IN ('OUTBOUND','ANY')
+           AND json_extract(a.payload,'$.paymentLeg') IN ('INTERBANK_SETTLEMENT','ANY')
+           AND json_extract(s.payload,'$.route.currency') = ?
+           AND json_extract(s.payload,'$.route.bookingEntity') IN (?, 'ANY')
+           AND COALESCE(json_extract(s.payload,'$.route.validFrom'),'0000-01-01') <= ?
+           AND COALESCE(json_extract(s.payload,'$.route.validTo'),'9999-12-31') >= ?
+           AND (
+             instr(',' || replace(COALESCE(json_extract(s.payload,'$.route.messageTypes'),''),' ','') || ',', ',MT103,') > 0
+             OR instr(',' || replace(COALESCE(json_extract(s.payload,'$.route.messageTypes'),''),' ','') || ',', ',pacs.008.001.12,') > 0
+             OR instr(',' || replace(COALESCE(json_extract(s.payload,'$.route.messageTypes'),''),' ','') || ',', ',pacs.008.001.08,') > 0
+           )
+         ORDER BY CAST(COALESCE(json_extract(s.payload,'$.route.priority'),'999999') AS INTEGER),
+                  json_extract(s.payload,'$.route.accountWithBic'), a.id`,
+      )
+      .all(
+        query.valueDate,
+        query.valueDate,
+        query.currency,
+        query.bookingEntity,
+        query.valueDate,
+        query.valueDate,
+      ) as Array<{ ssi_payload: string; applicability_payload: string }>;
+    return rows.map((row) => ({
+      ssi: JSON.parse(row.ssi_payload) as SsiRecord,
+      applicability: JSON.parse(
+        row.applicability_payload,
+      ) as SsiApplicabilityRecord,
+    }));
+  }
   /** Definition discovery projects only currency; executable bindings remain separate. */
   findPaymentResolutionCurrencies(query: PaymentSsiCandidateQuery): string[] {
-    const rows = this.db.prepare(
-      `SELECT DISTINCT json_extract(s.payload,'$.route.currency') AS currency
+    const rows = this.db
+      .prepare(
+        `SELECT DISTINCT json_extract(s.payload,'$.route.currency') AS currency
        FROM ssi AS s
        JOIN ssi_applicability AS a ON a.ssi_id = s.id
        WHERE json_extract(s.payload,'$.status') = 'ACTIVE'
@@ -950,11 +1056,16 @@ export class SqliteSsiRepository implements OnModuleDestroy {
          AND instr(',' || replace(COALESCE(json_extract(s.payload,'$.route.messageTypes'),''),' ','') || ',', ',' || ? || ',') > 0
          ${query.ssiId ? "AND s.id=?" : ""}
        ORDER BY currency`,
-    ).all(
-      query.valueDate, query.valueDate, query.valueDate, query.valueDate,
-      query.sourceMessageType, query.messageType,
-      ...(query.ssiId ? [query.ssiId] : []),
-    ) as { currency: string }[];
+      )
+      .all(
+        query.valueDate,
+        query.valueDate,
+        query.valueDate,
+        query.valueDate,
+        query.sourceMessageType,
+        query.messageType,
+        ...(query.ssiId ? [query.ssiId] : []),
+      ) as { currency: string }[];
     return rows.map(({ currency }) => currency);
   }
   listFinControlledFixtureCatalogueRows(): FinControlledFixtureRepositoryRow[] {

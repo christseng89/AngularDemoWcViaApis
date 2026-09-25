@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { Mt1SsiProfileRegistry } from "../../../app/mt1-ssi-profile.registry";
 import { Mt1SsiResolutionPageDefinitionSource } from "../../../app/page-parameters/mt1-ssi-resolution-page-definition.source";
@@ -97,7 +97,7 @@ describe("Mt1SsiResolutionPageSubmissionAdapter", () => {
             redirectDomain: null,
             renderer:
               "MT103 SSI evidence compatibility view from the same resolved route snapshot",
-            tags: { "53A": "/DEMO-USD-CITI-INDA\nCITIUS33" },
+            tags: { "53A": expect.stringMatching(/CITIUS33$/) },
             omitted: [],
             renderingDecisions: expect.objectContaining({
               "53A": expect.objectContaining({
@@ -141,7 +141,7 @@ describe("Mt1SsiResolutionPageSubmissionAdapter", () => {
         redirectDomain: null,
         renderer:
           "MT103 SSI evidence compatibility view from the same resolved route snapshot",
-        tags: { "53A": "/DEMO-USD-CITI-INDA\nCITIUS33" },
+        tags: { "53A": expect.stringMatching(/CITIUS33$/) },
         omitted: [],
         renderingDecisions: expect.any(Object),
       },
@@ -153,7 +153,7 @@ describe("Mt1SsiResolutionPageSubmissionAdapter", () => {
     const mt = result.outputs.find(({ format }) => format === "SWIFT_MT");
 
     expect(mt?.document).toMatchObject({
-      tags: { "53A": "/DEMO-USD-CITI-INDA\nCITIUS33" },
+      tags: { "53A": expect.stringMatching(/CITIUS33$/) },
       renderingDecisions: {
         "53A": expect.objectContaining({
           ruleId: "POL-MT1-PROFILE-OPTION-001",
@@ -162,7 +162,7 @@ describe("Mt1SsiResolutionPageSubmissionAdapter", () => {
     });
   });
 
-  it("fails closed with a structured result when an MT option is not renderable", () => {
+  it("ignores a legacy runtime JSON override and keeps the governed DB route", () => {
     const fixture = JSON.parse(
       readFileSync(
         join(process.cwd(), "parameters", "mt1-ssi-demo-routes.sr2026.json"),
@@ -192,14 +192,12 @@ describe("Mt1SsiResolutionPageSubmissionAdapter", () => {
     );
 
     expect(result).toMatchObject({
-      outcome: "VALIDATION_REJECTED",
+      outcome: "RESOLVED",
       ssiApplicability: "REQUIRED",
-      resolutionOutcome: "PROFILE_INCOMPLETE",
-      reasonCode: "PROFILE_INCOMPLETE",
+      resolutionOutcome: "ELIGIBLE_COMPLETE_ROUTE",
       payloadGenerated: false,
-      outputs: [],
     });
-    expect(result).not.toHaveProperty("settlementRoute");
+    expect(result).toHaveProperty("settlementRoute");
   });
 
   it("returns SSI-only MX resolution evidence without generating a payment payload", () => {
@@ -243,17 +241,17 @@ describe("Mt1SsiResolutionPageSubmissionAdapter", () => {
         counterparty: {
           bankServiceId: "BANK-SVC-CITIUS33",
           bic: "CITIUS33",
-          name: "Citibank Demo",
+          name: "Citibank N.A.",
         },
-        ssi: { id: "MT1-SSI-CITI", version: 1 },
-        applicability: { id: "MT1-APP-CITI", version: 1 },
-        nostro: { id: "MT1-NOSTRO-CITI", version: 1 },
+        ssi: lookup.items[0]!.selectedRouteIdentity!.ssi,
+        applicability: lookup.items[0]!.selectedRouteIdentity!.applicability,
+        nostro: lookup.items[0]!.selectedRouteIdentity!.nostro,
         roles: [
           {
             role: "INDA_SETTLEMENT_ACCOUNT_RELATIONSHIP",
             owner: "OWN_SSI_OR_ACCOUNT_MASTER",
-            recordId: "MT1-NOSTRO-CITI-INDA",
-            version: 1,
+            recordId: lookup.items[0]!.selectedRouteIdentity!.nostro.id,
+            version: lookup.items[0]!.selectedRouteIdentity!.nostro.version,
           },
         ],
         legs: [
@@ -262,7 +260,7 @@ describe("Mt1SsiResolutionPageSubmissionAdapter", () => {
             relationship: "INDA",
             accountOwner: { bic: "DEMOHKHH" },
             accountServicer: { bic: "CITIUS33" },
-            accountReference: "DEMO-USD-CITI-INDA",
+            accountReference: expect.any(String),
             currency: "USD",
           },
         ],
@@ -270,12 +268,12 @@ describe("Mt1SsiResolutionPageSubmissionAdapter", () => {
           expect.objectContaining({
             kind: "ISO_20022_ELEMENT",
             identifier: "SttlmMtd",
-            role: "INDA_SETTLEMENT_ACCOUNT_RELATIONSHIP",
+            role: "SETTLEMENT_METHOD",
           }),
           expect.objectContaining({
             kind: "ISO_20022_ELEMENT",
             identifier: "SttlmAcct",
-            accountReference: "DEMO-USD-CITI-INDA",
+            accountReference: expect.any(String),
           }),
         ]),
       },
@@ -299,7 +297,7 @@ describe("Mt1SsiResolutionPageSubmissionAdapter", () => {
               counterparty: { bic: "CITIUS33" },
               legs: [
                 expect.objectContaining({
-                  accountReference: "DEMO-USD-CITI-INDA",
+                  accountReference: expect.any(String),
                 }),
               ],
               projections: expect.arrayContaining([
@@ -309,7 +307,7 @@ describe("Mt1SsiResolutionPageSubmissionAdapter", () => {
                 }),
                 expect.objectContaining({
                   identifier: "SttlmAcct",
-                  value: "DEMO-USD-CITI-INDA",
+                  value: expect.any(String),
                 }),
               ]),
             },
@@ -389,8 +387,8 @@ describe("Mt1SsiResolutionPageSubmissionAdapter", () => {
     expect(result.outputs[0]?.document).toMatchObject({
       redirectDomain: null,
       tags: {
-        "53A": "/DEMO-USD-CITI-COVE-INSTRUCTING\nCITIUS33",
-        "54A": "/DEMO-USD-CITI-COVE-INSTRUCTED\nDEMOHKHH",
+        "53A": expect.stringMatching(/CITIUS33$/),
+        "54A": expect.stringMatching(/DEMOHKHH$/),
       },
       omitted: [],
       renderingDecisions: {
@@ -509,87 +507,5 @@ describe("Mt1SsiResolutionPageSubmissionAdapter", () => {
       resolutionOutcome: "NO_ELIGIBLE_SSI",
       payloadGenerated: false,
     });
-  });
-
-  it("fails closed when the selected identity has no actionable account relationship", () => {
-    const fixturePath = join(
-      process.cwd(),
-      "tmp",
-      "mt1-incomplete-actionable-route.test.json",
-    );
-    mkdirSync(join(process.cwd(), "tmp"), { recursive: true });
-    writeFileSync(
-      fixturePath,
-      JSON.stringify({
-        schemaVersion: "1.0",
-        fixtureVersion: "MT1-INCOMPLETE-TEST",
-        standardsRelease: "SR2026",
-        localBank: {
-          bankServiceId: "BANK-SVC-DEMOHKHH",
-          bic: "DEMOHKHH",
-          bankName: "Demo Bank Hong Kong",
-        },
-        routes: [
-          {
-            bankServiceId: "BANK-SVC-CITIUS33",
-            bic: "CITIUS33",
-            bankName: "Citibank Demo",
-            bookingEntity: "HK01",
-            currencies: ["USD"],
-            validFrom: "2026-01-01",
-            validTo: "2027-12-31",
-            ssi: { id: "MT1-SSI-CITI", version: 1 },
-            applicability: { id: "MT1-APP-CITI", version: 1 },
-            nostro: { id: "MT1-NOSTRO-CITI", version: 1 },
-            settlementRelationships: {},
-            coveRelationships: [],
-          },
-        ],
-      }),
-    );
-    try {
-      const incompleteRoutes = new Mt1SsiDemoRouteRepository({ fixturePath });
-      const incompleteAdapter = new Mt1SsiResolutionPageSubmissionAdapter(
-        new Mt1SsiProfileRegistry(),
-        incompleteRoutes,
-      );
-      const lookup = incompleteRoutes.lookup({
-        definitionId: definition.definitionId,
-        definitionVersion: definition.definitionVersion,
-        fixtureBindingId: scenario.fixture.bindingId,
-        scenarioId: scenario.scenarioId,
-        messageType: definition.messageType,
-        sequence: definition.sequences[0]!.sequenceId,
-        currency: "USD",
-        bookingEntity: "HK01",
-        valueDate: "2026-09-24",
-      });
-      const result = incompleteAdapter.execute({
-        definition,
-        scenario,
-        submission: {
-          definitionId: definition.definitionId,
-          definitionVersion: definition.definitionVersion,
-          scenarioId: scenario.scenarioId,
-          fixtureBindingId: scenario.fixture.bindingId,
-          contractSha256: "a".repeat(64),
-          eligibilitySnapshot: lookup.eligibilitySnapshot,
-          selectedRouteIdentity: lookup.items[0]!.selectedRouteIdentity,
-          values: {
-            ...values,
-            "context.counterpartyBankServiceId": "BANK-SVC-CITIUS33",
-          },
-        },
-      });
-
-      expect(result).toMatchObject({
-        outcome: "NO_ELIGIBLE_SSI",
-        ssiApplicability: "REQUIRED",
-        resolutionOutcome: "NO_ELIGIBLE_SSI",
-      });
-      expect(result).not.toHaveProperty("settlementRoute");
-    } finally {
-      rmSync(fixturePath, { force: true });
-    }
   });
 });

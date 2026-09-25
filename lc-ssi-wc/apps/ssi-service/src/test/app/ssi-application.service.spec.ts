@@ -182,6 +182,43 @@ describe("SsiApplicationService route standing-data validation", () => {
     ).not.toThrow();
   });
 
+  it("accepts a governed correspondent-banking route without a domestic clearing-system reference", () => {
+    expect(() =>
+      validateRoute({
+        ...completeRoute,
+        currency: "JPY",
+        settlementMarket: "CORRESPONDENT_BANKING",
+        clearingSystem: "CORRESPONDENT_CHAIN",
+        settlementCountry: "JP",
+        bic: "SMBCJPJT",
+        counterpartyBic: "SMBCJPJT",
+        beneficiarySource: "SSI",
+        beneficiaryBic: "SMBCJPJT",
+        accountWithBic: "SMBCJPJT",
+        actualReceiverBic: "SMBCJPJT",
+      }),
+    ).not.toThrow();
+  });
+
+  it.each([
+    ["CHATS", "HKD", "HK_DOMESTIC", "HK"],
+    ["TARGET", "EUR", "EURO_AREA", "ANY"],
+    ["FEDWIRE_CHIPS", "USD", "US_DOLLAR", "US"],
+  ])(
+    "accepts the governed legacy clearing-system value %s already stored in the DB",
+    (clearingSystem, currency, settlementMarket, settlementCountry) => {
+      expect(() =>
+        validateRoute({
+          ...completeRoute,
+          clearingSystem,
+          currency,
+          settlementMarket,
+          settlementCountry,
+        }),
+      ).not.toThrow();
+    },
+  );
+
   it("requires Beneficiary BIC only when the governed source is SSI", () => {
     expect(() =>
       validateRoute({ ...completeRoute, beneficiarySource: "SSI" }),

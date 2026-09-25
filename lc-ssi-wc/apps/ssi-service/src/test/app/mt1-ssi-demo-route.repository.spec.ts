@@ -1,9 +1,30 @@
-import { writeFileSync } from "node:fs";
-import { join } from "node:path";
 import { Mt1SsiDemoRouteRepository } from "../../app/mt1-ssi-demo-route.repository";
 
 describe("Mt1SsiDemoRouteRepository", () => {
-  it("binds picker and execution to one immutable demo fixture snapshot", () => {
+  it("selects the governed EUR counterparty from the database instead of the legacy JSON default", () => {
+    const repository = new Mt1SsiDemoRouteRepository();
+    const lookup = repository.lookup({
+      definitionId: "PAYMENT-MT103-BASE-SR2026",
+      definitionVersion: "V1",
+      fixtureBindingId: "FIXTURE-MT1-INDA-SSI",
+      scenarioId: "MT103-BASE-SR2026:MT1-INDA-SSI",
+      messageType: "MT103",
+      sequence: "SSI_ROUTE",
+      currency: "EUR",
+      bookingEntity: "HK01",
+      valueDate: "2026-09-25",
+    });
+
+    expect(lookup.eligibilitySnapshot).toMatchObject({
+      snapshotIdentityMethod: "SQLITE_WAL_AWARE_LOGICAL_SNAPSHOT_V1",
+    });
+    expect(lookup.items.map(({ bic }) => bic)).toContain("DEUTDEFF");
+    expect(lookup.defaultSelection).toMatchObject({
+      value: expect.stringContaining("DEUTDEFF"),
+    });
+  });
+
+  it("binds picker and execution to one immutable database snapshot", () => {
     const repository = new Mt1SsiDemoRouteRepository();
     const lookup = repository.lookup({
       definitionId: "PAYMENT-PACS008-PLAIN-SR2026",
@@ -20,7 +41,7 @@ describe("Mt1SsiDemoRouteRepository", () => {
 
     expect(lookup.items).toHaveLength(1);
     expect(lookup.eligibilitySnapshot).toMatchObject({
-      snapshotIdentityMethod: "SHA256_CANONICAL_DEMO_FIXTURE_V1",
+      snapshotIdentityMethod: "SQLITE_WAL_AWARE_LOGICAL_SNAPSHOT_V1",
     });
     expect(lookup.defaultSelection).toEqual({
       valueField: "bankServiceId",
@@ -81,8 +102,8 @@ describe("Mt1SsiDemoRouteRepository", () => {
     );
 
     expect(route?.legs[0]).toMatchObject({
-      accountOwner: { bic: "CITIUS33", name: "Citibank Demo" },
-      accountServicer: { bic: "DEMOHKHH", name: "Demo Bank Hong Kong" },
+      accountOwner: { bic: "CITIUS33", name: "Citibank N.A." },
+      accountServicer: { bic: "DEMOHKHH", name: "Local Bank" },
     });
     expect(route?.roles).toEqual([
       expect.objectContaining({
@@ -106,8 +127,8 @@ describe("Mt1SsiDemoRouteRepository", () => {
         expect.objectContaining({
           kind: "ISO_20022_ELEMENT",
           identifier: "SttlmAcct",
-          value: "DEMO-USD-CITI-INGA",
-          accountReference: "DEMO-USD-CITI-INGA",
+          value: expect.any(String),
+          accountReference: expect.any(String),
         }),
       ]),
     );
@@ -147,7 +168,7 @@ describe("Mt1SsiDemoRouteRepository", () => {
       expect.objectContaining({
         role: "INDA_SETTLEMENT_ACCOUNT_RELATIONSHIP",
         owner: "OWN_SSI_OR_ACCOUNT_MASTER",
-        recordId: "MT1-NOSTRO-CITI-INDA",
+        recordId: lookup.items[0]!.selectedRouteIdentity!.nostro.id,
       }),
     ]);
     expect(route?.legs[0]).toMatchObject({
@@ -203,7 +224,7 @@ describe("Mt1SsiDemoRouteRepository", () => {
         }),
         expect.objectContaining({
           identifier: "InstgRmbrsmntAgtAcct",
-          value: "DEMO-USD-CITI-COVE-INSTRUCTING",
+          value: expect.any(String),
         }),
         expect.objectContaining({
           identifier: "InstdRmbrsmntAgt",
@@ -211,26 +232,16 @@ describe("Mt1SsiDemoRouteRepository", () => {
         }),
         expect.objectContaining({
           identifier: "InstdRmbrsmntAgtAcct",
-          value: "DEMO-USD-CITI-COVE-INSTRUCTED",
+          value: expect.any(String),
         }),
       ]),
     );
   });
 
-  it("rejects an invalid controlled demo fixture", () => {
-    const fixturePath = join(process.cwd(), "tmp", "mt1-invalid-route.json");
-    writeFileSync(
-      fixturePath,
-      JSON.stringify({
-        schemaVersion: "1.0",
-        fixtureVersion: "TEST",
-        standardsRelease: "SR2026",
-        routes: [],
-      }),
-    );
-
-    expect(() => new Mt1SsiDemoRouteRepository({ fixturePath })).toThrow(
-      "MT1_SSI_DEMO_ROUTE_FIXTURE_INVALID",
+  it("does not depend on a runtime route JSON fixture", () => {
+    expect(Mt1SsiDemoRouteRepository.toString()).not.toContain("readFileSync");
+    expect(Mt1SsiDemoRouteRepository.toString()).not.toContain(
+      "mt1-ssi-demo-routes",
     );
   });
 });

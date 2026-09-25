@@ -239,7 +239,9 @@ function requireClearingSystem(route: Record<string, string>) {
   if (!route["settlementMarket"]?.trim())
     throw new BadRequestException("SETTLEMENT_MARKET_REQUIRED");
   const clearingSystem = CLEARING_SYSTEMS.find(
-    (system) => system.code === route["clearingSystem"],
+    (system) =>
+      system.code === route["clearingSystem"] ||
+      system.legacyAliases?.includes(route["clearingSystem"] ?? ""),
   );
   if (
     !route["clearingSystem"]?.trim() ||
@@ -254,6 +256,15 @@ function validateClearingScope(
   route: Record<string, string>,
   clearingSystem: (typeof CLEARING_SYSTEMS)[number],
 ): void {
+  if (clearingSystem.code === "CORRESPONDENT_CHAIN") {
+    if (
+      clearingSystem.status !== "ACTIVE" ||
+      Date.parse(clearingSystem.validFrom) > Date.parse(route["validTo"]!) ||
+      Date.parse(clearingSystem.validTo) < Date.parse(route["validFrom"]!)
+    )
+      throw new BadRequestException("CLEARING_SYSTEM_NOT_EFFECTIVE");
+    return;
+  }
   if (clearingSystem.supportedCurrency !== route["currency"])
     throw new BadRequestException("CLEARING_SYSTEM_CURRENCY_MISMATCH");
   if (!route["settlementCountry"]?.trim())

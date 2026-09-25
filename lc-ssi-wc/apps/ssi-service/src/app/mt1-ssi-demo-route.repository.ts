@@ -1,6 +1,3 @@
-import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { Injectable, Optional } from "@nestjs/common";
 import type {
   PageParameterLookupEnvelope,
@@ -8,74 +5,19 @@ import type {
   ResolutionPageSettlementRoute,
 } from "@ssi/contracts";
 import { hashCanonical } from "./canonical-json";
-
-interface Identity {
-  readonly id: string;
-  readonly version: number;
-}
-
-interface DemoBank {
-  readonly bankServiceId: string;
-  readonly bic: string;
-  readonly bankName: string;
-}
-
-interface DemoSettlementRelationship {
-  readonly accountReferenceTemplate: string;
-  readonly sourceRecordId: string;
-  readonly version: number;
-  readonly mtProjectionByProfile: Readonly<
-    Record<string, DemoMtProjection | undefined>
-  >;
-}
-
-interface DemoMtProjection {
-  readonly tag: string;
-  readonly option: string;
-  readonly officialDescription: string;
-}
-
-interface DemoCoveRelationship extends DemoSettlementRelationship {
-  readonly role:
-    | "INSTRUCTING_REIMBURSEMENT_AGENT"
-    | "INSTRUCTED_REIMBURSEMENT_AGENT"
-    | "THIRD_REIMBURSEMENT_AGENT";
-  readonly owner:
-    "OWN_SSI_OR_ACCOUNT_MASTER" | "COUNTERPARTY_SSI" | "THIRD_PARTY_SSI";
-  readonly accountOwnerSide: "LOCAL" | "COUNTERPARTY";
-  readonly accountServicerSide: "LOCAL" | "COUNTERPARTY";
-  readonly mxAgentElement: string;
-  readonly mxAccountElement: string;
-}
-
-interface DemoRoute {
-  readonly bankServiceId: string;
-  readonly bic: string;
-  readonly bankName: string;
-  readonly bookingEntity: string;
-  readonly currencies: readonly string[];
-  readonly validFrom: string;
-  readonly validTo: string;
-  readonly ssi: Identity;
-  readonly applicability: Identity;
-  readonly nostro: Identity;
-  readonly settlementRelationships: Readonly<
-    Record<"INDA" | "INGA", DemoSettlementRelationship>
-  >;
-  readonly coveRelationships: readonly DemoCoveRelationship[];
-}
-
-interface DemoRouteFixture {
-  readonly schemaVersion: "1.0";
-  readonly fixtureVersion: string;
-  readonly standardsRelease: "SR2026";
-  readonly localBank: DemoBank;
-  readonly routes: readonly DemoRoute[];
-}
-
-export interface Mt1SsiDemoRouteRepositoryOptions {
-  readonly fixturePath?: string;
-}
+import {
+  SqliteSsiRepository,
+  type PaymentSsiCandidateBinding,
+} from "./sqlite-ssi.repository";
+import { NostroApplicationService } from "./nostro/nostro-application.service";
+import {
+  NostroRepository,
+  type NostroRecord,
+} from "./nostro/nostro.repository";
+import { RmaApplicationService } from "./rma/rma-application.service";
+import { RmaRepository } from "./rma/rma.repository";
+import { DatabaseSnapshotIdentityService } from "./database-snapshot-identity.service";
+import { BankServiceDirectory } from "./bank-service-directory";
 
 export interface Mt1SsiRouteLookupQuery {
   readonly definitionId: string;
@@ -89,48 +31,299 @@ export interface Mt1SsiRouteLookupQuery {
   readonly valueDate: string;
   readonly query?: string;
 }
-
+type SettlementContext = "INDA" | "INGA" | "COVE";
 export interface Mt1SsiSettlementRouteQuery {
-  readonly settlementContext: "INDA" | "INGA" | "COVE";
+  readonly settlementContext: SettlementContext;
   readonly currency: string;
   readonly messageType: string;
   readonly profileId: string;
   readonly evidenceFormats: readonly ("SWIFT_MT" | "ISO_20022")[];
 }
+interface DbRoute {
+  readonly binding: PaymentSsiCandidateBinding;
+  readonly nostro: NostroRecord;
+  readonly bankServiceId: string;
+  readonly bic: string;
+  readonly bankName: string;
+}
+
+type SettlementParty = ResolutionPageSettlementRoute["counterparty"];
+type SettlementRole = ResolutionPageSettlementRoute["roles"][number];
+type SettlementLeg = ResolutionPageSettlementRoute["legs"][number];
+type SettlementProjection =
+  ResolutionPageSettlementRoute["projections"][number];
+
+const settlementRole = (context: SettlementContext) =>
+  context === "INGA"
+    ? "INGA_SETTLEMENT_ACCOUNT_RELATIONSHIP"
+    : "INDA_SETTLEMENT_ACCOUNT_RELATIONSHIP";
+
+function settlementRoles(
+  context: SettlementContext,
+  ssi: { readonly id: string; readonly version: number },
+  nostro: NostroRecord,
+): SettlementRole[] {
+  if (context === "COVE")
+    return [
+      {
+        role: "INSTRUCTING_REIMBURSEMENT_AGENT",
+        owner: "OWN_SSI_OR_ACCOUNT_MASTER",
+        recordId: nostro.id,
+        version: nostro.version,
+      },
+      {
+        role: "INSTRUCTED_REIMBURSEMENT_AGENT",
+        owner: "COUNTERPARTY_SSI",
+        recordId: ssi.id,
+        version: ssi.version,
+      },
+    ];
+  const inga = context === "INGA";
+  return [
+    {
+      role: settlementRole(context),
+      owner: inga ? "COUNTERPARTY_SSI" : "OWN_SSI_OR_ACCOUNT_MASTER",
+      recordId: inga ? ssi.id : nostro.id,
+      version: inga ? ssi.version : nostro.version,
+    },
+  ];
+}
+
+function settlementLegs(
+  query: Mt1SsiSettlementRouteQuery,
+  ssi: { readonly id: string; readonly version: number },
+  nostro: NostroRecord,
+  local: SettlementParty,
+  counterparty: SettlementParty,
+  accountReference: string,
+): SettlementLeg[] {
+  if (query.settlementContext === "COVE")
+    return [
+      {
+        order: 1,
+        relationship: "COVE",
+        role: "INSTRUCTING_REIMBURSEMENT_AGENT",
+        accountOwner: local,
+        accountServicer: counterparty,
+        accountReference,
+        currency: query.currency,
+        source: "GOVERNED_DATABASE",
+        sourceRecordId: nostro.id,
+        version: nostro.version,
+      },
+      {
+        order: 2,
+        relationship: "COVE",
+        role: "INSTRUCTED_REIMBURSEMENT_AGENT",
+        accountOwner: counterparty,
+        accountServicer: local,
+        accountReference,
+        currency: query.currency,
+        source: "GOVERNED_DATABASE",
+        sourceRecordId: ssi.id,
+        version: ssi.version,
+      },
+    ];
+  const inga = query.settlementContext === "INGA";
+  return [
+    {
+      order: 1,
+      relationship: query.settlementContext,
+      role: settlementRole(query.settlementContext),
+      accountOwner: inga ? counterparty : local,
+      accountServicer: inga ? local : counterparty,
+      accountReference,
+      currency: query.currency,
+      source: "GOVERNED_DATABASE",
+      sourceRecordId: nostro.id,
+      version: nostro.version,
+    },
+  ];
+}
+
+function swiftMtProjections(
+  query: Mt1SsiSettlementRouteQuery,
+  ssi: { readonly id: string; readonly version: number },
+  nostro: NostroRecord,
+  local: SettlementParty,
+  counterparty: SettlementParty,
+  accountReference: string,
+): SettlementProjection[] {
+  const serial = query.settlementContext !== "COVE";
+  const tag = query.settlementContext === "INGA" ? "54" : "53";
+  const projections: SettlementProjection[] = [
+    {
+      kind: "SWIFT_MT_FIELD",
+      identifier: tag,
+      option: "A",
+      label:
+        tag === "53" ? "Sender's Correspondent" : "Receiver's Correspondent",
+      role: serial
+        ? settlementRole(query.settlementContext)
+        : "INSTRUCTING_REIMBURSEMENT_AGENT",
+      value:
+        serial && query.settlementContext === "INGA"
+          ? local.bic
+          : counterparty.bic,
+      accountReference,
+      sourceRecordId: nostro.id,
+      version: nostro.version,
+    },
+  ];
+  if (!serial)
+    projections.push({
+      kind: "SWIFT_MT_FIELD",
+      identifier: "54",
+      option: "A",
+      label: "Receiver's Correspondent",
+      role: "INSTRUCTED_REIMBURSEMENT_AGENT",
+      value: local.bic,
+      accountReference,
+      sourceRecordId: ssi.id,
+      version: ssi.version,
+    });
+  return projections;
+}
+
+function iso20022Projections(
+  query: Mt1SsiSettlementRouteQuery,
+  ssi: { readonly id: string; readonly version: number },
+  nostro: NostroRecord,
+  local: SettlementParty,
+  counterparty: SettlementParty,
+  accountReference: string,
+): SettlementProjection[] {
+  const method: SettlementProjection = {
+    kind: "ISO_20022_ELEMENT",
+    identifier: "SttlmMtd",
+    label: "Settlement Method",
+    role: "SETTLEMENT_METHOD",
+    value: query.settlementContext,
+    sourceRecordId: nostro.id,
+    version: nostro.version,
+  };
+  if (query.settlementContext !== "COVE")
+    return [
+      method,
+      {
+        kind: "ISO_20022_ELEMENT",
+        identifier: "SttlmAcct",
+        label: "Settlement Account",
+        role: settlementRole(query.settlementContext),
+        value: accountReference,
+        accountReference,
+        sourceRecordId: nostro.id,
+        version: nostro.version,
+      },
+    ];
+  return [
+    method,
+    {
+      kind: "ISO_20022_ELEMENT",
+      identifier: "InstgRmbrsmntAgt",
+      label: "Instructing Reimbursement Agent",
+      role: "INSTRUCTING_REIMBURSEMENT_AGENT",
+      value: counterparty.bic,
+      sourceRecordId: nostro.id,
+      version: nostro.version,
+    },
+    {
+      kind: "ISO_20022_ELEMENT",
+      identifier: "InstgRmbrsmntAgtAcct",
+      label: "Instructing Reimbursement Agent Account",
+      role: "INSTRUCTING_REIMBURSEMENT_AGENT",
+      value: accountReference,
+      accountReference,
+      sourceRecordId: nostro.id,
+      version: nostro.version,
+    },
+    {
+      kind: "ISO_20022_ELEMENT",
+      identifier: "InstdRmbrsmntAgt",
+      label: "Instructed Reimbursement Agent",
+      role: "INSTRUCTED_REIMBURSEMENT_AGENT",
+      value: local.bic,
+      sourceRecordId: ssi.id,
+      version: ssi.version,
+    },
+    {
+      kind: "ISO_20022_ELEMENT",
+      identifier: "InstdRmbrsmntAgtAcct",
+      label: "Instructed Reimbursement Agent Account",
+      role: "INSTRUCTED_REIMBURSEMENT_AGENT",
+      value: accountReference,
+      accountReference,
+      sourceRecordId: ssi.id,
+      version: ssi.version,
+    },
+  ];
+}
+
+function settlementProjections(
+  query: Mt1SsiSettlementRouteQuery,
+  ssi: { readonly id: string; readonly version: number },
+  nostro: NostroRecord,
+  local: SettlementParty,
+  counterparty: SettlementParty,
+  accountReference: string,
+): SettlementProjection[] {
+  return query.evidenceFormats.flatMap((format) =>
+    format === "SWIFT_MT"
+      ? swiftMtProjections(
+          query,
+          ssi,
+          nostro,
+          local,
+          counterparty,
+          accountReference,
+        )
+      : iso20022Projections(
+          query,
+          ssi,
+          nostro,
+          local,
+          counterparty,
+          accountReference,
+        ),
+  );
+}
 
 @Injectable()
 export class Mt1SsiDemoRouteRepository {
-  private readonly fixture: DemoRouteFixture;
-  private readonly snapshotId: string;
+  private readonly ssi: SqliteSsiRepository;
+  private readonly nostros: NostroApplicationService;
+  private readonly rma: RmaApplicationService;
+  private readonly snapshots: DatabaseSnapshotIdentityService;
+  private readonly directory: BankServiceDirectory;
+  private readonly issuedSnapshots = new Set<string>();
 
-  constructor(@Optional() options?: Mt1SsiDemoRouteRepositoryOptions) {
-    const path =
-      options?.fixturePath ??
-      join(process.cwd(), "parameters", "mt1-ssi-demo-routes.sr2026.json");
-    const raw = readFileSync(path);
-    this.fixture = JSON.parse(raw.toString("utf8")) as DemoRouteFixture;
-    if (
-      this.fixture.schemaVersion !== "1.0" ||
-      this.fixture.standardsRelease !== "SR2026" ||
-      !this.fixture.routes.length
-    )
-      throw new Error("MT1_SSI_DEMO_ROUTE_FIXTURE_INVALID");
-    this.snapshotId = createHash("sha256").update(raw).digest("hex");
+  constructor(
+    @Optional() ssi?: SqliteSsiRepository,
+    @Optional() nostros?: NostroApplicationService,
+    @Optional() rma?: RmaApplicationService,
+    @Optional() snapshots?: DatabaseSnapshotIdentityService,
+    @Optional() directory?: BankServiceDirectory,
+  ) {
+    this.ssi =
+      ssi && typeof ssi.findMt1CandidateBindings === "function"
+        ? ssi
+        : new SqliteSsiRepository();
+    this.nostros =
+      nostros ?? new NostroApplicationService(new NostroRepository());
+    this.rma = rma ?? new RmaApplicationService(new RmaRepository());
+    this.snapshots = snapshots ?? new DatabaseSnapshotIdentityService();
+    this.directory = directory ?? new BankServiceDirectory();
   }
 
   lookup(input: Mt1SsiRouteLookupQuery): PageParameterLookupEnvelope {
+    const snapshot = this.snapshots.current();
+    this.issuedSnapshots.add(snapshot.sha256);
     const contextSha256 = this.contextSha256(input);
     const term = input.query?.trim().toUpperCase() ?? "";
-    const routes = this.fixture.routes.filter(
-      (route) =>
-        route.bookingEntity === input.bookingEntity &&
-        route.currencies.includes(input.currency) &&
-        route.validFrom <= input.valueDate &&
-        input.valueDate <= route.validTo &&
-        (!term ||
-          [route.bic, route.bankName].some((value) =>
-            value.toUpperCase().includes(term),
-          )),
+    const routes = this.routes(input).filter(
+      ({ bic, bankName }) =>
+        !term ||
+        [bic, bankName].some((value) => value.toUpperCase().includes(term)),
     );
     const items = routes.map((route) => ({
       provider: "SSI_COUNTERPARTY" as const,
@@ -141,20 +334,25 @@ export class Mt1SsiDemoRouteRepository {
       displayValue: `${route.bic} — ${route.bankName}`,
       selectedRouteIdentity: this.identity(input, route, contextSha256),
     }));
+    const best = routes[0];
+    const uniqueBest =
+      best &&
+      routes.filter(({ nostro }) => nostro.priority === best.nostro.priority)
+        .length === 1;
     return {
       provider: "SSI_COUNTERPARTY",
       action: "SSI_COUNTERPARTY",
       eligibilitySnapshot: {
-        snapshotId: this.snapshotId,
+        snapshotId: snapshot.sha256,
         contextSha256,
-        snapshotIdentityMethod: "SHA256_CANONICAL_DEMO_FIXTURE_V1",
+        snapshotIdentityMethod: snapshot.method,
       },
       items,
-      ...(!term && items.length === 1
+      ...(!term && uniqueBest
         ? {
             defaultSelection: {
               valueField: "bankServiceId" as const,
-              value: items[0]!.bankServiceId,
+              value: best.bankServiceId,
               reasonCode: "GOVERNED_PRIORITY_DEFAULT" as const,
               dependency: {
                 fieldId: "context.currency" as const,
@@ -170,23 +368,20 @@ export class Mt1SsiDemoRouteRepository {
     identity: PageParameterSelectedRouteIdentity,
     snapshotId: string,
   ): boolean {
-    if (snapshotId !== this.snapshotId) return false;
-    return this.fixture.routes.some((route) => {
-      const expected = {
-        ssi: route.ssi,
-        applicability: route.applicability,
-        nostro: route.nostro,
-      };
-      return (
-        identity.routeId === hashCanonical(expected) &&
-        identity.ssi.id === route.ssi.id &&
-        identity.ssi.version === route.ssi.version &&
-        identity.applicability.id === route.applicability.id &&
-        identity.applicability.version === route.applicability.version &&
-        identity.nostro.id === route.nostro.id &&
-        identity.nostro.version === route.nostro.version
-      );
-    });
+    if (!this.issuedSnapshots.has(snapshotId)) return false;
+    const ssi = this.ssi.find(identity.ssi.id);
+    const app = this.ssi
+      .listApplicability(identity.ssi.id)
+      .find(({ id }) => id === identity.applicability.id);
+    const nostro = this.nostros
+      .list()
+      .find(({ id }) => id === identity.nostro.id);
+    return Boolean(
+      ssi?.version === identity.ssi.version &&
+      app?.version === identity.applicability.version &&
+      nostro?.version === identity.nostro.version &&
+      nostro.status === "ACTIVE",
+    );
   }
 
   settlementRoute(
@@ -195,264 +390,119 @@ export class Mt1SsiDemoRouteRepository {
     query: Mt1SsiSettlementRouteQuery,
   ): ResolutionPageSettlementRoute | undefined {
     if (!this.accepts(identity, snapshotId)) return undefined;
-    const route = this.fixture.routes.find(
-      ({ ssi }) =>
-        ssi.id === identity.ssi.id && ssi.version === identity.ssi.version,
+    const ssi = this.ssi.find(identity.ssi.id)!;
+    const nostro = this.nostros
+      .list()
+      .find(({ id }) => id === identity.nostro.id)!;
+    const bank = this.bank(nostro.accountServicerBic);
+    const local = this.institution(
+      process.env["OWN_BIC"]?.trim().toUpperCase() || "DEMOHKHH",
+      "Local Bank",
     );
-    if (!route) return undefined;
-    const detail =
-      query.settlementContext === "COVE"
-        ? this.coveDetail(route, query)
-        : this.serialDetail(route, query);
-    if (!detail?.legs.length || !detail.projections.length) return undefined;
+    const counterparty = this.institution(nostro.accountServicerBic, bank.name);
+    const accountReference = nostro.accountReference ?? nostro.maskedAccountRef;
     return {
       routeBindingId: identity.routeId,
       counterparty: {
-        bankServiceId: route.bankServiceId,
-        bic: route.bic,
-        name: route.bankName,
+        bankServiceId: bank.bankServiceId,
+        bic: nostro.accountServicerBic,
+        name: bank.name,
       },
-      ssi: route.ssi,
-      applicability: route.applicability,
-      nostro: route.nostro,
-      ...detail,
-    };
-  }
-
-  private serialDetail(
-    route: DemoRoute,
-    query: Mt1SsiSettlementRouteQuery,
-  ):
-    | Pick<ResolutionPageSettlementRoute, "roles" | "legs" | "projections">
-    | undefined {
-    if (query.settlementContext === "COVE") return undefined;
-    const relationship = route.settlementRelationships[query.settlementContext];
-    if (!relationship) return undefined;
-    const inda = query.settlementContext === "INDA";
-    const local = this.settlementInstitution(this.fixture.localBank);
-    const counterparty = this.settlementInstitution(this.bank(route));
-    const owner = inda ? local : counterparty;
-    const servicer = inda ? counterparty : local;
-    const role = `${query.settlementContext}_SETTLEMENT_ACCOUNT_RELATIONSHIP`;
-    const accountReference = this.accountReference(
-      relationship.accountReferenceTemplate,
-      query.currency,
-    );
-    const projections: Array<
-      ResolutionPageSettlementRoute["projections"][number]
-    > = [];
-    if (query.evidenceFormats.includes("SWIFT_MT")) {
-      const mt = relationship.mtProjectionByProfile[query.profileId];
-      if (!mt) return undefined;
-      projections.push({
-        kind: "SWIFT_MT_FIELD",
-        identifier: mt.tag,
-        option: mt.option,
-        label: mt.officialDescription,
-        role,
-        value: servicer.bic,
-        accountReference,
-        sourceRecordId: relationship.sourceRecordId,
-        version: relationship.version,
-      });
-    }
-    if (query.evidenceFormats.includes("ISO_20022")) {
-      projections.push(
-        {
-          kind: "ISO_20022_ELEMENT",
-          identifier: "SttlmMtd",
-          label: "Settlement Method",
-          role,
-          value: query.settlementContext,
-          sourceRecordId: relationship.sourceRecordId,
-          version: relationship.version,
-        },
-        {
-          kind: "ISO_20022_ELEMENT",
-          identifier: "SttlmAcct",
-          label: "Settlement Account",
-          role,
-          value: accountReference,
-          accountReference,
-          sourceRecordId: relationship.sourceRecordId,
-          version: relationship.version,
-        },
-      );
-    }
-    return {
-      roles: [
-        {
-          role,
-          owner: inda ? "OWN_SSI_OR_ACCOUNT_MASTER" : "COUNTERPARTY_SSI",
-          recordId: relationship.sourceRecordId,
-          version: relationship.version,
-        },
-      ],
-      legs: [
-        {
-          order: 1,
-          relationship: query.settlementContext,
-          role,
-          accountOwner: owner,
-          accountServicer: servicer,
-          accountReference,
-          currency: query.currency,
-          source: "MT1_SSI_DEMO_ROUTE_FIXTURE",
-          sourceRecordId: relationship.sourceRecordId,
-          version: relationship.version,
-        },
-      ],
-      projections,
-    };
-  }
-
-  private coveDetail(
-    route: DemoRoute,
-    query: Mt1SsiSettlementRouteQuery,
-  ):
-    | Pick<ResolutionPageSettlementRoute, "roles" | "legs" | "projections">
-    | undefined {
-    if (!route.coveRelationships.length) return undefined;
-    const local = this.settlementInstitution(this.fixture.localBank);
-    const counterparty = this.settlementInstitution(this.bank(route));
-    return {
-      roles: route.coveRelationships.map((relationship) => ({
-        role: relationship.role,
-        owner: relationship.owner,
-        recordId: relationship.sourceRecordId,
-        version: relationship.version,
-      })),
-      legs: route.coveRelationships.map((relationship, index) => {
-        const accountOwner =
-          relationship.accountOwnerSide === "LOCAL" ? local : counterparty;
-        const accountServicer =
-          relationship.accountServicerSide === "LOCAL" ? local : counterparty;
-        return {
-          order: index + 1,
-          relationship: "COVE" as const,
-          role: relationship.role,
-          accountOwner,
-          accountServicer,
-          accountReference: this.accountReference(
-            relationship.accountReferenceTemplate,
-            query.currency,
-          ),
-          currency: query.currency,
-          source: "MT1_SSI_DEMO_ROUTE_FIXTURE",
-          sourceRecordId: relationship.sourceRecordId,
-          version: relationship.version,
-        };
-      }),
-      projections: this.coveProjections(
-        route.coveRelationships,
+      ssi: identity.ssi,
+      applicability: identity.applicability,
+      nostro: identity.nostro,
+      roles: settlementRoles(query.settlementContext, ssi, nostro),
+      legs: settlementLegs(
         query,
+        ssi,
+        nostro,
         local,
         counterparty,
+        accountReference,
+      ),
+      projections: settlementProjections(
+        query,
+        ssi,
+        nostro,
+        local,
+        counterparty,
+        accountReference,
       ),
     };
   }
 
-  private coveProjections(
-    relationships: readonly DemoCoveRelationship[],
-    query: Mt1SsiSettlementRouteQuery,
-    local: ReturnType<Mt1SsiDemoRouteRepository["settlementInstitution"]>,
-    counterparty: ReturnType<
-      Mt1SsiDemoRouteRepository["settlementInstitution"]
-    >,
-  ): ResolutionPageSettlementRoute["projections"] {
-    const projections: ResolutionPageSettlementRoute["projections"][number][] =
-      [];
-    if (query.evidenceFormats.includes("ISO_20022"))
-      projections.push({
-        kind: "ISO_20022_ELEMENT",
-        identifier: "SttlmMtd",
-        label: "Settlement Method",
-        role: "COVE_SETTLEMENT_METHOD",
-        value: "COVE",
-        sourceRecordId: relationships[0]!.sourceRecordId,
-        version: relationships[0]!.version,
-      });
-    for (const relationship of relationships) {
-      const accountReference = this.accountReference(
-        relationship.accountReferenceTemplate,
-        query.currency,
+  private routes(input: Mt1SsiRouteLookupQuery): DbRoute[] {
+    const bindings = this.ssi.findMt1CandidateBindings(input);
+    const nostros = this.nostros
+      .list("ACTIVE")
+      .filter(
+        (row) =>
+          row.currency === input.currency &&
+          row.purpose === "SETTLEMENT" &&
+          row.validFrom <= input.valueDate &&
+          input.valueDate <= row.validTo &&
+          (row.ownLegalEntityId === input.bookingEntity ||
+            (row.allowedBookingEntities ?? []).includes(input.bookingEntity) ||
+            (row.allowedBookingEntities ?? []).includes("ANY")),
+      )
+      .sort(
+        (left, right) =>
+          left.priority - right.priority || left.id.localeCompare(right.id),
       );
-      const servicer =
-        relationship.accountServicerSide === "LOCAL" ? local : counterparty;
-      if (query.evidenceFormats.includes("SWIFT_MT")) {
-        const mt = relationship.mtProjectionByProfile[query.profileId];
-        if (!mt) return [];
-        projections.push({
-          kind: "SWIFT_MT_FIELD",
-          identifier: mt.tag,
-          option: mt.option,
-          label: mt.officialDescription,
-          role: relationship.role,
-          value: servicer.bic,
-          accountReference,
-          sourceRecordId: relationship.sourceRecordId,
-          version: relationship.version,
-        });
-      }
-      if (query.evidenceFormats.includes("ISO_20022"))
-        projections.push(
-          {
-            kind: "ISO_20022_ELEMENT",
-            identifier: relationship.mxAgentElement,
-            label: relationship.role.replaceAll("_", " "),
-            role: relationship.role,
-            value: servicer.bic,
-            sourceRecordId: relationship.sourceRecordId,
-            version: relationship.version,
-          },
-          {
-            kind: "ISO_20022_ELEMENT",
-            identifier: relationship.mxAccountElement,
-            label: `${relationship.role.replaceAll("_", " ")} Account`,
-            role: relationship.role,
-            value: accountReference,
-            accountReference,
-            sourceRecordId: relationship.sourceRecordId,
-            version: relationship.version,
-          },
+    const byBic = new Map<string, NostroRecord>();
+    for (const nostro of nostros)
+      if (!byBic.has(nostro.accountServicerBic))
+        byBic.set(nostro.accountServicerBic, nostro);
+    return [...byBic.values()]
+      .flatMap((nostro) => {
+        const binding = bindings.find(({ ssi }) =>
+          [
+            ssi.route["accountWithBic"],
+            ssi.route["bic"],
+            ssi.route["actualReceiverBic"],
+          ].includes(nostro.accountServicerBic),
         );
-    }
-    return projections;
-  }
-
-  private bank(route: DemoRoute): DemoBank {
-    return {
-      bankServiceId: route.bankServiceId,
-      bic: route.bic,
-      bankName: route.bankName,
-    };
-  }
-
-  private settlementInstitution(bank: DemoBank): {
-    readonly bankServiceId: string;
-    readonly bic: string;
-    readonly name: string;
-  } {
-    return {
-      bankServiceId: bank.bankServiceId,
-      bic: bank.bic,
-      name: bank.bankName,
-    };
-  }
-
-  private accountReference(template: string, currency: string): string {
-    return template.replaceAll("{currency}", currency);
+        if (!binding) return [];
+        const decision = this.rma.check({
+          ownBic: process.env["OWN_BIC"]?.trim().toUpperCase() || "DEMOHKHH",
+          counterpartyBic: nostro.accountServicerBic,
+          service: "FIN",
+          direction: "OUTBOUND",
+          messageType: "MT103",
+          at: input.valueDate,
+          operationalOnly: true,
+        });
+        if (!decision.authorised) return [];
+        const bank = this.bank(nostro.accountServicerBic);
+        return [
+          {
+            binding,
+            nostro,
+            bankServiceId: bank.bankServiceId,
+            bic: nostro.accountServicerBic,
+            bankName: bank.name,
+          },
+        ];
+      })
+      .sort(
+        (left, right) =>
+          left.nostro.priority - right.nostro.priority ||
+          left.bic.localeCompare(right.bic),
+      );
   }
 
   private identity(
     input: Mt1SsiRouteLookupQuery,
-    route: DemoRoute,
+    route: DbRoute,
     contextSha256: string,
   ): PageParameterSelectedRouteIdentity {
     const records = {
-      ssi: route.ssi,
-      applicability: route.applicability,
-      nostro: route.nostro,
+      ssi: { id: route.binding.ssi.id, version: route.binding.ssi.version },
+      applicability: {
+        id: route.binding.applicability.id,
+        version: route.binding.applicability.version,
+      },
+      nostro: { id: route.nostro.id, version: route.nostro.version },
     };
     return {
       routeId: hashCanonical(records),
@@ -463,19 +513,16 @@ export class Mt1SsiDemoRouteRepository {
       ...records,
     };
   }
-
-  private contextSha256(
-    input: Pick<
-      Mt1SsiRouteLookupQuery,
-      | "scenarioId"
-      | "messageType"
-      | "sequence"
-      | "currency"
-      | "bookingEntity"
-      | "valueDate"
-      | "fixtureBindingId"
-    >,
-  ): string {
+  private bank(bic: string): { bankServiceId: string; name: string } {
+    const found = this.directory.search().find((record) => record.bic === bic);
+    return found
+      ? { bankServiceId: found.bankServiceId, name: found.name }
+      : { bankServiceId: `BANK-SVC-${bic}`, name: bic };
+  }
+  private institution(bic: string, name: string) {
+    return { bankServiceId: this.bank(bic).bankServiceId, bic, name };
+  }
+  private contextSha256(input: Mt1SsiRouteLookupQuery): string {
     return hashCanonical({
       scenarioId: input.scenarioId,
       messageType: input.messageType,
