@@ -79,32 +79,22 @@ const previousDefinitions = [
     governedContext: {},
   },
   ...[
-    ["MISSING", { state: "MISSING" }, "RMA_NOT_AUTHORIZED"],
-    ["EXPIRED", { state: "EXPIRED" }, "RMA_NOT_AUTHORIZED"],
-    ["WRONG-RECEIVER", { receiverMatches: false }, "RMA_NOT_AUTHORIZED"],
-    ["WRONG-BIZSVC", { businessServiceMatches: false }, "RMA_NOT_AUTHORIZED"],
-    ["INACTIVE", { active: false }, "RMA_NOT_AUTHORIZED"],
-    ["DENIED", { authorized: false }, "RMA_NOT_AUTHORIZED"],
-    ["VALID-MX", {}, "ELIGIBLE_COMPLETE_ROUTE"],
-    [
-      "VALID-FIN-CONTINGENCY",
-      { channel: "FIN", contingencyAuthorized: true },
-      "ELIGIBLE_COMPLETE_ROUTE",
-    ],
-  ].map(([suffix, decision, outcome]) => ({
-    caseId: `MT2-SSI-RMA-${suffix}`,
-    outcome,
-    source: "MT202",
-    governedContext: { rmaDecision: rmaDecision(decision) },
-  })),
-  ...[
-    ["MISSING", undefined],
-    ["INVALID", { ...governedAttestation("MT205"), validity: "INVALID" }],
-    ["STALE", { ...governedAttestation("MT205"), stale: true }],
-    ["HASH-MISMATCH", { ...governedAttestation("MT205"), hashMatches: false }],
-    ["SCOPE-MISMATCH", governedAttestation("MT202COV")],
-    ["VALID", governedAttestation("MT205")],
-  ].map(([suffix, attestation]) => ({
+    { suffix: "MISSING", attestation: undefined },
+    {
+      suffix: "INVALID",
+      attestation: { ...governedAttestation("MT205"), validity: "INVALID" },
+    },
+    {
+      suffix: "STALE",
+      attestation: { ...governedAttestation("MT205"), stale: true },
+    },
+    {
+      suffix: "HASH-MISMATCH",
+      attestation: { ...governedAttestation("MT205"), hashMatches: false },
+    },
+    { suffix: "SCOPE-MISMATCH", attestation: governedAttestation("MT202COV") },
+    { suffix: "VALID", attestation: governedAttestation("MT205") },
+  ].map(({ suffix, attestation }) => ({
     caseId: `MT2-SSI-ATTESTATION-${suffix}`,
     outcome:
       suffix === "VALID"
@@ -144,45 +134,6 @@ const previousDefinitions = [
     source: "MT202",
     governedContext: { eligibleCandidateCount: 0 },
   },
-  ...[
-    [
-      "56-57",
-      [routeCandidate("ROUTE-56-57", true, true)],
-      "ELIGIBLE_COMPLETE_ROUTE",
-    ],
-    ["56-ONLY", [routeCandidate("ROUTE-56", true, false)], "NO_ELIGIBLE_SSI"],
-    [
-      "57-ONLY",
-      [routeCandidate("ROUTE-57", false, true)],
-      "ELIGIBLE_COMPLETE_ROUTE",
-    ],
-    [
-      "NEITHER",
-      [routeCandidate("ROUTE-DIRECT", false, false)],
-      "ELIGIBLE_COMPLETE_ROUTE",
-    ],
-    [
-      "MIXED",
-      [
-        routeCandidate("ROUTE-INVALID", true, false),
-        routeCandidate("ROUTE-VALID", false, true),
-      ],
-      "ELIGIBLE_COMPLETE_ROUTE",
-    ],
-    [
-      "ALL-INVALID",
-      [
-        routeCandidate("ROUTE-INVALID-1", true, false),
-        routeCandidate("ROUTE-INVALID-2", true, false),
-      ],
-      "NO_ELIGIBLE_SSI",
-    ],
-  ].map(([suffix, routeCandidates, outcome]) => ({
-    caseId: `MT2-SSI-C81-${suffix}`,
-    outcome,
-    source: "MT202",
-    governedContext: { routeCandidates },
-  })),
   {
     caseId: "MT2-SSI-AMBIGUOUS-009",
     outcome: "AMBIGUOUS_ROUTE",
@@ -216,106 +167,139 @@ const previousDefinitions = [
 ];
 
 const rmaDefinitions = [
-  ["MISSING", { state: "MISSING" }, "RMA_NOT_AUTHORIZED"],
-  ["EXPIRED", { state: "EXPIRED" }, "RMA_NOT_AUTHORIZED"],
-  ["WRONG-RECEIVER", { receiverMatches: false }, "RMA_NOT_AUTHORIZED"],
-  ["WRONG-BIZSVC", { businessServiceMatches: false }, "RMA_NOT_AUTHORIZED"],
-  ["INACTIVE", { active: false }, "RMA_NOT_AUTHORIZED"],
-  ["DENIED", { authorized: false }, "RMA_NOT_AUTHORIZED"],
-  ["VALID-DUAL-CHANNEL", {}, "ELIGIBLE_COMPLETE_ROUTE"],
-  [
-    "FIN-NO-CONTINGENCY",
-    { channel: "FIN", contingencyAuthorized: false },
-    "RMA_NOT_AUTHORIZED",
-  ],
-  [
-    "VALID-FIN-CONTINGENCY",
-    {
+  {
+    suffix: "MISSING",
+    decision: { state: "MISSING" },
+    outcome: "RMA_NOT_AUTHORIZED",
+  },
+  {
+    suffix: "EXPIRED",
+    decision: { state: "EXPIRED" },
+    outcome: "RMA_NOT_AUTHORIZED",
+  },
+  {
+    suffix: "WRONG-RECEIVER",
+    decision: { receiverMatches: false },
+    outcome: "RMA_NOT_AUTHORIZED",
+  },
+  {
+    suffix: "WRONG-BIZSVC",
+    decision: { businessServiceMatches: false },
+    outcome: "RMA_NOT_AUTHORIZED",
+  },
+  {
+    suffix: "INACTIVE",
+    decision: { active: false },
+    outcome: "RMA_NOT_AUTHORIZED",
+  },
+  {
+    suffix: "DENIED",
+    decision: { authorized: false },
+    outcome: "RMA_NOT_AUTHORIZED",
+  },
+  {
+    suffix: "VALID-DUAL-CHANNEL",
+    decision: {},
+    outcome: "ELIGIBLE_COMPLETE_ROUTE",
+  },
+  {
+    suffix: "FIN-NO-CONTINGENCY",
+    decision: { channel: "FIN", contingencyAuthorized: false },
+    outcome: "RMA_NOT_AUTHORIZED",
+  },
+  {
+    suffix: "VALID-FIN-CONTINGENCY",
+    decision: {
       channel: "FIN",
       contingencyAuthorized: true,
       selectedTransport: "FIN",
     },
-    "ELIGIBLE_COMPLETE_ROUTE",
-  ],
-  [
-    "WRONG-PAIRED-PROFILE",
-    { pairedEvidenceProfileMatches: false },
-    "RMA_NOT_AUTHORIZED",
-  ],
-  [
-    "WRONG-PROFILE-BIZSVC-BINDING",
-    { profileBizSvcBindingMatches: false },
-    "RMA_NOT_AUTHORIZED",
-  ],
-  [
-    "WRONG-FIN-MESSAGE-TYPE",
-    { finMessageTypeMatches: false },
-    "RMA_NOT_AUTHORIZED",
-  ],
-].map(([suffix, decision, outcome]) => ({
+    outcome: "ELIGIBLE_COMPLETE_ROUTE",
+  },
+  {
+    suffix: "WRONG-PAIRED-PROFILE",
+    decision: { pairedEvidenceProfileMatches: false },
+    outcome: "RMA_NOT_AUTHORIZED",
+  },
+  {
+    suffix: "WRONG-PROFILE-BIZSVC-BINDING",
+    decision: { profileBizSvcBindingMatches: false },
+    outcome: "RMA_NOT_AUTHORIZED",
+  },
+  {
+    suffix: "WRONG-FIN-MESSAGE-TYPE",
+    decision: { finMessageTypeMatches: false },
+    outcome: "RMA_NOT_AUTHORIZED",
+  },
+].map(({ suffix, decision, outcome }) => ({
   caseId: `MT2-V1-RMA-${suffix}`,
   outcome,
   source: "MT202",
   governedContext: { rmaDecision: rmaDecision(decision) },
 }));
 
+const c81Scenarios = [
+  {
+    suffix: "56-57",
+    routeCandidates: [routeCandidate("ROUTE-56-57", true, true)],
+    outcome: "ELIGIBLE_COMPLETE_ROUTE",
+  },
+  {
+    suffix: "56-ONLY",
+    routeCandidates: [routeCandidate("ROUTE-56", true, false)],
+    outcome: "NO_ELIGIBLE_SSI",
+  },
+  {
+    suffix: "57-ONLY",
+    routeCandidates: [routeCandidate("ROUTE-57", false, true)],
+    outcome: "ELIGIBLE_COMPLETE_ROUTE",
+  },
+  {
+    suffix: "NEITHER",
+    routeCandidates: [routeCandidate("ROUTE-DIRECT", false, false)],
+    outcome: "ELIGIBLE_COMPLETE_ROUTE",
+  },
+  {
+    suffix: "MIXED",
+    routeCandidates: [
+      routeCandidate("ROUTE-INVALID", true, false),
+      routeCandidate("ROUTE-VALID", false, true),
+    ],
+    outcome: "ELIGIBLE_COMPLETE_ROUTE",
+  },
+  {
+    suffix: "ALL-INVALID",
+    routeCandidates: [
+      routeCandidate("ROUTE-INVALID-1", true, false),
+      routeCandidate("ROUTE-INVALID-2", true, false),
+    ],
+    outcome: "NO_ELIGIBLE_SSI",
+  },
+];
+
+const sourceContext = (source) => {
+  if (source === "MT205") return validMt205;
+  if (source === "MT205COV") return validMt205Cov;
+  if (source === "MT202COV")
+    return { upstreamAttestation: governedAttestation("MT202COV") };
+  return {};
+};
+
 const c81Definitions = ["MT202", "MT202COV", "MT205", "MT205COV"].flatMap(
   (source) =>
-    [
-      [
-        "56-57",
-        [routeCandidate("ROUTE-56-57", true, true)],
-        "ELIGIBLE_COMPLETE_ROUTE",
-      ],
-      ["56-ONLY", [routeCandidate("ROUTE-56", true, false)], "NO_ELIGIBLE_SSI"],
-      [
-        "57-ONLY",
-        [routeCandidate("ROUTE-57", false, true)],
-        "ELIGIBLE_COMPLETE_ROUTE",
-      ],
-      [
-        "NEITHER",
-        [routeCandidate("ROUTE-DIRECT", false, false)],
-        "ELIGIBLE_COMPLETE_ROUTE",
-      ],
-      [
-        "MIXED",
-        [
-          routeCandidate("ROUTE-INVALID", true, false),
-          routeCandidate("ROUTE-VALID", false, true),
-        ],
-        "ELIGIBLE_COMPLETE_ROUTE",
-      ],
-      [
-        "ALL-INVALID",
-        [
-          routeCandidate("ROUTE-INVALID-1", true, false),
-          routeCandidate("ROUTE-INVALID-2", true, false),
-        ],
-        "NO_ELIGIBLE_SSI",
-      ],
-    ].map(([suffix, routeCandidates, outcome]) => ({
+    c81Scenarios.map(({ suffix, routeCandidates, outcome }) => ({
       caseId: `MT2-V1-C81-${source}-${suffix}`,
       outcome,
       source,
       governedContext: {
-        ...(source === "MT205"
-          ? validMt205
-          : source === "MT205COV"
-            ? validMt205Cov
-            : source === "MT202COV"
-              ? { upstreamAttestation: governedAttestation("MT202COV") }
-              : {}),
+        ...sourceContext(source),
         routeCandidates,
       },
     })),
 );
 
 const definitions = [
-  ...previousDefinitions.filter(
-    ({ caseId }) =>
-      !caseId.startsWith("MT2-SSI-RMA-") && !caseId.startsWith("MT2-SSI-C81-"),
-  ),
+  ...previousDefinitions,
   ...rmaDefinitions,
   ...c81Definitions,
   {
@@ -353,14 +337,16 @@ const definitions = [
   },
 ];
 
-const httpStatus = (outcome) =>
-  ["ELIGIBLE_COMPLETE_ROUTE", "BILATERAL_RELATIONSHIP_CONFIRMED"].includes(
-    outcome,
+const httpStatus = (outcome) => {
+  if (
+    ["ELIGIBLE_COMPLETE_ROUTE", "BILATERAL_RELATIONSHIP_CONFIRMED"].includes(
+      outcome,
+    )
   )
-    ? 200
-    : ["STALE", "AMBIGUOUS_ROUTE"].includes(outcome)
-      ? 409
-      : 422;
+    return 200;
+  if (["STALE", "AMBIGUOUS_ROUTE"].includes(outcome)) return 409;
+  return 422;
+};
 
 const applicability = (outcome) => {
   if (outcome === "BILATERAL_RELATIONSHIP_CONFIRMED") return "NOT_REQUIRED";

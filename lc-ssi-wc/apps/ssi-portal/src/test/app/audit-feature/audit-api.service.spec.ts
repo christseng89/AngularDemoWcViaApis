@@ -13,15 +13,17 @@ import { AuditApiService } from "../../../app/audit-feature/audit-api.service";
 describe("AuditApiService", () => {
   beforeEach(() => get.mockClear());
 
-  it("performs only the existing three read-only requests in order", () => {
+  it("performs the governed Audit and shared RMA policy reads in order", () => {
     const api = new AuditApiService();
     api.events("rma").subscribe();
     api.lifecycle().subscribe();
     api.contract().subscribe();
+    api.messageTypePolicy().subscribe();
     expect(get.mock.calls.map(([url]) => url)).toEqual([
       "http://localhost:3100/api/rma-authorisations/audit/events",
       "http://localhost:3100/api/health/audit-retention",
       "/openapi/swift-data-service.v1.json",
+      "http://localhost:3100/api/rma-authorisations/message-type-policy",
     ]);
   });
 

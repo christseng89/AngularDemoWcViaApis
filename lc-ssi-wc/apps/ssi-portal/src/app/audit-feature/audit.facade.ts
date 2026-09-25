@@ -17,6 +17,7 @@ import {
 import { presentOperationalIssue } from "../operational-issue";
 import { governanceRecordValue } from "../governance-record-value";
 import { scalarText } from "../scalar-text";
+import type { RmaMessageTypePolicy } from "../swift-data-feature/swift-data.models";
 import { AuditApiService, type AuditParameterField } from "./audit-api.service";
 import { AuditSessionState } from "./audit-session-state";
 
@@ -37,6 +38,11 @@ export class AuditFacade {
   readonly currencyOptions = signal<
     readonly { code: string; decimals: number }[]
   >([]);
+  readonly messageTypePolicy = signal<RmaMessageTypePolicy>({
+    supportedMessageTypes: [],
+    categories: [],
+    items: [],
+  });
   readonly resourceLabel = computed(() => {
     const labels: Record<GovernanceTab, string> = {
       rma: "RMA",
@@ -134,10 +140,13 @@ export class AuditFacade {
     this.loading.set(true);
     this.error.set("");
     try {
-      const [rows, lifecycle, contract] = await Promise.all([
+      const [rows, lifecycle, contract, messageTypePolicy] = await Promise.all([
         firstValueFrom(this.api.events(this.tab())),
         firstValueFrom(this.api.lifecycle()),
         firstValueFrom(this.api.contract()),
+        this.tab() === "rma"
+          ? firstValueFrom(this.api.messageTypePolicy())
+          : Promise.resolve(this.messageTypePolicy()),
       ]);
       this.rows.set(rows);
       this.parameterFields.set(
@@ -145,6 +154,7 @@ export class AuditFacade {
           (resource) => resource.id === this.tab(),
         )?.fields ?? [],
       );
+      this.messageTypePolicy.set(messageTypePolicy);
       this.onlineQueryDays.set(lifecycle.onlineQueryDays);
       this.archiveAfterDays.set(lifecycle.archiveAfterDays);
       this.archiveRetentionDays.set(lifecycle.archiveRetentionDays);
@@ -273,6 +283,11 @@ export class AuditFacade {
     ];
     for (const [key, value] of optionalProps)
       if (value !== undefined) props[key] = value as never;
+    if (field.type === "multicheckbox") {
+      props["messageTypeCategories"] = this.messageTypePolicy().categories;
+      props["messageTypeItems"] = this.messageTypePolicy().items;
+      props["messageTypeOperation"] = "INQUIRE";
+    }
     return props;
   }
 }

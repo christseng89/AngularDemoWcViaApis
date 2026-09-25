@@ -3,6 +3,7 @@ import { Injectable, inject } from "@angular/core";
 import type { Observable } from "rxjs";
 import type { GovernanceTab } from "../app-view.models";
 import type { AuditRow } from "../audit-presentation";
+import type { RmaMessageTypePolicy } from "../swift-data-feature/swift-data.models";
 
 export interface AuditParameterField {
   key: string;
@@ -54,6 +55,12 @@ export class AuditApiService {
   lifecycle(): Observable<AuditLifecycleHealth> {
     return this.http.get<AuditLifecycleHealth>(
       `${this.api}/health/audit-retention`,
+    );
+  }
+
+  messageTypePolicy(): Observable<RmaMessageTypePolicy> {
+    return this.http.get<RmaMessageTypePolicy>(
+      `${this.api}/rma-authorisations/message-type-policy`,
     );
   }
 

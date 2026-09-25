@@ -46,11 +46,12 @@ const variantCount = ({ variants, profileMatrix }) => {
   if (/^[A-Z]$/.test(variants)) return profileMatrix ? 4 : 1;
   const match = /^([A-Z])\.\.([A-Z])$/.exec(variants);
   if (!match) throw new Error(`Unsupported variant expression: ${variants}`);
-  const count = match[2].charCodeAt(0) - match[1].charCodeAt(0) + 1;
+  const count =
+    (match[2].codePointAt(0) ?? 0) - (match[1].codePointAt(0) ?? 0) + 1;
   return profileMatrix ? count * 4 : count;
 };
 
-export const validateProposalCases = (catalogue, proposalHash, fixtures) => {
+const validateCatalogueHeader = (catalogue, proposalHash) => {
   const errors = [];
   if (catalogue.proposalSha256 !== proposalHash)
     errors.push("Proposal SHA-256 binding does not match the controlled file.");
@@ -64,18 +65,54 @@ export const validateProposalCases = (catalogue, proposalHash, fixtures) => {
     catalogue.profiles.some((profile) => !ALLOWED_PROFILES.has(profile))
   )
     errors.push("Gate contains a missing or out-of-scope profile.");
-  const expandedCaseCount = catalogue.groups.reduce(
-    (sum, group) => sum + variantCount(group),
-    0,
-  );
-  if (expandedCaseCount !== catalogue.expectedExpandedCaseCount)
+  return errors;
+};
+
+const validateFixtureBinding = (proposalCase, fixture) => {
+  const errors = [];
+  if (!fixture)
+    return [
+      `Explicit case ${proposalCase.caseId} has no controlled fixture binding.`,
+    ];
+  const unexpected = unexpectedContextKeys(fixture.execution?.governedContext);
+  if (unexpected.length)
     errors.push(
-      `Expanded case count ${expandedCaseCount} does not match ${catalogue.expectedExpandedCaseCount}.`,
+      `Explicit case ${proposalCase.caseId} contains non-governed context keys: ${unexpected.join(", ")}.`,
     );
-  if (catalogue.cases?.length !== catalogue.expectedExpandedCaseCount)
+  if (fixture.stimulus?.caseId !== proposalCase.caseId)
     errors.push(
-      `Explicit executable case count ${catalogue.cases?.length ?? 0} does not match ${catalogue.expectedExpandedCaseCount}.`,
+      `Explicit case ${proposalCase.caseId} stimulus trace does not match its case ID.`,
     );
+  if (
+    fixture.execution?.resolverRequest?.sourceMessageType !==
+    proposalCase.request?.sourceMessageType
+  )
+    errors.push(
+      `Explicit case ${proposalCase.caseId} request and fixture profile do not match.`,
+    );
+  return errors;
+};
+
+const validateExactOracle = (catalogue, proposalCase) => {
+  const errors = [];
+  if (
+    !proposalCase.expected?.resolutionOutcome ||
+    Array.isArray(proposalCase.expected?.resolutionOutcome) ||
+    proposalCase.expected?.allowedResolutionOutcomes
+  )
+    errors.push(
+      `Explicit case ${proposalCase.caseId} must have one exact outcome oracle.`,
+    );
+  for (const sideEffect of Object.keys(catalogue.sideEffects))
+    if (proposalCase.expected?.[sideEffect] !== false)
+      errors.push(
+        `Explicit case ${proposalCase.caseId} does not assert ${sideEffect}=false.`,
+      );
+  return errors;
+};
+
+const validateExplicitCases = (catalogue, fixtures) => {
+  const errors = [];
   const caseIds = new Set();
   const referencedBindings = new Set();
   for (const proposalCase of catalogue.cases ?? []) {
@@ -94,49 +131,22 @@ export const validateProposalCases = (catalogue, proposalHash, fixtures) => {
       errors.push(
         `Explicit case ${proposalCase.caseId} lacks fixture/request/expected/test binding.`,
       );
-    const fixture = fixtures?.bindings?.[proposalCase.fixtureBindingId];
-    if (!fixture)
-      errors.push(
-        `Explicit case ${proposalCase.caseId} has no controlled fixture binding.`,
-      );
-    else {
-      const unexpected = unexpectedContextKeys(
-        fixture.execution?.governedContext,
-      );
-      if (unexpected.length)
-        errors.push(
-          `Explicit case ${proposalCase.caseId} contains non-governed context keys: ${unexpected.join(", ")}.`,
-        );
-      if (fixture.stimulus?.caseId !== proposalCase.caseId)
-        errors.push(
-          `Explicit case ${proposalCase.caseId} stimulus trace does not match its case ID.`,
-        );
-      if (
-        fixture.execution?.resolverRequest?.sourceMessageType !==
-        proposalCase.request?.sourceMessageType
-      )
-        errors.push(
-          `Explicit case ${proposalCase.caseId} request and fixture profile do not match.`,
-        );
-    }
-    if (
-      !proposalCase.expected?.resolutionOutcome ||
-      Array.isArray(proposalCase.expected?.resolutionOutcome) ||
-      proposalCase.expected?.allowedResolutionOutcomes
-    )
-      errors.push(
-        `Explicit case ${proposalCase.caseId} must have one exact outcome oracle.`,
-      );
-    for (const sideEffect of Object.keys(catalogue.sideEffects))
-      if (proposalCase.expected?.[sideEffect] !== false)
-        errors.push(
-          `Explicit case ${proposalCase.caseId} does not assert ${sideEffect}=false.`,
-        );
+    errors.push(
+      ...validateFixtureBinding(
+        proposalCase,
+        fixtures?.bindings?.[proposalCase.fixtureBindingId],
+      ),
+      ...validateExactOracle(catalogue, proposalCase),
+    );
   }
   for (const fixtureBindingId of Object.keys(fixtures?.bindings ?? {}))
     if (!referencedBindings.has(fixtureBindingId))
       errors.push(`Controlled fixture ${fixtureBindingId} is orphaned.`);
+  return { errors, caseIds };
+};
 
+const validateFrozenMatrices = (caseIds) => {
+  const errors = [];
   const matrixCount = (prefix) =>
     [...caseIds].filter((caseId) => caseId.startsWith(prefix)).length;
   if (matrixCount("MT2-V1-RMA-") !== 12)
@@ -152,8 +162,13 @@ export const validateProposalCases = (catalogue, proposalHash, fixtures) => {
     errors.push(
       "Frozen attestation matrix must contain exactly 6 independent cases.",
     );
+  return errors;
+};
+
+const validateOutcomes = (catalogue) => {
+  const errors = [];
   const outcomes = new Set(
-    catalogue.groups.flatMap(({ outcomes }) => outcomes),
+    catalogue.groups.flatMap(({ outcomes: values }) => values),
   );
   for (const outcome of REQUIRED_OUTCOMES)
     if (!outcomes.has(outcome))
@@ -163,7 +178,37 @@ export const validateProposalCases = (catalogue, proposalHash, fixtures) => {
       errors.push(`Legacy or unsupported outcome: ${outcome}`);
   for (const [name, value] of Object.entries(catalogue.sideEffects))
     if (value !== false) errors.push(`${name} must be false.`);
-  return { errors, expandedCaseCount, outcomes: [...outcomes].sort() };
+  return { errors, outcomes };
+};
+
+export const validateProposalCases = (catalogue, proposalHash, fixtures) => {
+  const errors = validateCatalogueHeader(catalogue, proposalHash);
+  const expandedCaseCount = catalogue.groups.reduce(
+    (sum, group) => sum + variantCount(group),
+    0,
+  );
+  if (expandedCaseCount !== catalogue.expectedExpandedCaseCount)
+    errors.push(
+      `Expanded case count ${expandedCaseCount} does not match ${catalogue.expectedExpandedCaseCount}.`,
+    );
+  if (catalogue.cases?.length !== catalogue.expectedExpandedCaseCount)
+    errors.push(
+      `Explicit executable case count ${catalogue.cases?.length ?? 0} does not match ${catalogue.expectedExpandedCaseCount}.`,
+    );
+  const explicitCases = validateExplicitCases(catalogue, fixtures);
+  const outcomeValidation = validateOutcomes(catalogue);
+  errors.push(
+    ...explicitCases.errors,
+    ...validateFrozenMatrices(explicitCases.caseIds),
+    ...outcomeValidation.errors,
+  );
+  return {
+    errors,
+    expandedCaseCount,
+    outcomes: [...outcomeValidation.outcomes].sort((left, right) =>
+      left.localeCompare(right),
+    ),
+  };
 };
 
 export const proposalCaseReport = (catalogue, validation, caseResults) => ({

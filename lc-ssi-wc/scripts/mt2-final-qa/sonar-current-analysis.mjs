@@ -584,6 +584,33 @@ export const fetchDuplicationDensity = async ({
   return value;
 };
 
+export const fetchQualityGateStatus = async ({
+  fetchImpl,
+  host,
+  headers,
+  analysisId,
+}) => {
+  const response = await fetchImpl(
+    `${host}/api/qualitygates/project_status?analysisId=${encodeURIComponent(analysisId)}`,
+    { headers },
+  );
+  if (!response.ok)
+    throw new Error(`Sonar Quality Gate API failed: ${response.status}`);
+  const projectStatus = (await response.json()).projectStatus;
+  if (projectStatus?.status === "OK") return "OK";
+  const failures = (projectStatus?.conditions ?? [])
+    .filter(({ status }) => status === "ERROR")
+    .map(
+      ({ metricKey, actualValue, errorThreshold }) =>
+        `${metricKey}=${actualValue} (threshold ${errorThreshold})`,
+    )
+    .join(", ");
+  const failureDetails = failures ? `: ${failures}` : "";
+  throw new Error(
+    `FAIL_CLOSED: Sonar Quality Gate ${projectStatus?.status ?? "UNKNOWN"}${failureDetails}`,
+  );
+};
+
 const runAnalysis = async ({
   workspace = process.cwd(),
   fetchImpl = fetch,
@@ -645,6 +672,12 @@ const runAnalysis = async ({
     project,
     headers,
   });
+  const qualityGateStatus = await fetchQualityGateStatus({
+    fetchImpl,
+    host,
+    headers,
+    analysisId: ce.analysisId,
+  });
   const output = path.resolve(
     workspace,
     "qa/reports/latest/mt2/sonar-measures.json",
@@ -668,6 +701,7 @@ const runAnalysis = async ({
         sourceDigest: sourceManifest.digest,
         sourceManifest,
         analysisId: ce.analysisId,
+        qualityGateStatus,
         ceTaskId: task.ceTaskId,
         analysisPurpose: "DUPLICATION_MEASUREMENT",
         analysisMode,
@@ -695,6 +729,7 @@ const runAnalysis = async ({
       ? { commitSha: identity.commitSha }
       : { worktreeDigest: identity.worktreeDigest }),
     analysisId: ce.analysisId,
+    qualityGateStatus,
     analysisPurpose: "DUPLICATION_MEASUREMENT",
     analysisMode,
   };

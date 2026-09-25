@@ -237,11 +237,13 @@ export class CounterpartySsiResolutionService {
     const rmaError = this.rmaValidationError(context);
     if (rmaError) return rmaError;
 
-    const resolved = isCover
-      ? is205
+    let resolved: Context;
+    if (isCover)
+      resolved = is205
         ? this.mt205Cover(base, context)
-        : this.mt202Cover(base, context)
-      : is205
+        : this.mt202Cover(base, context);
+    else
+      resolved = is205
         ? this.mt205(base, context, beneficiary)
         : this.mt202(base, context, beneficiary);
     return routeSelection
@@ -611,13 +613,15 @@ export class CounterpartySsiResolutionService {
     const candidateId = (candidate: Context, index: number) =>
       scalarText(candidate["id"]) || `CANDIDATE-${index + 1}`;
     return {
-      evaluatedCandidateIds: candidates.map(candidateId),
+      evaluatedCandidateIds: candidates.map((candidate, index) =>
+        candidateId(candidate, index),
+      ),
       eligibleCandidateIds: candidates
         .filter(
           (candidate) =>
             !(candidate["has56"] === true && candidate["has57"] !== true),
         )
-        .map(candidateId),
+        .map((candidate, index) => candidateId(candidate, index)),
     };
   }
 

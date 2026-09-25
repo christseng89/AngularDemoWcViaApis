@@ -1,6 +1,5 @@
 import { Module } from "@nestjs/common";
-import { ModuleRef } from "@nestjs/core";
-import { APP_INTERCEPTOR } from "@nestjs/core";
+import { APP_INTERCEPTOR, ModuleRef } from "@nestjs/core";
 import { SsiController } from "./ssi.controller";
 import { SsiApplicationService } from "./ssi-application.service";
 import { SqliteSsiRepository } from "./sqlite-ssi.repository";

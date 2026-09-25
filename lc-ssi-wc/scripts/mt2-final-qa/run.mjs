@@ -39,10 +39,10 @@ gates.push(
     config.thresholds.duplication,
     "lt",
   ),
+  // The operational snapshot is the last acceptance observation. Nothing that
+  // can mutate or inspect the governed DB may run after this finalizer.
+  new ProcessGate(finalSnapshotGate, context),
 );
-// The operational snapshot is the last acceptance observation. Nothing that
-// can mutate or inspect the governed DB may run after this finalizer.
-gates.push(new ProcessGate(finalSnapshotGate, context));
 if (gates.map(({ id }) => id).join("|") !== plannedIds.join("|"))
   throw new Error("Acceptance gate implementation does not match its plan.");
 const result = await new QaOrchestrator(gates, {

@@ -27,9 +27,32 @@ const lifecycle = {
   archiveRetentionDays: 365,
   scheduleIntervalHours: 12,
 };
+const messageTypePolicy = {
+  supportedMessageTypes: ["MT202", "MT202COV"],
+  categories: [
+    {
+      categoryId: "PAYMENT" as const,
+      displayName: "Payment",
+      displayOrder: 3,
+      emptyStateText: "No governed Payment message types.",
+    },
+  ],
+  items: [
+    {
+      messageType: "MT202",
+      description: "General Financial Institution Transfer",
+      categoryId: "PAYMENT" as const,
+      directionApplicability: {
+        inbound: { applicable: true },
+        outbound: { applicable: true },
+      },
+    },
+  ],
+};
 const api = {
   events: jest.fn(() => of(rows)),
   lifecycle: jest.fn(() => of(lifecycle)),
+  messageTypePolicy: jest.fn(() => of(messageTypePolicy)),
   contract: jest.fn(() =>
     of({ "x-ui-resources": [{ id: "rma", fields: [] }] }),
   ),
@@ -48,7 +71,9 @@ jest.mock("@angular/core", () => ({
     token.name === "AuditSessionState" ? session : api,
   signal: testSignal,
 }));
-jest.mock("../../../app/audit-feature/audit-api.service", () => ({ AuditApiService: class {} }));
+jest.mock("../../../app/audit-feature/audit-api.service", () => ({
+  AuditApiService: class {},
+}));
 
 import { AuditFacade } from "../../../app/audit-feature/audit.facade";
 
@@ -57,6 +82,7 @@ describe("AuditFacade", () => {
     jest.clearAllMocks();
     api.events.mockImplementation(() => of(rows));
     api.lifecycle.mockImplementation(() => of(lifecycle));
+    api.messageTypePolicy.mockImplementation(() => of(messageTypePolicy));
     api.contract.mockImplementation(() =>
       of({ "x-ui-resources": [{ id: "rma", fields: [] }] }),
     );
@@ -74,9 +100,40 @@ describe("AuditFacade", () => {
     expect(api.events).toHaveBeenCalledWith("rma");
     expect(api.lifecycle).toHaveBeenCalledTimes(1);
     expect(api.contract).toHaveBeenCalledTimes(1);
+    expect(api.messageTypePolicy).toHaveBeenCalledTimes(1);
     expect(audit.rows()).toEqual(rows);
     expect(audit.onlineQueryDays()).toBe(7);
     expect(audit.loading()).toBe(false);
+  });
+
+  it("supplies the governed RMA message-type policy to Audit inquiry fields", async () => {
+    api.contract.mockImplementationOnce(() =>
+      of({
+        "x-ui-resources": [
+          {
+            id: "rma",
+            fields: [
+              {
+                key: "messageTypes",
+                label: "Message Types",
+                type: "multicheckbox",
+                optionsSource: "rma-authorisations/message-types",
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    const audit = new AuditFacade();
+
+    await audit.load();
+
+    expect(audit.detailFields()[0]?.props).toEqual(
+      expect.objectContaining({
+        messageTypeCategories: messageTypePolicy.categories,
+        messageTypeItems: messageTypePolicy.items,
+      }),
+    );
   });
 
   it("changes governed Audit tab and resets paging without retaining stale detail", async () => {
@@ -223,7 +280,8 @@ describe("AuditFacade", () => {
             { label: "MT202", value: "MT202" },
             { label: "MT202COV", value: "MT202COV" },
           ],
-          description: "受控 Message Types；按 View Message Types 查看完整選擇。",
+          description:
+            "受控 Message Types；按 View Message Types 查看完整選擇。",
         }),
       }),
     ]);
@@ -265,19 +323,31 @@ describe("AuditFacade", () => {
         action: "UPDATED",
         actor: "zeta",
         occurred_at: "2026-09-21T02:00:00Z",
-        payload: JSON.stringify({ after: { status: "SUSPENDED", maker: "zeta", checker: "checker", updatedAt: "2026-09-21" } }),
+        payload: JSON.stringify({
+          after: {
+            status: "SUSPENDED",
+            maker: "zeta",
+            checker: "checker",
+            updatedAt: "2026-09-21",
+          },
+        }),
       },
       {
         id: 1,
         action: "CREATED",
         actor: "alpha",
         occurred_at: "2026-09-21T01:00:00Z",
-        payload: JSON.stringify({ after: { status: "ACTIVE", maker: "alpha", createdAt: "2026-09-20" } }),
+        payload: JSON.stringify({
+          after: { status: "ACTIVE", maker: "alpha", createdAt: "2026-09-20" },
+        }),
       },
     ]);
     audit.indexSortPath.set("status");
 
-    expect(audit.sortedRows().map(({ eventId }) => eventId)).toEqual(["1", "2"]);
+    expect(audit.sortedRows().map(({ eventId }) => eventId)).toEqual([
+      "1",
+      "2",
+    ]);
     expect(audit.indexRows()).toHaveLength(2);
     expect(audit.indexRows()[1]?.trailing).toEqual([
       "zeta",
@@ -286,7 +356,10 @@ describe("AuditFacade", () => {
       "2026-09-21T02:00:00Z",
     ]);
     audit.sortDirection.set("desc");
-    expect(audit.sortedRows().map(({ eventId }) => eventId)).toEqual(["2", "1"]);
+    expect(audit.sortedRows().map(({ eventId }) => eventId)).toEqual([
+      "2",
+      "1",
+    ]);
     audit.currentPage.set(2);
     audit.movePage(10);
     expect(audit.currentPage()).toBe(1);
@@ -310,8 +383,15 @@ describe("AuditFacade", () => {
       rawPayload: null,
     };
 
-    expect(audit.messageTypeChanges({ ...base, changedFields: null })).toBeNull();
-    expect(audit.messageTypeChanges({ ...base, changedFields: { messageTypes: [] } })).toBeNull();
+    expect(
+      audit.messageTypeChanges({ ...base, changedFields: null }),
+    ).toBeNull();
+    expect(
+      audit.messageTypeChanges({
+        ...base,
+        changedFields: { messageTypes: [] },
+      }),
+    ).toBeNull();
     expect(
       audit.messageTypeChanges({
         ...base,
@@ -331,7 +411,9 @@ describe("AuditFacade", () => {
     expect(audit.issue()).toBeNull();
     audit.error.set("AUDIT_SERVICE_UNAVAILABLE");
     expect(audit.issue()).not.toBeNull();
-    audit.parameterFields.set([{ key: "plain", label: "Plain", type: "input" }]);
+    audit.parameterFields.set([
+      { key: "plain", label: "Plain", type: "input" },
+    ]);
     expect(audit.detailFields()[0]?.props?.options).toEqual([]);
     audit.tab.set("ssi");
     const invalid = {

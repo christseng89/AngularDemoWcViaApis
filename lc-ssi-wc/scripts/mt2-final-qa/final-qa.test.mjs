@@ -30,6 +30,7 @@ import {
   ensureAggregateLcov,
   fetchBoundAnalysis,
   fetchDuplicationDensity,
+  fetchQualityGateStatus,
   assertTypeScriptProgramCoverage,
   parseScannerTask,
   redactToken,
@@ -332,6 +333,7 @@ test("Sonar resume mode retrieves a task only when its analysis matches current 
         measures: [{ metric: "duplicated_lines_density", value: "0.5" }],
       },
     },
+    { projectStatus: { status: "OK", conditions: [] } },
   ];
   const previous = {
     host: process.env.SONAR_HOST_URL,
@@ -353,6 +355,7 @@ test("Sonar resume mode retrieves a task only when its analysis matches current 
     assert.equal(result.analysisMode, "resume");
     assert.equal(result.projectVersion, version);
     assert.equal(result.duplicatedLinesDensity, 0.5);
+    assert.equal(result.qualityGateStatus, "OK");
   } finally {
     for (const [name, value] of Object.entries(previous)) {
       const environmentName =
@@ -365,6 +368,42 @@ test("Sonar resume mode retrieves a task only when its analysis matches current 
       else process.env[environmentName] = value;
     }
   }
+});
+
+test("Sonar analysis fails closed unless the server Quality Gate is OK", async () => {
+  const response = (projectStatus) => ({
+    ok: true,
+    json: async () => ({ projectStatus }),
+  });
+  assert.equal(
+    await fetchQualityGateStatus({
+      fetchImpl: async () => response({ status: "OK", conditions: [] }),
+      host: "http://sonar.invalid",
+      headers: {},
+      analysisId: "analysis-1",
+    }),
+    "OK",
+  );
+  await assert.rejects(
+    fetchQualityGateStatus({
+      fetchImpl: async () =>
+        response({
+          status: "ERROR",
+          conditions: [
+            {
+              status: "ERROR",
+              metricKey: "new_violations",
+              actualValue: "14",
+              errorThreshold: "0",
+            },
+          ],
+        }),
+      host: "http://sonar.invalid",
+      headers: {},
+      analysisId: "analysis-2",
+    }),
+    /Quality Gate ERROR.*new_violations=14.*threshold 0/,
+  );
 });
 
 test("Sonar worktree identity hashes exactly configured non-test sources", () => {
