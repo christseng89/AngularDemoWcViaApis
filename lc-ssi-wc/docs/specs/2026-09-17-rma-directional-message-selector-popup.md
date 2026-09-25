@@ -3,7 +3,7 @@
 **Status:** `REVIEW CYCLE 2 — ROUND 1 CANDIDATE`  
 **Date:** 2026-09-17  
 **Scope:** RMA ADD／EDIT／VIEW Message Types popup only  
-**Normative dependencies:** `memory/rma-index-message-scope-memory.md`, `memory/ssi-maintenance-workflow-memory.md`, `memory/mt347-oas-page-parameters-ui-standard-v1.md`  
+**Normative dependencies:** `memory/ssi/rma-index-message-scope-memory.md`, `memory/ssi/ssi-maintenance-workflow-memory.md`, `memory/governance/mt347-oas-page-parameters-ui-standard-v1.md`
 **Implementation gate:** Do not implement until the authorized data-remediation phase and this specification both receive the required approval.
 
 ## 1. Problem statement

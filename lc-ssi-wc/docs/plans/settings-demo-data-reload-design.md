@@ -11,7 +11,7 @@ Accepted for implementation on 2026-09-12.
 - Show a server-derived, read-only Development flag. `demo` and `development` are ON; every other, blank, or unknown value is OFF.
 - When Development is ON, an operator may reload the canonical synthetic database after entering the control password.
 - Reload means build a replacement database from the modified canonical seed, validate it completely, then atomically replace the active demo database and refresh application data.
-- Default localhost, QA, and UAT must use the same canonical seed and report the seed and logical snapshot identities.
+- Default localhost, QA, and UAT must use the same canonical seed. Operational reload/audit evidence reports the seed and logical snapshot identities; ordinary Settings page loading does not inspect, return, or display them.
 - Redesign error and warning presentation around one accessible severity system without changing existing business flows.
 
 ## Assumptions and constraints
@@ -20,7 +20,8 @@ Accepted for implementation on 2026-09-12.
 - `SSI_RUNTIME_ENV` is authoritative; `NODE_ENV` is a deprecated fallback only. Reload is denied unless the resolved environment is exactly `demo` or `development`.
 - The control password is supplied only through uncommitted `.env` as `SSI_DEMO_ADMIN_PASSWORD`. `.env.example` contains a documented sample value only; the application has no password default or fallback.
 - The password is never stored client-side, logged, returned, or persisted in audit payloads.
-- Reload uses only the configured canonical synthetic seed. The client cannot supply a filesystem path.
+- Reload defaults to the latest server-side export, falling back to the configured canonical synthetic seed. After password authorization, the operator may instead choose a compliant seed JSON through the browser file picker.
+- The browser never supplies a server filesystem path. An uploaded seed is limited to 80 MB, parsed and validated server-side, bound to the one-time authorization, and removed when that authorization is cancelled or consumed.
 - Existing production-like SSI maintenance, resolution, checker, and audit flows are out of scope for behavioral redesign.
 
 ## Chosen approach
@@ -54,10 +55,12 @@ Alternative approaches considered:
 
 ### Backend
 
-- A settings status endpoint returns the resolved runtime environment, development flag, reload availability, seed identity, current logical snapshot identity, and status policy version.
-- A password-protected reload endpoint checks the runtime gate and password before doing filesystem work.
-- It validates the canonical seed and active schema first, then reloads all seed tables inside one `BEGIN IMMEDIATE` transaction. Any import failure rolls back the complete operation; existing repository connections observe only the committed state. This avoids stale SQLite file handles during Windows file replacement.
+- A settings status endpoint returns only the resolved runtime environment, development flag, reload availability, and status policy version. Seed and logical snapshot identities are resolved only inside the authorized reload workflow and its server-side audit evidence.
+- A password-protected authorization endpoint checks the runtime gate and password before offering the default data set and the browser file picker.
+- A one-time upload endpoint accepts only the authorized seed JSON, stores it under repository-local `tmp/`, validates its controlled metadata, and returns a selectable data-set identity. The original filename is display-only.
+- It validates the selected record data against the server-controlled active schema, backs up the active DB, builds and validates a new shadow DB, then replaces the active DB. Any build, validation, replacement, or restore failure fails closed; restore failure still produces persistent failure audit evidence.
 - No client-supplied seed path, target path, SQL, or command is accepted.
+- Export responses contain only the governed dataset identity and display name; server filesystem paths never cross the API boundary or appear in the browser.
 - Repositories must release and reopen database connections around the atomic replacement so no process continues reading the old inode or an incomplete database.
 - The audit record contains actor, timestamp, environment, seed SHA-256, previous/new logical snapshot SHA-256, imported row counts, and success/failure; never the password.
 
@@ -98,3 +101,4 @@ The endpoint is never retried automatically. UI disables repeat submission while
 4. Database reload is a single exclusive transaction so a failed import cannot destroy the working dataset and existing SQLite connections remain valid on Windows.
 5. Theme and alerts become shared services/components to satisfy SRP, DIP, reuse, and consistent behavior.
 6. The visual refresh is incremental; a full application rewrite is deferred to protect proven UAT flows.
+7. Password confirmation is followed by a dedicated file-selection screen. The latest export remains selected by default; `Choose file` opens the native operating-system picker and a valid uploaded JSON becomes the selected source without exposing client paths to the server.

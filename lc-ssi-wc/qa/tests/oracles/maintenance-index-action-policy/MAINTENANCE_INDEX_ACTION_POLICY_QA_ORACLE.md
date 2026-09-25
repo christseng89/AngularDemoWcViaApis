@@ -7,7 +7,7 @@
 
 ## Authority
 
-The Product Owner matrix in `memory/ssi-maintenance-workflow-memory.md` lines 74–89 is authoritative. Verified LF SHA-256:
+The Product Owner matrix in `memory/ssi/ssi-maintenance-workflow-memory.md` lines 74–89 is authoritative. Verified LF SHA-256:
 
 `341AC79E6032639926BC20656A9A0E2D7B804F7EBD90CEA2FFA068DDD3DEB45F`
 
@@ -17,18 +17,18 @@ The tab is the maximum presentation gate. Server lifecycle, authorization, maker
 
 Execute every scenario for `RMA`, `ENTITY`, `NOSTRO`, and `SSI`: **10 scenarios × 4 resources = 40 cases**. A mixed-row table scenario passes only if every row assertion passes.
 
-| Suffix | Tab | Row/input state | Expected action headers | Expected row result |
-|---|---|---|---|---|
-| `01` | ACTIVE | ACTIVE, no open revision | Revise, Suppress | Revise and Suppress only |
-| `02` | ACTIVE | ACTIVE, open `WIP` | Revise, Suppress | Two blank action cells; no mutation button |
-| `03` | ACTIVE | ACTIVE, open `DRAFT` | Revise, Suppress | Two blank action cells; no mutation button |
-| `04` | ACTIVE | ACTIVE, open `PENDING_APPROVAL` | Revise, Suppress | Two blank action cells; no mutation button |
-| `05` | ACTIVE | ACTIVE, open `APPROVED` legacy | Revise, Suppress | Two blank action cells; no mutation button |
-| `06` | DRAFT | DRAFT, `ADD` | Submit, Edit, Revoke Draft | All three buttons |
-| `07` | DRAFT | DRAFT, `REVISION` | Submit, Edit, Revoke Draft | All three buttons |
-| `08` | DRAFT | DRAFT, `SUPPRESSION` | Submit, Edit, Revoke Draft | Submit and Revoke Draft; blank Edit cell |
-| `09` | SUPPRESSED | SUPPRESSED | None | No action `th` or `td` |
-| `10` | ALL | Mixed unlocked ACTIVE, ordinary DRAFT, SUPPRESSION DRAFT, SUPPRESSED rows | None | No action `th` or `td` for any row |
+| Suffix | Tab        | Row/input state                                                           | Expected action headers    | Expected row result                        |
+| ------ | ---------- | ------------------------------------------------------------------------- | -------------------------- | ------------------------------------------ |
+| `01`   | ACTIVE     | ACTIVE, no open revision                                                  | Revise, Suppress           | Revise and Suppress only                   |
+| `02`   | ACTIVE     | ACTIVE, open `WIP`                                                        | Revise, Suppress           | Two blank action cells; no mutation button |
+| `03`   | ACTIVE     | ACTIVE, open `DRAFT`                                                      | Revise, Suppress           | Two blank action cells; no mutation button |
+| `04`   | ACTIVE     | ACTIVE, open `PENDING_APPROVAL`                                           | Revise, Suppress           | Two blank action cells; no mutation button |
+| `05`   | ACTIVE     | ACTIVE, open `APPROVED` legacy                                            | Revise, Suppress           | Two blank action cells; no mutation button |
+| `06`   | DRAFT      | DRAFT, `ADD`                                                              | Submit, Edit, Revoke Draft | All three buttons                          |
+| `07`   | DRAFT      | DRAFT, `REVISION`                                                         | Submit, Edit, Revoke Draft | All three buttons                          |
+| `08`   | DRAFT      | DRAFT, `SUPPRESSION`                                                      | Submit, Edit, Revoke Draft | Submit and Revoke Draft; blank Edit cell   |
+| `09`   | SUPPRESSED | SUPPRESSED                                                                | None                       | No action `th` or `td`                     |
+| `10`   | ALL        | Mixed unlocked ACTIVE, ordinary DRAFT, SUPPRESSION DRAFT, SUPPRESSED rows | None                       | No action `th` or `td` for any row         |
 
 Case IDs are `<RESOURCE>-<SUFFIX>`, for example `SSI-08`. Unknown, missing, or duplicate IDs fail reconciliation.
 

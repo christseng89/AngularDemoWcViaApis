@@ -10,9 +10,7 @@
       "SWIFT network acceptance",
       "third-party FIN Validator integration"
     ],
-    "nonBlockingExternalReferenceCaseIds": [
-      "MT742-010"
-    ]
+    "nonBlockingExternalReferenceCaseIds": ["MT742-010"]
   },
   "operatorVocabulary": [
     "PRESENT",
@@ -25,7 +23,7 @@
   "source": {
     "workbook": "qa/tdd/mt347/MT347_SR2026_SSI_TDD_CONTROLLED_v6.xlsx",
     "workbookSha256": "7EFFDFFF50F502E032A9AE1AF519A68886B53133DD065CAC53E10DA593A70EA0",
-    "memory": "memory/swift-mt347-v2.md",
+    "memory": "memory/ssi/swift-mt347-v2.md",
     "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
     "fixtureInputs": "parameters/mt347-fixture-inputs.v1.json",
     "fixtureInputsSha256": "FE00A08481CFF5FAEE42805C5FCE4E5CAF79929979F22772D977CA5B2B289323"
@@ -534,10 +532,7 @@
         "when": {
           "operator": "ONE_OF",
           "field": "triggerTag",
-          "values": [
-            "53A",
-            "56A"
-          ]
+          "values": ["53A", "56A"]
         },
         "then": [
           {
@@ -586,10 +581,7 @@
         "when": {
           "operator": "ONE_OF",
           "field": "triggerTag",
-          "values": [
-            "53A",
-            "56A"
-          ]
+          "values": ["53A", "56A"]
         },
         "then": [
           {
@@ -734,10 +726,7 @@
         "when": {
           "operator": "ONE_OF",
           "field": "triggerTag",
-          "values": [
-            "53A",
-            "56A"
-          ]
+          "values": ["53A", "56A"]
         },
         "then": [
           {
@@ -786,10 +775,7 @@
         "when": {
           "operator": "ONE_OF",
           "field": "triggerTag",
-          "values": [
-            "53A",
-            "56A"
-          ]
+          "values": ["53A", "56A"]
         },
         "then": [
           {
@@ -862,11 +848,7 @@
               {
                 "operator": "ONE_OF",
                 "field": "paymentBlockCount",
-                "values": [
-                  1,
-                  2,
-                  3
-                ]
+                "values": [1, 2, 3]
               }
             ]
           }
@@ -936,11 +918,7 @@
               {
                 "operator": "ONE_OF",
                 "field": "paymentBlockCount",
-                "values": [
-                  1,
-                  2,
-                  3
-                ]
+                "values": [1, 2, 3]
               }
             ]
           }
@@ -1414,7 +1392,7 @@
         "sheet": "TDD Cases",
         "row": 2,
         "mrgEvidence": "us3ma_20260717.pdf p.18; C4 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.21-22",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT"
       }
@@ -1542,7 +1520,7 @@
         "sheet": "TDD Cases",
         "row": 3,
         "mrgEvidence": "us3ma_20260717.pdf p.18; C4 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.21-22",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "senderCorrespondentBankServiceId=BANK-SVC-CITIUS33; intermediaryBankServiceId=BANK-SVC-HSBCHKHH; receivingBankServiceId=BANK-SVC-DEUTDEFF"
       }
@@ -1626,7 +1604,7 @@
         "sheet": "TDD Cases",
         "row": 4,
         "mrgEvidence": "us3ma_20260717.pdf p.18; C4 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.21-22",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequencePresent=true; source for mandatory 57a missing; no cross-role/sequence fallback"
       }
@@ -1710,7 +1688,7 @@
         "sheet": "TDD Cases",
         "row": 5,
         "mrgEvidence": "us3ma_20260717.pdf p.18; C4 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.21-22",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=B1.53Z; allowed=A,J"
       },
@@ -1799,7 +1777,7 @@
         "sheet": "TDD Cases",
         "row": 6,
         "mrgEvidence": "us3ma_20260717.pdf p.18; C4 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.21-22",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=B1.53J; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -1950,7 +1928,7 @@
         "sheet": "TDD Cases",
         "row": 7,
         "mrgEvidence": "us3ma_20260717.pdf p.18; C4 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.21-22",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT; beneficiaryBankServiceId=BANK-SVC-BARCGB22; beneficiaryBankServiceVersion=1; beneficiaryProvenance=TRANSACTION_CONTEXT"
       }
@@ -2102,7 +2080,7 @@
         "sheet": "TDD Cases",
         "row": 8,
         "mrgEvidence": "us3ma_20260717.pdf p.18; C4 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.21-22",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "senderCorrespondentBankServiceId=BANK-SVC-CITIUS33; intermediaryBankServiceId=BANK-SVC-HSBCHKHH; receivingBankServiceId=BANK-SVC-DEUTDEFF; beneficiaryBankServiceId=BANK-SVC-BARCGB22; beneficiaryBankServiceVersion=1; beneficiaryProvenance=TRANSACTION_CONTEXT"
       }
@@ -2186,7 +2164,7 @@
         "sheet": "TDD Cases",
         "row": 9,
         "mrgEvidence": "us3ma_20260717.pdf p.18; C4 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.21-22",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequencePresent=true; source for mandatory 57a missing; no cross-role/sequence fallback"
       }
@@ -2270,7 +2248,7 @@
         "sheet": "TDD Cases",
         "row": 10,
         "mrgEvidence": "us3ma_20260717.pdf p.18; C4 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.21-22",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=B2.53Z; allowed=A,J"
       },
@@ -2359,7 +2337,7 @@
         "sheet": "TDD Cases",
         "row": 11,
         "mrgEvidence": "us3ma_20260717.pdf p.18; C4 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.21-22",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=B2.53J; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -2510,7 +2488,7 @@
         "sheet": "TDD Cases",
         "row": 12,
         "mrgEvidence": "us3ma_20260717.pdf p.19; C4 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.21-22",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT; beneficiaryBankServiceId=BANK-SVC-BARCGB22; beneficiaryBankServiceVersion=1; beneficiaryProvenance=TRANSACTION_CONTEXT"
       }
@@ -2662,7 +2640,7 @@
         "sheet": "TDD Cases",
         "row": 13,
         "mrgEvidence": "us3ma_20260717.pdf p.19; C4 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.21-22",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "senderCorrespondentBankServiceId=BANK-SVC-CITIUS33; intermediaryBankServiceId=BANK-SVC-HSBCHKHH; receivingBankServiceId=BANK-SVC-DEUTDEFF; beneficiaryBankServiceId=BANK-SVC-BARCGB22; beneficiaryBankServiceVersion=1; beneficiaryProvenance=TRANSACTION_CONTEXT"
       }
@@ -2746,7 +2724,7 @@
         "sheet": "TDD Cases",
         "row": 14,
         "mrgEvidence": "us3ma_20260717.pdf p.19; C4 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.21-22",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequencePresent=true; source for mandatory 57a missing; no cross-role/sequence fallback"
       }
@@ -2830,7 +2808,7 @@
         "sheet": "TDD Cases",
         "row": 15,
         "mrgEvidence": "us3ma_20260717.pdf p.19; C4 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.21-22",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=D.53Z; allowed=A,D,J"
       },
@@ -2919,7 +2897,7 @@
         "sheet": "TDD Cases",
         "row": 16,
         "mrgEvidence": "us3ma_20260717.pdf p.19; C4 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.21-22",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=D.53D; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -3051,7 +3029,7 @@
         "sheet": "TDD Cases",
         "row": 17,
         "mrgEvidence": "us3ma_20260717.pdf p.124; C6 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.126-127",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT"
       }
@@ -3179,7 +3157,7 @@
         "sheet": "TDD Cases",
         "row": 18,
         "mrgEvidence": "us3ma_20260717.pdf p.124; C6 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.126-127",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "senderCorrespondentBankServiceId=BANK-SVC-CITIUS33; intermediaryBankServiceId=BANK-SVC-HSBCHKHH; receivingBankServiceId=BANK-SVC-DEUTDEFF"
       }
@@ -3263,7 +3241,7 @@
         "sheet": "TDD Cases",
         "row": 19,
         "mrgEvidence": "us3ma_20260717.pdf p.124; C6 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.126-127",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequencePresent=true; source for mandatory 53a missing; no cross-role/sequence fallback"
       }
@@ -3347,7 +3325,7 @@
         "sheet": "TDD Cases",
         "row": 20,
         "mrgEvidence": "us3ma_20260717.pdf p.124; C6 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.126-127",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=B1.53Z; allowed=A,J"
       },
@@ -3436,7 +3414,7 @@
         "sheet": "TDD Cases",
         "row": 21,
         "mrgEvidence": "us3ma_20260717.pdf p.124; C6 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.126-127",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=B1.53J; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -3587,7 +3565,7 @@
         "sheet": "TDD Cases",
         "row": 22,
         "mrgEvidence": "us3ma_20260717.pdf p.124; C6 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.126-127",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT; beneficiaryBankServiceId=BANK-SVC-BARCGB22; beneficiaryBankServiceVersion=1; beneficiaryProvenance=TRANSACTION_CONTEXT"
       }
@@ -3739,7 +3717,7 @@
         "sheet": "TDD Cases",
         "row": 23,
         "mrgEvidence": "us3ma_20260717.pdf p.124; C6 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.126-127",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "senderCorrespondentBankServiceId=BANK-SVC-CITIUS33; intermediaryBankServiceId=BANK-SVC-HSBCHKHH; receivingBankServiceId=BANK-SVC-DEUTDEFF; beneficiaryBankServiceId=BANK-SVC-BARCGB22; beneficiaryBankServiceVersion=1; beneficiaryProvenance=TRANSACTION_CONTEXT"
       }
@@ -3823,7 +3801,7 @@
         "sheet": "TDD Cases",
         "row": 24,
         "mrgEvidence": "us3ma_20260717.pdf p.124; C6 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.126-127",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequencePresent=true; source for mandatory 57a missing; no cross-role/sequence fallback"
       }
@@ -3907,7 +3885,7 @@
         "sheet": "TDD Cases",
         "row": 25,
         "mrgEvidence": "us3ma_20260717.pdf p.124; C6 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.126-127",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=B2.53Z; allowed=A,J"
       },
@@ -3996,7 +3974,7 @@
         "sheet": "TDD Cases",
         "row": 26,
         "mrgEvidence": "us3ma_20260717.pdf p.124; C6 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.126-127",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=B2.53J; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -4147,7 +4125,7 @@
         "sheet": "TDD Cases",
         "row": 27,
         "mrgEvidence": "us3ma_20260717.pdf p.125; us3ma_20260717.pdf p.126; C6 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.126-127",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT; beneficiaryBankServiceId=BANK-SVC-BARCGB22; beneficiaryBankServiceVersion=1; beneficiaryProvenance=TRANSACTION_CONTEXT"
       }
@@ -4299,7 +4277,7 @@
         "sheet": "TDD Cases",
         "row": 28,
         "mrgEvidence": "us3ma_20260717.pdf p.125; us3ma_20260717.pdf p.126; C6 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.126-127",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "senderCorrespondentBankServiceId=BANK-SVC-CITIUS33; intermediaryBankServiceId=BANK-SVC-HSBCHKHH; receivingBankServiceId=BANK-SVC-DEUTDEFF; beneficiaryBankServiceId=BANK-SVC-BARCGB22; beneficiaryBankServiceVersion=1; beneficiaryProvenance=TRANSACTION_CONTEXT"
       }
@@ -4383,7 +4361,7 @@
         "sheet": "TDD Cases",
         "row": 29,
         "mrgEvidence": "us3ma_20260717.pdf p.125; us3ma_20260717.pdf p.126; C6 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.126-127",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "no eligible SSI; all SSI-classified 5x roles in this sequence are optional"
       }
@@ -4467,7 +4445,7 @@
         "sheet": "TDD Cases",
         "row": 30,
         "mrgEvidence": "us3ma_20260717.pdf p.125; us3ma_20260717.pdf p.126; C6 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.126-127",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=E.53Z; allowed=A,D,J"
       },
@@ -4556,7 +4534,7 @@
         "sheet": "TDD Cases",
         "row": 31,
         "mrgEvidence": "us3ma_20260717.pdf p.125; us3ma_20260717.pdf p.126; C6 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.126-127",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=E.53D; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -4688,7 +4666,7 @@
         "sheet": "TDD Cases",
         "row": 32,
         "mrgEvidence": "us3ma_20260717.pdf p.195; C4 mandatory fields within an optional sequence/subsequence - us3ma_20260717.pdf p.197",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT"
       }
@@ -4816,7 +4794,7 @@
         "sheet": "TDD Cases",
         "row": 33,
         "mrgEvidence": "us3ma_20260717.pdf p.195; C4 mandatory fields within an optional sequence/subsequence - us3ma_20260717.pdf p.197",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "senderCorrespondentBankServiceId=BANK-SVC-CITIUS33; intermediaryBankServiceId=BANK-SVC-HSBCHKHH; receivingBankServiceId=BANK-SVC-DEUTDEFF"
       }
@@ -4900,7 +4878,7 @@
         "sheet": "TDD Cases",
         "row": 34,
         "mrgEvidence": "us3ma_20260717.pdf p.195; C4 mandatory fields within an optional sequence/subsequence - us3ma_20260717.pdf p.197",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequencePresent=true; source for mandatory 57a missing; no cross-role/sequence fallback"
       }
@@ -4984,7 +4962,7 @@
         "sheet": "TDD Cases",
         "row": 35,
         "mrgEvidence": "us3ma_20260717.pdf p.195; C4 mandatory fields within an optional sequence/subsequence - us3ma_20260717.pdf p.197",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=A.53Z; allowed=A,J"
       },
@@ -5073,7 +5051,7 @@
         "sheet": "TDD Cases",
         "row": 36,
         "mrgEvidence": "us3ma_20260717.pdf p.195; C4 mandatory fields within an optional sequence/subsequence - us3ma_20260717.pdf p.197",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=A.53J; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -5224,7 +5202,7 @@
         "sheet": "TDD Cases",
         "row": 37,
         "mrgEvidence": "us3ma_20260717.pdf p.262; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.269-270",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT; beneficiaryBankServiceId=BANK-SVC-BARCGB22; beneficiaryBankServiceVersion=1; beneficiaryProvenance=TRANSACTION_CONTEXT"
       }
@@ -5376,7 +5354,7 @@
         "sheet": "TDD Cases",
         "row": 38,
         "mrgEvidence": "us3ma_20260717.pdf p.262; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.269-270",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "senderCorrespondentBankServiceId=BANK-SVC-CITIUS33; intermediaryBankServiceId=BANK-SVC-HSBCHKHH; receivingBankServiceId=BANK-SVC-DEUTDEFF; beneficiaryBankServiceId=BANK-SVC-BARCGB22; beneficiaryBankServiceVersion=1; beneficiaryProvenance=TRANSACTION_CONTEXT"
       }
@@ -5460,7 +5438,7 @@
         "sheet": "TDD Cases",
         "row": 39,
         "mrgEvidence": "us3ma_20260717.pdf p.262; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.269-270",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequencePresent=true; source for mandatory 57a missing; no cross-role/sequence fallback"
       }
@@ -5544,7 +5522,7 @@
         "sheet": "TDD Cases",
         "row": 40,
         "mrgEvidence": "us3ma_20260717.pdf p.262; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.269-270",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=C.53Z; allowed=A,J"
       },
@@ -5633,7 +5611,7 @@
         "sheet": "TDD Cases",
         "row": 41,
         "mrgEvidence": "us3ma_20260717.pdf p.262; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.269-270",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=C.53J; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -5734,7 +5712,7 @@
         "sheet": "TDD Cases",
         "row": 42,
         "mrgEvidence": "us3ma_20260717.pdf p.262; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.269-270",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=C;86a present;56a absent"
       }
@@ -5880,7 +5858,7 @@
         "sheet": "TDD Cases",
         "row": 43,
         "mrgEvidence": "us3ma_20260717.pdf p.263; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.269-270",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT; beneficiaryBankServiceId=BANK-SVC-BARCGB22; beneficiaryBankServiceVersion=1; beneficiaryProvenance=TRANSACTION_CONTEXT"
       }
@@ -6032,7 +6010,7 @@
         "sheet": "TDD Cases",
         "row": 44,
         "mrgEvidence": "us3ma_20260717.pdf p.263; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.269-270",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "senderCorrespondentBankServiceId=BANK-SVC-CITIUS33; intermediaryBankServiceId=BANK-SVC-HSBCHKHH; receivingBankServiceId=BANK-SVC-DEUTDEFF; beneficiaryBankServiceId=BANK-SVC-BARCGB22; beneficiaryBankServiceVersion=1; beneficiaryProvenance=TRANSACTION_CONTEXT"
       }
@@ -6116,7 +6094,7 @@
         "sheet": "TDD Cases",
         "row": 45,
         "mrgEvidence": "us3ma_20260717.pdf p.263; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.269-270",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequencePresent=true; source for mandatory 57a missing; no cross-role/sequence fallback"
       }
@@ -6200,7 +6178,7 @@
         "sheet": "TDD Cases",
         "row": 46,
         "mrgEvidence": "us3ma_20260717.pdf p.263; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.269-270",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=E.53Z; allowed=A,J"
       },
@@ -6289,7 +6267,7 @@
         "sheet": "TDD Cases",
         "row": 47,
         "mrgEvidence": "us3ma_20260717.pdf p.263; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.269-270",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=E.53J; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -6390,7 +6368,7 @@
         "sheet": "TDD Cases",
         "row": 48,
         "mrgEvidence": "us3ma_20260717.pdf p.263; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.269-270",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=E;86a present;56a absent"
       }
@@ -6517,7 +6495,7 @@
         "sheet": "TDD Cases",
         "row": 49,
         "mrgEvidence": "us3ma_20260717.pdf p.267; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.269-270",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT"
       }
@@ -6645,7 +6623,7 @@
         "sheet": "TDD Cases",
         "row": 50,
         "mrgEvidence": "us3ma_20260717.pdf p.267; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.269-270",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "senderCorrespondentBankServiceId=BANK-SVC-CITIUS33; intermediaryBankServiceId=BANK-SVC-HSBCHKHH; receivingBankServiceId=BANK-SVC-DEUTDEFF"
       }
@@ -6729,7 +6707,7 @@
         "sheet": "TDD Cases",
         "row": 51,
         "mrgEvidence": "us3ma_20260717.pdf p.267; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.269-270",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequencePresent=true; source for mandatory 57a missing; no cross-role/sequence fallback"
       }
@@ -6813,7 +6791,7 @@
         "sheet": "TDD Cases",
         "row": 52,
         "mrgEvidence": "us3ma_20260717.pdf p.267; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.269-270",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=L.53Z; allowed=A,J"
       },
@@ -6902,7 +6880,7 @@
         "sheet": "TDD Cases",
         "row": 53,
         "mrgEvidence": "us3ma_20260717.pdf p.267; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.269-270",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=L.53J; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -7003,7 +6981,7 @@
         "sheet": "TDD Cases",
         "row": 54,
         "mrgEvidence": "us3ma_20260717.pdf p.267; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.269-270",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=L;86a present;56a absent"
       }
@@ -7149,7 +7127,7 @@
         "sheet": "TDD Cases",
         "row": 55,
         "mrgEvidence": "us3ma_20260717.pdf p.425; C7: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.428-430",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT; beneficiaryBankServiceId=BANK-SVC-BARCGB22; beneficiaryBankServiceVersion=1; beneficiaryProvenance=TRANSACTION_CONTEXT"
       }
@@ -7301,7 +7279,7 @@
         "sheet": "TDD Cases",
         "row": 56,
         "mrgEvidence": "us3ma_20260717.pdf p.425; C7: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.428-430",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "senderCorrespondentBankServiceId=BANK-SVC-CITIUS33; intermediaryBankServiceId=BANK-SVC-HSBCHKHH; receivingBankServiceId=BANK-SVC-DEUTDEFF; beneficiaryBankServiceId=BANK-SVC-BARCGB22; beneficiaryBankServiceVersion=1; beneficiaryProvenance=TRANSACTION_CONTEXT"
       }
@@ -7385,7 +7363,7 @@
         "sheet": "TDD Cases",
         "row": 57,
         "mrgEvidence": "us3ma_20260717.pdf p.425; C7: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.428-430",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequencePresent=true; source for mandatory 57a missing; no cross-role/sequence fallback"
       }
@@ -7469,7 +7447,7 @@
         "sheet": "TDD Cases",
         "row": 58,
         "mrgEvidence": "us3ma_20260717.pdf p.425; C7: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.428-430",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=C.53Z; allowed=A,D,J"
       },
@@ -7558,7 +7536,7 @@
         "sheet": "TDD Cases",
         "row": 59,
         "mrgEvidence": "us3ma_20260717.pdf p.425; C7: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.428-430",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=C.53D; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -7659,7 +7637,7 @@
         "sheet": "TDD Cases",
         "row": 60,
         "mrgEvidence": "us3ma_20260717.pdf p.425; C7: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.428-430",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=C;86a present;56a absent"
       }
@@ -7805,7 +7783,7 @@
         "sheet": "TDD Cases",
         "row": 61,
         "mrgEvidence": "us3ma_20260717.pdf p.426; C7: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.428-430",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT; beneficiaryBankServiceId=BANK-SVC-BARCGB22; beneficiaryBankServiceVersion=1; beneficiaryProvenance=TRANSACTION_CONTEXT"
       }
@@ -7957,7 +7935,7 @@
         "sheet": "TDD Cases",
         "row": 62,
         "mrgEvidence": "us3ma_20260717.pdf p.426; C7: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.428-430",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "senderCorrespondentBankServiceId=BANK-SVC-CITIUS33; intermediaryBankServiceId=BANK-SVC-HSBCHKHH; receivingBankServiceId=BANK-SVC-DEUTDEFF; beneficiaryBankServiceId=BANK-SVC-BARCGB22; beneficiaryBankServiceVersion=1; beneficiaryProvenance=TRANSACTION_CONTEXT"
       }
@@ -8041,7 +8019,7 @@
         "sheet": "TDD Cases",
         "row": 63,
         "mrgEvidence": "us3ma_20260717.pdf p.426; C7: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.428-430",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequencePresent=true; source for mandatory 57a missing; no cross-role/sequence fallback"
       }
@@ -8125,7 +8103,7 @@
         "sheet": "TDD Cases",
         "row": 64,
         "mrgEvidence": "us3ma_20260717.pdf p.426; C7: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.428-430",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=D.53Z; allowed=A,D,J"
       },
@@ -8214,7 +8192,7 @@
         "sheet": "TDD Cases",
         "row": 65,
         "mrgEvidence": "us3ma_20260717.pdf p.426; C7: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.428-430",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=D.53D; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -8315,7 +8293,7 @@
         "sheet": "TDD Cases",
         "row": 66,
         "mrgEvidence": "us3ma_20260717.pdf p.426; C7: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.428-430",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=D;86a present;56a absent"
       }
@@ -8461,7 +8439,7 @@
         "sheet": "TDD Cases",
         "row": 67,
         "mrgEvidence": "us3ma_20260717.pdf p.426; C7: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.428-430",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT; beneficiaryBankServiceId=BANK-SVC-BARCGB22; beneficiaryBankServiceVersion=1; beneficiaryProvenance=TRANSACTION_CONTEXT"
       }
@@ -8613,7 +8591,7 @@
         "sheet": "TDD Cases",
         "row": 68,
         "mrgEvidence": "us3ma_20260717.pdf p.426; C7: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.428-430",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "senderCorrespondentBankServiceId=BANK-SVC-CITIUS33; intermediaryBankServiceId=BANK-SVC-HSBCHKHH; receivingBankServiceId=BANK-SVC-DEUTDEFF; beneficiaryBankServiceId=BANK-SVC-BARCGB22; beneficiaryBankServiceVersion=1; beneficiaryProvenance=TRANSACTION_CONTEXT"
       }
@@ -8697,7 +8675,7 @@
         "sheet": "TDD Cases",
         "row": 69,
         "mrgEvidence": "us3ma_20260717.pdf p.426; C7: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.428-430",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequencePresent=true; source for mandatory 57a missing; no cross-role/sequence fallback"
       }
@@ -8781,7 +8759,7 @@
         "sheet": "TDD Cases",
         "row": 70,
         "mrgEvidence": "us3ma_20260717.pdf p.426; C7: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.428-430",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=E.53Z; allowed=A,D,J"
       },
@@ -8870,7 +8848,7 @@
         "sheet": "TDD Cases",
         "row": 71,
         "mrgEvidence": "us3ma_20260717.pdf p.426; C7: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.428-430",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=E.53D; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -8971,7 +8949,7 @@
         "sheet": "TDD Cases",
         "row": 72,
         "mrgEvidence": "us3ma_20260717.pdf p.426; C7: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.428-430",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=E;86a present;56a absent"
       }
@@ -9117,7 +9095,7 @@
         "sheet": "TDD Cases",
         "row": 73,
         "mrgEvidence": "us3ma_20260717.pdf p.426; C7: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.428-430",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT; beneficiaryBankServiceId=BANK-SVC-BARCGB22; beneficiaryBankServiceVersion=1; beneficiaryProvenance=TRANSACTION_CONTEXT"
       }
@@ -9269,7 +9247,7 @@
         "sheet": "TDD Cases",
         "row": 74,
         "mrgEvidence": "us3ma_20260717.pdf p.426; C7: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.428-430",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "senderCorrespondentBankServiceId=BANK-SVC-CITIUS33; intermediaryBankServiceId=BANK-SVC-HSBCHKHH; receivingBankServiceId=BANK-SVC-DEUTDEFF; beneficiaryBankServiceId=BANK-SVC-BARCGB22; beneficiaryBankServiceVersion=1; beneficiaryProvenance=TRANSACTION_CONTEXT"
       }
@@ -9353,7 +9331,7 @@
         "sheet": "TDD Cases",
         "row": 75,
         "mrgEvidence": "us3ma_20260717.pdf p.426; C7: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.428-430",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequencePresent=true; source for mandatory 57a missing; no cross-role/sequence fallback"
       }
@@ -9437,7 +9415,7 @@
         "sheet": "TDD Cases",
         "row": 76,
         "mrgEvidence": "us3ma_20260717.pdf p.426; C7: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.428-430",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=F.53Z; allowed=A,D,J"
       },
@@ -9526,7 +9504,7 @@
         "sheet": "TDD Cases",
         "row": 77,
         "mrgEvidence": "us3ma_20260717.pdf p.426; C7: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.428-430",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=F.53D; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -9627,7 +9605,7 @@
         "sheet": "TDD Cases",
         "row": 78,
         "mrgEvidence": "us3ma_20260717.pdf p.426; C7: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.428-430",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=F;86a present;56a absent"
       }
@@ -9754,7 +9732,7 @@
         "sheet": "TDD Cases",
         "row": 79,
         "mrgEvidence": "us3ma_20260717.pdf p.428; C7: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.428-430",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT"
       }
@@ -9882,7 +9860,7 @@
         "sheet": "TDD Cases",
         "row": 80,
         "mrgEvidence": "us3ma_20260717.pdf p.428; C7: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.428-430",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "senderCorrespondentBankServiceId=BANK-SVC-CITIUS33; intermediaryBankServiceId=BANK-SVC-HSBCHKHH; receivingBankServiceId=BANK-SVC-DEUTDEFF"
       }
@@ -9966,7 +9944,7 @@
         "sheet": "TDD Cases",
         "row": 81,
         "mrgEvidence": "us3ma_20260717.pdf p.428; C7: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.428-430",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequencePresent=true; source for mandatory 57a missing; no cross-role/sequence fallback"
       }
@@ -10050,7 +10028,7 @@
         "sheet": "TDD Cases",
         "row": 82,
         "mrgEvidence": "us3ma_20260717.pdf p.428; C7: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.428-430",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=I.53Z; allowed=A,D,J"
       },
@@ -10139,7 +10117,7 @@
         "sheet": "TDD Cases",
         "row": 83,
         "mrgEvidence": "us3ma_20260717.pdf p.428; C7: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.428-430",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=I.53D; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -10240,7 +10218,7 @@
         "sheet": "TDD Cases",
         "row": 84,
         "mrgEvidence": "us3ma_20260717.pdf p.428; C7: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.428-430",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=I;86a present;56a absent"
       }
@@ -10386,7 +10364,7 @@
         "sheet": "TDD Cases",
         "row": 85,
         "mrgEvidence": "us3ma_20260717.pdf p.558; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.560-562",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT; beneficiaryBankServiceId=BANK-SVC-BARCGB22; beneficiaryBankServiceVersion=1; beneficiaryProvenance=TRANSACTION_CONTEXT"
       }
@@ -10538,7 +10516,7 @@
         "sheet": "TDD Cases",
         "row": 86,
         "mrgEvidence": "us3ma_20260717.pdf p.558; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.560-562",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "senderCorrespondentBankServiceId=BANK-SVC-CITIUS33; intermediaryBankServiceId=BANK-SVC-HSBCHKHH; receivingBankServiceId=BANK-SVC-DEUTDEFF; beneficiaryBankServiceId=BANK-SVC-BARCGB22; beneficiaryBankServiceVersion=1; beneficiaryProvenance=TRANSACTION_CONTEXT"
       }
@@ -10622,7 +10600,7 @@
         "sheet": "TDD Cases",
         "row": 87,
         "mrgEvidence": "us3ma_20260717.pdf p.558; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.560-562",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequencePresent=true; source for mandatory 57a missing; no cross-role/sequence fallback"
       }
@@ -10706,7 +10684,7 @@
         "sheet": "TDD Cases",
         "row": 88,
         "mrgEvidence": "us3ma_20260717.pdf p.558; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.560-562",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=C.53Z; allowed=A,D,J"
       },
@@ -10795,7 +10773,7 @@
         "sheet": "TDD Cases",
         "row": 89,
         "mrgEvidence": "us3ma_20260717.pdf p.558; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.560-562",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=C.53D; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -10896,7 +10874,7 @@
         "sheet": "TDD Cases",
         "row": 90,
         "mrgEvidence": "us3ma_20260717.pdf p.558; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.560-562",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=C;86a present;56a absent"
       }
@@ -11042,7 +11020,7 @@
         "sheet": "TDD Cases",
         "row": 91,
         "mrgEvidence": "us3ma_20260717.pdf p.558; us3ma_20260717.pdf p.559; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.560-562",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT; beneficiaryBankServiceId=BANK-SVC-BARCGB22; beneficiaryBankServiceVersion=1; beneficiaryProvenance=TRANSACTION_CONTEXT"
       }
@@ -11194,7 +11172,7 @@
         "sheet": "TDD Cases",
         "row": 92,
         "mrgEvidence": "us3ma_20260717.pdf p.558; us3ma_20260717.pdf p.559; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.560-562",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "senderCorrespondentBankServiceId=BANK-SVC-CITIUS33; intermediaryBankServiceId=BANK-SVC-HSBCHKHH; receivingBankServiceId=BANK-SVC-DEUTDEFF; beneficiaryBankServiceId=BANK-SVC-BARCGB22; beneficiaryBankServiceVersion=1; beneficiaryProvenance=TRANSACTION_CONTEXT"
       }
@@ -11278,7 +11256,7 @@
         "sheet": "TDD Cases",
         "row": 93,
         "mrgEvidence": "us3ma_20260717.pdf p.558; us3ma_20260717.pdf p.559; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.560-562",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequencePresent=true; source for mandatory 57a missing; no cross-role/sequence fallback"
       }
@@ -11362,7 +11340,7 @@
         "sheet": "TDD Cases",
         "row": 94,
         "mrgEvidence": "us3ma_20260717.pdf p.558; us3ma_20260717.pdf p.559; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.560-562",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=D.53Z; allowed=A,D,J"
       },
@@ -11451,7 +11429,7 @@
         "sheet": "TDD Cases",
         "row": 95,
         "mrgEvidence": "us3ma_20260717.pdf p.558; us3ma_20260717.pdf p.559; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.560-562",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=D.53D; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -11552,7 +11530,7 @@
         "sheet": "TDD Cases",
         "row": 96,
         "mrgEvidence": "us3ma_20260717.pdf p.558; us3ma_20260717.pdf p.559; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.560-562",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=D;86a present;56a absent"
       }
@@ -11698,7 +11676,7 @@
         "sheet": "TDD Cases",
         "row": 97,
         "mrgEvidence": "us3ma_20260717.pdf p.559; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.560-562",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT; beneficiaryBankServiceId=BANK-SVC-BARCGB22; beneficiaryBankServiceVersion=1; beneficiaryProvenance=TRANSACTION_CONTEXT"
       }
@@ -11850,7 +11828,7 @@
         "sheet": "TDD Cases",
         "row": 98,
         "mrgEvidence": "us3ma_20260717.pdf p.559; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.560-562",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "senderCorrespondentBankServiceId=BANK-SVC-CITIUS33; intermediaryBankServiceId=BANK-SVC-HSBCHKHH; receivingBankServiceId=BANK-SVC-DEUTDEFF; beneficiaryBankServiceId=BANK-SVC-BARCGB22; beneficiaryBankServiceVersion=1; beneficiaryProvenance=TRANSACTION_CONTEXT"
       }
@@ -11934,7 +11912,7 @@
         "sheet": "TDD Cases",
         "row": 99,
         "mrgEvidence": "us3ma_20260717.pdf p.559; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.560-562",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequencePresent=true; source for mandatory 57a missing; no cross-role/sequence fallback"
       }
@@ -12018,7 +11996,7 @@
         "sheet": "TDD Cases",
         "row": 100,
         "mrgEvidence": "us3ma_20260717.pdf p.559; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.560-562",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=E.53Z; allowed=A,D,J"
       },
@@ -12107,7 +12085,7 @@
         "sheet": "TDD Cases",
         "row": 101,
         "mrgEvidence": "us3ma_20260717.pdf p.559; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.560-562",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=E.53D; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -12208,7 +12186,7 @@
         "sheet": "TDD Cases",
         "row": 102,
         "mrgEvidence": "us3ma_20260717.pdf p.559; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.560-562",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=E;86a present;56a absent"
       }
@@ -12354,7 +12332,7 @@
         "sheet": "TDD Cases",
         "row": 103,
         "mrgEvidence": "us3ma_20260717.pdf p.559; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.560-562",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT; beneficiaryBankServiceId=BANK-SVC-BARCGB22; beneficiaryBankServiceVersion=1; beneficiaryProvenance=TRANSACTION_CONTEXT"
       }
@@ -12506,7 +12484,7 @@
         "sheet": "TDD Cases",
         "row": 104,
         "mrgEvidence": "us3ma_20260717.pdf p.559; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.560-562",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "senderCorrespondentBankServiceId=BANK-SVC-CITIUS33; intermediaryBankServiceId=BANK-SVC-HSBCHKHH; receivingBankServiceId=BANK-SVC-DEUTDEFF; beneficiaryBankServiceId=BANK-SVC-BARCGB22; beneficiaryBankServiceVersion=1; beneficiaryProvenance=TRANSACTION_CONTEXT"
       }
@@ -12590,7 +12568,7 @@
         "sheet": "TDD Cases",
         "row": 105,
         "mrgEvidence": "us3ma_20260717.pdf p.559; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.560-562",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequencePresent=true; source for mandatory 57a missing; no cross-role/sequence fallback"
       }
@@ -12674,7 +12652,7 @@
         "sheet": "TDD Cases",
         "row": 106,
         "mrgEvidence": "us3ma_20260717.pdf p.559; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.560-562",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=F.53Z; allowed=A,D,J"
       },
@@ -12763,7 +12741,7 @@
         "sheet": "TDD Cases",
         "row": 107,
         "mrgEvidence": "us3ma_20260717.pdf p.559; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.560-562",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=F.53D; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -12864,7 +12842,7 @@
         "sheet": "TDD Cases",
         "row": 108,
         "mrgEvidence": "us3ma_20260717.pdf p.559; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.560-562",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=F;86a present;56a absent"
       }
@@ -13010,7 +12988,7 @@
         "sheet": "TDD Cases",
         "row": 109,
         "mrgEvidence": "us3ma_20260717.pdf p.640; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.642-645",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT; beneficiaryBankServiceId=BANK-SVC-BARCGB22; beneficiaryBankServiceVersion=1; beneficiaryProvenance=TRANSACTION_CONTEXT"
       }
@@ -13162,7 +13140,7 @@
         "sheet": "TDD Cases",
         "row": 110,
         "mrgEvidence": "us3ma_20260717.pdf p.640; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.642-645",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "senderCorrespondentBankServiceId=BANK-SVC-CITIUS33; intermediaryBankServiceId=BANK-SVC-HSBCHKHH; receivingBankServiceId=BANK-SVC-DEUTDEFF; beneficiaryBankServiceId=BANK-SVC-BARCGB22; beneficiaryBankServiceVersion=1; beneficiaryProvenance=TRANSACTION_CONTEXT"
       }
@@ -13246,7 +13224,7 @@
         "sheet": "TDD Cases",
         "row": 111,
         "mrgEvidence": "us3ma_20260717.pdf p.640; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.642-645",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequencePresent=true; source for mandatory 57a missing; no cross-role/sequence fallback"
       }
@@ -13330,7 +13308,7 @@
         "sheet": "TDD Cases",
         "row": 112,
         "mrgEvidence": "us3ma_20260717.pdf p.640; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.642-645",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=C.53Z; allowed=A,D,J"
       },
@@ -13419,7 +13397,7 @@
         "sheet": "TDD Cases",
         "row": 113,
         "mrgEvidence": "us3ma_20260717.pdf p.640; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.642-645",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=C.53D; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -13520,7 +13498,7 @@
         "sheet": "TDD Cases",
         "row": 114,
         "mrgEvidence": "us3ma_20260717.pdf p.640; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.642-645",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=C;86a present;56a absent"
       }
@@ -13666,7 +13644,7 @@
         "sheet": "TDD Cases",
         "row": 115,
         "mrgEvidence": "us3ma_20260717.pdf p.640; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.642-645",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT; beneficiaryBankServiceId=BANK-SVC-BARCGB22; beneficiaryBankServiceVersion=1; beneficiaryProvenance=TRANSACTION_CONTEXT"
       }
@@ -13818,7 +13796,7 @@
         "sheet": "TDD Cases",
         "row": 116,
         "mrgEvidence": "us3ma_20260717.pdf p.640; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.642-645",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "senderCorrespondentBankServiceId=BANK-SVC-CITIUS33; intermediaryBankServiceId=BANK-SVC-HSBCHKHH; receivingBankServiceId=BANK-SVC-DEUTDEFF; beneficiaryBankServiceId=BANK-SVC-BARCGB22; beneficiaryBankServiceVersion=1; beneficiaryProvenance=TRANSACTION_CONTEXT"
       }
@@ -13902,7 +13880,7 @@
         "sheet": "TDD Cases",
         "row": 117,
         "mrgEvidence": "us3ma_20260717.pdf p.640; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.642-645",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequencePresent=true; source for mandatory 57a missing; no cross-role/sequence fallback"
       }
@@ -13986,7 +13964,7 @@
         "sheet": "TDD Cases",
         "row": 118,
         "mrgEvidence": "us3ma_20260717.pdf p.640; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.642-645",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=D.53Z; allowed=A,D,J"
       },
@@ -14075,7 +14053,7 @@
         "sheet": "TDD Cases",
         "row": 119,
         "mrgEvidence": "us3ma_20260717.pdf p.640; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.642-645",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=D.53D; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -14176,7 +14154,7 @@
         "sheet": "TDD Cases",
         "row": 120,
         "mrgEvidence": "us3ma_20260717.pdf p.640; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.642-645",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=D;86a present;56a absent"
       }
@@ -14303,7 +14281,7 @@
         "sheet": "TDD Cases",
         "row": 121,
         "mrgEvidence": "us3ma_20260717.pdf p.641; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.642-645",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT"
       }
@@ -14431,7 +14409,7 @@
         "sheet": "TDD Cases",
         "row": 122,
         "mrgEvidence": "us3ma_20260717.pdf p.641; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.642-645",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "senderCorrespondentBankServiceId=BANK-SVC-CITIUS33; intermediaryBankServiceId=BANK-SVC-HSBCHKHH; receivingBankServiceId=BANK-SVC-DEUTDEFF"
       }
@@ -14515,7 +14493,7 @@
         "sheet": "TDD Cases",
         "row": 123,
         "mrgEvidence": "us3ma_20260717.pdf p.641; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.642-645",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequencePresent=true; source for mandatory 57a missing; no cross-role/sequence fallback"
       }
@@ -14599,7 +14577,7 @@
         "sheet": "TDD Cases",
         "row": 124,
         "mrgEvidence": "us3ma_20260717.pdf p.641; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.642-645",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=F.53Z; allowed=A,D,J"
       },
@@ -14688,7 +14666,7 @@
         "sheet": "TDD Cases",
         "row": 125,
         "mrgEvidence": "us3ma_20260717.pdf p.641; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.642-645",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=F.53D; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -14789,7 +14767,7 @@
         "sheet": "TDD Cases",
         "row": 126,
         "mrgEvidence": "us3ma_20260717.pdf p.641; C8: 86a requires 56a in same sequence (E35) - us3ma_20260717.pdf pp.642-645",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=F;86a present;56a absent"
       }
@@ -14935,7 +14913,7 @@
         "sheet": "TDD Cases",
         "row": 127,
         "mrgEvidence": "us3ma_20260717.pdf p.722; C2: 86a requires 56a in sequence C (E35) - us3ma_20260717.pdf p.724",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT; beneficiaryBankServiceId=BANK-SVC-BARCGB22; beneficiaryBankServiceVersion=1; beneficiaryProvenance=TRANSACTION_CONTEXT"
       }
@@ -15087,7 +15065,7 @@
         "sheet": "TDD Cases",
         "row": 128,
         "mrgEvidence": "us3ma_20260717.pdf p.722; C2: 86a requires 56a in sequence C (E35) - us3ma_20260717.pdf p.724",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "senderCorrespondentBankServiceId=BANK-SVC-CITIUS33; intermediaryBankServiceId=BANK-SVC-HSBCHKHH; receivingBankServiceId=BANK-SVC-DEUTDEFF; beneficiaryBankServiceId=BANK-SVC-BARCGB22; beneficiaryBankServiceVersion=1; beneficiaryProvenance=TRANSACTION_CONTEXT"
       }
@@ -15171,7 +15149,7 @@
         "sheet": "TDD Cases",
         "row": 129,
         "mrgEvidence": "us3ma_20260717.pdf p.722; C2: 86a requires 56a in sequence C (E35) - us3ma_20260717.pdf p.724",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequencePresent=true; source for mandatory 57a missing; no cross-role/sequence fallback"
       }
@@ -15255,7 +15233,7 @@
         "sheet": "TDD Cases",
         "row": 130,
         "mrgEvidence": "us3ma_20260717.pdf p.722; C2: 86a requires 56a in sequence C (E35) - us3ma_20260717.pdf p.724",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=C.53Z; allowed=A,D,J"
       },
@@ -15344,7 +15322,7 @@
         "sheet": "TDD Cases",
         "row": 131,
         "mrgEvidence": "us3ma_20260717.pdf p.722; C2: 86a requires 56a in sequence C (E35) - us3ma_20260717.pdf p.724",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=C.53D; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -15445,7 +15423,7 @@
         "sheet": "TDD Cases",
         "row": 132,
         "mrgEvidence": "us3ma_20260717.pdf p.722; C2: 86a requires 56a in sequence C (E35) - us3ma_20260717.pdf p.724",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=C;86a present;56a absent"
       }
@@ -15591,7 +15569,7 @@
         "sheet": "TDD Cases",
         "row": 133,
         "mrgEvidence": "us3mb_20260717.pdf p.17; C3: 86a requires 56a in sequence C (E35) - us3mb_20260717.pdf pp.17-18",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT; beneficiaryBankServiceId=BANK-SVC-BARCGB22; beneficiaryBankServiceVersion=1; beneficiaryProvenance=TRANSACTION_CONTEXT"
       }
@@ -15743,7 +15721,7 @@
         "sheet": "TDD Cases",
         "row": 134,
         "mrgEvidence": "us3mb_20260717.pdf p.17; C3: 86a requires 56a in sequence C (E35) - us3mb_20260717.pdf pp.17-18",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "senderCorrespondentBankServiceId=BANK-SVC-CITIUS33; intermediaryBankServiceId=BANK-SVC-HSBCHKHH; receivingBankServiceId=BANK-SVC-DEUTDEFF; beneficiaryBankServiceId=BANK-SVC-BARCGB22; beneficiaryBankServiceVersion=1; beneficiaryProvenance=TRANSACTION_CONTEXT"
       }
@@ -15827,7 +15805,7 @@
         "sheet": "TDD Cases",
         "row": 135,
         "mrgEvidence": "us3mb_20260717.pdf p.17; C3: 86a requires 56a in sequence C (E35) - us3mb_20260717.pdf pp.17-18",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequencePresent=true; source for mandatory 57a missing; no cross-role/sequence fallback"
       }
@@ -15911,7 +15889,7 @@
         "sheet": "TDD Cases",
         "row": 136,
         "mrgEvidence": "us3mb_20260717.pdf p.17; C3: 86a requires 56a in sequence C (E35) - us3mb_20260717.pdf pp.17-18",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=C.53Z; allowed=A,D,J"
       },
@@ -16000,7 +15978,7 @@
         "sheet": "TDD Cases",
         "row": 137,
         "mrgEvidence": "us3mb_20260717.pdf p.17; C3: 86a requires 56a in sequence C (E35) - us3mb_20260717.pdf pp.17-18",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=C.53D; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -16101,7 +16079,7 @@
         "sheet": "TDD Cases",
         "row": 138,
         "mrgEvidence": "us3mb_20260717.pdf p.17; C3: 86a requires 56a in sequence C (E35) - us3mb_20260717.pdf pp.17-18",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=C;86a present;56a absent"
       }
@@ -16228,7 +16206,7 @@
         "sheet": "TDD Cases",
         "row": 139,
         "mrgEvidence": "us3mb_20260717.pdf p.51; C13: 53a/56a require 57a in L/M; C14: 86a requires 56a - us3mb_20260717.pdf pp.57-59",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT"
       }
@@ -16356,7 +16334,7 @@
         "sheet": "TDD Cases",
         "row": 140,
         "mrgEvidence": "us3mb_20260717.pdf p.51; C13: 53a/56a require 57a in L/M; C14: 86a requires 56a - us3mb_20260717.pdf pp.57-59",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "senderCorrespondentBankServiceId=BANK-SVC-CITIUS33; intermediaryBankServiceId=BANK-SVC-HSBCHKHH; receivingBankServiceId=BANK-SVC-DEUTDEFF"
       }
@@ -16440,7 +16418,7 @@
         "sheet": "TDD Cases",
         "row": 141,
         "mrgEvidence": "us3mb_20260717.pdf p.51; C13: 53a/56a require 57a in L/M; C14: 86a requires 56a - us3mb_20260717.pdf pp.57-59",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequencePresent=true; source for mandatory 57a missing; no cross-role/sequence fallback"
       }
@@ -16524,7 +16502,7 @@
         "sheet": "TDD Cases",
         "row": 142,
         "mrgEvidence": "us3mb_20260717.pdf p.51; C13: 53a/56a require 57a in L/M; C14: 86a requires 56a - us3mb_20260717.pdf pp.57-59",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=D.53Z; allowed=A,D,J"
       },
@@ -16613,7 +16591,7 @@
         "sheet": "TDD Cases",
         "row": 143,
         "mrgEvidence": "us3mb_20260717.pdf p.51; C13: 53a/56a require 57a in L/M; C14: 86a requires 56a - us3mb_20260717.pdf pp.57-59",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=D.53D; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -16714,7 +16692,7 @@
         "sheet": "TDD Cases",
         "row": 144,
         "mrgEvidence": "us3mb_20260717.pdf p.51; C13: 53a/56a require 57a in L/M; C14: 86a requires 56a - us3mb_20260717.pdf pp.57-59",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=D;86a present;56a absent"
       }
@@ -16798,7 +16776,7 @@
         "sheet": "TDD Cases",
         "row": 145,
         "mrgEvidence": "us3mb_20260717.pdf Format table p.51; MT360 D mandatory 57a Field detail No.60 p.113",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=D;57a absent;mandatory receiving agent unresolved"
       }
@@ -16925,7 +16903,7 @@
         "sheet": "TDD Cases",
         "row": 146,
         "mrgEvidence": "us3mb_20260717.pdf p.53; C13: 53a/56a require 57a in L/M; C14: 86a requires 56a - us3mb_20260717.pdf pp.57-59",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT"
       }
@@ -17053,7 +17031,7 @@
         "sheet": "TDD Cases",
         "row": 147,
         "mrgEvidence": "us3mb_20260717.pdf p.53; C13: 53a/56a require 57a in L/M; C14: 86a requires 56a - us3mb_20260717.pdf pp.57-59",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "senderCorrespondentBankServiceId=BANK-SVC-CITIUS33; intermediaryBankServiceId=BANK-SVC-HSBCHKHH; receivingBankServiceId=BANK-SVC-DEUTDEFF"
       }
@@ -17137,7 +17115,7 @@
         "sheet": "TDD Cases",
         "row": 148,
         "mrgEvidence": "us3mb_20260717.pdf p.53; C13: 53a/56a require 57a in L/M; C14: 86a requires 56a - us3mb_20260717.pdf pp.57-59",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequencePresent=true; source for mandatory 57a missing; no cross-role/sequence fallback"
       }
@@ -17221,7 +17199,7 @@
         "sheet": "TDD Cases",
         "row": 149,
         "mrgEvidence": "us3mb_20260717.pdf p.53; C13: 53a/56a require 57a in L/M; C14: 86a requires 56a - us3mb_20260717.pdf pp.57-59",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=G.53Z; allowed=A,D,J"
       },
@@ -17310,7 +17288,7 @@
         "sheet": "TDD Cases",
         "row": 150,
         "mrgEvidence": "us3mb_20260717.pdf p.53; C13: 53a/56a require 57a in L/M; C14: 86a requires 56a - us3mb_20260717.pdf pp.57-59",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=G.53D; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -17411,7 +17389,7 @@
         "sheet": "TDD Cases",
         "row": 151,
         "mrgEvidence": "us3mb_20260717.pdf p.53; C13: 53a/56a require 57a in L/M; C14: 86a requires 56a - us3mb_20260717.pdf pp.57-59",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=G;86a present;56a absent"
       }
@@ -17495,7 +17473,7 @@
         "sheet": "TDD Cases",
         "row": 152,
         "mrgEvidence": "us3mb_20260717.pdf Format table p.53; MT360 G mandatory 57a Field detail No.97 p.142",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=G;57a absent;mandatory receiving agent unresolved"
       }
@@ -17622,7 +17600,7 @@
         "sheet": "TDD Cases",
         "row": 153,
         "mrgEvidence": "us3mb_20260717.pdf p.54; C13: 53a/56a require 57a in L/M; C14: 86a requires 56a - us3mb_20260717.pdf pp.57-59",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT"
       }
@@ -17750,7 +17728,7 @@
         "sheet": "TDD Cases",
         "row": 154,
         "mrgEvidence": "us3mb_20260717.pdf p.54; C13: 53a/56a require 57a in L/M; C14: 86a requires 56a - us3mb_20260717.pdf pp.57-59",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "senderCorrespondentBankServiceId=BANK-SVC-CITIUS33; intermediaryBankServiceId=BANK-SVC-HSBCHKHH; receivingBankServiceId=BANK-SVC-DEUTDEFF"
       }
@@ -17834,7 +17812,7 @@
         "sheet": "TDD Cases",
         "row": 155,
         "mrgEvidence": "us3mb_20260717.pdf p.54; C13: 53a/56a require 57a in L/M; C14: 86a requires 56a - us3mb_20260717.pdf pp.57-59",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "no eligible SSI; all SSI-classified 5x roles in this sequence are optional"
       }
@@ -17918,7 +17896,7 @@
         "sheet": "TDD Cases",
         "row": 156,
         "mrgEvidence": "us3mb_20260717.pdf p.54; C13: 53a/56a require 57a in L/M; C14: 86a requires 56a - us3mb_20260717.pdf pp.57-59",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=L.53Z; allowed=A,D,J"
       },
@@ -18007,7 +17985,7 @@
         "sheet": "TDD Cases",
         "row": 157,
         "mrgEvidence": "us3mb_20260717.pdf p.54; C13: 53a/56a require 57a in L/M; C14: 86a requires 56a - us3mb_20260717.pdf pp.57-59",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=L.53D; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -18108,7 +18086,7 @@
         "sheet": "TDD Cases",
         "row": 158,
         "mrgEvidence": "us3mb_20260717.pdf p.54; C13: 53a/56a require 57a in L/M; C14: 86a requires 56a - us3mb_20260717.pdf pp.57-59",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=L;86a present;56a absent"
       }
@@ -18146,10 +18124,7 @@
           "dataType": "FIN_TAG",
           "value": "53A",
           "required": true,
-          "allowedValues": [
-            "53A",
-            "56A"
-          ]
+          "allowedValues": ["53A", "56A"]
         },
         {
           "key": "tag.57A.present",
@@ -18208,7 +18183,7 @@
         "sheet": "TDD Cases",
         "row": 159,
         "mrgEvidence": "us3mb_20260717.pdf p.54; C13: 53a/56a require 57a in L/M; C14: 86a requires 56a - us3mb_20260717.pdf pp.57-59",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=L;53a/56a present;57a absent"
       }
@@ -18335,7 +18310,7 @@
         "sheet": "TDD Cases",
         "row": 160,
         "mrgEvidence": "us3mb_20260717.pdf p.55; C13: 53a/56a require 57a in L/M; C14: 86a requires 56a - us3mb_20260717.pdf pp.57-59",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT"
       }
@@ -18463,7 +18438,7 @@
         "sheet": "TDD Cases",
         "row": 161,
         "mrgEvidence": "us3mb_20260717.pdf p.55; C13: 53a/56a require 57a in L/M; C14: 86a requires 56a - us3mb_20260717.pdf pp.57-59",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "senderCorrespondentBankServiceId=BANK-SVC-CITIUS33; intermediaryBankServiceId=BANK-SVC-HSBCHKHH; receivingBankServiceId=BANK-SVC-DEUTDEFF"
       }
@@ -18547,7 +18522,7 @@
         "sheet": "TDD Cases",
         "row": 162,
         "mrgEvidence": "us3mb_20260717.pdf p.55; C13: 53a/56a require 57a in L/M; C14: 86a requires 56a - us3mb_20260717.pdf pp.57-59",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "no eligible SSI; all SSI-classified 5x roles in this sequence are optional"
       }
@@ -18631,7 +18606,7 @@
         "sheet": "TDD Cases",
         "row": 163,
         "mrgEvidence": "us3mb_20260717.pdf p.55; C13: 53a/56a require 57a in L/M; C14: 86a requires 56a - us3mb_20260717.pdf pp.57-59",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=M.53Z; allowed=A,D,J"
       },
@@ -18720,7 +18695,7 @@
         "sheet": "TDD Cases",
         "row": 164,
         "mrgEvidence": "us3mb_20260717.pdf p.55; C13: 53a/56a require 57a in L/M; C14: 86a requires 56a - us3mb_20260717.pdf pp.57-59",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=M.53D; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -18821,7 +18796,7 @@
         "sheet": "TDD Cases",
         "row": 165,
         "mrgEvidence": "us3mb_20260717.pdf p.55; C13: 53a/56a require 57a in L/M; C14: 86a requires 56a - us3mb_20260717.pdf pp.57-59",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=M;86a present;56a absent"
       }
@@ -18859,10 +18834,7 @@
           "dataType": "FIN_TAG",
           "value": "53A",
           "required": true,
-          "allowedValues": [
-            "53A",
-            "56A"
-          ]
+          "allowedValues": ["53A", "56A"]
         },
         {
           "key": "tag.57A.present",
@@ -18921,7 +18893,7 @@
         "sheet": "TDD Cases",
         "row": 166,
         "mrgEvidence": "us3mb_20260717.pdf p.55; C13: 53a/56a require 57a in L/M; C14: 86a requires 56a - us3mb_20260717.pdf pp.57-59",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=M;53a/56a present;57a absent"
       }
@@ -19048,7 +19020,7 @@
         "sheet": "TDD Cases",
         "row": 167,
         "mrgEvidence": "us3mb_20260717.pdf p.210; C13: 53a/56a require 57a in M/N; C14: 86a requires 56a - us3mb_20260717.pdf pp.217-220",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT"
       }
@@ -19176,7 +19148,7 @@
         "sheet": "TDD Cases",
         "row": 168,
         "mrgEvidence": "us3mb_20260717.pdf p.210; C13: 53a/56a require 57a in M/N; C14: 86a requires 56a - us3mb_20260717.pdf pp.217-220",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "senderCorrespondentBankServiceId=BANK-SVC-CITIUS33; intermediaryBankServiceId=BANK-SVC-HSBCHKHH; receivingBankServiceId=BANK-SVC-DEUTDEFF"
       }
@@ -19260,7 +19232,7 @@
         "sheet": "TDD Cases",
         "row": 169,
         "mrgEvidence": "us3mb_20260717.pdf p.210; C13: 53a/56a require 57a in M/N; C14: 86a requires 56a - us3mb_20260717.pdf pp.217-220",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequencePresent=true; source for mandatory 57a missing; no cross-role/sequence fallback"
       }
@@ -19344,7 +19316,7 @@
         "sheet": "TDD Cases",
         "row": 170,
         "mrgEvidence": "us3mb_20260717.pdf p.210; C13: 53a/56a require 57a in M/N; C14: 86a requires 56a - us3mb_20260717.pdf pp.217-220",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=D.53Z; allowed=A,D,J"
       },
@@ -19433,7 +19405,7 @@
         "sheet": "TDD Cases",
         "row": 171,
         "mrgEvidence": "us3mb_20260717.pdf p.210; C13: 53a/56a require 57a in M/N; C14: 86a requires 56a - us3mb_20260717.pdf pp.217-220",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=D.53D; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -19534,7 +19506,7 @@
         "sheet": "TDD Cases",
         "row": 172,
         "mrgEvidence": "us3mb_20260717.pdf p.210; C13: 53a/56a require 57a in M/N; C14: 86a requires 56a - us3mb_20260717.pdf pp.217-220",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=D;86a present;56a absent"
       }
@@ -19618,7 +19590,7 @@
         "sheet": "TDD Cases",
         "row": 173,
         "mrgEvidence": "us3mb_20260717.pdf Format table p.210; MT361 D mandatory 57a Field detail No.61 p.274",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=D;57a absent;mandatory receiving agent unresolved"
       }
@@ -19745,7 +19717,7 @@
         "sheet": "TDD Cases",
         "row": 174,
         "mrgEvidence": "us3mb_20260717.pdf p.212; C13: 53a/56a require 57a in M/N; C14: 86a requires 56a - us3mb_20260717.pdf pp.217-220",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT"
       }
@@ -19873,7 +19845,7 @@
         "sheet": "TDD Cases",
         "row": 175,
         "mrgEvidence": "us3mb_20260717.pdf p.212; C13: 53a/56a require 57a in M/N; C14: 86a requires 56a - us3mb_20260717.pdf pp.217-220",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "senderCorrespondentBankServiceId=BANK-SVC-CITIUS33; intermediaryBankServiceId=BANK-SVC-HSBCHKHH; receivingBankServiceId=BANK-SVC-DEUTDEFF"
       }
@@ -19957,7 +19929,7 @@
         "sheet": "TDD Cases",
         "row": 176,
         "mrgEvidence": "us3mb_20260717.pdf p.212; C13: 53a/56a require 57a in M/N; C14: 86a requires 56a - us3mb_20260717.pdf pp.217-220",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequencePresent=true; source for mandatory 57a missing; no cross-role/sequence fallback"
       }
@@ -20041,7 +20013,7 @@
         "sheet": "TDD Cases",
         "row": 177,
         "mrgEvidence": "us3mb_20260717.pdf p.212; C13: 53a/56a require 57a in M/N; C14: 86a requires 56a - us3mb_20260717.pdf pp.217-220",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=G.53Z; allowed=A,D,J"
       },
@@ -20130,7 +20102,7 @@
         "sheet": "TDD Cases",
         "row": 178,
         "mrgEvidence": "us3mb_20260717.pdf p.212; C13: 53a/56a require 57a in M/N; C14: 86a requires 56a - us3mb_20260717.pdf pp.217-220",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=G.53D; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -20231,7 +20203,7 @@
         "sheet": "TDD Cases",
         "row": 179,
         "mrgEvidence": "us3mb_20260717.pdf p.212; C13: 53a/56a require 57a in M/N; C14: 86a requires 56a - us3mb_20260717.pdf pp.217-220",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=G;86a present;56a absent"
       }
@@ -20315,7 +20287,7 @@
         "sheet": "TDD Cases",
         "row": 180,
         "mrgEvidence": "us3mb_20260717.pdf Format table p.212; MT361 G mandatory 57a Field detail No.98 p.303",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=G;57a absent;mandatory receiving agent unresolved"
       }
@@ -20442,7 +20414,7 @@
         "sheet": "TDD Cases",
         "row": 181,
         "mrgEvidence": "us3mb_20260717.pdf p.214; C13: 53a/56a require 57a in M/N; C14: 86a requires 56a - us3mb_20260717.pdf pp.217-220",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT"
       }
@@ -20570,7 +20542,7 @@
         "sheet": "TDD Cases",
         "row": 182,
         "mrgEvidence": "us3mb_20260717.pdf p.214; C13: 53a/56a require 57a in M/N; C14: 86a requires 56a - us3mb_20260717.pdf pp.217-220",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "senderCorrespondentBankServiceId=BANK-SVC-CITIUS33; intermediaryBankServiceId=BANK-SVC-HSBCHKHH; receivingBankServiceId=BANK-SVC-DEUTDEFF"
       }
@@ -20654,7 +20626,7 @@
         "sheet": "TDD Cases",
         "row": 183,
         "mrgEvidence": "us3mb_20260717.pdf p.214; C13: 53a/56a require 57a in M/N; C14: 86a requires 56a - us3mb_20260717.pdf pp.217-220",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequencePresent=true; source for mandatory 57a missing; no cross-role/sequence fallback"
       }
@@ -20738,7 +20710,7 @@
         "sheet": "TDD Cases",
         "row": 184,
         "mrgEvidence": "us3mb_20260717.pdf p.214; C13: 53a/56a require 57a in M/N; C14: 86a requires 56a - us3mb_20260717.pdf pp.217-220",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=K.53Z; allowed=A,D,J"
       },
@@ -20827,7 +20799,7 @@
         "sheet": "TDD Cases",
         "row": 185,
         "mrgEvidence": "us3mb_20260717.pdf p.214; C13: 53a/56a require 57a in M/N; C14: 86a requires 56a - us3mb_20260717.pdf pp.217-220",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=K.53D; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -20928,7 +20900,7 @@
         "sheet": "TDD Cases",
         "row": 186,
         "mrgEvidence": "us3mb_20260717.pdf p.214; C13: 53a/56a require 57a in M/N; C14: 86a requires 56a - us3mb_20260717.pdf pp.217-220",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=K;86a present;56a absent"
       }
@@ -21012,7 +20984,7 @@
         "sheet": "TDD Cases",
         "row": 187,
         "mrgEvidence": "us3mb_20260717.pdf Format table p.214; MT361 K mandatory 57a Field detail No.132 p.328",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=K;57a absent;mandatory receiving agent unresolved"
       }
@@ -21139,7 +21111,7 @@
         "sheet": "TDD Cases",
         "row": 188,
         "mrgEvidence": "us3mb_20260717.pdf p.215; C13: 53a/56a require 57a in M/N; C14: 86a requires 56a - us3mb_20260717.pdf pp.217-220",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT"
       }
@@ -21267,7 +21239,7 @@
         "sheet": "TDD Cases",
         "row": 189,
         "mrgEvidence": "us3mb_20260717.pdf p.215; C13: 53a/56a require 57a in M/N; C14: 86a requires 56a - us3mb_20260717.pdf pp.217-220",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "senderCorrespondentBankServiceId=BANK-SVC-CITIUS33; intermediaryBankServiceId=BANK-SVC-HSBCHKHH; receivingBankServiceId=BANK-SVC-DEUTDEFF"
       }
@@ -21351,7 +21323,7 @@
         "sheet": "TDD Cases",
         "row": 190,
         "mrgEvidence": "us3mb_20260717.pdf p.215; C13: 53a/56a require 57a in M/N; C14: 86a requires 56a - us3mb_20260717.pdf pp.217-220",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequencePresent=true; source for mandatory 57a missing; no cross-role/sequence fallback"
       }
@@ -21435,7 +21407,7 @@
         "sheet": "TDD Cases",
         "row": 191,
         "mrgEvidence": "us3mb_20260717.pdf p.215; C13: 53a/56a require 57a in M/N; C14: 86a requires 56a - us3mb_20260717.pdf pp.217-220",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=L.53Z; allowed=A,D,J"
       },
@@ -21524,7 +21496,7 @@
         "sheet": "TDD Cases",
         "row": 192,
         "mrgEvidence": "us3mb_20260717.pdf p.215; C13: 53a/56a require 57a in M/N; C14: 86a requires 56a - us3mb_20260717.pdf pp.217-220",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=L.53D; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -21625,7 +21597,7 @@
         "sheet": "TDD Cases",
         "row": 193,
         "mrgEvidence": "us3mb_20260717.pdf p.215; C13: 53a/56a require 57a in M/N; C14: 86a requires 56a - us3mb_20260717.pdf pp.217-220",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=L;86a present;56a absent"
       }
@@ -21709,7 +21681,7 @@
         "sheet": "TDD Cases",
         "row": 194,
         "mrgEvidence": "us3mb_20260717.pdf Format table p.215; MT361 L mandatory 57a Field detail No.144 p.340",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=L;57a absent;mandatory receiving agent unresolved"
       }
@@ -21836,7 +21808,7 @@
         "sheet": "TDD Cases",
         "row": 195,
         "mrgEvidence": "us3mb_20260717.pdf p.216; C13: 53a/56a require 57a in M/N; C14: 86a requires 56a - us3mb_20260717.pdf pp.217-220",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT"
       }
@@ -21964,7 +21936,7 @@
         "sheet": "TDD Cases",
         "row": 196,
         "mrgEvidence": "us3mb_20260717.pdf p.216; C13: 53a/56a require 57a in M/N; C14: 86a requires 56a - us3mb_20260717.pdf pp.217-220",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "senderCorrespondentBankServiceId=BANK-SVC-CITIUS33; intermediaryBankServiceId=BANK-SVC-HSBCHKHH; receivingBankServiceId=BANK-SVC-DEUTDEFF"
       }
@@ -22048,7 +22020,7 @@
         "sheet": "TDD Cases",
         "row": 197,
         "mrgEvidence": "us3mb_20260717.pdf p.216; C13: 53a/56a require 57a in M/N; C14: 86a requires 56a - us3mb_20260717.pdf pp.217-220",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "no eligible SSI; all SSI-classified 5x roles in this sequence are optional"
       }
@@ -22132,7 +22104,7 @@
         "sheet": "TDD Cases",
         "row": 198,
         "mrgEvidence": "us3mb_20260717.pdf p.216; C13: 53a/56a require 57a in M/N; C14: 86a requires 56a - us3mb_20260717.pdf pp.217-220",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=M.53Z; allowed=A,D,J"
       },
@@ -22221,7 +22193,7 @@
         "sheet": "TDD Cases",
         "row": 199,
         "mrgEvidence": "us3mb_20260717.pdf p.216; C13: 53a/56a require 57a in M/N; C14: 86a requires 56a - us3mb_20260717.pdf pp.217-220",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=M.53D; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -22322,7 +22294,7 @@
         "sheet": "TDD Cases",
         "row": 200,
         "mrgEvidence": "us3mb_20260717.pdf p.216; C13: 53a/56a require 57a in M/N; C14: 86a requires 56a - us3mb_20260717.pdf pp.217-220",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=M;86a present;56a absent"
       }
@@ -22360,10 +22332,7 @@
           "dataType": "FIN_TAG",
           "value": "53A",
           "required": true,
-          "allowedValues": [
-            "53A",
-            "56A"
-          ]
+          "allowedValues": ["53A", "56A"]
         },
         {
           "key": "tag.57A.present",
@@ -22422,7 +22391,7 @@
         "sheet": "TDD Cases",
         "row": 201,
         "mrgEvidence": "us3mb_20260717.pdf p.216; C13: 53a/56a require 57a in M/N; C14: 86a requires 56a - us3mb_20260717.pdf pp.217-220",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=M;53a/56a present;57a absent"
       }
@@ -22549,7 +22518,7 @@
         "sheet": "TDD Cases",
         "row": 202,
         "mrgEvidence": "us3mb_20260717.pdf p.216; C13: 53a/56a require 57a in M/N; C14: 86a requires 56a - us3mb_20260717.pdf pp.217-220",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT"
       }
@@ -22677,7 +22646,7 @@
         "sheet": "TDD Cases",
         "row": 203,
         "mrgEvidence": "us3mb_20260717.pdf p.216; C13: 53a/56a require 57a in M/N; C14: 86a requires 56a - us3mb_20260717.pdf pp.217-220",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "senderCorrespondentBankServiceId=BANK-SVC-CITIUS33; intermediaryBankServiceId=BANK-SVC-HSBCHKHH; receivingBankServiceId=BANK-SVC-DEUTDEFF"
       }
@@ -22761,7 +22730,7 @@
         "sheet": "TDD Cases",
         "row": 204,
         "mrgEvidence": "us3mb_20260717.pdf p.216; C13: 53a/56a require 57a in M/N; C14: 86a requires 56a - us3mb_20260717.pdf pp.217-220",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "no eligible SSI; all SSI-classified 5x roles in this sequence are optional"
       }
@@ -22845,7 +22814,7 @@
         "sheet": "TDD Cases",
         "row": 205,
         "mrgEvidence": "us3mb_20260717.pdf p.216; C13: 53a/56a require 57a in M/N; C14: 86a requires 56a - us3mb_20260717.pdf pp.217-220",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=N.53Z; allowed=A,D,J"
       },
@@ -22934,7 +22903,7 @@
         "sheet": "TDD Cases",
         "row": 206,
         "mrgEvidence": "us3mb_20260717.pdf p.216; C13: 53a/56a require 57a in M/N; C14: 86a requires 56a - us3mb_20260717.pdf pp.217-220",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=N.53D; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -23035,7 +23004,7 @@
         "sheet": "TDD Cases",
         "row": 207,
         "mrgEvidence": "us3mb_20260717.pdf p.216; C13: 53a/56a require 57a in M/N; C14: 86a requires 56a - us3mb_20260717.pdf pp.217-220",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=N;86a present;56a absent"
       }
@@ -23073,10 +23042,7 @@
           "dataType": "FIN_TAG",
           "value": "53A",
           "required": true,
-          "allowedValues": [
-            "53A",
-            "56A"
-          ]
+          "allowedValues": ["53A", "56A"]
         },
         {
           "key": "tag.57A.present",
@@ -23135,7 +23101,7 @@
         "sheet": "TDD Cases",
         "row": 208,
         "mrgEvidence": "us3mb_20260717.pdf p.216; C13: 53a/56a require 57a in M/N; C14: 86a requires 56a - us3mb_20260717.pdf pp.217-220",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=N;53a/56a present;57a absent"
       }
@@ -23262,7 +23228,7 @@
         "sheet": "TDD Cases",
         "row": 209,
         "mrgEvidence": "us3mb_20260717.pdf p.396; C4/C5 NET once/GROSS max three; C7: 86a requires 56a - us3mb_20260717.pdf pp.396-399",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT"
       }
@@ -23390,7 +23356,7 @@
         "sheet": "TDD Cases",
         "row": 210,
         "mrgEvidence": "us3mb_20260717.pdf p.396; C4/C5 NET once/GROSS max three; C7: 86a requires 56a - us3mb_20260717.pdf pp.396-399",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "senderCorrespondentBankServiceId=BANK-SVC-CITIUS33; intermediaryBankServiceId=BANK-SVC-HSBCHKHH; receivingBankServiceId=BANK-SVC-DEUTDEFF"
       }
@@ -23474,7 +23440,7 @@
         "sheet": "TDD Cases",
         "row": 211,
         "mrgEvidence": "us3mb_20260717.pdf p.396; C4/C5 NET once/GROSS max three; C7: 86a requires 56a - us3mb_20260717.pdf pp.396-399",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequencePresent=true; source for mandatory 57a missing; no cross-role/sequence fallback"
       }
@@ -23558,7 +23524,7 @@
         "sheet": "TDD Cases",
         "row": 212,
         "mrgEvidence": "us3mb_20260717.pdf p.396; C4/C5 NET once/GROSS max three; C7: 86a requires 56a - us3mb_20260717.pdf pp.396-399",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=C.53Z; allowed=A,D,J"
       },
@@ -23647,7 +23613,7 @@
         "sheet": "TDD Cases",
         "row": 213,
         "mrgEvidence": "us3mb_20260717.pdf p.396; C4/C5 NET once/GROSS max three; C7: 86a requires 56a - us3mb_20260717.pdf pp.396-399",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=C.53D; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -23748,7 +23714,7 @@
         "sheet": "TDD Cases",
         "row": 214,
         "mrgEvidence": "us3mb_20260717.pdf p.396; C4/C5 NET once/GROSS max three; C7: 86a requires 56a - us3mb_20260717.pdf pp.396-399",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=C;86a present;56a absent"
       }
@@ -23786,10 +23752,7 @@
           "dataType": "ENUM",
           "value": "NET",
           "required": true,
-          "allowedValues": [
-            "NET",
-            "GROSS"
-          ]
+          "allowedValues": ["NET", "GROSS"]
         },
         {
           "key": "paymentBlockCount",
@@ -23849,7 +23812,7 @@
         "sheet": "TDD Cases",
         "row": 215,
         "mrgEvidence": "us3mb_20260717.pdf p.396; C4/C5 NET once/GROSS max three; C7: 86a requires 56a - us3mb_20260717.pdf pp.396-399",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "NET with two blocks or GROSS with four blocks"
       }
@@ -23976,7 +23939,7 @@
         "sheet": "TDD Cases",
         "row": 216,
         "mrgEvidence": "us3mb_20260717.pdf p.397; C4/C5 NET once/GROSS max three; C7: 86a requires 56a - us3mb_20260717.pdf pp.396-399",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT"
       }
@@ -24104,7 +24067,7 @@
         "sheet": "TDD Cases",
         "row": 217,
         "mrgEvidence": "us3mb_20260717.pdf p.397; C4/C5 NET once/GROSS max three; C7: 86a requires 56a - us3mb_20260717.pdf pp.396-399",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "senderCorrespondentBankServiceId=BANK-SVC-CITIUS33; intermediaryBankServiceId=BANK-SVC-HSBCHKHH; receivingBankServiceId=BANK-SVC-DEUTDEFF"
       }
@@ -24188,7 +24151,7 @@
         "sheet": "TDD Cases",
         "row": 218,
         "mrgEvidence": "us3mb_20260717.pdf p.397; C4/C5 NET once/GROSS max three; C7: 86a requires 56a - us3mb_20260717.pdf pp.396-399",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequencePresent=true; source for mandatory 57a missing; no cross-role/sequence fallback"
       }
@@ -24272,7 +24235,7 @@
         "sheet": "TDD Cases",
         "row": 219,
         "mrgEvidence": "us3mb_20260717.pdf p.397; C4/C5 NET once/GROSS max three; C7: 86a requires 56a - us3mb_20260717.pdf pp.396-399",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=E.53Z; allowed=A,D,J"
       },
@@ -24361,7 +24324,7 @@
         "sheet": "TDD Cases",
         "row": 220,
         "mrgEvidence": "us3mb_20260717.pdf p.397; C4/C5 NET once/GROSS max three; C7: 86a requires 56a - us3mb_20260717.pdf pp.396-399",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=E.53D; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -24462,7 +24425,7 @@
         "sheet": "TDD Cases",
         "row": 221,
         "mrgEvidence": "us3mb_20260717.pdf p.397; C4/C5 NET once/GROSS max three; C7: 86a requires 56a - us3mb_20260717.pdf pp.396-399",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=E;86a present;56a absent"
       }
@@ -24500,10 +24463,7 @@
           "dataType": "ENUM",
           "value": "NET",
           "required": true,
-          "allowedValues": [
-            "NET",
-            "GROSS"
-          ]
+          "allowedValues": ["NET", "GROSS"]
         },
         {
           "key": "paymentBlockCount",
@@ -24563,7 +24523,7 @@
         "sheet": "TDD Cases",
         "row": 222,
         "mrgEvidence": "us3mb_20260717.pdf p.397; C4/C5 NET once/GROSS max three; C7: 86a requires 56a - us3mb_20260717.pdf pp.396-399",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "NET with two blocks or GROSS with four blocks"
       }
@@ -24690,7 +24650,7 @@
         "sheet": "TDD Cases",
         "row": 223,
         "mrgEvidence": "us3mb_20260717.pdf p.448; C3: 86a requires 56a (E35) - us3mb_20260717.pdf pp.447-449",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT"
       }
@@ -24818,7 +24778,7 @@
         "sheet": "TDD Cases",
         "row": 224,
         "mrgEvidence": "us3mb_20260717.pdf p.448; C3: 86a requires 56a (E35) - us3mb_20260717.pdf pp.447-449",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "senderCorrespondentBankServiceId=BANK-SVC-CITIUS33; intermediaryBankServiceId=BANK-SVC-HSBCHKHH; receivingBankServiceId=BANK-SVC-DEUTDEFF"
       }
@@ -24902,7 +24862,7 @@
         "sheet": "TDD Cases",
         "row": 225,
         "mrgEvidence": "us3mb_20260717.pdf p.448; C3: 86a requires 56a (E35) - us3mb_20260717.pdf pp.447-449",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequencePresent=true; source for mandatory 57a missing; no cross-role/sequence fallback"
       }
@@ -24986,7 +24946,7 @@
         "sheet": "TDD Cases",
         "row": 226,
         "mrgEvidence": "us3mb_20260717.pdf p.448; C3: 86a requires 56a (E35) - us3mb_20260717.pdf pp.447-449",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=L.53Z; allowed=A,D,J"
       },
@@ -25075,7 +25035,7 @@
         "sheet": "TDD Cases",
         "row": 227,
         "mrgEvidence": "us3mb_20260717.pdf p.448; C3: 86a requires 56a (E35) - us3mb_20260717.pdf pp.447-449",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=L.53D; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -25176,7 +25136,7 @@
         "sheet": "TDD Cases",
         "row": 228,
         "mrgEvidence": "us3mb_20260717.pdf p.448; C3: 86a requires 56a (E35) - us3mb_20260717.pdf pp.447-449",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=L;86a present;56a absent"
       }
@@ -25303,7 +25263,7 @@
         "sheet": "TDD Cases",
         "row": 229,
         "mrgEvidence": "us3mb_20260717.pdf p.448; C3: 86a requires 56a (E35) - us3mb_20260717.pdf pp.447-449",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT"
       }
@@ -25431,7 +25391,7 @@
         "sheet": "TDD Cases",
         "row": 230,
         "mrgEvidence": "us3mb_20260717.pdf p.448; C3: 86a requires 56a (E35) - us3mb_20260717.pdf pp.447-449",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "senderCorrespondentBankServiceId=BANK-SVC-CITIUS33; intermediaryBankServiceId=BANK-SVC-HSBCHKHH; receivingBankServiceId=BANK-SVC-DEUTDEFF"
       }
@@ -25515,7 +25475,7 @@
         "sheet": "TDD Cases",
         "row": 231,
         "mrgEvidence": "us3mb_20260717.pdf p.448; C3: 86a requires 56a (E35) - us3mb_20260717.pdf pp.447-449",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequencePresent=true; source for mandatory 57a missing; no cross-role/sequence fallback"
       }
@@ -25599,7 +25559,7 @@
         "sheet": "TDD Cases",
         "row": 232,
         "mrgEvidence": "us3mb_20260717.pdf p.448; C3: 86a requires 56a (E35) - us3mb_20260717.pdf pp.447-449",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=M.53Z; allowed=A,D,J"
       },
@@ -25688,7 +25648,7 @@
         "sheet": "TDD Cases",
         "row": 233,
         "mrgEvidence": "us3mb_20260717.pdf p.448; C3: 86a requires 56a (E35) - us3mb_20260717.pdf pp.447-449",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=M.53D; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -25789,7 +25749,7 @@
         "sheet": "TDD Cases",
         "row": 234,
         "mrgEvidence": "us3mb_20260717.pdf p.448; C3: 86a requires 56a (E35) - us3mb_20260717.pdf pp.447-449",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=M;86a present;56a absent"
       }
@@ -25916,7 +25876,7 @@
         "sheet": "TDD Cases",
         "row": 235,
         "mrgEvidence": "us3mb_20260717.pdf p.490; C3: 86a requires 56a (E35) - us3mb_20260717.pdf pp.490-492",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT"
       }
@@ -26044,7 +26004,7 @@
         "sheet": "TDD Cases",
         "row": 236,
         "mrgEvidence": "us3mb_20260717.pdf p.490; C3: 86a requires 56a (E35) - us3mb_20260717.pdf pp.490-492",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "senderCorrespondentBankServiceId=BANK-SVC-CITIUS33; intermediaryBankServiceId=BANK-SVC-HSBCHKHH; receivingBankServiceId=BANK-SVC-DEUTDEFF"
       }
@@ -26128,7 +26088,7 @@
         "sheet": "TDD Cases",
         "row": 237,
         "mrgEvidence": "us3mb_20260717.pdf p.490; C3: 86a requires 56a (E35) - us3mb_20260717.pdf pp.490-492",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequencePresent=true; source for mandatory 57a missing; no cross-role/sequence fallback"
       }
@@ -26212,7 +26172,7 @@
         "sheet": "TDD Cases",
         "row": 238,
         "mrgEvidence": "us3mb_20260717.pdf p.490; C3: 86a requires 56a (E35) - us3mb_20260717.pdf pp.490-492",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=J.53Z; allowed=A,D,J"
       },
@@ -26301,7 +26261,7 @@
         "sheet": "TDD Cases",
         "row": 239,
         "mrgEvidence": "us3mb_20260717.pdf p.490; C3: 86a requires 56a (E35) - us3mb_20260717.pdf pp.490-492",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=J.53D; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -26402,7 +26362,7 @@
         "sheet": "TDD Cases",
         "row": 240,
         "mrgEvidence": "us3mb_20260717.pdf p.490; C3: 86a requires 56a (E35) - us3mb_20260717.pdf pp.490-492",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=J;86a present;56a absent"
       }
@@ -26529,7 +26489,7 @@
         "sheet": "TDD Cases",
         "row": 241,
         "mrgEvidence": "us3mb_20260717.pdf p.490; C3: 86a requires 56a (E35) - us3mb_20260717.pdf pp.490-492",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT"
       }
@@ -26657,7 +26617,7 @@
         "sheet": "TDD Cases",
         "row": 242,
         "mrgEvidence": "us3mb_20260717.pdf p.490; C3: 86a requires 56a (E35) - us3mb_20260717.pdf pp.490-492",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "senderCorrespondentBankServiceId=BANK-SVC-CITIUS33; intermediaryBankServiceId=BANK-SVC-HSBCHKHH; receivingBankServiceId=BANK-SVC-DEUTDEFF"
       }
@@ -26741,7 +26701,7 @@
         "sheet": "TDD Cases",
         "row": 243,
         "mrgEvidence": "us3mb_20260717.pdf p.490; C3: 86a requires 56a (E35) - us3mb_20260717.pdf pp.490-492",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequencePresent=true; source for mandatory 57a missing; no cross-role/sequence fallback"
       }
@@ -26825,7 +26785,7 @@
         "sheet": "TDD Cases",
         "row": 244,
         "mrgEvidence": "us3mb_20260717.pdf p.490; C3: 86a requires 56a (E35) - us3mb_20260717.pdf pp.490-492",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=K.53Z; allowed=A,D,J"
       },
@@ -26914,7 +26874,7 @@
         "sheet": "TDD Cases",
         "row": 245,
         "mrgEvidence": "us3mb_20260717.pdf p.490; C3: 86a requires 56a (E35) - us3mb_20260717.pdf pp.490-492",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=K.53D; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -27015,7 +26975,7 @@
         "sheet": "TDD Cases",
         "row": 246,
         "mrgEvidence": "us3mb_20260717.pdf p.490; C3: 86a requires 56a (E35) - us3mb_20260717.pdf pp.490-492",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=K;86a present;56a absent"
       }
@@ -27142,7 +27102,7 @@
         "sheet": "TDD Cases",
         "row": 247,
         "mrgEvidence": "us3mb_20260717.pdf p.490; us3mb_20260717.pdf p.491; C3: 86a requires 56a (E35) - us3mb_20260717.pdf pp.490-492",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT"
       }
@@ -27270,7 +27230,7 @@
         "sheet": "TDD Cases",
         "row": 248,
         "mrgEvidence": "us3mb_20260717.pdf p.490; us3mb_20260717.pdf p.491; C3: 86a requires 56a (E35) - us3mb_20260717.pdf pp.490-492",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "senderCorrespondentBankServiceId=BANK-SVC-CITIUS33; intermediaryBankServiceId=BANK-SVC-HSBCHKHH; receivingBankServiceId=BANK-SVC-DEUTDEFF"
       }
@@ -27354,7 +27314,7 @@
         "sheet": "TDD Cases",
         "row": 249,
         "mrgEvidence": "us3mb_20260717.pdf p.490; us3mb_20260717.pdf p.491; C3: 86a requires 56a (E35) - us3mb_20260717.pdf pp.490-492",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequencePresent=true; source for mandatory 57a missing; no cross-role/sequence fallback"
       }
@@ -27438,7 +27398,7 @@
         "sheet": "TDD Cases",
         "row": 250,
         "mrgEvidence": "us3mb_20260717.pdf p.490; us3mb_20260717.pdf p.491; C3: 86a requires 56a (E35) - us3mb_20260717.pdf pp.490-492",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=L.53Z; allowed=A,D,J"
       },
@@ -27527,7 +27487,7 @@
         "sheet": "TDD Cases",
         "row": 251,
         "mrgEvidence": "us3mb_20260717.pdf p.490; us3mb_20260717.pdf p.491; C3: 86a requires 56a (E35) - us3mb_20260717.pdf pp.490-492",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=L.53D; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -27628,7 +27588,7 @@
         "sheet": "TDD Cases",
         "row": 252,
         "mrgEvidence": "us3mb_20260717.pdf p.490; us3mb_20260717.pdf p.491; C3: 86a requires 56a (E35) - us3mb_20260717.pdf pp.490-492",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=L;86a present;56a absent"
       }
@@ -27755,7 +27715,7 @@
         "sheet": "TDD Cases",
         "row": 253,
         "mrgEvidence": "us3mb_20260717.pdf p.491; C3: 86a requires 56a (E35) - us3mb_20260717.pdf pp.490-492",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT"
       }
@@ -27883,7 +27843,7 @@
         "sheet": "TDD Cases",
         "row": 254,
         "mrgEvidence": "us3mb_20260717.pdf p.491; C3: 86a requires 56a (E35) - us3mb_20260717.pdf pp.490-492",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "senderCorrespondentBankServiceId=BANK-SVC-CITIUS33; intermediaryBankServiceId=BANK-SVC-HSBCHKHH; receivingBankServiceId=BANK-SVC-DEUTDEFF"
       }
@@ -27967,7 +27927,7 @@
         "sheet": "TDD Cases",
         "row": 255,
         "mrgEvidence": "us3mb_20260717.pdf p.491; C3: 86a requires 56a (E35) - us3mb_20260717.pdf pp.490-492",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequencePresent=true; source for mandatory 57a missing; no cross-role/sequence fallback"
       }
@@ -28051,7 +28011,7 @@
         "sheet": "TDD Cases",
         "row": 256,
         "mrgEvidence": "us3mb_20260717.pdf p.491; C3: 86a requires 56a (E35) - us3mb_20260717.pdf pp.490-492",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=M.53Z; allowed=A,D,J"
       },
@@ -28140,7 +28100,7 @@
         "sheet": "TDD Cases",
         "row": 257,
         "mrgEvidence": "us3mb_20260717.pdf p.491; C3: 86a requires 56a (E35) - us3mb_20260717.pdf pp.490-492",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=M.53D; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -28241,7 +28201,7 @@
         "sheet": "TDD Cases",
         "row": 258,
         "mrgEvidence": "us3mb_20260717.pdf p.491; C3: 86a requires 56a (E35) - us3mb_20260717.pdf pp.490-492",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "sequence=M;86a present;56a absent"
       }
@@ -28387,7 +28347,7 @@
         "sheet": "TDD Cases",
         "row": 259,
         "mrgEvidence": "us4m_20260717.pdf p.12; C1: 57a only if both 53a and 54a present (C11) - us4m_20260717.pdf pp.12-13",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT"
       }
@@ -28471,7 +28431,7 @@
         "sheet": "TDD Cases",
         "row": 260,
         "mrgEvidence": "us4m_20260717.pdf p.12; C1: 57a only if both 53a and 54a present (C11) - us4m_20260717.pdf pp.12-13",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "no eligible SSI; all SSI-classified 5x roles in this sequence are optional"
       }
@@ -28555,7 +28515,7 @@
         "sheet": "TDD Cases",
         "row": 261,
         "mrgEvidence": "us4m_20260717.pdf p.12; C1: 57a only if both 53a and 54a present (C11) - us4m_20260717.pdf pp.12-13",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=53Z; allowed=A,B,D"
       },
@@ -28644,7 +28604,7 @@
         "sheet": "TDD Cases",
         "row": 262,
         "mrgEvidence": "us4m_20260717.pdf p.12; C1: 57a only if both 53a and 54a present (C11) - us4m_20260717.pdf pp.12-13",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=53B; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -28761,7 +28721,7 @@
         "sheet": "TDD Cases",
         "row": 263,
         "mrgEvidence": "us7m_20260717.pdf p.177; C1 25 XOR 57a; C2 32D excludes 57a - us7m_20260717.pdf p.177",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT"
       }
@@ -28845,7 +28805,7 @@
         "sheet": "TDD Cases",
         "row": 264,
         "mrgEvidence": "us7m_20260717.pdf p.177; C1 25 XOR 57a; C2 32D excludes 57a - us7m_20260717.pdf p.177",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "no eligible SSI; all SSI-classified 5x roles in this sequence are optional"
       }
@@ -28929,7 +28889,7 @@
         "sheet": "TDD Cases",
         "row": 265,
         "mrgEvidence": "us7m_20260717.pdf p.177; C1 25 XOR 57a; C2 32D excludes 57a - us7m_20260717.pdf p.177",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=57Z; allowed=A,D"
       },
@@ -29018,7 +28978,7 @@
         "sheet": "TDD Cases",
         "row": 266,
         "mrgEvidence": "us7m_20260717.pdf p.177; C1 25 XOR 57a; C2 32D excludes 57a - us7m_20260717.pdf p.177",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=57D; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -29135,7 +29095,7 @@
         "sheet": "TDD Cases",
         "row": 267,
         "mrgEvidence": "us7m_20260717.pdf p.187; No 5x-specific message-level NVR - us7m_20260717.pdf p.187",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT"
       }
@@ -29219,7 +29179,7 @@
         "sheet": "TDD Cases",
         "row": 268,
         "mrgEvidence": "us7m_20260717.pdf p.187; No 5x-specific message-level NVR - us7m_20260717.pdf p.187",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "no eligible SSI; all SSI-classified 5x roles in this sequence are optional"
       }
@@ -29303,7 +29263,7 @@
         "sheet": "TDD Cases",
         "row": 269,
         "mrgEvidence": "us7m_20260717.pdf p.187; No 5x-specific message-level NVR - us7m_20260717.pdf p.187",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=57Z; allowed=A,B,D"
       },
@@ -29392,7 +29352,7 @@
         "sheet": "TDD Cases",
         "row": 270,
         "mrgEvidence": "us7m_20260717.pdf p.187; No 5x-specific message-level NVR - us7m_20260717.pdf p.187",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=57B; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -29509,7 +29469,7 @@
         "sheet": "TDD Cases",
         "row": 271,
         "mrgEvidence": "us7m_20260717.pdf p.215; No message-level NVR - us7m_20260717.pdf p.215",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT"
       }
@@ -29593,7 +29553,7 @@
         "sheet": "TDD Cases",
         "row": 272,
         "mrgEvidence": "us7m_20260717.pdf p.215; No message-level NVR - us7m_20260717.pdf p.215",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "no eligible SSI; all SSI-classified 5x roles in this sequence are optional"
       }
@@ -29677,7 +29637,7 @@
         "sheet": "TDD Cases",
         "row": 273,
         "mrgEvidence": "us7m_20260717.pdf p.215; No message-level NVR - us7m_20260717.pdf p.215",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=57Z; allowed=A,B,D"
       },
@@ -29766,7 +29726,7 @@
         "sheet": "TDD Cases",
         "row": 274,
         "mrgEvidence": "us7m_20260717.pdf p.215; No message-level NVR - us7m_20260717.pdf p.215",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=57B; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -29883,7 +29843,7 @@
         "sheet": "TDD Cases",
         "row": 275,
         "mrgEvidence": "us7m_20260717.pdf p.244; No 5x-specific message-level NVR - us7m_20260717.pdf p.244",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT"
       }
@@ -29967,7 +29927,7 @@
         "sheet": "TDD Cases",
         "row": 276,
         "mrgEvidence": "us7m_20260717.pdf p.244; No 5x-specific message-level NVR - us7m_20260717.pdf p.244",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "no eligible SSI; all SSI-classified 5x roles in this sequence are optional"
       }
@@ -30051,7 +30011,7 @@
         "sheet": "TDD Cases",
         "row": 277,
         "mrgEvidence": "us7m_20260717.pdf p.244; No 5x-specific message-level NVR - us7m_20260717.pdf p.244",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=57Z; allowed=A,B,D"
       },
@@ -30140,7 +30100,7 @@
         "sheet": "TDD Cases",
         "row": 278,
         "mrgEvidence": "us7m_20260717.pdf p.244; No 5x-specific message-level NVR - us7m_20260717.pdf p.244",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=57B; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -30272,7 +30232,7 @@
         "sheet": "TDD Cases",
         "row": 279,
         "mrgEvidence": "us7m_20260717.pdf p.252; No 5x-specific message-level NVR - us7m_20260717.pdf p.252",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT"
       }
@@ -30356,7 +30316,7 @@
         "sheet": "TDD Cases",
         "row": 280,
         "mrgEvidence": "us7m_20260717.pdf p.252; No 5x-specific message-level NVR - us7m_20260717.pdf p.252",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "no eligible SSI; all SSI-classified 5x roles in this sequence are optional"
       }
@@ -30440,7 +30400,7 @@
         "sheet": "TDD Cases",
         "row": 281,
         "mrgEvidence": "us7m_20260717.pdf p.252; No 5x-specific message-level NVR - us7m_20260717.pdf p.252",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=53Z; allowed=A,B,D"
       },
@@ -30529,7 +30489,7 @@
         "sheet": "TDD Cases",
         "row": 282,
         "mrgEvidence": "us7m_20260717.pdf p.252; No 5x-specific message-level NVR - us7m_20260717.pdf p.252",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=53B; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -30646,7 +30606,7 @@
         "sheet": "TDD Cases",
         "row": 283,
         "mrgEvidence": "us7m_20260717.pdf p.264; C2: either 53a or 57a, not both (C14) - us7m_20260717.pdf p.265",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT"
       }
@@ -30730,7 +30690,7 @@
         "sheet": "TDD Cases",
         "row": 284,
         "mrgEvidence": "us7m_20260717.pdf p.264; C2: either 53a or 57a, not both (C14) - us7m_20260717.pdf p.265",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "no eligible SSI; all SSI-classified 5x roles in this sequence are optional"
       }
@@ -30814,7 +30774,7 @@
         "sheet": "TDD Cases",
         "row": 285,
         "mrgEvidence": "us7m_20260717.pdf p.264; C2: either 53a or 57a, not both (C14) - us7m_20260717.pdf p.265",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=57Z; allowed=A,B,D"
       },
@@ -30903,7 +30863,7 @@
         "sheet": "TDD Cases",
         "row": 286,
         "mrgEvidence": "us7m_20260717.pdf p.264; C2: either 53a or 57a, not both (C14) - us7m_20260717.pdf p.265",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=57B; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -31035,7 +30995,7 @@
         "sheet": "TDD Cases",
         "row": 287,
         "mrgEvidence": "us7m_20260717.pdf p.275; No 5x-specific message-level NVR - us7m_20260717.pdf p.275",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT"
       }
@@ -31119,7 +31079,7 @@
         "sheet": "TDD Cases",
         "row": 288,
         "mrgEvidence": "us7m_20260717.pdf p.275; No 5x-specific message-level NVR - us7m_20260717.pdf p.275",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "no eligible SSI; all SSI-classified 5x roles in this sequence are optional"
       }
@@ -31203,7 +31163,7 @@
         "sheet": "TDD Cases",
         "row": 289,
         "mrgEvidence": "us7m_20260717.pdf p.275; No 5x-specific message-level NVR - us7m_20260717.pdf p.275",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=53Z; allowed=A,B,D"
       },
@@ -31292,7 +31252,7 @@
         "sheet": "TDD Cases",
         "row": 290,
         "mrgEvidence": "us7m_20260717.pdf p.275; No 5x-specific message-level NVR - us7m_20260717.pdf p.275",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=53B; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -31409,7 +31369,7 @@
         "sheet": "TDD Cases",
         "row": 291,
         "mrgEvidence": "us7m_20260717.pdf p.355 Format table fields No.21 (56a) / No.22 (57a)",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT"
       }
@@ -31518,7 +31478,7 @@
         "sheet": "TDD Cases",
         "row": 292,
         "mrgEvidence": "us7m_20260717.pdf p.355 Format table fields No.21 (56a) / No.22 (57a)",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "intermediaryBankServiceId=BANK-SVC-HSBCHKHH; receivingBankServiceId=BANK-SVC-DEUTDEFF"
       }
@@ -31602,7 +31562,7 @@
         "sheet": "TDD Cases",
         "row": 293,
         "mrgEvidence": "us7m_20260717.pdf p.355 Format table fields No.21 (56a) / No.22 (57a)",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "no eligible SSI; all SSI-classified 5x roles in this sequence are optional"
       }
@@ -31686,7 +31646,7 @@
         "sheet": "TDD Cases",
         "row": 294,
         "mrgEvidence": "us7m_20260717.pdf p.355 Format table fields No.21 (56a) / No.22 (57a)",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=56Z; allowed=A,B,D"
       },
@@ -31775,7 +31735,7 @@
         "sheet": "TDD Cases",
         "row": 295,
         "mrgEvidence": "us7m_20260717.pdf p.355 Format table fields No.21 (56a) / No.22 (57a)",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=56B; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -31892,7 +31852,7 @@
         "sheet": "TDD Cases",
         "row": 296,
         "mrgEvidence": "us7m_20260717.pdf p.389; C1 25 XOR 57a; C2 32D excludes 57a - us7m_20260717.pdf p.389",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT"
       }
@@ -31976,7 +31936,7 @@
         "sheet": "TDD Cases",
         "row": 297,
         "mrgEvidence": "us7m_20260717.pdf p.389; C1 25 XOR 57a; C2 32D excludes 57a - us7m_20260717.pdf p.389",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "no eligible SSI; all SSI-classified 5x roles in this sequence are optional"
       }
@@ -32060,7 +32020,7 @@
         "sheet": "TDD Cases",
         "row": 298,
         "mrgEvidence": "us7m_20260717.pdf p.389; C1 25 XOR 57a; C2 32D excludes 57a - us7m_20260717.pdf p.389",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=57Z; allowed=A,B,D"
       },
@@ -32149,7 +32109,7 @@
         "sheet": "TDD Cases",
         "row": 299,
         "mrgEvidence": "us7m_20260717.pdf p.389; C1 25 XOR 57a; C2 32D excludes 57a - us7m_20260717.pdf p.389",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=57B; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -32266,7 +32226,7 @@
         "sheet": "TDD Cases",
         "row": 300,
         "mrgEvidence": "us7m_20260717.pdf p.396; C1 25 XOR 57a; C3 32D excludes 57a - us7m_20260717.pdf pp.396-398",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service IDs only; currency=USD; bookingEntity=HK01; manual BIC/5x=null; route=DIRECT"
       }
@@ -32350,7 +32310,7 @@
         "sheet": "TDD Cases",
         "row": 301,
         "mrgEvidence": "us7m_20260717.pdf p.396; C1 25 XOR 57a; C3 32D excludes 57a - us7m_20260717.pdf pp.396-398",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "no eligible SSI; all SSI-classified 5x roles in this sequence are optional"
       }
@@ -32434,7 +32394,7 @@
         "sheet": "TDD Cases",
         "row": 302,
         "mrgEvidence": "us7m_20260717.pdf p.396; C1 25 XOR 57a; C3 32D excludes 57a - us7m_20260717.pdf pp.396-398",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=57Z; allowed=A,B,D"
       },
@@ -32523,7 +32483,7 @@
         "sheet": "TDD Cases",
         "row": 303,
         "mrgEvidence": "us7m_20260717.pdf p.396; C1 25 XOR 57a; C3 32D excludes 57a - us7m_20260717.pdf pp.396-398",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "requested=57B; only BIC snapshot exists; option-specific structured source absent"
       },
@@ -32612,7 +32572,7 @@
         "sheet": "TDD Cases",
         "row": 304,
         "mrgEvidence": "MRG p.12",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "53a/54a/57a absent"
       }
@@ -32722,7 +32682,7 @@
         "sheet": "TDD Cases",
         "row": 305,
         "mrgEvidence": "MRG pp.12-13",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "57a present;53a or54a missing"
       }
@@ -32806,7 +32766,7 @@
         "sheet": "TDD Cases",
         "row": 306,
         "mrgEvidence": "MRG pp.177,180",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "25 absent;57a absent"
       }
@@ -32844,10 +32804,7 @@
           "dataType": "ENUM",
           "value": "25_WITH_57A",
           "required": true,
-          "allowedValues": [
-            "25_WITH_57A",
-            "32D_WITH_57A"
-          ]
+          "allowedValues": ["25_WITH_57A", "32D_WITH_57A"]
         },
         {
           "key": "tag.57A.present",
@@ -32918,7 +32875,7 @@
         "sheet": "TDD Cases",
         "row": 307,
         "mrgEvidence": "MRG p.177",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "25+57a or32D+57a"
       }
@@ -32977,9 +32934,7 @@
         "statusOrError": "RESOLVED",
         "http": "200",
         "tags": {},
-        "presentTags": [
-          "MESSAGE.53A"
-        ],
+        "presentTags": ["MESSAGE.53A"],
         "outputText": "53a emitted"
       },
       "fixtureBinding": {
@@ -33012,7 +32967,7 @@
         "sheet": "TDD Cases",
         "row": 308,
         "mrgEvidence": "MRG pp.264-265",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "53a present;57a absent"
       }
@@ -33071,9 +33026,7 @@
         "statusOrError": "RESOLVED",
         "http": "200",
         "tags": {},
-        "presentTags": [
-          "MESSAGE.57A"
-        ],
+        "presentTags": ["MESSAGE.57A"],
         "outputText": "57a emitted"
       },
       "fixtureBinding": {
@@ -33106,7 +33059,7 @@
         "sheet": "TDD Cases",
         "row": 309,
         "mrgEvidence": "MRG pp.264-265",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "53a absent;57a present"
       }
@@ -33202,7 +33155,7 @@
         "sheet": "TDD Cases",
         "row": 310,
         "mrgEvidence": "MRG p.265",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "53a+57a"
       }
@@ -33286,7 +33239,7 @@
         "sheet": "TDD Cases",
         "row": 311,
         "mrgEvidence": "MRG pp.389-390",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "25 absent;57a absent"
       }
@@ -33324,10 +33277,7 @@
           "dataType": "ENUM",
           "value": "25_WITH_57A",
           "required": true,
-          "allowedValues": [
-            "25_WITH_57A",
-            "32D_WITH_57A"
-          ]
+          "allowedValues": ["25_WITH_57A", "32D_WITH_57A"]
         },
         {
           "key": "tag.57A.present",
@@ -33398,7 +33348,7 @@
         "sheet": "TDD Cases",
         "row": 312,
         "mrgEvidence": "MRG p.389",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "25+57a or32D+57a"
       }
@@ -33482,7 +33432,7 @@
         "sheet": "TDD Cases",
         "row": 313,
         "mrgEvidence": "MRG pp.396-398",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "25 absent;57a absent"
       }
@@ -33520,10 +33470,7 @@
           "dataType": "ENUM",
           "value": "25_WITH_57A",
           "required": true,
-          "allowedValues": [
-            "25_WITH_57A",
-            "32D_WITH_57A"
-          ]
+          "allowedValues": ["25_WITH_57A", "32D_WITH_57A"]
         },
         {
           "key": "tag.57A.present",
@@ -33594,7 +33541,7 @@
         "sheet": "TDD Cases",
         "row": 314,
         "mrgEvidence": "MRG pp.396-398",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "25+57a or32D+57a"
       }
@@ -33700,7 +33647,7 @@
         "sheet": "TDD Cases",
         "row": 315,
         "mrgEvidence": "us3ma_20260717.pdf p.18",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service resolves Party Identifier //FW021000021 plus BIC CITIUS33 for B1.53A"
       }
@@ -33792,7 +33739,7 @@
         "sheet": "TDD Cases",
         "row": 316,
         "mrgEvidence": "us3ma_20260717.pdf p.124",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service resolves Party Identifier //FW021000021 plus BIC CITIUS33 for B1.53A"
       }
@@ -33898,7 +33845,7 @@
         "sheet": "TDD Cases",
         "row": 317,
         "mrgEvidence": "us3ma_20260717.pdf p.195",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service resolves Party Identifier //FW021000021 plus BIC CITIUS33 for A.53A"
       }
@@ -34004,7 +33951,7 @@
         "sheet": "TDD Cases",
         "row": 318,
         "mrgEvidence": "us3ma_20260717.pdf p.262",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service resolves Party Identifier //FW021000021 plus BIC CITIUS33 for C.53A"
       }
@@ -34110,7 +34057,7 @@
         "sheet": "TDD Cases",
         "row": 319,
         "mrgEvidence": "us3ma_20260717.pdf p.425",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service resolves Party Identifier //FW021000021 plus BIC CITIUS33 for C.53A"
       }
@@ -34216,7 +34163,7 @@
         "sheet": "TDD Cases",
         "row": 320,
         "mrgEvidence": "us3ma_20260717.pdf p.558",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service resolves Party Identifier //FW021000021 plus BIC CITIUS33 for C.53A"
       }
@@ -34322,7 +34269,7 @@
         "sheet": "TDD Cases",
         "row": 321,
         "mrgEvidence": "us3ma_20260717.pdf p.640",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service resolves Party Identifier //FW021000021 plus BIC CITIUS33 for C.53A"
       }
@@ -34428,7 +34375,7 @@
         "sheet": "TDD Cases",
         "row": 322,
         "mrgEvidence": "us3ma_20260717.pdf p.722",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service resolves Party Identifier //FW021000021 plus BIC CITIUS33 for C.53A"
       }
@@ -34534,7 +34481,7 @@
         "sheet": "TDD Cases",
         "row": 323,
         "mrgEvidence": "us3mb_20260717.pdf p.17",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service resolves Party Identifier //FW021000021 plus BIC CITIUS33 for C.53A"
       }
@@ -34640,7 +34587,7 @@
         "sheet": "TDD Cases",
         "row": 324,
         "mrgEvidence": "us3mb_20260717.pdf p.51",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service resolves Party Identifier //FW021000021 plus BIC CITIUS33 for D.53A"
       }
@@ -34746,7 +34693,7 @@
         "sheet": "TDD Cases",
         "row": 325,
         "mrgEvidence": "us3mb_20260717.pdf p.210",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service resolves Party Identifier //FW021000021 plus BIC CITIUS33 for D.53A"
       }
@@ -34852,7 +34799,7 @@
         "sheet": "TDD Cases",
         "row": 326,
         "mrgEvidence": "us3mb_20260717.pdf p.396",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service resolves Party Identifier //FW021000021 plus BIC CITIUS33 for C.53A"
       }
@@ -34958,7 +34905,7 @@
         "sheet": "TDD Cases",
         "row": 327,
         "mrgEvidence": "us3mb_20260717.pdf p.448",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service resolves Party Identifier //FW021000021 plus BIC CITIUS33 for L.53A"
       }
@@ -35064,7 +35011,7 @@
         "sheet": "TDD Cases",
         "row": 328,
         "mrgEvidence": "us3mb_20260717.pdf p.490",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service resolves Party Identifier //FW021000021 plus BIC CITIUS33 for J.53A"
       }
@@ -35156,7 +35103,7 @@
         "sheet": "TDD Cases",
         "row": 329,
         "mrgEvidence": "us4m_20260717.pdf p.12",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service resolves Party Identifier //FW021000021 plus BIC CITIUS33 for 53A"
       }
@@ -35248,7 +35195,7 @@
         "sheet": "TDD Cases",
         "row": 330,
         "mrgEvidence": "us7m_20260717.pdf p.177",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service resolves Party Identifier //FW021000021 plus BIC CITIUS33 for 57A"
       }
@@ -35340,7 +35287,7 @@
         "sheet": "TDD Cases",
         "row": 331,
         "mrgEvidence": "us7m_20260717.pdf p.187",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service resolves Party Identifier //FW021000021 plus BIC CITIUS33 for 57A"
       }
@@ -35432,7 +35379,7 @@
         "sheet": "TDD Cases",
         "row": 332,
         "mrgEvidence": "us7m_20260717.pdf p.215",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service resolves Party Identifier //FW021000021 plus BIC CITIUS33 for 57A"
       }
@@ -35524,7 +35471,7 @@
         "sheet": "TDD Cases",
         "row": 333,
         "mrgEvidence": "us7m_20260717.pdf p.244",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service resolves Party Identifier //FW021000021 plus BIC CITIUS33 for 57A"
       }
@@ -35616,7 +35563,7 @@
         "sheet": "TDD Cases",
         "row": 334,
         "mrgEvidence": "us7m_20260717.pdf p.252",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service resolves Party Identifier //FW021000021 plus BIC CITIUS33 for 53A"
       }
@@ -35708,7 +35655,7 @@
         "sheet": "TDD Cases",
         "row": 335,
         "mrgEvidence": "us7m_20260717.pdf p.264",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service resolves Party Identifier //FW021000021 plus BIC CITIUS33 for 57A"
       }
@@ -35800,7 +35747,7 @@
         "sheet": "TDD Cases",
         "row": 336,
         "mrgEvidence": "us7m_20260717.pdf p.275",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service resolves Party Identifier //FW021000021 plus BIC CITIUS33 for 53A"
       }
@@ -35892,7 +35839,7 @@
         "sheet": "TDD Cases",
         "row": 337,
         "mrgEvidence": "us7m_20260717.pdf p.355",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service resolves Party Identifier //FW021000021 plus BIC CITIUS33 for 56A"
       }
@@ -35984,7 +35931,7 @@
         "sheet": "TDD Cases",
         "row": 338,
         "mrgEvidence": "us7m_20260717.pdf p.389",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service resolves Party Identifier //FW021000021 plus BIC CITIUS33 for 57A"
       }
@@ -36076,7 +36023,7 @@
         "sheet": "TDD Cases",
         "row": 339,
         "mrgEvidence": "us7m_20260717.pdf p.396",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "Bank Service resolves Party Identifier //FW021000021 plus BIC CITIUS33 for 57A"
       }
@@ -36137,9 +36084,7 @@
         "tags": {
           "MESSAGE.58A": "BARCGB22"
         },
-        "presentTags": [
-          "MESSAGE.58A"
-        ],
+        "presentTags": ["MESSAGE.58A"],
         "outputText": "58A emitted; 57a omitted per field 58a usage rule"
       },
       "fixtureBinding": {
@@ -36172,7 +36117,7 @@
         "sheet": "TDD Cases",
         "row": 340,
         "mrgEvidence": "us7m_20260717.pdf pp.215,220-221; fields No.9-10; C77/C78 do not apply (compare MT730 p.177)",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "58A supplied by immutable upstream trade instruction; 57a absent"
       }
@@ -36274,7 +36219,7 @@
         "sheet": "TDD Cases",
         "row": 341,
         "mrgEvidence": "us7m_20260717.pdf Format table p.215; MT742 57a/58a Usage Rules pp.220-221: omit 57a only when Receiver directly services the branch account",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "receiverDirectlyServicesBeneficiaryBranchAccount=true;57A requested;58A requested"
       }
@@ -36358,7 +36303,7 @@
         "sheet": "TDD Cases",
         "row": 342,
         "mrgEvidence": "us7m_20260717.pdf pp.215,220-221; fields No.9-10; C77/C78 do not apply (compare MT730 p.177)",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "58a requested but upstream beneficiary branch/affiliate is absent"
       }
@@ -36442,7 +36387,7 @@
         "sheet": "TDD Cases",
         "row": 343,
         "mrgEvidence": "us7m_20260717.pdf p.215 Format Specifications",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=53A from generic SSI"
       },
@@ -36531,7 +36476,7 @@
         "sheet": "TDD Cases",
         "row": 344,
         "mrgEvidence": "us7m_20260717.pdf p.220; field No.9",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "57A contains unregistered/non-FI BIC"
       }
@@ -36615,7 +36560,7 @@
         "sheet": "TDD Cases",
         "row": 345,
         "mrgEvidence": "us7m_20260717.pdf pp.215,220; field No.9",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "option D selected; no controlled name/address record"
       }
@@ -36674,9 +36619,7 @@
         "statusOrError": "RESOLVED",
         "http": "200",
         "tags": {},
-        "presentTags": [
-          "MESSAGE.57A"
-        ],
+        "presentTags": ["MESSAGE.57A"],
         "outputText": "57A resolved; do not apply MT730/768/769 C77/C78"
       },
       "fixtureBinding": {
@@ -36709,7 +36652,7 @@
         "sheet": "TDD Cases",
         "row": 346,
         "mrgEvidence": "us7m_20260717.pdf pp.215,220-221; fields No.9-10; C77/C78 do not apply (compare MT730 p.177)",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "field25/32D-like upstream attributes present; valid MT742 57A"
       }
@@ -36793,7 +36736,7 @@
         "sheet": "TDD Cases",
         "row": 347,
         "mrgEvidence": "us7m_20260717.pdf pp.264-265,270-271; fields No.8-10; C2/C14",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "53A requested; only counterparty SSI route provides a BIC"
       }
@@ -36877,7 +36820,7 @@
         "sheet": "TDD Cases",
         "row": 348,
         "mrgEvidence": "us7m_20260717.pdf p.264 Format Specifications",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "candidate=54A"
       },
@@ -36943,9 +36886,7 @@
         "tags": {
           "MESSAGE.58A": "BARCGB22"
         },
-        "presentTags": [
-          "MESSAGE.58A"
-        ],
+        "presentTags": ["MESSAGE.58A"],
         "outputText": "58A emitted; 57a omitted per field 58a usage rule"
       },
       "fixtureBinding": {
@@ -36978,7 +36919,7 @@
         "sheet": "TDD Cases",
         "row": 349,
         "mrgEvidence": "us7m_20260717.pdf p.271; field No.10",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "58A from immutable upstream trade instruction; 57a absent"
       }
@@ -37037,9 +36978,7 @@
         "statusOrError": "RESOLVED",
         "http": "200",
         "tags": {},
-        "presentTags": [
-          "MESSAGE.57A"
-        ],
+        "presentTags": ["MESSAGE.57A"],
         "outputText": "57A emitted; enforce MT754 C2/C14 only"
       },
       "fixtureBinding": {
@@ -37072,7 +37011,7 @@
         "sheet": "TDD Cases",
         "row": 350,
         "mrgEvidence": "us7m_20260717.pdf pp.264-265,270-271; fields No.8-10; C2/C14",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "field25/32D-like upstream attributes present; valid 57A and no 53a"
       }
@@ -37131,9 +37070,7 @@
         "statusOrError": "RESOLVED",
         "http": "200",
         "tags": {},
-        "presentTags": [
-          "MESSAGE.53A"
-        ],
+        "presentTags": ["MESSAGE.53A"],
         "outputText": "53A emitted; 54a omitted"
       },
       "fixtureBinding": {
@@ -37166,7 +37103,7 @@
         "sheet": "TDD Cases",
         "row": 351,
         "mrgEvidence": "us7m_20260717.pdf pp.275,278; fields No.5-6; RCB usage rule",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "53A own Nostro available; direct Sender/Receiver account; 54a absent"
       }
@@ -37250,7 +37187,7 @@
         "sheet": "TDD Cases",
         "row": 352,
         "mrgEvidence": "us7m_20260717.pdf pp.275,278; fields No.5-6; RCB usage rule",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "route requires receiver correspondent; no governed receiver-correspondent record"
       }
@@ -37334,7 +37271,7 @@
         "sheet": "TDD Cases",
         "row": 353,
         "mrgEvidence": "us7m_20260717.pdf pp.275,278; fields No.5-6; RCB usage rule",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "53a and 54a absent; exactly one direct account relationship in currency"
       }
@@ -37418,7 +37355,7 @@
         "sheet": "TDD Cases",
         "row": 354,
         "mrgEvidence": "us7m_20260717.pdf pp.275,278; fields No.5-6; RCB usage rule",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "53A candidate sourced from Counterparty SSI"
       }
@@ -37502,7 +37439,7 @@
         "sheet": "TDD Cases",
         "row": 355,
         "mrgEvidence": "us7m_20260717.pdf pp.275,278; fields No.5-6; RCB usage rule",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "53A and 54A copied from same SSI record/institution"
       }
@@ -37604,7 +37541,7 @@
         "sheet": "TDD Cases",
         "row": 356,
         "mrgEvidence": "us7m_20260717.pdf pp.275,278; fields No.5-6; RCB usage rule",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "72Z contains /RCB/ but only 53A is present"
       }
@@ -37677,10 +37614,7 @@
         "statusOrError": "RESOLVED",
         "http": "200",
         "tags": {},
-        "presentTags": [
-          "MESSAGE.53A",
-          "MESSAGE.54A"
-        ],
+        "presentTags": ["MESSAGE.53A", "MESSAGE.54A"],
         "outputText": "53A/54A resolved; do not apply MT730/768/769 C77/C78"
       },
       "fixtureBinding": {
@@ -37713,7 +37647,7 @@
         "sheet": "TDD Cases",
         "row": 357,
         "mrgEvidence": "us7m_20260717.pdf pp.275,278; fields No.5-6; RCB usage rule",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "field25/32D-like upstream attributes present; valid MT756 53A/54A"
       }
@@ -37797,7 +37731,7 @@
         "sheet": "TDD Cases",
         "row": 358,
         "mrgEvidence": "us4m_20260717.pdf pp.38,42; field No.5",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "messageType=MT416; candidate 53A exists"
       }
@@ -37881,7 +37815,7 @@
         "sheet": "TDD Cases",
         "row": 359,
         "mrgEvidence": "us7m_20260717.pdf pp.409-414; fields No.11-12; C1/C81",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "messageType=MT785; 56A/57A advising chain supplied"
       }
@@ -37975,7 +37909,7 @@
         "sheet": "TDD Cases",
         "row": 360,
         "mrgEvidence": "us7m_20260717.pdf pp.220-221; field 58a usage rule",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "transaction-selected beneficiary branch/affiliate; more than one valid credited-account relationship for same scope"
       }
@@ -38059,7 +37993,7 @@
         "sheet": "TDD Cases",
         "row": 361,
         "mrgEvidence": "us7m_20260717.pdf pp.220-221; field 58a usage rule",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "transaction-selected beneficiary exists; controlled account data is missing, duplicated or ambiguous under the applicable scope"
       }
@@ -38153,7 +38087,7 @@
         "sheet": "TDD Cases",
         "row": 362,
         "mrgEvidence": "us7m_20260717.pdf pp.270-271; field 58a usage rule; C2 p.265",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "transaction-selected beneficiary branch/affiliate; more than one valid credited-account relationship for same scope; 53a/57a absent"
       }
@@ -38237,7 +38171,7 @@
         "sheet": "TDD Cases",
         "row": 363,
         "mrgEvidence": "us7m_20260717.pdf pp.270-271; field 58a usage rule; C2 p.265",
-        "memory": "memory/swift-mt347-v2.md",
+        "memory": "memory/ssi/swift-mt347-v2.md",
         "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
         "rawInputContract": "transaction-selected beneficiary exists; controlled account data is missing, duplicated or ambiguous under the applicable scope"
       }

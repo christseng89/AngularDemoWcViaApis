@@ -4,20 +4,20 @@
   "workbook": "../../../fixtures/mt2/MT2XX_測試案例_SSI與NOSTRO_v6.2_FINAL.xlsx",
   "workbookSha256": "DF3328998BA24B904B1E8944F1680699F75A916A77716BB0AD831D4A4CAA2BED",
   "expectedRuntime": {
-    "fixtureId": "SSI-DEMO-V15.8-PACS009-REPAIRED-ISOLATED-CANONICAL",
-    "seedSha256": "3B01A813C70FEEFBFE4008A5118DA0DCC195C251B066A077B5293BDDA1D59960",
+    "fixtureId": "SSI-DEMO-MT1-MT2-PACS008-PACS009-V1",
+    "seedSha256": "4D17A179ECCB45212DAC6BFF5E242AFF1388F490486A67072EA49E4605CBC1AA",
     "snapshotSha256": "62BCAA7900D3404C9ED2AF8AB54BB5C5DB644DD2C667FBC780112C124E7EF0F4",
     "snapshotMethod": "SQLITE_WAL_AWARE_LOGICAL_SNAPSHOT_V1"
   },
   "baselineArtifacts": [
     {
-      "file": "../../../fixtures/rma/reload-test-data/ssi-demo.v15.8.pacs009-repaired-isolated.canonical.seed.json",
-      "sha256": "3B01A813C70FEEFBFE4008A5118DA0DCC195C251B066A077B5293BDDA1D59960",
+      "file": "../../../../data/reload-test-data/ssi-demo.mt1-mt2.v1.approved.canonical.seed.json",
+      "sha256": "4D17A179ECCB45212DAC6BFF5E242AFF1388F490486A67072EA49E4605CBC1AA",
       "role": "CANONICAL_POSITIVE_SEED"
     },
     {
       "file": "../../../fixtures/mt2/baselines/swift-data-service.v1.current.json",
-      "sha256": "C4855F1B917DA7588A526B704BC004CA1CB9E9E1006BF30783912E61F4AF5FD0",
+      "sha256": "85AF6B8C83EC733C313764B0F9A712E2A29FA8913CD53265E09EEC71D775D018",
       "role": "CURRENT_OAS"
     },
     {
@@ -57,7 +57,7 @@
     },
     {
       "file": "../../../fixtures/mt2/baselines/bank-service.current.json",
-      "sha256": "9270C2D26F7CDE62E2D297F1BF428D1B8245414A9F6BFD97696303E66F886DCB",
+      "sha256": "DC02207FFC433F4F72C0913AE0028D217B6EBF7A5D70A8C5A96866AB44811885",
       "role": "BANK_SERVICE"
     }
   ],

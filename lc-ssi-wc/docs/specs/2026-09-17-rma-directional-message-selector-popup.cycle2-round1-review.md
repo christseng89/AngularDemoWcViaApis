@@ -8,9 +8,9 @@
 
 Both reviewers independently confirmed that they reread the complete current versions of:
 
-- `memory/ssi-maintenance-workflow-memory.md`
-- `memory/rma-index-message-scope-memory.md`
-- `memory/mt347-oas-page-parameters-ui-standard-v1.md`
+- `memory/ssi/ssi-maintenance-workflow-memory.md`
+- `memory/ssi/rma-index-message-scope-memory.md`
+- `memory/governance/mt347-oas-page-parameters-ui-standard-v1.md`
 
 ## Decision
 

@@ -20,6 +20,8 @@ import {
 } from "./governance-index-table.component";
 import {
   RuntimeSettingsService,
+  type DemoDatasetSummary,
+  type DemoExportResult,
   type DemoReloadAuthorization,
   type DemoReloadResult,
   type RuntimeSettings,
@@ -86,6 +88,17 @@ export type ThemeMode = "system" | "light" | "dark";
           (click)="selectSettingsTab('reload')"
         >
           Reload Test Data
+        </button>
+        <button
+          type="button"
+          role="tab"
+          id="export-tab"
+          aria-controls="export-panel"
+          [attr.aria-selected]="settingsTab() === 'export'"
+          [class.active]="settingsTab() === 'export'"
+          (click)="selectSettingsTab('export')"
+        >
+          Export Current DB to Test Data
         </button>
         <button
           type="button"
@@ -169,6 +182,51 @@ export type ThemeMode = "system" | "light" | "dark";
               {{ synced.inserted }} · Unchanged {{ synced.unchanged }} ·
               Inactivated {{ synced.inactivated }}
             </p>
+          }
+        </section>
+      }
+
+      @if (settingsTab() === "export") {
+        <section
+          id="export-panel"
+          class="reload-zone"
+          role="tabpanel"
+          aria-labelledby="export-tab"
+        >
+          <div class="reload-header">
+            <div>
+              <p class="eyebrow">DEVELOPMENT DATA</p>
+              <h3>Export Current DB to Test Data</h3>
+              <p>
+                將目前 Demo DB 匯出為可重新載入的合規 Test Data，保存於
+                dataexport。
+              </p>
+            </div>
+          </div>
+          <div class="reload-footer">
+            <p>匯出不修改目前 DB。Reload 時最近一次 Export 會成為預設選項。</p>
+            <button
+              type="button"
+              class="danger-secondary"
+              [disabled]="!runtime()?.developmentEnabled || exportBusy()"
+              (click)="exportCurrentDatabase()"
+            >
+              {{ exportBusy() ? "Exporting…" : "Export Current DB" }}
+            </button>
+          </div>
+          @if (exportResult(); as exported) {
+            <ssi-alert
+              [model]="exportSuccessAlert(exported)"
+              variant="banner"
+            />
+          }
+          @if (exportError(); as failure) {
+            <ssi-alert
+              [model]="failure"
+              variant="blocking"
+              [dismissible]="true"
+              (dismiss)="exportError.set(null)"
+            />
           }
         </section>
       }
@@ -287,34 +345,77 @@ export type ThemeMode = "system" | "light" | "dark";
           >
             ×
           </button>
-          <p class="eyebrow">DEFAULT COMPLIANT TEST DATA</p>
+          <p class="eyebrow">COMPLIANT TEST DATA</p>
           <h2 id="dataset-dialog-title">Confirm Reload Test Data</h2>
           <p id="dataset-dialog-description">
             系統會先備份目前 DB，再建立並驗證新的 DB。失敗時恢復原 DB。
           </p>
-          <dl class="dataset-summary">
-            <div>
-              <dt>Data set</dt>
-              <dd>{{ authorized.dataset.displayName }}</dd>
-            </div>
-            <div>
-              <dt>Version</dt>
-              <dd>{{ authorized.dataset.version }}</dd>
-            </div>
-            <div>
-              <dt>Classification</dt>
-              <dd>{{ authorized.dataset.classification }}</dd>
-            </div>
-            <div>
-              <dt>Records</dt>
-              <dd>{{ authorized.dataset.estimatedRows }}</dd>
-            </div>
-          </dl>
+          <label for="reload-dataset">Test data file</label>
+          <div class="file-picker-row">
+            <select
+              id="reload-dataset"
+              [value]="selectedDatasetId()"
+              [disabled]="busy() || uploadBusy()"
+              (change)="selectedDatasetId.set($any($event.target).value)"
+            >
+              @for (dataset of authorized.datasets; track dataset.datasetId) {
+                <option [value]="dataset.datasetId">
+                  {{ dataset.displayName }}
+                </option>
+              }
+            </select>
+            <input
+              #datasetFile
+              hidden
+              type="file"
+              accept=".json,application/json"
+              (change)="uploadSelectedFile($event)"
+            />
+            <button
+              type="button"
+              class="secondary-action"
+              [disabled]="busy() || uploadBusy()"
+              (click)="datasetFile.click()"
+            >
+              {{ uploadBusy() ? "Validating…" : "Choose file" }}
+            </button>
+          </div>
+          <p class="file-picker-help">
+            預設為最近一次 Export；也可以從電腦選擇其他合規 JSON 檔案。
+          </p>
+          @if (uploadError(); as uploadFailure) {
+            <ssi-alert
+              [model]="uploadFailure"
+              variant="inline"
+              [dismissible]="true"
+              (dismiss)="uploadError.set(null)"
+            />
+          }
+          @if (selectedDataset(); as dataset) {
+            <dl class="dataset-summary">
+              <div>
+                <dt>Data set</dt>
+                <dd>{{ dataset.displayName }}</dd>
+              </div>
+              <div>
+                <dt>Version</dt>
+                <dd>{{ dataset.version }}</dd>
+              </div>
+              <div>
+                <dt>Classification</dt>
+                <dd>{{ dataset.classification }}</dd>
+              </div>
+              <div>
+                <dt>Records</dt>
+                <dd>{{ dataset.estimatedRows }}</dd>
+              </div>
+            </dl>
+          }
           <div class="dialog-actions">
             <button
               type="button"
               class="danger-primary"
-              [disabled]="busy()"
+              [disabled]="busy() || uploadBusy()"
               (click)="reload()"
             >
               {{ busy() ? "Reloading data…" : "Confirm Reload" }}
@@ -340,10 +441,16 @@ export class SettingsPageComponent implements OnInit, OnDestroy {
   readonly confirmationOpen = signal(false);
   readonly datasetConfirmationOpen = signal(false);
   readonly authorization = signal<DemoReloadAuthorization | null>(null);
+  readonly selectedDatasetId = signal("");
+  readonly uploadBusy = signal(false);
+  readonly uploadError = signal<AlertModel | null>(null);
   readonly password = signal("");
   readonly result = signal<DemoReloadResult | null>(null);
   readonly error = signal<AlertModel | null>(null);
-  readonly settingsTab = signal<"reload" | "currency">("reload");
+  readonly settingsTab = signal<"reload" | "export" | "currency">("reload");
+  readonly exportBusy = signal(false);
+  readonly exportResult = signal<DemoExportResult | null>(null);
+  readonly exportError = signal<AlertModel | null>(null);
   readonly currencyColumns = signal<readonly GovernanceIndexColumn[]>([]);
   readonly currencyRows = signal<
     readonly GovernanceIndexRow<ResolutionCurrencyRow>[]
@@ -390,10 +497,40 @@ export class SettingsPageComponent implements OnInit, OnDestroy {
     if (this.currencySearchTimer) clearTimeout(this.currencySearchTimer);
   }
 
-  selectSettingsTab(tab: "reload" | "currency"): void {
+  selectSettingsTab(tab: "reload" | "export" | "currency"): void {
     this.settingsTab.set(tab);
     if (tab === "currency" && !this.currencyLoaded() && !this.currencyLoading())
       void this.loadCurrencyInquiry();
+  }
+
+  selectedDataset(): DemoDatasetSummary | null {
+    const authorization = this.authorization();
+    if (!authorization) return null;
+    return (
+      authorization.datasets.find(
+        ({ datasetId }) => datasetId === this.selectedDatasetId(),
+      ) ?? authorization.dataset
+    );
+  }
+
+  async exportCurrentDatabase(): Promise<void> {
+    if (!this.runtime()?.developmentEnabled || this.exportBusy()) return;
+    this.exportBusy.set(true);
+    this.exportError.set(null);
+    try {
+      this.exportResult.set(
+        await firstValueFrom(this.service.exportCurrentDatabase()),
+      );
+    } catch (error_) {
+      this.exportError.set({
+        severity: "error",
+        title: "Export Current DB 失敗",
+        message: "目前 DB 未能匯出；現有資料不受影響。",
+        code: this.errorCode(error_),
+      });
+    } finally {
+      this.exportBusy.set(false);
+    }
   }
 
   currencyConfig() {
@@ -561,6 +698,7 @@ export class SettingsPageComponent implements OnInit, OnDestroy {
         this.service.authorizeDevelopmentDataReload(this.password()),
       );
       this.authorization.set(authorization);
+      this.selectedDatasetId.set(authorization.defaultDatasetId);
       this.confirmationOpen.set(false);
       this.datasetConfirmationOpen.set(true);
     } catch (error_) {
@@ -585,9 +723,11 @@ export class SettingsPageComponent implements OnInit, OnDestroy {
   }
 
   async cancelDatasetConfirmation(): Promise<void> {
-    if (this.busy()) return;
+    if (this.busy() || this.uploadBusy()) return;
     const authorization = this.authorization();
     this.authorization.set(null);
+    this.selectedDatasetId.set("");
+    this.uploadError.set(null);
     this.datasetConfirmationOpen.set(false);
     if (!authorization) return;
     try {
@@ -601,6 +741,42 @@ export class SettingsPageComponent implements OnInit, OnDestroy {
     }
   }
 
+  async uploadSelectedFile(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    const authorization = this.authorization();
+    if (!file || !authorization || this.busy() || this.uploadBusy()) return;
+    this.uploadBusy.set(true);
+    this.uploadError.set(null);
+    try {
+      const dataset = await firstValueFrom(
+        this.service.uploadDevelopmentData(
+          authorization.authorizationToken,
+          file,
+        ),
+      );
+      this.authorization.set({
+        ...authorization,
+        dataset,
+        datasets: [
+          dataset,
+          ...authorization.datasets.filter(({ source }) => source !== "UPLOAD"),
+        ],
+      });
+      this.selectedDatasetId.set(dataset.datasetId);
+    } catch (error_) {
+      this.uploadError.set({
+        severity: "error",
+        title: "Test data file 不合規",
+        message: "請選擇有效的合規 JSON 測試資料；現有 DB 未被修改。",
+        code: this.errorCode(error_),
+      });
+    } finally {
+      input.value = "";
+      this.uploadBusy.set(false);
+    }
+  }
+
   async reload(): Promise<void> {
     const authorization = this.authorization();
     if (this.busy() || !authorization) return;
@@ -608,10 +784,14 @@ export class SettingsPageComponent implements OnInit, OnDestroy {
     this.error.set(null);
     try {
       const result = await firstValueFrom(
-        this.service.reloadDevelopmentData(authorization.authorizationToken),
+        this.service.reloadDevelopmentData(
+          authorization.authorizationToken,
+          this.selectedDatasetId(),
+        ),
       );
       this.result.set(result);
       this.authorization.set(null);
+      this.selectedDatasetId.set("");
       this.datasetConfirmationOpen.set(false);
       this.dataReloaded.emit(result);
       await this.loadRuntime();
@@ -646,6 +826,16 @@ export class SettingsPageComponent implements OnInit, OnDestroy {
       title: "Development test data 已重新載入",
       message: `已匯入 ${count} 筆資料；畫面資料已重新整理。`,
       impact: `Snapshot ${result.snapshotHash}`,
+      code: result.code,
+    };
+  }
+
+  exportSuccessAlert(result: DemoExportResult): AlertModel {
+    return {
+      severity: "success",
+      title: "Current DB 已匯出",
+      message: `${result.dataset.displayName} 可在 Reload Test Data 中選擇。`,
+      impact: "Export 已由伺服器安全保存。",
       code: result.code,
     };
   }

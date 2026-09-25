@@ -30,12 +30,25 @@ export interface DemoReloadAuthorization {
   readonly code: "DEMO_RELOAD_AUTHORIZED";
   readonly authorizationToken: string;
   readonly expiresAt: string;
-  readonly dataset: {
-    readonly displayName: string;
-    readonly version: string;
-    readonly classification: string;
-    readonly estimatedRows: number;
-  };
+  readonly dataset: DemoDatasetSummary;
+  readonly datasets: readonly DemoDatasetSummary[];
+  readonly defaultDatasetId: string;
+}
+
+export interface DemoDatasetSummary {
+  readonly datasetId: string;
+  readonly displayName: string;
+  readonly version: string;
+  readonly classification: string;
+  readonly estimatedRows: number;
+  readonly source: "DEFAULT" | "EXPORT" | "UPLOAD";
+  readonly exportedAt?: string;
+}
+
+export interface DemoExportResult {
+  readonly code: "DEMO_DATA_EXPORTED";
+  readonly completedAt: string;
+  readonly dataset: DemoDatasetSummary;
 }
 
 export interface CurrencyInquiryContract {
@@ -100,10 +113,31 @@ export class RuntimeSettingsService {
 
   reloadDevelopmentData(
     authorizationToken: string,
+    datasetId: string,
   ): Observable<DemoReloadResult> {
     return this.http.post<DemoReloadResult>(
       `${this.api}/development-data/reload`,
-      { authorizationToken },
+      { authorizationToken, datasetId },
+    );
+  }
+
+  uploadDevelopmentData(
+    authorizationToken: string,
+    file: File,
+  ): Observable<DemoDatasetSummary> {
+    const form = new FormData();
+    form.append("authorizationToken", authorizationToken);
+    form.append("file", file);
+    return this.http.post<DemoDatasetSummary>(
+      `${this.api}/development-data/reload/upload`,
+      form,
+    );
+  }
+
+  exportCurrentDatabase(): Observable<DemoExportResult> {
+    return this.http.post<DemoExportResult>(
+      `${this.api}/development-data/export`,
+      {},
     );
   }
 

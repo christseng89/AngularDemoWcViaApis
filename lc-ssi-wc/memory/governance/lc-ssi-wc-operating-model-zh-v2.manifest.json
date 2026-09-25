@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "1.0",
+  "artifact": "memory/governance/lc-ssi-wc-operating-model-zh-v2.md",
+  "optionalVersion": "v2.8.25",
+  "effectiveDate": "2026-09-18",
+  "identityPolicy": "GIT_TRACKED_PATH",
+  "manifestAuthority": "LOCATOR_METADATA_ONLY",
+  "roleApprovalAuthority": "EXTERNAL_TASK_AND_4_EYES_EVIDENCE",
+  "changeReason": "Add the Product Owner directed integrity and deliberate-nonperformance red line with evidence-based adjudication, immediate project-role removal and replacement, protected good-faith reporting, and independent baseline reconstruction; retain Git-tracked path plus external exact-commit identity and local-commit/no-push governance.",
+  "scope": "All current and future SSI Resolution Message Families and their Generic UI consumers.",
+  "maker": "/root/governance_integrity_maker",
+  "independentChecker": "PENDING_ASSIGNMENT",
+  "checkerStatus": "PENDING_REVIEW",
+  "checkedAt": null,
+  "referencedArtifacts": [
+    {
+      "artifact": "memory/governance/mt347-oas-page-parameters-ui-standard-v1.md",
+      "optionalVersion": "v1"
+    }
+  ],
+  "reviewEvidence": {
+    "ba": {
+      "checker": "/root/ba_mt1_pacs008_boundary",
+      "status": "PENDING_REVIEW",
+      "scope": "MT1/pacs.008 CPI versus Bank SSI boundary, Customer UI semantics, Serial/Cover and INDA/INGA/COVE axes, scenario ownership, current-rule evidence, and D: authorization revocation"
+    },
+    "qa": {
+      "checker": "/root/qa_payment_all_scenarios",
+      "status": "PENDING_REVIEW",
+      "scope": "Exact-profile RMA acceptance matrix, FINPLUS default, FIN-only fail-closed, compatibility-view snapshot stability, and transport-change reconfirmation"
+    },
+    "dba": {
+      "checker": "/root/dba_performance_review",
+      "status": "PENDING_REVIEW",
+      "scope": "Query plans, indexes, row counts, cold/hot latency, WAL/locking, and exact Operational/API/UI/QA logical-snapshot parity"
+    },
+    "sonarLoopbackException": {
+      "checker": "/root/qa_payment_all_scenarios",
+      "status": "PENDING_REVIEW",
+      "scope": "Verify the HTTP exception is restricted to loopback-only repo-local QA/Sonar tooling and all other HTTP/TLS findings remain actionable"
+    }
+  }
+}

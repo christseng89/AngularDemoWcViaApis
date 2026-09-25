@@ -24,7 +24,7 @@ const DEFAULT_OAS = join(
   "swift-data-service.v1.json",
 );
 const OAS_ARTIFACT = "openapi/swift-data-service.v1.json";
-const MEMORY_ARTIFACT = "memory/swift-mt1xx-pacs008-ssi-v3.md";
+const MEMORY_ARTIFACT = "memory/ssi/swift-mt1xx-pacs008-ssi-v3.md";
 const MEMORY_SHA =
   "1F3D85023360211DD1D418C251DB0D3B59D480A188A0B7921A8CC05E5EF91BAA";
 

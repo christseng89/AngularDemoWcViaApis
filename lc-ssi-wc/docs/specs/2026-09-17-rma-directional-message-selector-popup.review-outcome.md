@@ -4,9 +4,9 @@
 **Reviewed Round 3 artifact SHA-256:** `BF1220C13AE0943F2BB2A34BCC7E44915C272348B5006F0192EF7E73252FEC3A`  
 **Applicable Memory read by every reviewer:**
 
-- `memory/ssi-maintenance-workflow-memory.md`
-- `memory/rma-index-message-scope-memory.md`
-- `memory/mt347-oas-page-parameters-ui-standard-v1.md`
+- `memory/ssi/ssi-maintenance-workflow-memory.md`
+- `memory/ssi/rma-index-message-scope-memory.md`
+- `memory/governance/mt347-oas-page-parameters-ui-standard-v1.md`
 
 ## Three-round result
 

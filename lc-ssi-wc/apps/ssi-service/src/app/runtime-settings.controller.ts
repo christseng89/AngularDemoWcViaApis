@@ -7,7 +7,10 @@ import {
   ForbiddenException,
   BadRequestException,
   Optional,
+  UploadedFile,
+  UseInterceptors,
 } from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
 import { DevelopmentDataReloadService } from "./development-data-reload.service";
 import { ResolutionCurrencyCoverageCoordinator } from "./resolution-currency-coordinator";
 import {
@@ -37,15 +40,41 @@ export class RuntimeSettingsController {
 
   @Post("development-data/reload")
   async reload(
-    @Body() body: { authorizationToken?: unknown },
+    @Body() body: { authorizationToken?: unknown; datasetId?: unknown },
   ): Promise<unknown> {
     const result = await this.reloadService.reload(
       typeof body?.authorizationToken === "string"
         ? body.authorizationToken
         : "",
+      typeof body?.datasetId === "string" ? body.datasetId : undefined,
     );
     this.currencies?.onReloadCommitted();
     return result;
+  }
+
+  @Post("development-data/export")
+  exportCurrentDatabase(): unknown {
+    return this.reloadService.exportCurrentDatabase();
+  }
+
+  @Post("development-data/reload/upload")
+  @UseInterceptors(
+    FileInterceptor("file", {
+      limits: { files: 1, fileSize: 80 * 1024 * 1024 },
+    }),
+  )
+  uploadReloadDataset(
+    @Body() body: { authorizationToken?: unknown },
+    @UploadedFile()
+    file?: { readonly originalname: string; readonly buffer: Buffer },
+  ): unknown {
+    if (!file) throw new BadRequestException("DEMO_RELOAD_FILE_REQUIRED");
+    return this.reloadService.uploadDataset(
+      typeof body?.authorizationToken === "string"
+        ? body.authorizationToken
+        : "",
+      { originalName: file.originalname, buffer: file.buffer },
+    );
   }
 
   @Post("development-data/reload/authorize")

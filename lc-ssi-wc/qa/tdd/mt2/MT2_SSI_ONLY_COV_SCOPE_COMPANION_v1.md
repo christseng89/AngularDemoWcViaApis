@@ -25,16 +25,16 @@ This companion applies the current SSI-only scope decision:
 
 Normative and controlled basis:
 
-- `memory/swift-mt2xx-pacs009-v2.md`, SHA-256 `B0BC5655CB843B771E8FBFFE0F6448D5400A42A2F2AE0F6F37444E0935E8132A`, sections 1, 4, 5 and 6.
+- `memory/ssi/swift-mt2xx-pacs009-v2.md`, SHA-256 `B0BC5655CB843B771E8FBFFE0F6448D5400A42A2F2AE0F6F37444E0935E8132A`, sections 1, 4, 5 and 6.
 - `SWIFT/us2m_20260717.pdf`, SHA-256 `64483D7F7C094DB28E03791AB6BBC7A0522DAEC90487A7DD834228E848FA8323`, MT202 plain pp.39–40 and MT202COV pp.59–61.
 - pacs.009 COV profile requires `BizSvc=swift.cbprplus.cov.04`; profile selection uses the business scenario and BAH `BizSvc`, not the common `pacs.009.001.08` message definition alone.
 
 ## 2. Controlled corrections
 
-| Case | Existing v6.2 expectation | Corrected SSI-only expectation | Owner | Rule classification |
-|---|---|---|---|---|
-| `MT202C-16` | HTTP 200 `RESOLVED` for `CREDIT_ONE_OF_SEVERAL_AT_57A` under MT202COV | HTTP 400 `COUNTERPARTY_PAYMENT_PROFILE_MISMATCH`; `payloadGenerated=false`; no confirmed resolution/snapshot; no Repair Queue submission. Detail must state that the own-account scenario is valid only for plain MT202. | `SSI_FIELD_RESOLUTION_API` | `BA_SCENARIO_PROFILE_GUARD` |
-| `MT202C-17` | HTTP 200 `RESOLVED` for `BOOK_TRANSFER_SAME_RECEIVER` under MT202COV | HTTP 400 `COUNTERPARTY_PAYMENT_PROFILE_MISMATCH`; `payloadGenerated=false`; no confirmed resolution/snapshot; no Repair Queue submission. Detail must state that the book-transfer scenario is valid only for plain MT202. | `SSI_FIELD_RESOLUTION_API` | `BA_SCENARIO_PROFILE_GUARD` |
+| Case        | Existing v6.2 expectation                                             | Corrected SSI-only expectation                                                                                                                                                                                             | Owner                      | Rule classification         |
+| ----------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- | --------------------------- |
+| `MT202C-16` | HTTP 200 `RESOLVED` for `CREDIT_ONE_OF_SEVERAL_AT_57A` under MT202COV | HTTP 400 `COUNTERPARTY_PAYMENT_PROFILE_MISMATCH`; `payloadGenerated=false`; no confirmed resolution/snapshot; no Repair Queue submission. Detail must state that the own-account scenario is valid only for plain MT202.   | `SSI_FIELD_RESOLUTION_API` | `BA_SCENARIO_PROFILE_GUARD` |
+| `MT202C-17` | HTTP 200 `RESOLVED` for `BOOK_TRANSFER_SAME_RECEIVER` under MT202COV  | HTTP 400 `COUNTERPARTY_PAYMENT_PROFILE_MISMATCH`; `payloadGenerated=false`; no confirmed resolution/snapshot; no Repair Queue submission. Detail must state that the book-transfer scenario is valid only for plain MT202. | `SSI_FIELD_RESOLUTION_API` | `BA_SCENARIO_PROFILE_GUARD` |
 
 The two corrected cases must not emit MT tags, pacs.009 elements, a confirmed snapshot, a settlement payload or a Repair Queue item. Their failure is an SSI profile/scenario contract decision, not a FIN NVR result.
 
@@ -82,11 +82,11 @@ The accepted MT2 final report and its 139-case execution remain historical evide
 
 Source identities:
 
-| Artifact | SHA-256 | Treatment |
-|---|---|---|
+| Artifact                                                     | SHA-256                                                            | Treatment                                                    |
+| ------------------------------------------------------------ | ------------------------------------------------------------------ | ------------------------------------------------------------ |
 | `qa/fixtures/mt2/MT2XX_測試案例_SSI與NOSTRO_v6.2_FINAL.xlsx` | `DF3328998BA24B904B1E8944F1680699F75A916A77716BB0AD831D4A4CAA2BED` | Preserved; two expected results overridden by this companion |
-| `qa/reports/latest/mt2/final/mt2-final-qa-report.json` | `503B0479FA4F30DABCA2093FAB0B7F114C1ABEC3A9C487852A578952AA31D4D4` | Historical; two PASS assertions quarantined |
-| `qa/tests/mt2/final/mt2-final-qa.config.json` | `5113FC2FEB4CFD60BF81EE90AB1E0B2695250F75493DB2012FFBAB6B0C340117` | Historical execution configuration |
+| `qa/reports/latest/mt2/final/mt2-final-qa-report.json`       | `503B0479FA4F30DABCA2093FAB0B7F114C1ABEC3A9C487852A578952AA31D4D4` | Historical; two PASS assertions quarantined                  |
+| `qa/tests/mt2/final/mt2-final-qa.config.json`                | `5113FC2FEB4CFD60BF81EE90AB1E0B2695250F75493DB2012FFBAB6B0C340117` | Historical execution configuration                           |
 
 ## 6. BA sign-off
 

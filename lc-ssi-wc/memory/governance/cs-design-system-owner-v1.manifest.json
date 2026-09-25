@@ -1,0 +1,12 @@
+{
+  "artifact": "memory/governance/cs-design-system-owner-v1.md",
+  "optionalVersion": "v1",
+  "status": "PERMANENT_TEAM_DECISION",
+  "identityPolicy": "GIT_TRACKED_PATH",
+  "manifestAuthority": "LOCATOR_METADATA_ONLY",
+  "roleApprovalAuthority": "EXTERNAL_TASK_AND_4_EYES_EVIDENCE",
+  "effectiveDate": "2026-09-18",
+  "owner": "User / Project Lead",
+  "manifestMaker": "/root/angular_lazy_defer_engineer",
+  "approval": "PENDING_INDEPENDENT_CHECKER"
+}

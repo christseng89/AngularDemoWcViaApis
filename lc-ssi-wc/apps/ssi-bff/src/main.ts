@@ -14,7 +14,10 @@ import {
   Post,
   Put,
   Query,
+  UploadedFile,
+  UseInterceptors,
 } from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
 import { UpstreamApiInterceptor } from "./upstream-api.interceptor";
 
 const serviceUrl = () =>
@@ -31,15 +34,17 @@ async function forward(
   timeoutOverrideMs?: number,
 ): Promise<unknown> {
   try {
+    const forwardedInit: RequestInit = { ...init };
+    if (!(init?.body instanceof FormData)) {
+      const headers: Record<string, string> = Object.fromEntries(
+        new Headers(init?.headers).entries(),
+      );
+      headers["content-type"] = "application/json";
+      forwardedInit.headers = headers;
+    }
     const response = await upstreamApiInterceptor.intercept(
       `${baseUrl}/${path}`,
-      {
-        ...init,
-        headers: {
-          "content-type": "application/json",
-          ...init?.headers,
-        },
-      },
+      forwardedInit,
       timeoutOverrideMs,
     );
     const value = (await response.json()) as unknown;
@@ -123,6 +128,50 @@ class BffController {
         method: "POST",
         body: JSON.stringify(body),
       },
+      DEMO_RELOAD_TIMEOUT_MS,
+    );
+  }
+  @Post("settings/development-data/export")
+  exportCurrentDatabase(): Promise<unknown> {
+    return forwardSsi(
+      "settings/development-data/export",
+      { method: "POST" },
+      DEMO_RELOAD_TIMEOUT_MS,
+    );
+  }
+  @Post("settings/development-data/reload/upload")
+  @UseInterceptors(
+    FileInterceptor("file", {
+      limits: { files: 1, fileSize: 80 * 1024 * 1024 },
+    }),
+  )
+  uploadDevelopmentData(
+    @Body() body: { authorizationToken?: unknown },
+    @UploadedFile()
+    file?: {
+      readonly originalname: string;
+      readonly mimetype: string;
+      readonly buffer: Buffer;
+    },
+  ): Promise<unknown> {
+    if (!file) throw new HttpException("DEMO_RELOAD_FILE_REQUIRED", 400);
+    const form = new FormData();
+    form.append(
+      "authorizationToken",
+      typeof body.authorizationToken === "string"
+        ? body.authorizationToken
+        : "",
+    );
+    const bytes = new Uint8Array(file.buffer.byteLength);
+    bytes.set(file.buffer);
+    form.append(
+      "file",
+      new Blob([bytes], { type: file.mimetype || "application/json" }),
+      file.originalname,
+    );
+    return forwardSsi(
+      "settings/development-data/reload/upload",
+      { method: "POST", body: form },
       DEMO_RELOAD_TIMEOUT_MS,
     );
   }

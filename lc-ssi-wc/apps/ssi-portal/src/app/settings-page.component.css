@@ -17,7 +17,9 @@
   gap: 16px;
   margin-bottom: 16px;
 }
-.currency-heading h3 { margin: 0; }
+.currency-heading h3 {
+  margin: 0;
+}
 .settings-tabs {
   display: flex;
   gap: 8px;
@@ -123,6 +125,19 @@
   width: min(560px, calc(100vw - 32px));
   max-height: 90dvh;
   overflow: auto;
+}
+.file-picker-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+.file-picker-row select {
+  min-width: 0;
+}
+.file-picker-help {
+  margin: 8px 0 0;
+  color: var(--muted);
 }
 .dialog-actions {
   display: flex;

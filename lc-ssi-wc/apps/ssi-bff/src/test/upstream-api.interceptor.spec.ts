@@ -84,8 +84,17 @@ describe("UpstreamApiInterceptor", () => {
     const fetchImpl = jest.fn().mockResolvedValue(response(201));
     const timeout = jest.spyOn(global, "setTimeout");
     try {
-      const interceptor = new UpstreamApiInterceptor(environment(), fetchImpl);
-      await interceptor.intercept("http://service.test/api/settings/development-data/reload", { method: "POST" }, 120_000);
+      const interceptor = new UpstreamApiInterceptor(
+        environment(),
+        fetchImpl,
+        async () => undefined,
+        () => 0,
+      );
+      await interceptor.intercept(
+        "http://service.test/api/settings/development-data/reload",
+        { method: "POST" },
+        120_000,
+      );
       expect(timeout).toHaveBeenCalledWith(expect.any(Function), 120_000);
       expect(fetchImpl).toHaveBeenCalledTimes(1);
       expect(readApiRetryPolicy(environment()).maxElapsedMs).toBe(10_000);

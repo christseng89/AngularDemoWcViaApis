@@ -139,6 +139,13 @@ describe("SSI BFF forwarding contract", () => {
       body: { authorizationToken: "token" },
     },
     {
+      name: "development data export",
+      method: "exportCurrentDatabase",
+      args: [],
+      url: "http://ssi.test/api/settings/development-data/export",
+      httpMethod: "POST",
+    },
+    {
       name: "development data reload authorization",
       method: "authorizeDevelopmentDataReload",
       args: [{ password: "entered" }],

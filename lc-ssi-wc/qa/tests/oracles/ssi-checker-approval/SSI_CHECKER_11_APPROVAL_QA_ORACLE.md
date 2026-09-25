@@ -8,9 +8,9 @@
 
 ## Governance identity
 
-| Artifact | Declared version / SHA | Observed SHA | Result |
-|---|---|---|---|
-| `memory/lc-ssi-wc-operating-model-zh-v2.md` | `v2.8.21` / `EA77F1C77441928E02AFB18221C9AB71CAE266B4FB384AE73B8C1D0404EB6626` | `5727E09B9C0D0F481A20A56096C34586B32D881A349A75D46B94D7A63684B9CC` | `MISMATCH` |
+| Artifact                                               | Declared version / SHA                                                         | Observed SHA                                                       | Result     |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------ | ------------------------------------------------------------------ | ---------- |
+| `memory/governance/lc-ssi-wc-operating-model-zh-v2.md` | `v2.8.21` / `EA77F1C77441928E02AFB18221C9AB71CAE266B4FB384AE73B8C1D0404EB6626` | `5727E09B9C0D0F481A20A56096C34586B32D881A349A75D46B94D7A63684B9CC` | `MISMATCH` |
 
 The governance SHA mismatch is an independent acceptance blocker. It does not alter the defect root-cause evidence below.
 
@@ -22,19 +22,19 @@ Read-only GET:
 
 Observed `totalItems=11`. UI Checker badge also shows `11`; SSI Checker Index shows `11 records` across two UI pages.
 
-| # | Pending approval identity | SSI name / identity | Maker | Pending status | Applicability | Active applicability | Pre-fix expectation |
-|---:|---|---|---|---|---:|---:|---|
-| 1 | `SSI-MT12-V1-09E928E1-F3D1-4C9B-A10C-51707A303E4B` | `CP-ANY-HKD` | `maker.datafix` | `PENDING_APPROVAL` | 6 `DRAFT` | 0 | Approval rejected |
-| 2 | `SSI-MT12-V1-5547DF35-B8E3-4375-A54A-E569FC4E69FA` | `CP-ANY-USD` | `maker.datafix` | `PENDING_APPROVAL` | 6 `DRAFT` | 0 | Approval rejected |
-| 3 | `SSI-MT12-V1-71C01B10-581D-4892-84E5-92BD247727DA` | `CP-ANY-AUD` | `maker.datafix` | `PENDING_APPROVAL` | 6 `DRAFT` | 0 | Approval rejected |
-| 4 | `SSI-MT12-V1-867B9600-5A93-45A3-A4C8-EC5B008FE8CF` | `CP-ANY` / CHASUS33 | `maker.datafix` | `PENDING_APPROVAL` | 2 `DRAFT` | 0 | Approval rejected |
-| 5 | `SSI-MT12-V1-8DE05200-E796-42CC-8806-F6E7437A20B2` | `CP-ANY-SGD` | `maker.datafix` | `PENDING_APPROVAL` | 6 `DRAFT` | 0 | Approval rejected |
-| 6 | `SSI-MT12-V1-AE2A71AE-A2A1-427C-8701-B519DBBF12B1` | `CP-ANY-CNY` | `maker.datafix` | `PENDING_APPROVAL` | 6 `DRAFT` | 0 | Approval rejected |
-| 7 | `SSI-MT12-V1-B6436323-B43E-42C6-AFD1-764A5A264E11` | `ANY` / DEUTDEFF | `maker.datafix` | `PENDING_APPROVAL` | 6 `DRAFT` | 0 | Approval rejected |
-| 8 | `SSI-MT12-V1-BFBEEC3D-E9A5-458D-8036-7419A45C6866` | `CP-ANY-CAD` | `maker.datafix` | `PENDING_APPROVAL` | 6 `DRAFT` | 0 | Approval rejected |
-| 9 | `SSI-MT12-V1-CD321EEF-6C2F-40A2-82C6-E835745D002E` | `CP-ANY-CHF` | `maker.datafix` | `PENDING_APPROVAL` | 6 `DRAFT` | 0 | Approval rejected |
-| 10 | `SSI-MT12-V1-D20BA710-2EF3-4F3D-8222-ACAFF54C4441` | `ANY` / BOTKJPJT | `maker.datafix` | `PENDING_APPROVAL` | 6 `DRAFT` | 0 | Approval rejected |
-| 11 | `SSI-MT12-V1-E73224F3-5B8B-4702-AD97-A88C87CDC3A6` | `CP-ANY-GBP` | `maker.datafix` | `PENDING_APPROVAL` | 6 `DRAFT` | 0 | Approval rejected |
+|   # | Pending approval identity                          | SSI name / identity | Maker           | Pending status     | Applicability | Active applicability | Pre-fix expectation |
+| --: | -------------------------------------------------- | ------------------- | --------------- | ------------------ | ------------: | -------------------: | ------------------- |
+|   1 | `SSI-MT12-V1-09E928E1-F3D1-4C9B-A10C-51707A303E4B` | `CP-ANY-HKD`        | `maker.datafix` | `PENDING_APPROVAL` |     6 `DRAFT` |                    0 | Approval rejected   |
+|   2 | `SSI-MT12-V1-5547DF35-B8E3-4375-A54A-E569FC4E69FA` | `CP-ANY-USD`        | `maker.datafix` | `PENDING_APPROVAL` |     6 `DRAFT` |                    0 | Approval rejected   |
+|   3 | `SSI-MT12-V1-71C01B10-581D-4892-84E5-92BD247727DA` | `CP-ANY-AUD`        | `maker.datafix` | `PENDING_APPROVAL` |     6 `DRAFT` |                    0 | Approval rejected   |
+|   4 | `SSI-MT12-V1-867B9600-5A93-45A3-A4C8-EC5B008FE8CF` | `CP-ANY` / CHASUS33 | `maker.datafix` | `PENDING_APPROVAL` |     2 `DRAFT` |                    0 | Approval rejected   |
+|   5 | `SSI-MT12-V1-8DE05200-E796-42CC-8806-F6E7437A20B2` | `CP-ANY-SGD`        | `maker.datafix` | `PENDING_APPROVAL` |     6 `DRAFT` |                    0 | Approval rejected   |
+|   6 | `SSI-MT12-V1-AE2A71AE-A2A1-427C-8701-B519DBBF12B1` | `CP-ANY-CNY`        | `maker.datafix` | `PENDING_APPROVAL` |     6 `DRAFT` |                    0 | Approval rejected   |
+|   7 | `SSI-MT12-V1-B6436323-B43E-42C6-AFD1-764A5A264E11` | `ANY` / DEUTDEFF    | `maker.datafix` | `PENDING_APPROVAL` |     6 `DRAFT` |                    0 | Approval rejected   |
+|   8 | `SSI-MT12-V1-BFBEEC3D-E9A5-458D-8036-7419A45C6866` | `CP-ANY-CAD`        | `maker.datafix` | `PENDING_APPROVAL` |     6 `DRAFT` |                    0 | Approval rejected   |
+|   9 | `SSI-MT12-V1-CD321EEF-6C2F-40A2-82C6-E835745D002E` | `CP-ANY-CHF`        | `maker.datafix` | `PENDING_APPROVAL` |     6 `DRAFT` |                    0 | Approval rejected   |
+|  10 | `SSI-MT12-V1-D20BA710-2EF3-4F3D-8222-ACAFF54C4441` | `ANY` / BOTKJPJT    | `maker.datafix` | `PENDING_APPROVAL` |     6 `DRAFT` |                    0 | Approval rejected   |
+|  11 | `SSI-MT12-V1-E73224F3-5B8B-4702-AD97-A88C87CDC3A6` | `CP-ANY-GBP`        | `maker.datafix` | `PENDING_APPROVAL` |     6 `DRAFT` |                    0 | Approval rejected   |
 
 ## Reproduction and root-cause oracle
 
@@ -48,24 +48,24 @@ Observed `totalItems=11`. UI Checker badge also shows `11`; SSI Checker Index sh
 
 ## Candidate acceptance matrix
 
-| Gate | Required result |
-|---|---|
-| Denominator | Exactly the same 11 identities are covered; no invented or omitted record |
-| Button | `Approve` remains visible, keyboard reachable, and enabled for an eligible independent Checker |
-| Four-eyes positive | `maker.datafix` with `checker.demo` is accepted |
-| Four-eyes negative | Same Maker actor is rejected with zero data/audit side effects |
-| State transition | Pending SSI revision becomes `ACTIVE` directly on Checker approval |
-| Applicability lifecycle | All intended applicability rows for the approved revision become `ACTIVE` atomically; none remain `DRAFT` |
-| Previous version | Referenced prior Active SSI becomes `SUPERSEDED` exactly once |
-| API success | Approval returns success with the approved SSI identity, `status=ACTIVE`, and independent checker |
-| API failure safety | Any validation/concurrency failure leaves SSI, applicability, predecessor, audit, and outbox logically unchanged |
-| Audit | Checker, approval action, new Active revision, and superseded predecessor are traceable |
-| UI refresh | Detail closes; Checker count/list removes only the approved identity; remaining count decrements by one |
-| Pagination | Page 1/2 remains coherent as 11 decreases; no skipped/duplicated row |
-| Reject regression | Reason shorter than 5 remains blocked; valid Reject returns the record to `DRAFT` |
-| Existing lifecycle regression | Revise/WIP/Save Draft/Submit/Suppress/Revoke rules remain unchanged |
-| Tests | New Red test proves the pre-fix defect; Green unit/integration/UI tests pass without weakening assertions |
-| Shared DB | QA does not mutate the shared Development DB before explicit execution authorization |
+| Gate                          | Required result                                                                                                  |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Denominator                   | Exactly the same 11 identities are covered; no invented or omitted record                                        |
+| Button                        | `Approve` remains visible, keyboard reachable, and enabled for an eligible independent Checker                   |
+| Four-eyes positive            | `maker.datafix` with `checker.demo` is accepted                                                                  |
+| Four-eyes negative            | Same Maker actor is rejected with zero data/audit side effects                                                   |
+| State transition              | Pending SSI revision becomes `ACTIVE` directly on Checker approval                                               |
+| Applicability lifecycle       | All intended applicability rows for the approved revision become `ACTIVE` atomically; none remain `DRAFT`        |
+| Previous version              | Referenced prior Active SSI becomes `SUPERSEDED` exactly once                                                    |
+| API success                   | Approval returns success with the approved SSI identity, `status=ACTIVE`, and independent checker                |
+| API failure safety            | Any validation/concurrency failure leaves SSI, applicability, predecessor, audit, and outbox logically unchanged |
+| Audit                         | Checker, approval action, new Active revision, and superseded predecessor are traceable                          |
+| UI refresh                    | Detail closes; Checker count/list removes only the approved identity; remaining count decrements by one          |
+| Pagination                    | Page 1/2 remains coherent as 11 decreases; no skipped/duplicated row                                             |
+| Reject regression             | Reason shorter than 5 remains blocked; valid Reject returns the record to `DRAFT`                                |
+| Existing lifecycle regression | Revise/WIP/Save Draft/Submit/Suppress/Revoke rules remain unchanged                                              |
+| Tests                         | New Red test proves the pre-fix defect; Green unit/integration/UI tests pass without weakening assertions        |
+| Shared DB                     | QA does not mutate the shared Development DB before explicit execution authorization                             |
 
 ## Final evidence placeholders
 

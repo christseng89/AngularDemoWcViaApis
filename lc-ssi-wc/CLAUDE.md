@@ -2,9 +2,9 @@
 
 ## 全專案交付治理必讀
 
-- 開工、分派、設計、DB Reload、QA、SonarQube、Excel TDD、封存及 Block 回報，一律遵守 `memory/lc-ssi-wc-operating-model-zh-v2.md`。Active Git-tracked governance 以 repository path＋外部任務交接／review evidence 所記錄的 exact Git commit 識別；exact commit 不寫回本檔或 manifest。Semantic version 若存在，只是可選的人類／release label，不是身分或每次修改 Gate。
-- SSI Resolver 的產品責任與結案邊界一律遵守 `memory/ssi-resolver-service-boundary-v1.md`：第三方 FIN Validator／完整 FIN NVR／SWIFT Network 為 `OUT_OF_SCOPE — CLOSED`，不得建立 SSI Open／Block，禁止 scope creeping。
-- MT1／pacs.008 的受控知識入口為 `memory/swift-mt1xx-pacs008-ssi-v3.md`，範圍固定為 `OUTWARD_SSI_ONLY`；`INWARD`／received-payment context 不進行 SSI discovery。`memory/swift-mt1xx-pacs008-v2.md` 與 `memory/mt1/` 下的 v0.6 CPI／repair artifacts 只作歷史或 upstream interface reference，不是實作權威。v3 在 Independent BA／QA／Product Owner 對同一 exact Git candidate commit 核准前仍為 `IMPLEMENTATION NOT AUTHORIZED`。
+- 開工、分派、設計、DB Reload、QA、SonarQube、Excel TDD、封存及 Block 回報，一律遵守 `memory/governance/lc-ssi-wc-operating-model-zh-v2.md`。Active Git-tracked governance 以 repository path＋外部任務交接／review evidence 所記錄的 exact Git commit 識別；exact commit 不寫回本檔或 manifest。Semantic version 若存在，只是可選的人類／release label，不是身分或每次修改 Gate。
+- SSI Resolver 的產品責任與結案邊界一律遵守 `memory/ssi/ssi-resolver-service-boundary-v1.md`：第三方 FIN Validator／完整 FIN NVR／SWIFT Network 為 `OUT_OF_SCOPE — CLOSED`，不得建立 SSI Open／Block，禁止 scope creeping。
+- MT1／pacs.008 的受控知識入口為 `memory/ssi/swift-mt1xx-pacs008-ssi-v3.md`，範圍固定為 `OUTWARD_SSI_ONLY`；`INWARD`／received-payment context 不進行 SSI discovery。被取代的 v2 與 v0.6 workspace 檔案已移除，歷史僅由 Git history 保存。v3 在 Independent BA／QA／Product Owner 對同一 exact Git candidate commit 核准前仍為 `IMPLEMENTATION NOT AUTHORIZED`。
 
 ## 全專案強制架構要求
 
@@ -12,7 +12,7 @@
 - API 是頁面參數與 SSI 業務規則的唯一真實來源；UI 僅負責參數映射、通用渲染、提交與結果呈現。
 - UI 禁止 hard-code MT 類型、sequence、5x 欄位、scenario、polarity、fixture binding 或個案判斷。
 - 修改配置或測試資料後，必須可透過 Reload DB 反映至 API 與 UI，不得要求修改或重建 Angular 原始碼。
-- 本要求適用 MT2、`pacs.009` plain／COV／ADV、MT347 及未來所有 message family。MT2→MX profile 必須由 API 依受控業務情境與 BAH `BizSvc` 決定；UI 不得用 MT code 或 `MsgDefIdr` 自行判斷。完整決策與驗收規則見 `docs/architecture/ADR-001-api-driven-ui.md` 及 `memory/mt347-oas-page-parameters-ui-standard-v1.md`。
+- 本要求適用 MT2、`pacs.009` plain／COV／ADV、MT347 及未來所有 message family。MT2→MX profile 必須由 API 依受控業務情境與 BAH `BizSvc` 決定；UI 不得用 MT code 或 `MsgDefIdr` 自行判斷。完整決策與驗收規則見 `docs/architecture/ADR-001-api-driven-ui.md` 及 `memory/governance/mt347-oas-page-parameters-ui-standard-v1.md`。
 
 ## 專案
 
@@ -163,7 +163,7 @@ MT300/304/305/306/320/330/340/341/350/360/361/362/364/365；MT400；MT730/734/74
 
 | 檔案                                                            | SHA-256                                                            |
 | --------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `memory/swift-mt347.md`                                         | `F1B413E13253432E5153CA9EEC9D082460A897CAC4640E1288D8A2DDF1CCF490` |
+| `memory/ssi/swift-mt347-v2.md`                                  | `42A9F5BB1BE6B7C55333434A76447CF357F3314D0BABA1E097DD5E1E8BCCFC81` |
 | `qa/tdd/mt347/MT347_SR2026_SSI_TDD_CONTROLLED_v1.xlsx`          | `D586C86E61641CA3563771EA2AB937E3F15BA96A92F1F314007BCCE3BEA149D2` |
 | `qa/tdd/mt347/MT347_SR2026_SSI_QA_Test_Plan_v4.xlsx`            | `1FDF15CFF1E78B0A6A3813163E6ADDD76517C0A045B240665003B249F2C5EFF5` |
 | `qa/tdd/mt347/SWIFT_SR2026_MT3_MT4_MT7_SSI_分析_中文版_v5.xlsx` | `C3EC8EB1A5B256C51D707BE342C079DB9DEBE304B03B562046CBAF1C459BECD2` |
@@ -179,6 +179,6 @@ MT300/304/305/306/320/330/340/341/350/360/361/362/364/365；MT400；MT730/734/74
 
 ---
 
-→ 規範全文：`memory/swift-mt2xx-pacs009-v2.md`（CONTROLLED，BA/QA 2026-09-12 接受）
+→ 規範全文：`memory/ssi/swift-mt2xx-pacs009-v2.md`（CONTROLLED，BA/QA 2026-09-12 接受）
 → BA 裁定：`qa/reports/latest/mt2/BA-MRG-MT202-53A-RULING-20260912.md`、`BA-DQ-NOSTRO-CONFIRMATION-20260912.md`
 → 獨立觀察與原始 JSON：`qa/reports/latest/mt2/claude-independent-20260912/`

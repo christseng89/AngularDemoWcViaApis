@@ -81,7 +81,7 @@ Catalogue generation rules:
    - manifest evidence `FIELD_PROFILE_PROVEN`; and
    - at least one scenario with `closureDisposition=IN_SCOPE_SSI_RESOLVER`; and
    - at least one mapping with `scopeStatus=SSI_SUPPORTED`, `evidenceStatus=FIELD_PROFILE_PROVEN`, and `suggestionEnabled=true`.
-3. The MT1／pacs.008 business scope is already decided by `memory/swift-mt1xx-pacs008-v2.md` and `PO-SCOPE-MT1-20260916`; it is not an open Product Owner scope question. The catalogue generator must materialise the following governed Phase-1 rules from that normative source instead of hard-coding them in UI, API, seed, audit, or repair code:
+3. The MT1／pacs.008 business scope is already decided by `memory/ssi/swift-mt1xx-pacs008-ssi-v3.md` and `PO-SCOPE-MT1-20260916`; it is not an open Product Owner scope question. The catalogue generator must materialise the following governed Phase-1 rules from that normative source instead of hard-coding them in UI, API, seed, audit, or repair code:
    - `MT103` base and `MT103 STP` are in scope and appear as one selectable `MT103` Message Type with governed profile metadata.
    - `MT103 REMIT` is eligible only when an effective approved community／MUG／profile row exists; otherwise it returns `UNSUPPORTED_PROFILE` and does not expand the base `MT103` authorization.
    - `pacs.008.001.08` plain (`BizSvc=swift.cbprplus.04`) and STP (`BizSvc=swift.cbprplus.stp.04`) are in scope, with `NbOfTxs=1`; they appear as one selectable `pacs.008.001.08` Message Type with governed profile metadata.

@@ -26,9 +26,7 @@ describe("approved synthetic seed currency discovery", () => {
       readFileSync(
         join(
           process.cwd(),
-          "qa",
-          "fixtures",
-          "ssi",
+          "data",
           "reload-test-data",
           "ssi-demo.mt1-mt2.v1.approved.canonical.seed.json",
         ),

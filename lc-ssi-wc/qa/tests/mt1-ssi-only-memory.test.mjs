@@ -7,11 +7,11 @@ const workspace = path.resolve(import.meta.dirname, "../..");
 const read = (relativePath) =>
   fs.readFileSync(path.resolve(workspace, relativePath), "utf8");
 
-const activeMemoryPath = "memory/swift-mt1xx-pacs008-ssi-v3.md";
+const activeMemoryPath = "memory/ssi/swift-mt1xx-pacs008-ssi-v3.md";
 const scopeContractPath =
-  "memory/mt1/MT1_PACS008_SSI_RESOLUTION_SCOPE_CONTEXT_CONTRACT_v1_DRAFT.md";
+  "memory/ssi/mt1/MT1_PACS008_SSI_RESOLUTION_SCOPE_CONTEXT_CONTRACT_v1_DRAFT.md";
 const routeMatrixPath =
-  "memory/mt1/MT1_PACS008_SETTLEMENT_CONTEXT_SSI_ROLE_ATOMIC_ROUTE_MATRIX_v1_DRAFT.md";
+  "memory/ssi/mt1/MT1_PACS008_SETTLEMENT_CONTEXT_SSI_ROLE_ATOMIC_ROUTE_MATRIX_v1_DRAFT.md";
 
 test("MT1/pacs.008 active candidate is explicitly SSI-resolution-only", () => {
   const memory = read(activeMemoryPath);
@@ -177,7 +177,7 @@ test("complete COVE route exposes profile-option failure in the R09 row", () => 
 });
 
 test("MT1 index promotes the SSI-only candidate and retires CPI repair from active scope", () => {
-  const index = read("memory/mt1/README.md");
+  const index = read("memory/ssi/mt1/README.md");
   assert.match(index, /swift-mt1xx-pacs008-ssi-v3\.md/);
   assert.match(index, /OUTWARD_SSI_ONLY/);
   assert.match(index, /historical|superseded/i);

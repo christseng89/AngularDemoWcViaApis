@@ -1,5 +1,11 @@
 import { HttpException } from "@nestjs/common";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -60,6 +66,9 @@ describe("DevelopmentDataReloadService", () => {
     SSI_DEMO_SEED_PATH: seedPath,
     SSI_DEMO_BACKUP_PATH: join(directory, "backup.sqlite"),
     SSI_DEMO_SHADOW_PATH: join(directory, "shadow.sqlite"),
+    SSI_DEMO_EXPORT_PATH: join(directory, "export"),
+    SSI_DEMO_RELOAD_AUDIT_PATH: join(directory, "reload-audit.jsonl"),
+    SSI_DEMO_RELOAD_ACTOR: "SETTINGS-TEST-OPERATOR",
     ...overrides,
   });
 
@@ -129,6 +138,71 @@ describe("DevelopmentDataReloadService", () => {
     expect(status.seedSha256).toBeUndefined();
   });
 
+  it("binds a browser-selected compliant seed to the one-time authorization", async () => {
+    const service = new DevelopmentDataReloadService(environment());
+    const authorization = service.authorize("secret");
+    writeSeed([["UPLOADED", "selected"]]);
+    const selected = service.uploadDataset(authorization.authorizationToken, {
+      originalName: "selected.seed.json",
+      buffer: readFileSync(seedPath),
+    });
+
+    expect(selected).toMatchObject({
+      displayName: "selected.seed.json",
+      source: "UPLOAD",
+      estimatedRows: 1,
+    });
+    await service.reload(authorization.authorizationToken, selected.datasetId);
+    expect(rows()).toEqual([{ id: "UPLOADED", value: "selected" }]);
+  });
+
+  it("rejects a browser-selected file that is not a compliant JSON seed", () => {
+    const service = new DevelopmentDataReloadService(environment());
+    const authorization = service.authorize("secret");
+    expect(
+      codeOf(() =>
+        service.uploadDataset(authorization.authorizationToken, {
+          originalName: "not-a-seed.txt",
+          buffer: Buffer.from("not json"),
+        }),
+      ),
+    ).toEqual({ status: 422, code: "DEMO_RELOAD_FILE_INVALID" });
+  });
+
+  it("rejects uploaded schema SQL instead of executing client-supplied statements", () => {
+    const service = new DevelopmentDataReloadService(environment());
+    const authorization = service.authorize("secret");
+    const seed = JSON.parse(readFileSync(seedPath, "utf8"));
+    seed.schema[0].sql =
+      "CREATE TABLE record (id TEXT PRIMARY KEY, value TEXT NOT NULL); CREATE TABLE injected (value TEXT)";
+
+    expect(
+      codeOf(() =>
+        service.uploadDataset(authorization.authorizationToken, {
+          originalName: "client-sql.seed.json",
+          buffer: Buffer.from(JSON.stringify(seed)),
+        }),
+      ),
+    ).toEqual({ status: 422, code: "DEMO_RELOAD_SCHEMA_NOT_AUTHORIZED" });
+  });
+
+  it("rejects an uploaded data set whose schema differs from the active server schema", () => {
+    const service = new DevelopmentDataReloadService(environment());
+    const authorization = service.authorize("secret");
+    const seed = JSON.parse(readFileSync(seedPath, "utf8"));
+    seed.schema[0].sql =
+      "CREATE TABLE record (id TEXT PRIMARY KEY, value INTEGER NOT NULL)";
+
+    expect(
+      codeOf(() =>
+        service.uploadDataset(authorization.authorizationToken, {
+          originalName: "wrong-schema.seed.json",
+          buffer: Buffer.from(JSON.stringify(seed)),
+        }),
+      ),
+    ).toEqual({ status: 422, code: "DEMO_RELOAD_SCHEMA_NOT_AUTHORIZED" });
+  });
+
   it("uses the approved MT1/MT2 canonical seed as the default reload source", () => {
     const authorization = new DevelopmentDataReloadService(
       environment({ SSI_DEMO_SEED_PATH: undefined }),
@@ -147,9 +221,7 @@ describe("DevelopmentDataReloadService", () => {
       readFileSync(
         join(
           process.cwd(),
-          "qa",
-          "fixtures",
-          "ssi",
+          "data",
           "reload-test-data",
           "ssi-demo.mt1-mt2.v1.approved.canonical.seed.json",
         ),
@@ -300,6 +372,66 @@ describe("DevelopmentDataReloadService", () => {
     });
     expect(result.snapshotHash).toMatch(/^[a-f0-9]{64}$/);
     expect(rows()).toEqual([{ id: "NEW", value: "new" }]);
+    const audit = readFileSync(join(directory, "reload-audit.jsonl"), "utf8")
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    expect(audit).toEqual([
+      expect.objectContaining({
+        action: "DEVELOPMENT_DATA_RELOAD",
+        outcome: "SUCCESS",
+        actor: "SETTINGS-TEST-OPERATOR",
+        environment: "demo",
+        previousSnapshotSha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+        newSnapshotSha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+        importedRows: { record: 1 },
+      }),
+    ]);
+    expect(JSON.stringify(audit)).not.toContain("secret");
+  });
+
+  it("exports the current DB as compliant test data and defaults Reload to the latest export", () => {
+    const service = new DevelopmentDataReloadService(environment());
+    const exported = service.exportCurrentDatabase();
+    expect(exported).toMatchObject({
+      code: "DEMO_DATA_EXPORTED",
+      dataset: {
+        source: "EXPORT",
+        classification: "SYNTHETIC_DEMO_QA_UAT",
+        estimatedRows: 1,
+      },
+    });
+    expect(exported).not.toHaveProperty("path");
+    expect(
+      readdirSync(join(directory, "export")).some((name) =>
+        name.endsWith(".seed.json"),
+      ),
+    ).toBe(true);
+
+    const authorization = service.authorize("secret");
+    expect(authorization.defaultDatasetId).toBe(exported.dataset.datasetId);
+    expect(authorization.datasets[0]).toEqual(exported.dataset);
+  });
+
+  it("reloads a user-selected older export instead of the latest default", async () => {
+    const service = new DevelopmentDataReloadService(environment());
+    const first = service.exportCurrentDatabase();
+    const database = new DatabaseSync(databasePath);
+    database.prepare("UPDATE record SET id=?, value=?").run("SECOND", "second");
+    database.close();
+    const second = service.exportCurrentDatabase();
+    expect(second.dataset.datasetId).not.toBe(first.dataset.datasetId);
+
+    const changed = new DatabaseSync(databasePath);
+    changed.prepare("UPDATE record SET id=?, value=?").run("THIRD", "third");
+    changed.close();
+    const authorization = service.authorize("secret");
+    expect(authorization.defaultDatasetId).toBe(second.dataset.datasetId);
+    await service.reload(
+      authorization.authorizationToken,
+      first.dataset.datasetId,
+    );
+    expect(rows()).toEqual([{ id: "OLD", value: "old" }]);
   });
 
   it("reloads multiple tables in deterministic dependency order", async () => {
@@ -365,6 +497,59 @@ describe("DevelopmentDataReloadService", () => {
       code: "DEMO_DATA_RELOAD_FAILED",
     });
     expect(rows()).toEqual([{ id: "OLD", value: "old" }]);
+    const audit = JSON.parse(
+      readFileSync(join(directory, "reload-audit.jsonl"), "utf8").trim(),
+    );
+    expect(audit).toEqual(
+      expect.objectContaining({
+        action: "DEVELOPMENT_DATA_RELOAD",
+        outcome: "FAILURE",
+        actor: "SETTINGS-TEST-OPERATOR",
+        newSnapshotSha256: null,
+        errorCode: "DEMO_DATA_RELOAD_FAILED",
+      }),
+    );
+  });
+
+  it("persists a failure audit when restoring the backup also fails", async () => {
+    writeSeed([
+      ["DUPLICATE", "one"],
+      ["DUPLICATE", "two"],
+    ]);
+    const service = new DevelopmentDataReloadService(environment());
+    jest
+      .spyOn(
+        service as unknown as {
+          restoreBackup: (
+            backupPath: string,
+            activePath: string,
+          ) => Promise<void>;
+        },
+        "restoreBackup",
+      )
+      .mockRejectedValue(
+        new HttpException({ code: "DEMO_DATA_RESTORE_FAILED" }, 500),
+      );
+    const authorization = service.authorize("secret");
+
+    await expect(
+      asyncCodeOf(() => service.reload(authorization.authorizationToken)),
+    ).resolves.toEqual({
+      status: 500,
+      code: "DEMO_DATA_RESTORE_FAILED",
+    });
+    const audit = JSON.parse(
+      readFileSync(join(directory, "reload-audit.jsonl"), "utf8").trim(),
+    );
+    expect(audit).toEqual(
+      expect.objectContaining({
+        action: "DEVELOPMENT_DATA_RELOAD",
+        outcome: "FAILURE",
+        actor: "SETTINGS-TEST-OPERATOR",
+        newSnapshotSha256: null,
+        errorCode: "DEMO_DATA_RESTORE_FAILED",
+      }),
+    );
   });
 
   it("rejects test data whose declared columns do not match its schema", async () => {

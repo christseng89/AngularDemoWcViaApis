@@ -20,9 +20,16 @@ describe("RuntimeSettingsController", () => {
       code: "DEMO_RELOAD_AUTHORIZATION_CANCELLED",
       authorizationToken,
     })),
-    reload: jest.fn(async (authorizationToken: string) => ({
+    reload: jest.fn(async (authorizationToken: string, datasetId?: string) => ({
       code: "DEMO_DATA_RELOADED",
       authorizationToken,
+      datasetId,
+    })),
+    exportCurrentDatabase: jest.fn(() => ({ code: "DEMO_DATA_EXPORTED" })),
+    uploadDataset: jest.fn((authorizationToken: string, file: unknown) => ({
+      datasetId: "UPLOAD-1",
+      authorizationToken,
+      file,
     })),
   } as unknown as DevelopmentDataReloadService;
   const controller = new RuntimeSettingsController(reloadService);
@@ -48,12 +55,34 @@ describe("RuntimeSettingsController", () => {
     });
     controller.authorizeReload({ password: 123 });
     expect(reloadService.authorize).toHaveBeenLastCalledWith("");
-    expect(await controller.reload({ authorizationToken: "token" })).toEqual({
+    expect(
+      await controller.reload({
+        authorizationToken: "token",
+        datasetId: "EXPORT-1",
+      }),
+    ).toEqual({
       code: "DEMO_DATA_RELOADED",
       authorizationToken: "token",
+      datasetId: "EXPORT-1",
     });
     await controller.reload({ authorizationToken: 123 });
-    expect(reloadService.reload).toHaveBeenLastCalledWith("");
+    expect(reloadService.reload).toHaveBeenLastCalledWith("", undefined);
+    expect(controller.exportCurrentDatabase()).toEqual({
+      code: "DEMO_DATA_EXPORTED",
+    });
+    expect(
+      controller.uploadReloadDataset(
+        { authorizationToken: "token" },
+        {
+          originalname: "selected.seed.json",
+          buffer: Buffer.from("{}"),
+        },
+      ),
+    ).toMatchObject({ datasetId: "UPLOAD-1" });
+    expect(reloadService.uploadDataset).toHaveBeenCalledWith("token", {
+      originalName: "selected.seed.json",
+      buffer: Buffer.from("{}"),
+    });
   });
 
   it("cancels a pending one-time reload authorization", () => {

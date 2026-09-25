@@ -34,7 +34,7 @@ describe("RuntimeSettingsService", () => {
     const service = new RuntimeSettingsService();
     await firstValueFrom(service.authorizeDevelopmentDataReload("entered"));
     await expect(
-      firstValueFrom(service.reloadDevelopmentData("token")),
+      firstValueFrom(service.reloadDevelopmentData("token", "EXPORT-1")),
     ).resolves.toEqual({ code: "DEMO_DATA_RELOADED" });
     expect(http.post).toHaveBeenCalledWith(
       "/api/settings/development-data/reload/authorize",
@@ -42,8 +42,34 @@ describe("RuntimeSettingsService", () => {
     );
     expect(http.post).toHaveBeenCalledWith(
       "/api/settings/development-data/reload",
-      { authorizationToken: "token" },
+      { authorizationToken: "token", datasetId: "EXPORT-1" },
     );
+  });
+
+  it("exports the current DB to reusable test data", async () => {
+    const { RuntimeSettingsService } =
+      await import("../../app/runtime-settings.service");
+    const service = new RuntimeSettingsService();
+    await firstValueFrom(service.exportCurrentDatabase());
+    expect(http.post).toHaveBeenCalledWith(
+      "/api/settings/development-data/export",
+      {},
+    );
+  });
+
+  it("uploads a browser-selected test-data file under the authorization", async () => {
+    const { RuntimeSettingsService } =
+      await import("../../app/runtime-settings.service");
+    const service = new RuntimeSettingsService();
+    const file = new File(["{}"], "selected.seed.json", {
+      type: "application/json",
+    });
+    await firstValueFrom(service.uploadDevelopmentData("token", file));
+    const call = http.post.mock.calls.at(-1)!;
+    expect(call[0]).toBe("/api/settings/development-data/reload/upload");
+    expect(call[1]).toBeInstanceOf(FormData);
+    expect((call[1] as FormData).get("authorizationToken")).toBe("token");
+    expect((call[1] as FormData).get("file")).toBe(file);
   });
 
   it("cancels a pending reload authorization", async () => {

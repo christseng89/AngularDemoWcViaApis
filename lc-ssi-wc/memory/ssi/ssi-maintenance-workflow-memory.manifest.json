@@ -1,0 +1,11 @@
+{
+  "artifact": "memory/ssi/ssi-maintenance-workflow-memory.md",
+  "optionalVersion": null,
+  "status": "NORMATIVE_PROJECT_MEMORY",
+  "identityPolicy": "GIT_TRACKED_PATH",
+  "manifestAuthority": "LOCATOR_METADATA_ONLY",
+  "roleApprovalAuthority": "EXTERNAL_TASK_AND_4_EYES_EVIDENCE",
+  "latestConfirmation": "2026-09-18",
+  "manifestMaker": "/root/angular_lazy_defer_engineer",
+  "approval": "PENDING_INDEPENDENT_CHECKER"
+}

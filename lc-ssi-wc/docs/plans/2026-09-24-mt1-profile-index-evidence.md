@@ -14,9 +14,9 @@
 
 **Files:**
 
-- Modify: `memory/swift-mt1xx-pacs008-ssi-v3.md`
-- Modify: `memory/mt1/MT1_PACS008_SSI_RESOLUTION_SCOPE_CONTEXT_CONTRACT_v1_DRAFT.md`
-- Modify: `memory/mt1/MT1_PACS008_SETTLEMENT_CONTEXT_SSI_ROLE_ATOMIC_ROUTE_MATRIX_v1_DRAFT.md`
+- Modify: `memory/ssi/swift-mt1xx-pacs008-ssi-v3.md`
+- Modify: `memory/ssi/mt1/MT1_PACS008_SSI_RESOLUTION_SCOPE_CONTEXT_CONTRACT_v1_DRAFT.md`
+- Modify: `memory/ssi/mt1/MT1_PACS008_SETTLEMENT_CONTEXT_SSI_ROLE_ATOMIC_ROUTE_MATRIX_v1_DRAFT.md`
 - Modify: `openapi/swift-data-service.v1.json`
 - Modify: `apps/ssi-portal/public/openapi/swift-data-service.v1.json`
 

@@ -76,11 +76,24 @@ const service = {
           authorizationToken: "one-time-token",
           expiresAt: "2026-09-25T01:05:00Z",
           dataset: {
+            datasetId: "DEFAULT-COMPLIANT",
             displayName: "Default compliant development test data",
             version: "1.0",
             classification: "SYNTHETIC_DEMO_QA_UAT",
             estimatedRows: 201,
+            source: "DEFAULT",
           },
+          datasets: [
+            {
+              datasetId: "DEFAULT-COMPLIANT",
+              displayName: "Default compliant development test data",
+              version: "1.0",
+              classification: "SYNTHETIC_DEMO_QA_UAT",
+              estimatedRows: 201,
+              source: "DEFAULT",
+            },
+          ],
+          defaultDatasetId: "DEFAULT-COMPLIANT",
         }),
   ),
   cancelDevelopmentDataReload: jest.fn(() =>
@@ -98,6 +111,30 @@ const service = {
           snapshotIdentityMethod: "LOGICAL",
           importedRows: { ssi: 42, nostro: 159 },
         }),
+  ),
+  exportCurrentDatabase: jest.fn(() =>
+    of({
+      code: "DEMO_DATA_EXPORTED",
+      completedAt: "2026-09-25T02:00:00Z",
+      dataset: {
+        datasetId: "EXPORT-1",
+        displayName: "export-1.seed.json",
+        version: "1.0",
+        classification: "SYNTHETIC_DEMO_QA_UAT",
+        estimatedRows: 201,
+        source: "EXPORT",
+      },
+    }),
+  ),
+  uploadDevelopmentData: jest.fn(() =>
+    of({
+      datasetId: "UPLOAD-1",
+      displayName: "selected.seed.json",
+      version: "1.0",
+      classification: "SYNTHETIC_DEMO_QA_UAT",
+      estimatedRows: 201,
+      source: "UPLOAD",
+    }),
   ),
 };
 
@@ -297,11 +334,98 @@ describe("SettingsPageComponent", () => {
     expect(component.busy()).toBe(false);
     expect(service.reloadDevelopmentData).toHaveBeenCalledWith(
       "one-time-token",
+      "DEFAULT-COMPLIANT",
     );
     expect(component.successAlert(component.result()!).message).toContain(
       "201",
     );
     expect(emitted).toHaveLength(1);
+  });
+
+  it("defaults Reload to the latest export while allowing an older export", async () => {
+    service.authorizeDevelopmentDataReload.mockImplementationOnce(() =>
+      of({
+        code: "DEMO_RELOAD_AUTHORIZED",
+        authorizationToken: "one-time-token",
+        expiresAt: "2026-09-25T01:05:00Z",
+        dataset: {
+          datasetId: "EXPORT-2",
+          displayName: "Second export",
+          version: "1.0",
+          classification: "SYNTHETIC_DEMO_QA_UAT",
+          estimatedRows: 202,
+          source: "EXPORT",
+        },
+        datasets: [
+          {
+            datasetId: "EXPORT-2",
+            displayName: "Second export",
+            version: "1.0",
+            classification: "SYNTHETIC_DEMO_QA_UAT",
+            estimatedRows: 202,
+            source: "EXPORT",
+          },
+          {
+            datasetId: "EXPORT-1",
+            displayName: "First export",
+            version: "1.0",
+            classification: "SYNTHETIC_DEMO_QA_UAT",
+            estimatedRows: 201,
+            source: "EXPORT",
+          },
+        ],
+        defaultDatasetId: "EXPORT-2",
+      }),
+    );
+    const { SettingsPageComponent } =
+      await import("../../app/settings-page.component");
+    const component = new SettingsPageComponent();
+    component.password.set("entered");
+    await component.authorizeReload();
+    expect(component.selectedDataset()?.datasetId).toBe("EXPORT-2");
+    component.selectedDatasetId.set("EXPORT-1");
+    await component.reload();
+    expect(service.reloadDevelopmentData).toHaveBeenCalledWith(
+      "one-time-token",
+      "EXPORT-1",
+    );
+  });
+
+  it("opens the native file input path and selects an uploaded compliant seed", async () => {
+    const { SettingsPageComponent } =
+      await import("../../app/settings-page.component");
+    const component = new SettingsPageComponent();
+    component.password.set("entered");
+    await component.authorizeReload();
+    const file = new File(["{}"], "selected.seed.json", {
+      type: "application/json",
+    });
+    await component.uploadSelectedFile({
+      target: { files: [file], value: "C:\\fakepath\\selected.seed.json" },
+    } as unknown as Event);
+    expect(service.uploadDevelopmentData).toHaveBeenCalledWith(
+      "one-time-token",
+      file,
+    );
+    expect(component.selectedDataset()).toMatchObject({
+      datasetId: "UPLOAD-1",
+      source: "UPLOAD",
+    });
+  });
+
+  it("exports the current DB without changing it", async () => {
+    const { SettingsPageComponent } =
+      await import("../../app/settings-page.component");
+    const component = new SettingsPageComponent();
+    component.ngOnInit();
+    await Promise.resolve();
+    await component.exportCurrentDatabase();
+    expect(service.exportCurrentDatabase).toHaveBeenCalledTimes(1);
+    expect(component.exportResult()).toMatchObject({
+      code: "DEMO_DATA_EXPORTED",
+      dataset: { datasetId: "EXPORT-1" },
+    });
+    expect(component.exportResult()).not.toHaveProperty("path");
   });
 
   it("presents wrong-password failure without changing runtime capability", async () => {
@@ -355,11 +479,24 @@ describe("SettingsPageComponent", () => {
       authorizationToken: "expired-token",
       expiresAt: "2026-09-25T01:05:00Z",
       dataset: {
+        datasetId: "DEFAULT-COMPLIANT",
         displayName: "Default data",
         version: "1",
         classification: "SYNTHETIC",
         estimatedRows: 1,
+        source: "DEFAULT",
       },
+      datasets: [
+        {
+          datasetId: "DEFAULT-COMPLIANT",
+          displayName: "Default data",
+          version: "1",
+          classification: "SYNTHETIC",
+          estimatedRows: 1,
+          source: "DEFAULT",
+        },
+      ],
+      defaultDatasetId: "DEFAULT-COMPLIANT",
     });
     await expect(
       component.cancelDatasetConfirmation(),

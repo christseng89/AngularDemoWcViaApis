@@ -33,10 +33,10 @@ The review objective is deterministic Demo behavior, not Production-grade remedi
 
 The requested scope contains all four families: MT1, MT2, pacs.008 and pacs.009. They are not cross-mapped arbitrarily:
 
-| FIN family | Canonical CBPR+ family | Controlled source |
-|---|---|---|
-| MT1 customer-payment scope | `pacs.008.001.08` plain/STP | `memory/swift-mt1xx-pacs008-v2.md` and frozen v0.6 matrices |
-| MT2 FI-transfer scope | `pacs.009.001.08` plain/COV | `memory/swift-mt2xx-pacs009-v2.md` and MT2 final gate |
+| FIN family                 | Canonical CBPR+ family      | Controlled source                                                   |
+| -------------------------- | --------------------------- | ------------------------------------------------------------------- |
+| MT1 customer-payment scope | `pacs.008.001.08` plain/STP | `memory/ssi/swift-mt1xx-pacs008-ssi-v3.md` and its active contracts |
+| MT2 FI-transfer scope      | `pacs.009.001.08` plain/COV | `memory/ssi/swift-mt2xx-pacs009-v2.md` and MT2 final gate           |
 
 `pacs.008` must not be inferred from MT2, and `pacs.009` must not be inferred from MT1. Message family, profile, business service, direction and settlement leg are explicit Rule Table fields.
 
@@ -44,18 +44,18 @@ The requested scope contains all four families: MT1, MT2, pacs.008 and pacs.009.
 
 Counts below are ACTIVE-record counts observed on 2026-09-17. One record may contain more than one message type, so columns are not additive.
 
-| Scope | ACTIVE total | MT1 | MT2 | pacs.008 `.001.12` | pacs.008 `.001.08` | pacs.009 `.001.12` | pacs.009 `.001.08` | Current conclusion |
-|---|---:|---:|---:|---:|---:|---:|---:|---|
-| SSI | 10,329 | 0 | 0 | 24 | 0 | 43 | 68 | Non-MT347 MT1/MT2 and `.12` SSI repair/regeneration remains open |
-| RMA | 44 | 8 | 14 | 2 | 28 | 2 | 40 | Read-only reference only: two FINPLUS records remain and are governed `SKIP_DEVELOPMENT_REFERENCE_GAP` |
+| Scope | ACTIVE total | MT1 | MT2 | pacs.008 `.001.12` | pacs.008 `.001.08` | pacs.009 `.001.12` | pacs.009 `.001.08` | Current conclusion                                                                                     |
+| ----- | -----------: | --: | --: | -----------------: | -----------------: | -----------------: | -----------------: | ------------------------------------------------------------------------------------------------------ |
+| SSI   |       10,329 |   0 |   0 |                 24 |                  0 |                 43 |                 68 | Non-MT347 MT1/MT2 and `.12` SSI repair/regeneration remains open                                       |
+| RMA   |           44 |   8 |  14 |                  2 |                 28 |                  2 |                 40 | Read-only reference only: two FINPLUS records remain and are governed `SKIP_DEVELOPMENT_REFERENCE_GAP` |
 
 Required table from the repair request:
 
-| Scope | ACTIVE `.001.12` | ACTIVE `.001.08` | Conclusion |
-|---|---:|---:|---|
-| SSI | 24 | 0 | `pacs.008` SSI has not been repaired |
-| RMA | 2 | 28 | Read-only evidence: two FINPLUS records contain `.12`; this SSI package must not mutate them |
-| RMA MT2 | 14 | — | Existing MT2 rows were not modified by the MT347 change package |
+| Scope   | ACTIVE `.001.12` | ACTIVE `.001.08` | Conclusion                                                                                   |
+| ------- | ---------------: | ---------------: | -------------------------------------------------------------------------------------------- |
+| SSI     |               24 |                0 | `pacs.008` SSI has not been repaired                                                         |
+| RMA     |                2 |               28 | Read-only evidence: two FINPLUS records contain `.12`; this SSI package must not mutate them |
+| RMA MT2 |               14 |                — | Existing MT2 rows were not modified by the MT347 change package                              |
 
 Prior RMA publication evidence additionally records:
 
@@ -86,22 +86,21 @@ Because the governed Development Reload service performs transactional full-tabl
 
 BA and QA must review the Rule Table against the following local, controlled SR2026 sources. Filename, SHA, release and page/rule reference are mandatory evidence fields; a generic comment such as “according to SWIFT” is insufficient.
 
-| Family | Controlled source | SHA-256 | Governed use |
-|---|---|---|---|
-| MT1 MRG/NVR | `SWIFT/us1m_20260717.pdf` | `54002BDF2140563A543DE330283EE7BC64C0724DC69499326CE34F70A7E90E70` | MT102 pp.71–73,111–113; MT102 STP pp.124–126,158–159; MT103 pp.171–173,193–203; MT103 REMIT pp.255–260,279–280,285–287; MT103 STP pp.297–302,318–319,322–323; MT104 pp.356–358,386–388; MT107 pp.394–396,420–422 |
-| MT1 compatibility | `SWIFT/us1m_20250718.pdf` | `3ACCBAFC7231D2745C4F3D7CEB85117555DEFFDEB0AE7F798E00339BE12B62D9` | Compatibility fallback only when the SR2026 artifact/rule is genuinely absent; never overrides an SR2026 prohibition |
-| pacs.008 plain UG | `SWIFT/CBPRPlus_SR2026_(Combined)_CBPRPlus-pacs_008_001_08_FIToFICustomerCreditTransfer_20260521_0831.pdf` | `F563E3478ED76329DB2400BC1E58BE5D345C499DABEB4C4561A7A8E1D15566B3` | Profile, settlement/reimbursement, Creditor Agent/account and identifier precedence |
-| pacs.008 STP UG | `SWIFT/CBPRPlus_SR2026_(Combined)_CBPRPlus-pacs_008_001_08_STP_FIToFICustomerCreditTransfer_20260522_0133.pdf` | `D9807C95700CCFBFB6AAD03CE40AE32213F75B805A683937EB4BBD296EEF23F6` | STP profile and permitted settlement/reimbursement structure |
-| MT2 MRG/NVR | `SWIFT/us2m_20260717.pdf` | `64483D7F7C094DB28E03791AB6BBC7A0522DAEC90487A7DD834228E848FA8323` | MT202 pp.39–54; MT202COV pp.59–75; MT205 pp.134–148; MT205COV pp.153–168 |
-| MT2 compatibility | `SWIFT/us2m_20250718.pdf` | `820581F85FC9EFA34A56F1A54FE66DDA684C6C2FFE9533E38F096A2176B9845C` | Controlled compatibility fallback only |
-| pacs.009 plain UG | `SWIFT/CBPRPlus_SR2026_(Combined)_CBPRPlus-pacs_009_001_08_FinancialInstitutionCreditTransfer_20260521_0643.pdf` | `4B9436D21B141C5CEF75ACFFAE961B5130FEAD9B95C1B9CD144197DAA7EA6585` | `swift.cbprplus.04`, INDA/INGA, account and settlement fields |
-| pacs.009 COV UG | `SWIFT/CBPRPlus_SR2026_(Combined)_CBPRPlus-pacs_009_001_08_COV_FinancialInstitutionCreditTransfer_20260521_0643.pdf` | `745B302A700C785CAE1E5F630CC906F41DF31C1E5727BF03EF591F0AD1CFA0A1` | `swift.cbprplus.cov.04`, cover structure and underlying-customer block |
-| pacs.009 ADV UG | `SWIFT/CBPRPlus_SR2026_(Combined)_CBPRPlus-pacs_009_001_08_ADV_FinancialInstitutionCreditTransfer_20260521_0643.pdf` | `8F76D4071F67FC2AC2996B6BED68F2F2D1388FEB3CF14B83353ECF3B7F785CE1` | Explicit non-settling ADV exclusion guard |
-| SR2026 Contingency NVR | `SWIFT/SR2026_Contingency_Processing_Network_Validated_Rules_20260717_v1_0.pdf` | `BDE3874D324C218C88F11F9116E089684106093144E3E143890BAD7368D5DBCB` | Full-FIN/network validation ownership boundary for applicable MT103, MT202/COV and MT205/COV rules |
-| MT1 project memory | `memory/swift-mt1xx-pacs008-v2.md` | raw `1C17114AB2A2AD3C2455EAEE910951FFA426C2CCF25FB9A29E2385C6325980A1`; canonical LF `AA4287E19FFF3D2EB2DD826F83CC73B4AAE1BAA7F05910960FE6C8E5E6F28886` | Project scope, settlement-leg boundary and frozen OPEN-01/OPEN-02 decisions; pending authority holds only groups whose disposition depends on that authority |
-| MT1 matrix review | `memory/mt1/MT1XX_PACS008_v0.6_MATRIX_REVIEW.md` | `23F87D36C696F6C5D4B70B76A36E9CA2BD85E88A27ECF9E82A6AF2D764A80092` | BA/QA-reviewed matrix bundle; implementation still requires the stated approval gate |
-| MT2 project memory | `memory/swift-mt2xx-pacs009-v2.md` | raw `3F28D940510D4F4B0CEC5C5EB906FBB69EB3D63D42F5B815363E2DE3AD7BCBFA`; canonical LF `FE2418F9711C742D20E0A349D4E0E791BFAA574BBEB25C6F7F876D0677B8F196` | Plain/COV/ADV boundary, MRG rulings, account evidence and converter contract; pending authority holds only groups whose disposition depends on that authority |
-| MT2 final gate | `qa/tests/mt2/final/mt2-pacs009-rework-gate.json` | `F04A8512A144B2088655946AACD52672C51D49AF3997098F60B5259EEF62B448` | Executable four-message scope and acceptance requirements |
+| Family                 | Controlled source                                                                                                    | SHA-256                                                                                                                                                 | Governed use                                                                                                                                                                                                     |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| MT1 MRG/NVR            | `SWIFT/us1m_20260717.pdf`                                                                                            | `54002BDF2140563A543DE330283EE7BC64C0724DC69499326CE34F70A7E90E70`                                                                                      | MT102 pp.71–73,111–113; MT102 STP pp.124–126,158–159; MT103 pp.171–173,193–203; MT103 REMIT pp.255–260,279–280,285–287; MT103 STP pp.297–302,318–319,322–323; MT104 pp.356–358,386–388; MT107 pp.394–396,420–422 |
+| MT1 compatibility      | `SWIFT/us1m_20250718.pdf`                                                                                            | `3ACCBAFC7231D2745C4F3D7CEB85117555DEFFDEB0AE7F798E00339BE12B62D9`                                                                                      | Compatibility fallback only when the SR2026 artifact/rule is genuinely absent; never overrides an SR2026 prohibition                                                                                             |
+| pacs.008 plain UG      | `SWIFT/CBPRPlus_SR2026_(Combined)_CBPRPlus-pacs_008_001_08_FIToFICustomerCreditTransfer_20260521_0831.pdf`           | `F563E3478ED76329DB2400BC1E58BE5D345C499DABEB4C4561A7A8E1D15566B3`                                                                                      | Profile, settlement/reimbursement, Creditor Agent/account and identifier precedence                                                                                                                              |
+| pacs.008 STP UG        | `SWIFT/CBPRPlus_SR2026_(Combined)_CBPRPlus-pacs_008_001_08_STP_FIToFICustomerCreditTransfer_20260522_0133.pdf`       | `D9807C95700CCFBFB6AAD03CE40AE32213F75B805A683937EB4BBD296EEF23F6`                                                                                      | STP profile and permitted settlement/reimbursement structure                                                                                                                                                     |
+| MT2 MRG/NVR            | `SWIFT/us2m_20260717.pdf`                                                                                            | `64483D7F7C094DB28E03791AB6BBC7A0522DAEC90487A7DD834228E848FA8323`                                                                                      | MT202 pp.39–54; MT202COV pp.59–75; MT205 pp.134–148; MT205COV pp.153–168                                                                                                                                         |
+| MT2 compatibility      | `SWIFT/us2m_20250718.pdf`                                                                                            | `820581F85FC9EFA34A56F1A54FE66DDA684C6C2FFE9533E38F096A2176B9845C`                                                                                      | Controlled compatibility fallback only                                                                                                                                                                           |
+| pacs.009 plain UG      | `SWIFT/CBPRPlus_SR2026_(Combined)_CBPRPlus-pacs_009_001_08_FinancialInstitutionCreditTransfer_20260521_0643.pdf`     | `4B9436D21B141C5CEF75ACFFAE961B5130FEAD9B95C1B9CD144197DAA7EA6585`                                                                                      | `swift.cbprplus.04`, INDA/INGA, account and settlement fields                                                                                                                                                    |
+| pacs.009 COV UG        | `SWIFT/CBPRPlus_SR2026_(Combined)_CBPRPlus-pacs_009_001_08_COV_FinancialInstitutionCreditTransfer_20260521_0643.pdf` | `745B302A700C785CAE1E5F630CC906F41DF31C1E5727BF03EF591F0AD1CFA0A1`                                                                                      | `swift.cbprplus.cov.04`, cover structure and underlying-customer block                                                                                                                                           |
+| pacs.009 ADV UG        | `SWIFT/CBPRPlus_SR2026_(Combined)_CBPRPlus-pacs_009_001_08_ADV_FinancialInstitutionCreditTransfer_20260521_0643.pdf` | `8F76D4071F67FC2AC2996B6BED68F2F2D1388FEB3CF14B83353ECF3B7F785CE1`                                                                                      | Explicit non-settling ADV exclusion guard                                                                                                                                                                        |
+| SR2026 Contingency NVR | `SWIFT/SR2026_Contingency_Processing_Network_Validated_Rules_20260717_v1_0.pdf`                                      | `BDE3874D324C218C88F11F9116E089684106093144E3E143890BAD7368D5DBCB`                                                                                      | Full-FIN/network validation ownership boundary for applicable MT103, MT202/COV and MT205/COV rules                                                                                                               |
+| MT1 project memory     | `memory/ssi/swift-mt1xx-pacs008-ssi-v3.md`                                                                           | raw `AF1CB17499FA12C1F87C9D1A45E067B78E206E9D174430E17056F1D9D9D9F6A2`; canonical LF `4BC52FABB4D885B6526B313C5786425FE10710F13BA561D55D0A54D177BC116A` | Active outward-SSI-only project scope and settlement-leg boundary                                                                                                                                                |
+| MT2 project memory     | `memory/ssi/swift-mt2xx-pacs009-v2.md`                                                                               | raw `3F28D940510D4F4B0CEC5C5EB906FBB69EB3D63D42F5B815363E2DE3AD7BCBFA`; canonical LF `FE2418F9711C742D20E0A349D4E0E791BFAA574BBEB25C6F7F876D0677B8F196` | Plain/COV/ADV boundary, MRG rulings, account evidence and converter contract; pending authority holds only groups whose disposition depends on that authority                                                    |
+| MT2 final gate         | `qa/tests/mt2/final/mt2-pacs009-rework-gate.json`                                                                    | `F04A8512A144B2088655946AACD52672C51D49AF3997098F60B5259EEF62B448`                                                                                      | Executable four-message scope and acceptance requirements                                                                                                                                                        |
 
 ### Source precedence
 
@@ -120,11 +119,11 @@ BA and QA must review the Rule Table against the following local, controlled SR2
 
 Every Negative/Boundary rule must declare `validationOwner`:
 
-| Owner | Handling in this package |
-|---|---|
-| `SSI_PROFILE_GATE` | Exact typed rejection before lookup when profile/service/topology is unsupported or contradictory |
-| `SSI_RESOLVER` | Exact typed rejection when a required governed SSI relationship/evidence cannot be resolved |
-| `FULL_FIN_VALIDATOR` | `OUT_OF_SCOPE_CLOSED`; SSI lookup not performed; zero candidate and zero side effects |
+| Owner                            | Handling in this package                                                                                                                                                                                                                                                                                                               |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SSI_PROFILE_GATE`               | Exact typed rejection before lookup when profile/service/topology is unsupported or contradictory                                                                                                                                                                                                                                      |
+| `SSI_RESOLVER`                   | Exact typed rejection when a required governed SSI relationship/evidence cannot be resolved                                                                                                                                                                                                                                            |
+| `FULL_FIN_VALIDATOR`             | `OUT_OF_SCOPE_CLOSED`; SSI lookup not performed; zero candidate and zero side effects                                                                                                                                                                                                                                                  |
 | `CBPR_USAGE_GUIDELINE_VALIDATOR` | Each row must select exactly one mode: invoke the named governed validator and assert its typed result, or close as `OUT_OF_SCOPE_CLOSED + FIN_VALIDATION_NOT_EVALUATED + ssiLookup=NOT_PERFORMED + expectedCandidateCount=0`; never silently reclassify it as SSI configuration failure or include it in the SSI-negative denominator |
 
 The Generator must not turn a Full-FIN MRG NVR into an SSI Resolver error merely because the Demo contains a synthetic invalid field. Conversely, an SSI-owned missing relationship must not be hidden behind a generic NVR code.
@@ -201,7 +200,13 @@ interface GovernedMessageVersionRule {
   sharedCatalogueSha256: string;
   requiredSourceStatuses: readonly ["ACTIVE", "DRAFT"];
   eligibleDatasetClasses: readonly ["OPERATIONAL_POSITIVE"];
-  excludedDatasetClasses: readonly ["HISTORICAL_BASELINE", "QA_NEGATIVE", "QA_BOUNDARY", "QA_ISOLATED", "LEGACY"];
+  excludedDatasetClasses: readonly [
+    "HISTORICAL_BASELINE",
+    "QA_NEGATIVE",
+    "QA_BOUNDARY",
+    "QA_ISOLATED",
+    "LEGACY",
+  ];
   excludedTokens: readonly ["pacs.009.001.12.COV", "pacs.009.001.012.COV"];
 }
 ```
@@ -217,17 +222,17 @@ Only an eligible positive SSI record whose family, exact token, lifecycle, datas
 
 The Rule Table assigns exactly one disposition to every target canonical group:
 
-| Disposition | Deterministic meaning |
-|---|---|
-| `GENERATE_CANONICAL` | Approved FIN-generated fixture has no version-source row: generate its canonical `.001.08` target according to the frozen MT1/MT2 profile rule |
-| `CONVERT` | Eligible source contains `.12` and lacks `.08`: remove the exact `.12` token and add exactly one canonical `.08` token in a versioned successor |
-| `REMOVE_SOURCE_TOKEN` | Eligible source contains both `.12` and `.08`: remove only the exact `.12` token; do not add a duplicate `.08` token |
-| `UNCHANGED` | Source already contains the required `.08` and contains no `.12`; zero row/token mutation |
-| `SKIP_NEGATIVE` | Preserve the intentional QA-negative fixture bit/logically unchanged |
-| `SKIP_HISTORY` | Preserve REVOKED/SUPERSEDED/Historical data bit/logically unchanged |
-| `SKIP_COV` | Exclude `.12.COV`/`.012.COV` from the plain conversion rule |
-| `HOLD_DEPENDENCY` | Only this group is held because an unresolved MT1/MT2 authority decision can change its disposition |
-| `OUT_OF_SCOPE` | Exclude the group from this change package with zero SSI/Applicability output |
+| Disposition           | Deterministic meaning                                                                                                                           |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GENERATE_CANONICAL`  | Approved FIN-generated fixture has no version-source row: generate its canonical `.001.08` target according to the frozen MT1/MT2 profile rule  |
+| `CONVERT`             | Eligible source contains `.12` and lacks `.08`: remove the exact `.12` token and add exactly one canonical `.08` token in a versioned successor |
+| `REMOVE_SOURCE_TOKEN` | Eligible source contains both `.12` and `.08`: remove only the exact `.12` token; do not add a duplicate `.08` token                            |
+| `UNCHANGED`           | Source already contains the required `.08` and contains no `.12`; zero row/token mutation                                                       |
+| `SKIP_NEGATIVE`       | Preserve the intentional QA-negative fixture bit/logically unchanged                                                                            |
+| `SKIP_HISTORY`        | Preserve REVOKED/SUPERSEDED/Historical data bit/logically unchanged                                                                             |
+| `SKIP_COV`            | Exclude `.12.COV`/`.012.COV` from the plain conversion rule                                                                                     |
+| `HOLD_DEPENDENCY`     | Only this group is held because an unresolved MT1/MT2 authority decision can change its disposition                                             |
+| `OUT_OF_SCOPE`        | Exclude the group from this change package with zero SSI/Applicability output                                                                   |
 
 The 43 pacs.009 `.12` memberships are not forty-three additions: 32 source records already also contain `.08`. Before eligibility classification the raw upper bounds are therefore `targetAdded <= 11` and `sourceRemoved <= 43`; the approved Rule Table, not an assumed target count, determines final values. For the 32 dual-token records, `UNCHANGED` is prohibited while `.12` remains present: eligible rows use `REMOVE_SOURCE_TOKEN`; ineligible rows use the appropriate explicit skip/hold disposition.
 
@@ -240,23 +245,51 @@ The Rule Table and Oracle use a versioned machine-validated schema with closed e
 ```ts
 // OutcomeCode and ReasonCode are generated literal unions from the same-SHA
 // outcome-reason-code-catalogue.v1.json; plain string is prohibited.
-type ReviewStatus = "DRAFT" | "BLOCKED" | "BA_CONFIRMED" | "OUT_OF_SCOPE_CLOSED";
+type ReviewStatus =
+  "DRAFT" | "BLOCKED" | "BA_CONFIRMED" | "OUT_OF_SCOPE_CLOSED";
 type ScopeStatus = "IN_SCOPE" | "OUT_OF_SCOPE_CLOSED";
 type ExpectedHttp = 200 | 400 | 409 | 422 | 500 | 503 | "NOT_APPLICABLE";
 type Iso4217Code = CurrencyCatalogueCode; // generated from the same-SHA Currency catalogue
-type OosMessageIdentity = "MT101" | "MT102" | "MT104" | "MT107" | "MT204" | OosCatalogueIdentity;
+type OosMessageIdentity =
+  "MT101" | "MT102" | "MT104" | "MT107" | "MT204" | OosCatalogueIdentity;
 
 type CurrencyContext =
-  | { requirement: "REQUIRED" | "FROM_TRANSACTION"; source: "RULE" | "TRANSACTION"; currency: Iso4217Code }
-  | { requirement: "NOT_REQUIRED"; source: "NOT_APPLICABLE"; currency: "NOT_APPLICABLE" };
+  | {
+      requirement: "REQUIRED" | "FROM_TRANSACTION";
+      source: "RULE" | "TRANSACTION";
+      currency: Iso4217Code;
+    }
+  | {
+      requirement: "NOT_REQUIRED";
+      source: "NOT_APPLICABLE";
+      currency: "NOT_APPLICABLE";
+    };
 
 type BookingEntityContext =
-  | { requirement: "REQUIRED" | "FROM_CONTEXT"; source: "RULE" | "CONTEXT"; bookingEntityId: EntityCatalogueId }
-  | { requirement: "NOT_REQUIRED"; source: "NOT_APPLICABLE"; bookingEntityId: "NOT_APPLICABLE" };
+  | {
+      requirement: "REQUIRED" | "FROM_CONTEXT";
+      source: "RULE" | "CONTEXT";
+      bookingEntityId: EntityCatalogueId;
+    }
+  | {
+      requirement: "NOT_REQUIRED";
+      source: "NOT_APPLICABLE";
+      bookingEntityId: "NOT_APPLICABLE";
+    };
 
 type ValueDateContext =
-  | { source: "TRANSACTION" | "CONTEXT"; valueDate: IsoDate; effectiveFrom: IsoDate; effectiveTo: IsoDate }
-  | { source: "NOT_APPLICABLE"; valueDate: "NOT_APPLICABLE"; effectiveFrom: "NOT_APPLICABLE"; effectiveTo: "NOT_APPLICABLE" };
+  | {
+      source: "TRANSACTION" | "CONTEXT";
+      valueDate: IsoDate;
+      effectiveFrom: IsoDate;
+      effectiveTo: IsoDate;
+    }
+  | {
+      source: "NOT_APPLICABLE";
+      valueDate: "NOT_APPLICABLE";
+      effectiveFrom: "NOT_APPLICABLE";
+      effectiveTo: "NOT_APPLICABLE";
+    };
 
 type AccountRelationshipContext =
   | {
@@ -285,7 +318,11 @@ interface SuppliedAccountIdentity {
 type InputAccountSelection =
   | { case: "ABSENT" }
   | { case: "SINGLE_VALID"; account: SuppliedAccountIdentity }
-  | { case: "SINGLE_INVALID"; account: SuppliedAccountIdentity; invalidReasonCode: ReasonCode }
+  | {
+      case: "SINGLE_INVALID";
+      account: SuppliedAccountIdentity;
+      invalidReasonCode: ReasonCode;
+    }
   | { case: "MULTIPLE"; accounts: readonly SuppliedAccountIdentity[] };
 
 interface ExecutionContext {
@@ -295,8 +332,16 @@ interface ExecutionContext {
   valueDate: ValueDateContext;
   account: AccountRelationshipContext;
   amount:
-    | { requirement: "REQUIRED" | "FROM_TRANSACTION"; decimalValue: CanonicalDecimalString; currency: Iso4217Code }
-    | { requirement: "NOT_REQUIRED"; decimalValue: "NOT_APPLICABLE"; currency: "NOT_APPLICABLE" };
+    | {
+        requirement: "REQUIRED" | "FROM_TRANSACTION";
+        decimalValue: CanonicalDecimalString;
+        currency: Iso4217Code;
+      }
+    | {
+        requirement: "NOT_REQUIRED";
+        decimalValue: "NOT_APPLICABLE";
+        currency: "NOT_APPLICABLE";
+      };
   productId: ProductCatalogueId | "NOT_APPLICABLE";
   businessFunctionId: BusinessFunctionCatalogueId | "NOT_APPLICABLE";
   paymentLegId: PaymentLegCatalogueId | "NOT_APPLICABLE";
@@ -342,18 +387,50 @@ interface VersionConversionBase {
   canonicalTargetPresent: boolean;
   covTokenPresent: boolean;
   sourceLifecycle: "ACTIVE" | "DRAFT" | "REVOKED" | "SUPERSEDED";
-  sourceDatasetClass: "OPERATIONAL_POSITIVE" | "QA_POSITIVE" | "QA_NEGATIVE" | "QA_BOUNDARY" | "QA_ISOLATED" | "HISTORICAL_BASELINE" | "LEGACY";
+  sourceDatasetClass:
+    | "OPERATIONAL_POSITIVE"
+    | "QA_POSITIVE"
+    | "QA_NEGATIVE"
+    | "QA_BOUNDARY"
+    | "QA_ISOLATED"
+    | "HISTORICAL_BASELINE"
+    | "LEGACY";
   direction: "INBOUND" | "OUTBOUND";
   contextKey: ExecutionContextCatalogueId;
   dependencyStatus: "CLOSED" | "PENDING" | "NOT_APPLICABLE";
   executionContext: ExecutionContext;
 }
 
-type VersionConversionInput = VersionConversionBase & (
-  | { family: "pacs.008"; sourceAliasesPresent: readonly ("pacs.008.001.12" | "pacs.008.001.012")[]; targetToken: "pacs.008.001.08"; profile: "PLAIN" | "REMIT"; businessService: "swift.cbprplus.04" }
-  | { family: "pacs.008"; sourceAliasesPresent: readonly ("pacs.008.001.12" | "pacs.008.001.012")[]; targetToken: "pacs.008.001.08"; profile: "STP"; businessService: "swift.cbprplus.stp.04" }
-  | { family: "pacs.009"; sourceAliasesPresent: readonly ("pacs.009.001.12" | "pacs.009.001.012")[]; targetToken: "pacs.009.001.08"; profile: "PLAIN"; businessService: "swift.cbprplus.04" }
-);
+type VersionConversionInput = VersionConversionBase &
+  (
+    | {
+        family: "pacs.008";
+        sourceAliasesPresent: readonly (
+          "pacs.008.001.12" | "pacs.008.001.012"
+        )[];
+        targetToken: "pacs.008.001.08";
+        profile: "PLAIN" | "REMIT";
+        businessService: "swift.cbprplus.04";
+      }
+    | {
+        family: "pacs.008";
+        sourceAliasesPresent: readonly (
+          "pacs.008.001.12" | "pacs.008.001.012"
+        )[];
+        targetToken: "pacs.008.001.08";
+        profile: "STP";
+        businessService: "swift.cbprplus.stp.04";
+      }
+    | {
+        family: "pacs.009";
+        sourceAliasesPresent: readonly (
+          "pacs.009.001.12" | "pacs.009.001.012"
+        )[];
+        targetToken: "pacs.009.001.08";
+        profile: "PLAIN";
+        businessService: "swift.cbprplus.04";
+      }
+  );
 
 interface FinGeneratedBase {
   sourceKind: "FIN_GENERATED_FIXTURE";
@@ -363,13 +440,49 @@ interface FinGeneratedBase {
   executionContext: ExecutionContext;
 }
 
-type FinGeneratedFixtureInput = FinGeneratedBase & (
-  | { family: "MT1"; messageType: "MT103"; targetFamily: "pacs.008"; targetToken: "pacs.008.001.08"; profile: "PLAIN"; businessService: "swift.cbprplus.04" }
-  | { family: "MT1"; messageType: "MT103"; targetFamily: "pacs.008"; targetToken: "pacs.008.001.08"; profile: "STP"; businessService: "swift.cbprplus.stp.04" }
-  | { family: "MT1"; messageType: "MT103"; targetFamily: "pacs.008"; targetToken: "pacs.008.001.08"; profile: "REMIT"; businessService: "swift.cbprplus.04" }
-  | { family: "MT2"; messageType: "MT202" | "MT205"; targetFamily: "pacs.009"; targetToken: "pacs.009.001.08"; profile: "PLAIN"; businessService: "swift.cbprplus.04" }
-  | { family: "MT2"; messageType: "MT202COV" | "MT205COV"; targetFamily: "pacs.009"; targetToken: "pacs.009.001.08"; profile: "COV"; businessService: "swift.cbprplus.cov.04" }
-);
+type FinGeneratedFixtureInput = FinGeneratedBase &
+  (
+    | {
+        family: "MT1";
+        messageType: "MT103";
+        targetFamily: "pacs.008";
+        targetToken: "pacs.008.001.08";
+        profile: "PLAIN";
+        businessService: "swift.cbprplus.04";
+      }
+    | {
+        family: "MT1";
+        messageType: "MT103";
+        targetFamily: "pacs.008";
+        targetToken: "pacs.008.001.08";
+        profile: "STP";
+        businessService: "swift.cbprplus.stp.04";
+      }
+    | {
+        family: "MT1";
+        messageType: "MT103";
+        targetFamily: "pacs.008";
+        targetToken: "pacs.008.001.08";
+        profile: "REMIT";
+        businessService: "swift.cbprplus.04";
+      }
+    | {
+        family: "MT2";
+        messageType: "MT202" | "MT205";
+        targetFamily: "pacs.009";
+        targetToken: "pacs.009.001.08";
+        profile: "PLAIN";
+        businessService: "swift.cbprplus.04";
+      }
+    | {
+        family: "MT2";
+        messageType: "MT202COV" | "MT205COV";
+        targetFamily: "pacs.009";
+        targetToken: "pacs.009.001.08";
+        profile: "COV";
+        businessService: "swift.cbprplus.cov.04";
+      }
+  );
 
 interface OosOracleBase {
   sourceKind: "OOS_ORACLE_ONLY";
@@ -379,10 +492,19 @@ interface OosOracleBase {
   executionContext: ExecutionContext;
 }
 
-type OosOracleInput = OosOracleBase & (
-  | { family: "pacs.009"; profile: "ADV"; businessService: "swift.cbprplus.adv.04" }
-  | { family: "MT1" | "MT2" | "pacs.008" | "pacs.009"; profile: "NOT_APPLICABLE"; businessService: "NOT_APPLICABLE" }
-);
+type OosOracleInput = OosOracleBase &
+  (
+    | {
+        family: "pacs.009";
+        profile: "ADV";
+        businessService: "swift.cbprplus.adv.04";
+      }
+    | {
+        family: "MT1" | "MT2" | "pacs.008" | "pacs.009";
+        profile: "NOT_APPLICABLE";
+        businessService: "NOT_APPLICABLE";
+      }
+  );
 
 interface HistoricalOrSkipInput {
   sourceKind: "HISTORICAL_OR_SKIP";
@@ -390,14 +512,30 @@ interface HistoricalOrSkipInput {
   sourceRecordId: string;
   sourceVersion: number;
   sourceLifecycle: "ACTIVE" | "DRAFT" | "REVOKED" | "SUPERSEDED";
-  sourceDatasetClass: "QA_NEGATIVE" | "QA_BOUNDARY" | "QA_ISOLATED" | "HISTORICAL_BASELINE" | "LEGACY";
+  sourceDatasetClass:
+    | "QA_NEGATIVE"
+    | "QA_BOUNDARY"
+    | "QA_ISOLATED"
+    | "HISTORICAL_BASELINE"
+    | "LEGACY";
   contextKey: ExecutionContextCatalogueId;
   dependencyStatus: "CLOSED" | "PENDING" | "NOT_APPLICABLE";
   executionContext: ExecutionContext;
 }
 
-type InputCondition = VersionConversionInput | FinGeneratedFixtureInput | OosOracleInput | HistoricalOrSkipInput;
-type AccountCase = "NOT_APPLICABLE" | "REQUIRED_PRESENT" | "REQUIRED_MISSING" | "OPTIONAL_ABSENT" | "OPTIONAL_PRESENT_VALID" | "OPTIONAL_PRESENT_INVALID" | "OPTIONAL_MULTIPLE";
+type InputCondition =
+  | VersionConversionInput
+  | FinGeneratedFixtureInput
+  | OosOracleInput
+  | HistoricalOrSkipInput;
+type AccountCase =
+  | "NOT_APPLICABLE"
+  | "REQUIRED_PRESENT"
+  | "REQUIRED_MISSING"
+  | "OPTIONAL_ABSENT"
+  | "OPTIONAL_PRESENT_VALID"
+  | "OPTIONAL_PRESENT_INVALID"
+  | "OPTIONAL_MULTIPLE";
 
 interface SourceEvidence {
   sourceArtifactId: string;
@@ -408,17 +546,39 @@ interface SourceEvidence {
   ruleId: string;
   sectionOrPage: string;
   ruleCategory: "NORMATIVE" | "BA_RULING" | "QA_INVARIANT" | "PRODUCT_POLICY";
-  registryId: "CONTROLLED_SOURCE_REGISTER" | "BA_RULING_REGISTRY" | "QA_INVARIANT_REGISTRY" | "PRODUCT_POLICY_REGISTRY";
+  registryId:
+    | "CONTROLLED_SOURCE_REGISTER"
+    | "BA_RULING_REGISTRY"
+    | "QA_INVARIANT_REGISTRY"
+    | "PRODUCT_POLICY_REGISTRY";
 }
 
 type ValidationExecution =
-  | { owner: "SSI_PROFILE_GATE" | "SSI_RESOLVER"; mode: "EXECUTE"; ssiLookup: "PERFORMED" | "NOT_PERFORMED" }
-  | { owner: "CBPR_USAGE_GUIDELINE_VALIDATOR"; mode: "EXECUTE_NAMED_VALIDATOR"; validatorId: string; ssiLookup: "NOT_PERFORMED" }
-  | { owner: "FULL_FIN_VALIDATOR" | "CBPR_USAGE_GUIDELINE_VALIDATOR"; mode: "OUT_OF_SCOPE_CLOSED"; finValidationStatus: "FIN_VALIDATION_NOT_EVALUATED"; ssiLookup: "NOT_PERFORMED" };
+  | {
+      owner: "SSI_PROFILE_GATE" | "SSI_RESOLVER";
+      mode: "EXECUTE";
+      ssiLookup: "PERFORMED" | "NOT_PERFORMED";
+    }
+  | {
+      owner: "CBPR_USAGE_GUIDELINE_VALIDATOR";
+      mode: "EXECUTE_NAMED_VALIDATOR";
+      validatorId: string;
+      ssiLookup: "NOT_PERFORMED";
+    }
+  | {
+      owner: "FULL_FIN_VALIDATOR" | "CBPR_USAGE_GUIDELINE_VALIDATOR";
+      mode: "OUT_OF_SCOPE_CLOSED";
+      finValidationStatus: "FIN_VALIDATION_NOT_EVALUATED";
+      ssiLookup: "NOT_PERFORMED";
+    };
 
 type ActivationContract =
   | { targetLifecycle: "DRAFT"; activationPath: "MAKER_CHECKER" }
-  | { targetLifecycle: "ACTIVE"; activationPath: "CONTROLLED_DEMO_SEED_ACTIVE_EXCEPTION"; poDecisionId: string };
+  | {
+      targetLifecycle: "ACTIVE";
+      activationPath: "CONTROLLED_DEMO_SEED_ACTIVE_EXCEPTION";
+      poDecisionId: string;
+    };
 
 interface TypedSideEffects {
   payloadGenerated: false;
@@ -436,7 +596,16 @@ interface RuleOracleRow {
   scopeStatus: ScopeStatus;
   reviewStatus: ReviewStatus;
   inputCondition: InputCondition;
-  disposition: "GENERATE_CANONICAL" | "CONVERT" | "REMOVE_SOURCE_TOKEN" | "UNCHANGED" | "SKIP_NEGATIVE" | "SKIP_HISTORY" | "SKIP_COV" | "HOLD_DEPENDENCY" | "OUT_OF_SCOPE";
+  disposition:
+    | "GENERATE_CANONICAL"
+    | "CONVERT"
+    | "REMOVE_SOURCE_TOKEN"
+    | "UNCHANGED"
+    | "SKIP_NEGATIVE"
+    | "SKIP_HISTORY"
+    | "SKIP_COV"
+    | "HOLD_DEPENDENCY"
+    | "OUT_OF_SCOPE";
   validation: ValidationExecution;
   activation: ActivationContract | null;
   accountRuleKey: string | null;
@@ -478,9 +647,17 @@ interface RuleTableRow {
   mutationDisposition: RuleOracleRow["disposition"];
   validation: ValidationExecution;
   activation: ActivationContract | null;
-  datasetClass: "OPERATIONAL_POSITIVE" | "QA_POSITIVE" | "QA_NEGATIVE" | "QA_BOUNDARY" | "QA_ISOLATED" | "HISTORICAL_BASELINE" | "LEGACY";
+  datasetClass:
+    | "OPERATIONAL_POSITIVE"
+    | "QA_POSITIVE"
+    | "QA_NEGATIVE"
+    | "QA_BOUNDARY"
+    | "QA_ISOLATED"
+    | "HISTORICAL_BASELINE"
+    | "LEGACY";
   targetLifecycle: "DRAFT" | "ACTIVE" | null;
-  activationPath: "MAKER_CHECKER" | "CONTROLLED_DEMO_SEED_ACTIVE_EXCEPTION" | null;
+  activationPath:
+    "MAKER_CHECKER" | "CONTROLLED_DEMO_SEED_ACTIVE_EXCEPTION" | null;
   dependencyId: string | null;
   priority: number;
   tiePolicy: "AMBIGUOUS";
@@ -522,7 +699,11 @@ interface RuleTableRow {
   expectedRecordsUnchanged: 0 | 1;
   expectedSsiRowDelta: number;
   expectedApplicabilityRowDelta: number;
-  runtimeDriftDisposition: "NOT_APPLICABLE" | "PRESERVE_NON_TARGET_RUNTIME_DRIFT" | "TARGET_EXPLICIT_RULE" | "BLOCKED";
+  runtimeDriftDisposition:
+    | "NOT_APPLICABLE"
+    | "PRESERVE_NON_TARGET_RUNTIME_DRIFT"
+    | "TARGET_EXPLICIT_RULE"
+    | "BLOCKED";
 }
 ```
 
@@ -536,13 +717,13 @@ The No-Inference closure gate requires `freeTextExecutableRules=0`, `ambiguousNu
 
 ## 5. Dataset lifecycle and visibility
 
-| Dataset class | Operational discovery | QA discovery | Audit | Mutation policy |
-|---|---|---|---|---|
-| Historical Baseline | No | No | Yes | Immutable |
-| Operational Positive | Yes | Yes | Yes | New version only |
-| QA Positive | No | Yes | Yes | New version only |
-| QA Negative | No | Yes | Yes | Preserve intentional defect |
-| QA Boundary / OOS | No | Oracle only | Yes | No SSI candidate row |
+| Dataset class        | Operational discovery | QA discovery | Audit | Mutation policy             |
+| -------------------- | --------------------- | ------------ | ----- | --------------------------- |
+| Historical Baseline  | No                    | No           | Yes   | Immutable                   |
+| Operational Positive | Yes                   | Yes          | Yes   | New version only            |
+| QA Positive          | No                    | Yes          | Yes   | New version only            |
+| QA Negative          | No                    | Yes          | Yes   | Preserve intentional defect |
+| QA Boundary / OOS    | No                    | Oracle only  | Yes   | No SSI candidate row        |
 
 Negative fixtures must never be “repaired” into Positive merely to obtain API 200. OOS cases must produce zero SSI and zero Applicability rows.
 
@@ -787,8 +968,8 @@ Expected: both commands exit `0`. Commit only after Product Owner explicitly aut
 - Create: `qa/fixtures/src/ssi/mt1-mt2-rule-oracle.schema.ts`
 - Create: `qa/fixtures/src/ssi/validate-mt1-mt2-rule-table.ts`
 - Test: `qa/fixtures/src/ssi/validate-mt1-mt2-rule-table.test.ts`
-- Reference: `memory/swift-mt1xx-pacs008-v2.md`
-- Reference: `memory/swift-mt2xx-pacs009-v2.md`
+- Reference: `memory/ssi/swift-mt1xx-pacs008-ssi-v3.md`
+- Reference: `memory/ssi/swift-mt2xx-pacs009-v2.md`
 
 **Step 1: Populate templates without inventing decisions**
 

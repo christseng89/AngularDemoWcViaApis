@@ -4,7 +4,13 @@ coverage/
 .nx/
 .angular/
 .scannerwork/
+.quality/
+artifacts/
+Claude outputs/
+outputs/
 data/*.sqlite*
+data/export/
+data/backup/
 .env
 playwright-report/
 test-results/
@@ -24,16 +30,14 @@ qa/*
 !qa/tests/**
 !qa/tdd/
 !qa/tdd/**
-!qa/reports/
-qa/reports/*
-!qa/reports/latest/
-!qa/reports/latest/**
-
-# Transient outputs created by QA runners inside the approved layout.
-qa/reports/latest/**/*.partial.json
-qa/reports/latest/**/*.stdout.log
-qa/reports/latest/**/*.stderr.log
-qa/reports/latest/**/*.png
+qa/reports/
+qa/**/*.sqlite-shm
+qa/**/*.sqlite-wal
 
 *.log
 *.sha256.txt
+
+backup/
+backups/
+export/
+ssi-demo.sqlite*

@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "status": "PLANNED_NOT_EXECUTED",
   "scope": "MT202/MT202COV/MT205/MT205COV and pacs.009 plain/COV/ADV routing guard",
-  "controlledMemory": "memory/swift-mt2xx-pacs009-v2.md",
+  "controlledMemory": "memory/ssi/swift-mt2xx-pacs009-v2.md",
   "commands": [
     "npm run qa:mt2:final",
     "npm run qa:mt2:ui",
