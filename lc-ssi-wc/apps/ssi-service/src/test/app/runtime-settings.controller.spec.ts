@@ -12,50 +12,136 @@ describe("RuntimeSettingsController", () => {
   };
   const reloadService = {
     status: jest.fn(() => status),
-    reload: jest.fn((password: string) => ({ code: "DEMO_DATA_RELOADED", password })),
+    authorize: jest.fn((password: string) => ({
+      code: "DEMO_RELOAD_AUTHORIZED",
+      authorizationToken: password,
+    })),
+    cancelAuthorization: jest.fn((authorizationToken: string) => ({
+      code: "DEMO_RELOAD_AUTHORIZATION_CANCELLED",
+      authorizationToken,
+    })),
+    reload: jest.fn(async (authorizationToken: string) => ({
+      code: "DEMO_DATA_RELOADED",
+      authorizationToken,
+    })),
   } as unknown as DevelopmentDataReloadService;
   const controller = new RuntimeSettingsController(reloadService);
 
   beforeEach(() => jest.clearAllMocks());
 
   it("returns runtime capability and current snapshot without secrets", () => {
-    expect(controller.runtime()).toMatchObject({ ...status, resolutionCurrencyInquiry: {
-      title: "Inquire Business Currency Index", sortBy: "businessDomain", sortDirection: "asc", pageSize: 10,
-    } });
+    expect(controller.runtime()).toMatchObject({
+      ...status,
+      resolutionCurrencyInquiry: {
+        title: "Inquire Business Currency Index",
+        sortBy: "businessDomain",
+        sortDirection: "asc",
+        pageSize: 10,
+      },
+    });
   });
 
-  it("passes only a string password to the reload service", () => {
-    expect(controller.reload({ password: "entered" })).toEqual({
-      code: "DEMO_DATA_RELOADED",
-      password: "entered",
+  it("authorizes with a password and reloads with only the one-time token", async () => {
+    expect(controller.authorizeReload({ password: "entered" })).toEqual({
+      code: "DEMO_RELOAD_AUTHORIZED",
+      authorizationToken: "entered",
     });
-    controller.reload({ password: 123 });
+    controller.authorizeReload({ password: 123 });
+    expect(reloadService.authorize).toHaveBeenLastCalledWith("");
+    expect(await controller.reload({ authorizationToken: "token" })).toEqual({
+      code: "DEMO_DATA_RELOADED",
+      authorizationToken: "token",
+    });
+    await controller.reload({ authorizationToken: 123 });
     expect(reloadService.reload).toHaveBeenLastCalledWith("");
+  });
+
+  it("cancels a pending one-time reload authorization", () => {
+    expect(
+      controller.cancelReloadAuthorization({ authorizationToken: "token" }),
+    ).toMatchObject({ code: "DEMO_RELOAD_AUTHORIZATION_CANCELLED" });
+    expect(reloadService.cancelAuthorization).toHaveBeenCalledWith("token");
+    controller.cancelReloadAuthorization({ authorizationToken: 123 });
+    expect(reloadService.cancelAuthorization).toHaveBeenLastCalledWith("");
   });
 
   it("exposes paged currency inquiry and development-only manual Resync", () => {
     const currencies = {
-      inquiry: jest.fn(() => ({ items: [], page: 1, pageSize: 25, totalItems: 0 })),
-      resync: jest.fn(() => ({ discovered: 10, inserted: 0, unchanged: 10, activated: 0, inactivated: 0 })),
+      inquiry: jest.fn(() => ({
+        items: [],
+        page: 1,
+        pageSize: 25,
+        totalItems: 0,
+      })),
+      resync: jest.fn(() => ({
+        discovered: 10,
+        inserted: 0,
+        unchanged: 10,
+        activated: 0,
+        inactivated: 0,
+      })),
     };
-    const subject = new RuntimeSettingsController(reloadService, currencies as never);
-    expect(subject.resolutionCurrencyInquiry({ page: "1", pageSize: "25" }))
-      .toMatchObject({ totalItems: 0 });
-    expect(currencies.inquiry).toHaveBeenCalledWith({ page: 1, pageSize: 25, sortBy: "businessDomain", sortDirection: "asc" });
-    expect(subject.resyncResolutionCurrencies()).toMatchObject({ inserted: 0, unchanged: 10 });
+    const subject = new RuntimeSettingsController(
+      reloadService,
+      currencies as never,
+    );
+    expect(
+      subject.resolutionCurrencyInquiry({ page: "1", pageSize: "25" }),
+    ).toMatchObject({ totalItems: 0 });
+    expect(currencies.inquiry).toHaveBeenCalledWith({
+      page: 1,
+      pageSize: 25,
+      sortBy: "businessDomain",
+      sortDirection: "asc",
+    });
+    subject.resolutionCurrencyInquiry({
+      businessDomain: "PAYMENT",
+      status: "ACTIVE",
+      search: "USD",
+      sortBy: "currency",
+      sortDirection: "desc",
+    });
+    expect(currencies.inquiry).toHaveBeenLastCalledWith({
+      page: 1,
+      pageSize: 10,
+      businessDomain: "PAYMENT",
+      status: "ACTIVE",
+      search: "USD",
+      sortBy: "currency",
+      sortDirection: "desc",
+    });
+    expect(() =>
+      subject.resolutionCurrencyInquiry({ businessDomain: "INVALID" }),
+    ).toThrow("RESOLUTION_CURRENCY_INVALID_INQUIRY");
+    expect(() =>
+      subject.resolutionCurrencyInquiry({ status: "INVALID" }),
+    ).toThrow("RESOLUTION_CURRENCY_INVALID_INQUIRY");
+    expect(subject.resyncResolutionCurrencies()).toMatchObject({
+      inserted: 0,
+      unchanged: 10,
+    });
     expect(currencies.resync).toHaveBeenCalledTimes(1);
-    jest.spyOn(reloadService, "status").mockReturnValueOnce({ ...status, developmentEnabled: false });
+    jest
+      .spyOn(reloadService, "status")
+      .mockReturnValueOnce({ ...status, developmentEnabled: false });
     expect(() => subject.resyncResolutionCurrencies()).toThrow();
     expect(currencies.resync).toHaveBeenCalledTimes(1);
   });
 
-  it("invalidates cached page definitions only after successful Reload", () => {
+  it("invalidates cached page definitions only after successful Reload", async () => {
     const currencies = { onReloadCommitted: jest.fn() };
-    const subject = new RuntimeSettingsController(reloadService, currencies as never);
-    subject.reload({ password: "entered" });
+    const subject = new RuntimeSettingsController(
+      reloadService,
+      currencies as never,
+    );
+    await subject.reload({ authorizationToken: "entered" });
     expect(currencies.onReloadCommitted).toHaveBeenCalledTimes(1);
-    jest.spyOn(reloadService, "reload").mockImplementationOnce(() => { throw new Error("failed"); });
-    expect(() => subject.reload({ password: "entered" })).toThrow("failed");
+    jest
+      .spyOn(reloadService, "reload")
+      .mockRejectedValueOnce(new Error("failed"));
+    await expect(
+      subject.reload({ authorizationToken: "entered" }),
+    ).rejects.toThrow("failed");
     expect(currencies.onReloadCommitted).toHaveBeenCalledTimes(1);
   });
 });

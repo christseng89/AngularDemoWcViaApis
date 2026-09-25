@@ -28,6 +28,7 @@ import { hashCanonical } from "../canonical-json";
 import { Mt1SsiResolutionPageDefinitionSource } from "./mt1-ssi-resolution-page-definition.source";
 import { Mt1SsiDemoRouteRepository } from "../mt1-ssi-demo-route.repository";
 import { EntityRepository } from "../entity/entity.repository";
+import { mt2ControlledProfile } from "../mt2-settlement-request.policy";
 
 interface SsiCounterpartyLookupQuery {
   readonly scenarioId: string;
@@ -580,6 +581,7 @@ export class PageParameterLookupService {
           },
           nostro: candidate.nostro,
           rma: candidate.rma,
+          profile: mt2ControlledProfile(input.messageType),
           route: {
             actualReceiverBic,
             accountWithBic: entry.record.route["accountWithBic"] ?? "",

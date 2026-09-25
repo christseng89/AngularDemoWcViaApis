@@ -3115,16 +3115,34 @@
         "required": ["projectionId", "classification", "role"],
         "properties": {
           "projectionId": { "type": "string", "minLength": 1 },
-          "classification": { "enum": ["SSI_DERIVED", "UPSTREAM_CONTEXT", "OMITTED_BY_RULE", "NOT_APPLICABLE"] },
+          "classification": {
+            "enum": [
+              "SSI_DERIVED",
+              "UPSTREAM_CONTEXT",
+              "OMITTED_BY_RULE",
+              "NOT_APPLICABLE"
+            ]
+          },
           "role": { "type": "string", "minLength": 1 },
           "mtTagOption": { "type": "string" },
           "isoPath": { "type": "string" },
-          "valueType": { "enum": ["BIC", "ACCOUNT_REFERENCE", "SETTLEMENT_METHOD"] },
+          "valueType": {
+            "enum": ["BIC", "ACCOUNT_REFERENCE", "SETTLEMENT_METHOD"]
+          },
           "value": { "type": "string" },
-          "sourceRecordType": { "enum": ["BANK_SSI", "OWN_NOSTRO_ACCOUNT", "UPSTREAM_ATTESTATION", "TOPOLOGY_RULE"] },
+          "sourceRecordType": {
+            "enum": [
+              "BANK_SSI",
+              "OWN_NOSTRO_ACCOUNT",
+              "UPSTREAM_ATTESTATION",
+              "TOPOLOGY_RULE"
+            ]
+          },
           "sourceRecordId": { "type": "string" },
           "sourceRecordVersion": { "type": "string" },
           "mappingRuleId": { "type": "string" },
+          "decisionRuleId": { "type": "string" },
+          "reason": { "type": "string" },
           "rulingProvenance": { "type": "object" }
         }
       },
@@ -3136,7 +3154,13 @@
           "profileId": { "type": "string", "minLength": 1 },
           "messageDefinitionId": { "type": "string" },
           "businessService": { "type": "string" },
-          "evidenceProjections": { "type": "array", "minItems": 1, "items": { "$ref": "#/components/schemas/ResolutionPageEvidenceProjection" } }
+          "evidenceProjections": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/ResolutionPageEvidenceProjection"
+            }
+          }
         }
       },
       "ResolutionPageExecutionResult": {
@@ -3213,7 +3237,9 @@
           "evidenceCards": {
             "type": "array",
             "minItems": 1,
-            "items": { "$ref": "#/components/schemas/ResolutionPageEvidenceCard" }
+            "items": {
+              "$ref": "#/components/schemas/ResolutionPageEvidenceCard"
+            }
           },
           "fields": { "type": "array", "items": { "type": "object" } },
           "outputs": {

@@ -44,6 +44,9 @@ export interface RmaDecision {
   rmaId?: string;
   rmaVersion?: number;
   source?: RmaRecord["source"];
+  profileId?: string;
+  pairedEvidenceProfileId?: string;
+  businessService?: string;
 }
 const BIC = /^[A-Z0-9]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?$/;
 const MESSAGE = /^(?:MT\d{3}(?:COV)?|pacs\.[A-Za-z0-9.]+|\*)$/;
@@ -323,6 +326,10 @@ export class RmaApplicationService {
     usageGroup?: string;
     fixtureBindingId?: string;
     operationalOnly?: boolean;
+    decisionId?: string;
+    profileId?: string;
+    pairedEvidenceProfileId?: string;
+    businessService?: string;
   }): RmaDecision {
     const ownBic = normalizeBic(request.ownBic),
       counterpartyBic = normalizeBic(request.counterpartyBic);
@@ -342,7 +349,7 @@ export class RmaApplicationService {
       throw new BadRequestException("RMA_SCOPE_CONFLICT");
     }
     const checkedAt = new Date().toISOString(),
-      decisionId = randomUUID();
+      decisionId = request.decisionId ?? randomUUID();
     const candidates = this.repository.findAuthorised({
       ownBic,
       counterpartyBic,
@@ -368,7 +375,19 @@ export class RmaApplicationService {
         Date.parse(record.validFrom) <= effectiveTime &&
         effectiveTime <= Date.parse(record.validTo),
     );
-    const base = { decisionId, authorised: false, checkedAt, effectiveAt };
+    const base = {
+      decisionId,
+      authorised: false,
+      checkedAt,
+      effectiveAt,
+      ...(request.profileId ? { profileId: request.profileId } : {}),
+      ...(request.pairedEvidenceProfileId
+        ? { pairedEvidenceProfileId: request.pairedEvidenceProfileId }
+        : {}),
+      ...(request.businessService
+        ? { businessService: request.businessService }
+        : {}),
+    };
     if (effective.length !== 1) {
       let decision: RmaDecision["decision"] = "NOT_FOUND";
       if (effective.length > 1) {

@@ -64,6 +64,14 @@ const object = (value: unknown): Json =>
 const numeric = (value: unknown): number | undefined =>
   typeof value === "number" && Number.isInteger(value) ? value : undefined;
 
+const evidenceSourceRecordType = (
+  field: ResolutionPageFieldResult,
+): "UPSTREAM_ATTESTATION" | "OWN_NOSTRO_ACCOUNT" | "BANK_SSI" => {
+  if (field.provenance.source === "TRANSACTION_CONTEXT")
+    return "UPSTREAM_ATTESTATION";
+  return field.swiftTag === "53" ? "OWN_NOSTRO_ACCOUNT" : "BANK_SSI";
+};
+
 const jsonWireRepresentation = (value: Json): unknown => {
   const serialized = JSON.stringify(value);
   return JSON.parse(serialized) as unknown;
@@ -85,7 +93,7 @@ const previousMessageType = (
 const PREVIOUS_COVER_TYPES = new Set([
   "MT202COV",
   "MT205COV",
-  "EQUIVALENT_COVER",
+  "GOVERNED_EQUIVALENT_COVER",
 ]);
 
 @Injectable()
@@ -360,7 +368,10 @@ export class PaymentResolutionPageSubmissionAdapter {
       values,
       "context.previousMessageAttestationVersion",
     );
-    const artifactSha256 = text(values, "context.previousMessageArtifactSha256");
+    const artifactSha256 = text(
+      values,
+      "context.previousMessageArtifactSha256",
+    );
     if (
       sourceMessageType === "MT205" &&
       (nonCoverAttested !== true ||
@@ -368,7 +379,9 @@ export class PaymentResolutionPageSubmissionAdapter {
         !attestationVersion ||
         !/^[a-f\d]{64}$/i.test(artifactSha256))
     )
-      throw new BadRequestException({ code: "MT205_PREDECESSOR_ATTESTATION_REQUIRED" });
+      throw new BadRequestException({
+        code: "MT205_PREDECESSOR_ATTESTATION_REQUIRED",
+      });
     return {
       previousMessage: {
         ...identity,
@@ -404,6 +417,21 @@ export class PaymentResolutionPageSubmissionAdapter {
       throw new BadRequestException({
         code: "PAYMENT_PREVIOUS_ARTIFACT_SHA256_INVALID",
       });
+    const equivalentCoverRuleRecordId = text(
+      values,
+      "context.equivalentCoverRuleRecordId",
+    );
+    const equivalentCoverRuleRecordVersion = text(
+      values,
+      "context.equivalentCoverRuleRecordVersion",
+    );
+    if (
+      type === "GOVERNED_EQUIVALENT_COVER" &&
+      (!equivalentCoverRuleRecordId || !equivalentCoverRuleRecordVersion)
+    )
+      throw new BadRequestException({
+        code: "PAYMENT_EQUIVALENT_COVER_RULE_REQUIRED",
+      });
     return {
       type,
       "20": this.requiredText(values, "context.previousMessage20"),
@@ -420,6 +448,12 @@ export class PaymentResolutionPageSubmissionAdapter {
         values,
         "context.previousMessageArtifactVersion",
       ),
+      ...(type === "GOVERNED_EQUIVALENT_COVER"
+        ? {
+            equivalentCoverRuleRecordId,
+            equivalentCoverRuleRecordVersion,
+          }
+        : {}),
     };
   }
 
@@ -514,7 +548,12 @@ export class PaymentResolutionPageSubmissionAdapter {
     const selected = submission.selectedRouteIdentity;
     const snapshot = submission.eligibilitySnapshot;
     const evidenceCards = this.evidenceCards(definition, request, raw, fields);
-    const settlementRoute = this.settlementRoute(request, raw, selected, fields);
+    const settlementRoute = this.settlementRoute(
+      request,
+      raw,
+      selected,
+      fields,
+    );
     return {
       definitionId: definition.definitionId,
       definitionVersion: definition.definitionVersion,
@@ -533,7 +572,7 @@ export class PaymentResolutionPageSubmissionAdapter {
       ...(snapshot || selected
         ? {
             contextSnapshotId:
-              snapshot?.contextSha256 ?? selected?.contextSha256 ?? "",
+              selected?.contextSha256 ?? snapshot?.contextSha256 ?? "",
           }
         : {}),
       ...(selected?.rma
@@ -569,7 +608,9 @@ export class PaymentResolutionPageSubmissionAdapter {
     fields: readonly ResolutionPageFieldResult[],
   ): ResolutionPageExecutionResult["settlementRoute"] {
     if (!selected) return undefined;
-    const chosen = object(raw["chosenRoute"] ?? object(raw["mx"])["chosenRoute"]);
+    const chosen = object(
+      raw["chosenRoute"] ?? object(raw["mx"])["chosenRoute"],
+    );
     const actualReceiverBic = scalarText(chosen["actualReceiverBic"]).trim();
     const executionTransport = scalarText(chosen["executionTransport"]).trim();
     const settlementMethod = scalarText(chosen["settlementMethod"]).trim();
@@ -584,7 +625,9 @@ export class PaymentResolutionPageSubmissionAdapter {
       this.invalidResolverResponse("PAYMENT_RESOLVER_ROUTE_BINDING_REQUIRED");
     const accountReference = scalarText(chosen["accountId"]).trim();
     if (!accountReference)
-      this.invalidResolverResponse("PAYMENT_RESOLVER_OPERATIONAL_ACCOUNT_REQUIRED");
+      this.invalidResolverResponse(
+        "PAYMENT_RESOLVER_OPERATIONAL_ACCOUNT_REQUIRED",
+      );
     return {
       routeBindingId: selected.routeId,
       actualReceiverBic,
@@ -614,7 +657,9 @@ export class PaymentResolutionPageSubmissionAdapter {
           role: "ACCOUNT_SERVICER",
           accountOwner: {
             bankServiceId: request.bookingEntity,
-            bic: scalarText(object(object(raw["mx"])["canonicalRoles"])["debtor"]),
+            bic: scalarText(
+              object(object(raw["mx"])["canonicalRoles"])["debtor"],
+            ),
           },
           accountServicer: {
             bankServiceId: bank.bankServiceId,
@@ -638,8 +683,7 @@ export class PaymentResolutionPageSubmissionAdapter {
         ...(field.accountReference
           ? { accountReference: field.accountReference }
           : {}),
-        sourceRecordId:
-          field.provenance.sourceRecordId ?? selected.ssi.id,
+        sourceRecordId: field.provenance.sourceRecordId ?? selected.ssi.id,
         version:
           field.swiftTag === "53"
             ? selected.nostro.version
@@ -654,33 +698,50 @@ export class PaymentResolutionPageSubmissionAdapter {
     raw: Json,
     fields: readonly ResolutionPageFieldResult[],
   ): readonly ResolutionPageEvidenceCard[] {
-    const chosen = object(raw["chosenRoute"] ?? object(raw["mx"])["chosenRoute"]);
+    const chosen = object(
+      raw["chosenRoute"] ?? object(raw["mx"])["chosenRoute"],
+    );
     const nostroId = scalarText(chosen["nostroId"] ?? request.selectedNostroId);
-    const nostroVersion = String(chosen["nostroVersion"] ?? request.selectedNostroVersion ?? "");
+    const nostroVersion = scalarText(
+      chosen["nostroVersion"] ?? request.selectedNostroVersion,
+    );
     const mtProjections = fields
       .filter((field) => field.swiftTag === "53" && field.swiftOption === "B")
       .map((field, index) => ({
-      projectionId: `MT-${index + 1}`,
-      classification:
-        field.provenance.source === "TRANSACTION_CONTEXT"
-          ? ("UPSTREAM_CONTEXT" as const)
-          : ("SSI_DERIVED" as const),
-      role: field.role,
-      mtTagOption: `${field.swiftTag}${field.swiftOption === "NONE" ? "" : field.swiftOption}`,
-      valueType: field.accountReference ? ("ACCOUNT_REFERENCE" as const) : ("BIC" as const),
-      value: field.value ?? "",
-      sourceRecordType:
-        field.provenance.source === "TRANSACTION_CONTEXT"
-          ? ("UPSTREAM_ATTESTATION" as const)
-          : field.swiftTag === "53"
-            ? ("OWN_NOSTRO_ACCOUNT" as const)
-            : ("BANK_SSI" as const),
-      sourceRecordId: field.provenance.sourceRecordId ??
-        (field.swiftTag === "53" ? nostroId : scalarText(chosen["ssiId"])),
-      sourceRecordVersion:
-        field.swiftTag === "53" ? nostroVersion : String(chosen["ssiVersion"] ?? ""),
-      mappingRuleId: "MRG-MT202-53B",
-    }));
+        projectionId: `MT-${index + 1}`,
+        classification:
+          field.provenance.source === "TRANSACTION_CONTEXT"
+            ? ("UPSTREAM_CONTEXT" as const)
+            : ("SSI_DERIVED" as const),
+        role: field.role,
+        mtTagOption: `${field.swiftTag}${field.swiftOption === "NONE" ? "" : field.swiftOption}`,
+        valueType: field.accountReference
+          ? ("ACCOUNT_REFERENCE" as const)
+          : ("BIC" as const),
+        value: field.value ?? "",
+        sourceRecordType: evidenceSourceRecordType(field),
+        sourceRecordId:
+          field.provenance.sourceRecordId ??
+          (field.swiftTag === "53" ? nostroId : scalarText(chosen["ssiId"])),
+        sourceRecordVersion:
+          field.swiftTag === "53"
+            ? nostroVersion
+            : scalarText(chosen["ssiVersion"]),
+        mappingRuleId: "MRG-MT202-53B",
+      }));
+    const governedMtProjections: ResolutionPageEvidenceCard["evidenceProjections"] =
+      mtProjections.length
+        ? mtProjections
+        : [
+            {
+              projectionId: "MT-OPTIONAL-SSI-OMISSION",
+              classification: "OMITTED_BY_RULE",
+              role: "OPTIONAL_MT_SSI_PROJECTION",
+              decisionRuleId: "POL-MT2-PROFILE-OPTION-001",
+              reason:
+                "No registered optional MT SSI projection applies to the selected route.",
+            },
+          ];
     const mx = object(raw["mx"]);
     const composer = object(mx["messageComposerContext"]);
     const settlementAccount = object(composer["SttlmAcct"]);
@@ -694,44 +755,57 @@ export class PaymentResolutionPageSubmissionAdapter {
       topologyRulingId === "BA-TOPOLOGY-INDA-INGA-001" &&
       Boolean(topologyRulingVersion);
     if (request.routeBindingId && !governedTopology)
-      this.invalidResolverResponse("PAYMENT_RESOLVER_TOPOLOGY_EVIDENCE_REQUIRED");
+      this.invalidResolverResponse(
+        "PAYMENT_RESOLVER_TOPOLOGY_EVIDENCE_REQUIRED",
+      );
     const mxProjections: ResolutionPageEvidenceCard["evidenceProjections"] = [
       ...(scalarText(settlementAccount["value"])
-        ? [{
-            projectionId: "MX-STTLM-ACCT",
-            classification: "SSI_DERIVED" as const,
-            role: "SETTLEMENT_ACCOUNT",
-            isoPath: "/Document/FICdtTrf/GrpHdr/SttlmInf/SttlmAcct",
-            valueType: "ACCOUNT_REFERENCE" as const,
-            value: scalarText(settlementAccount["value"]),
-            sourceRecordType: "OWN_NOSTRO_ACCOUNT" as const,
-            sourceRecordId: nostroId,
-            sourceRecordVersion: nostroVersion,
-            mappingRuleId: "MAP-MT2-53B-STTLMACCT-001",
-          }]
+        ? [
+            {
+              projectionId: "MX-STTLM-ACCT",
+              classification: "SSI_DERIVED" as const,
+              role: "SETTLEMENT_ACCOUNT",
+              isoPath: "/Document/FICdtTrf/GrpHdr/SttlmInf/SttlmAcct",
+              valueType: "ACCOUNT_REFERENCE" as const,
+              value: scalarText(settlementAccount["value"]),
+              sourceRecordType: "OWN_NOSTRO_ACCOUNT" as const,
+              sourceRecordId: nostroId,
+              sourceRecordVersion: nostroVersion,
+              mappingRuleId: "MAP-MT2-53B-STTLMACCT-001",
+            },
+          ]
         : []),
-      ...(governedTopology ? [{
-        projectionId: "MX-STTLM-MTD",
-        classification: "SSI_DERIVED" as const,
-        role: "SETTLEMENT_METHOD",
-        isoPath: "/Document/FICdtTrf/GrpHdr/SttlmInf/SttlmMtd",
-        valueType: "SETTLEMENT_METHOD" as const,
-        value: settlementMethod,
-        sourceRecordType: "TOPOLOGY_RULE" as const,
-        sourceRecordId: topologyRulingId,
-        sourceRecordVersion: topologyRulingVersion,
-        mappingRuleId: "MAP-MT2-STTLMMTD-002",
-        rulingProvenance: {
-          rulingId: topologyRulingId,
-          rulingVersion: topologyRulingVersion,
-        },
-      }] : []),
+      ...(governedTopology
+        ? [
+            {
+              projectionId: "MX-STTLM-MTD",
+              classification: "SSI_DERIVED" as const,
+              role: "SETTLEMENT_METHOD",
+              isoPath: "/Document/FICdtTrf/GrpHdr/SttlmInf/SttlmMtd",
+              valueType: "SETTLEMENT_METHOD" as const,
+              value: settlementMethod,
+              sourceRecordType: "TOPOLOGY_RULE" as const,
+              sourceRecordId: topologyRulingId,
+              sourceRecordVersion: topologyRulingVersion,
+              mappingRuleId: "MAP-MT2-STTLMMTD-002",
+              rulingProvenance: {
+                rulingId: topologyRulingId,
+                rulingVersion: topologyRulingVersion,
+              },
+            },
+          ]
+        : []),
     ];
     return [
-      { format: "SWIFT_MT", profileId: request.profileId ?? definition.profile.profileId, evidenceProjections: mtProjections },
+      {
+        format: "SWIFT_MT",
+        profileId: request.profileId ?? definition.profile.profileId,
+        evidenceProjections: governedMtProjections,
+      },
       {
         format: "ISO_20022",
-        profileId: request.pairedEvidenceProfileId ?? definition.profile.profileId,
+        profileId:
+          request.pairedEvidenceProfileId ?? definition.profile.profileId,
         ...(definition.profile.messageDefinitionId
           ? { messageDefinitionId: definition.profile.messageDefinitionId }
           : {}),

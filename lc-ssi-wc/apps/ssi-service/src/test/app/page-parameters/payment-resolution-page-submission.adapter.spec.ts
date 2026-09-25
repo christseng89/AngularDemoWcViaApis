@@ -389,6 +389,11 @@ describe("PaymentResolutionPageSubmissionAdapter", () => {
     });
     const submission = {
       ...submissionFor(definition, scenario),
+      eligibilitySnapshot: {
+        snapshotId: "database-snapshot-1",
+        snapshotIdentityMethod: "SQLITE_LOGICAL_V1",
+        contextSha256: "b".repeat(64),
+      },
       selectedRouteIdentity: {
         routeId: SHA,
         definitionId: definition.definitionId,
@@ -406,7 +411,11 @@ describe("PaymentResolutionPageSubmissionAdapter", () => {
       },
     };
 
-    const result = context.adapter.execute({ definition, scenario, submission });
+    const result = context.adapter.execute({
+      definition,
+      scenario,
+      submission,
+    });
 
     expect(context.resolver.resolve).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -426,7 +435,15 @@ describe("PaymentResolutionPageSubmissionAdapter", () => {
         settlementMethod: "INDA",
       }),
       evidenceCards: [
-        expect.objectContaining({ format: "SWIFT_MT" }),
+        expect.objectContaining({
+          format: "SWIFT_MT",
+          evidenceProjections: expect.arrayContaining([
+            expect.objectContaining({
+              classification: "OMITTED_BY_RULE",
+              decisionRuleId: "POL-MT2-PROFILE-OPTION-001",
+            }),
+          ]),
+        }),
         expect.objectContaining({
           format: "ISO_20022",
           evidenceProjections: expect.arrayContaining([
@@ -699,6 +716,35 @@ describe("PaymentResolutionPageSubmissionAdapter", () => {
           type: "MT202",
           nonCoverAttested: true,
           attestationVersion: "1.0.0",
+        }),
+      }),
+    );
+  });
+
+  it("preserves governed-equivalent cover rule provenance for MT205COV", () => {
+    const definition = definitionFor("MT205COV");
+    const baseScenario = scenarioFor(definition, "MT205COV-OP-CONTINUATION");
+    const scenario = {
+      ...baseScenario,
+      inputValues: {
+        ...baseScenario.inputValues,
+        "context.previousMessageType": "GOVERNED_EQUIVALENT_COVER",
+        "context.equivalentCoverRuleRecordId": "COVER-EQUIVALENCE-001",
+        "context.equivalentCoverRuleRecordVersion": "1.0.0",
+      },
+    };
+    const context = harness();
+    context.adapter.execute({
+      definition,
+      scenario,
+      submission: submissionFor(definition, scenario),
+    });
+    expect(context.resolver.resolve).toHaveBeenCalledWith(
+      expect.objectContaining({
+        previousMessage: expect.objectContaining({
+          type: "GOVERNED_EQUIVALENT_COVER",
+          equivalentCoverRuleRecordId: "COVER-EQUIVALENCE-001",
+          equivalentCoverRuleRecordVersion: "1.0.0",
         }),
       }),
     );

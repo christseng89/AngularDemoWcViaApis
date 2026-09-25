@@ -7,6 +7,7 @@ import type { SsiApplicationService } from "../../app/ssi-application.service";
 import type { MessageDomainResolutionService } from "../../app/message-domain-resolution.service";
 import type { DatabaseSnapshotIdentityService } from "../../app/database-snapshot-identity.service";
 import type { SsiDataQualityService } from "../../app/ssi-data-quality.service";
+import { hashCanonical } from "../../app/canonical-json";
 
 type Json = Record<string, unknown>;
 
@@ -147,6 +148,266 @@ const mtOf = (body: Json): Json => body["mt"] as Json;
 const mxOf = (body: Json): Json => body["mx"] as Json;
 
 describe("SettlementController", () => {
+  it("covers governed route binding, transport and topology decisions", () => {
+    const context = harness();
+    const internals = context.controller as unknown as {
+      assertCurrentRouteBinding(request: Json): void;
+      executionTransport(route: Json): "FIN" | "FINPLUS";
+      governedSettlementMethod(
+        accountWith: string,
+        actualReceiver: string,
+        senderBic: string,
+      ): "INDA" | "INGA";
+    };
+    expect(() => internals.assertCurrentRouteBinding({})).not.toThrow();
+    const bindingRequest = {
+      selectedSsiId: "SSI-1",
+      selectedSsiVersion: 1,
+      selectedApplicabilityId: "APPL-1",
+      selectedApplicabilityVersion: 1,
+      selectedNostroId: "NOSTRO-1",
+      selectedNostroVersion: 1,
+      selectedRmaId: "RMA-1",
+      selectedRmaVersion: 1,
+      selectedRmaDecisionId: "RMA-DECISION-1",
+      contextSnapshotId: "CONTEXT-1",
+      databaseSnapshotId: "snapshot-hash",
+      snapshotIdentityMethod: "SQLITE_WAL_AWARE_LOGICAL_SNAPSHOT_V1",
+    };
+    const routeBindingId = hashCanonical({
+      ssi: { id: "SSI-1", version: 1 },
+      applicability: { id: "APPL-1", version: 1 },
+      nostro: { id: "NOSTRO-1", version: 1 },
+      rma: { id: "RMA-1", version: 1, decisionId: "RMA-DECISION-1" },
+      contextSha256: "CONTEXT-1",
+    });
+    expect(() =>
+      internals.assertCurrentRouteBinding({
+        ...bindingRequest,
+        routeBindingId,
+      }),
+    ).not.toThrow();
+    expect(
+      mxOf(
+        responseOf(() =>
+          internals.assertCurrentRouteBinding({
+            ...bindingRequest,
+            routeBindingId: "stale-binding",
+          }),
+        ),
+      ).code,
+    ).toBe("STALE");
+    expect(internals.executionTransport({ messagingService: "FINPLUS" })).toBe(
+      "FINPLUS",
+    );
+    expect(
+      internals.executionTransport({
+        messagingService: "FIN",
+        finContingencyApproved: true,
+      }),
+    ).toBe("FIN");
+    expect(
+      mxOf(
+        responseOf(() =>
+          internals.executionTransport({ messagingService: "UNKNOWN" }),
+        ),
+      ).code,
+    ).toBe("PROFILE_INCOMPLETE");
+    expect(
+      mxOf(
+        responseOf(() =>
+          internals.executionTransport({ messagingService: "FIN" }),
+        ),
+      ).code,
+    ).toBe("PROFILE_INCOMPLETE");
+    expect(
+      internals.governedSettlementMethod("DEMOHKHH", "CITIUS33", "DEMOHKHH"),
+    ).toBe("INGA");
+    expect(
+      mxOf(
+        responseOf(() =>
+          internals.governedSettlementMethod(
+            "OTHERBIC",
+            "CITIUS33",
+            "DEMOHKHH",
+          ),
+        ),
+      ).code,
+    ).toBe("INVALID_CONTEXT_TOPOLOGY");
+  });
+
+  it("fails closed and returns governed RMA route decisions", () => {
+    const check = jest.fn(() => ({
+      authorised: true,
+      rmaId: "RMA-1",
+      rmaVersion: 2,
+      decisionId: "RMA-DECISION-1",
+      profileId: "MT2-MT202-PLAIN-SR2026",
+      pairedEvidenceProfileId: "PACS009-PLAIN-SR2026",
+      businessService: "swift.cbprplus.04",
+    }));
+    const context = harness([], { rma: { check } });
+    const internals = context.controller as unknown as {
+      routeRmaDecision(
+        request: Json,
+        senderBic: string,
+        actualReceiver: string,
+        executionTransport: "FIN" | "FINPLUS",
+      ): Json | undefined;
+    };
+    expect(
+      mxOf(
+        responseOf(() =>
+          internals.routeRmaDecision({}, "", "CITIUS33", "FINPLUS"),
+        ),
+      ).code,
+    ).toBe("RMA_NOT_AUTHORIZED");
+    const request = {
+      valueDate: "2026-09-25",
+      selectedRmaId: "RMA-1",
+      selectedRmaVersion: 2,
+      selectedRmaDecisionId: "RMA-DECISION-1",
+      profileId: "MT2-MT202-PLAIN-SR2026",
+      pairedEvidenceProfileId: "PACS009-PLAIN-SR2026",
+      businessService: "swift.cbprplus.04",
+    };
+    expect(
+      internals.routeRmaDecision(request, "DEMOHKHH", "CITIUS33", "FINPLUS"),
+    ).toMatchObject({ authorised: true, rmaId: "RMA-1" });
+    expect(check).toHaveBeenCalledWith(
+      expect.objectContaining({
+        decisionId: "RMA-DECISION-1",
+        profileId: "MT2-MT202-PLAIN-SR2026",
+        pairedEvidenceProfileId: "PACS009-PLAIN-SR2026",
+        businessService: "swift.cbprplus.04",
+      }),
+    );
+
+    const minimal = harness([], {
+      rma: {
+        check: jest.fn(() => ({ authorised: true })),
+      },
+    }).controller as unknown as {
+      routeRmaDecision(
+        request: Json,
+        senderBic: string,
+        actualReceiver: string,
+        executionTransport: "FIN" | "FINPLUS",
+      ): Json | undefined;
+    };
+    expect(
+      minimal.routeRmaDecision(
+        { valueDate: "2026-09-25" },
+        "DEMOHKHH",
+        "CITIUS33",
+        "FINPLUS",
+      ),
+    ).toMatchObject({ authorised: true });
+  });
+
+  it("preserves governed scenario context failures", () => {
+    const context = harness();
+    context.counterparty.validateContext.mockReturnValue({
+      mx: { httpStatus: 422, code: "INVALID_UPSTREAM_CONTEXT" },
+      payloadGenerated: false,
+    });
+    expect(
+      mxOf(
+        responseOf(() =>
+          context.controller.resolve(
+            baseBody({
+              sourceMessageType: "MT202",
+              scenarioCode: "DIRECT_INSTITUTIONAL_TRANSFER",
+            }) as never,
+          ),
+        ),
+      ),
+    ).toMatchObject({ httpStatus: 422, code: "INVALID_UPSTREAM_CONTEXT" });
+  });
+
+  it("covers MT205 jurisdiction source, conflict and permitted decisions", () => {
+    const request = {
+      sourceMessageType: "MT205",
+      bookingEntity: "HK01",
+      valueDate: "2026-09-14",
+    };
+    const missing = harness();
+    const missingInternals = missing.controller as unknown as {
+      jurisdictionEvidence(
+        request: Json,
+        actualReceiver: string,
+        senderBic: string,
+      ): Json | undefined;
+    };
+    expect(
+      mxOf(
+        responseOf(() =>
+          missingInternals.jurisdictionEvidence(
+            request,
+            "DEMOHKHH",
+            "DEMOHKHH",
+          ),
+        ),
+      ).code,
+    ).toBe("PROFILE_INCOMPLETE");
+
+    const jurisdictionHarness = (country: string) =>
+      harness([], {
+        banks: {
+          search: jest.fn(() => [
+            {
+              bankServiceId: "BANK-SVC-DEMOHKHH",
+              bic: "DEMOHKHH",
+              country,
+            },
+          ]),
+        },
+        entities: {
+          list: jest.fn(() => [
+            {
+              id: "ENTITY-HK01",
+              version: 3,
+              branchCode: "HK01",
+              countryCode: "HK",
+              validFrom: "2026-01-01",
+              validTo: null,
+            },
+          ]),
+        },
+      });
+    const conflict = jurisdictionHarness("US").controller as unknown as {
+      jurisdictionEvidence(
+        request: Json,
+        actualReceiver: string,
+        senderBic: string,
+      ): Json | undefined;
+    };
+    expect(
+      mxOf(
+        responseOf(() =>
+          conflict.jurisdictionEvidence(request, "DEMOHKHH", "DEMOHKHH"),
+        ),
+      ).code,
+    ).toBe("JURISDICTION_EVIDENCE_CONFLICT");
+    const permitted = jurisdictionHarness("HK").controller as unknown as {
+      jurisdictionEvidence(
+        request: Json,
+        actualReceiver: string,
+        senderBic: string,
+      ): Json | undefined;
+    };
+    expect(
+      permitted.jurisdictionEvidence(request, "DEMOHKHH", "DEMOHKHH"),
+    ).toMatchObject({ senderCountry: "HK", receiverCountry: "HK" });
+    expect(
+      permitted.jurisdictionEvidence(
+        { ...request, sourceMessageType: "MT202" },
+        "DEMOHKHH",
+        "DEMOHKHH",
+      ),
+    ).toBeUndefined();
+  });
+
   it("reports global SSI data-quality state", () => {
     expect(harness().controller.dataQualityStatus()).toEqual({
       status: "PASS",
@@ -365,7 +626,10 @@ describe("SettlementController", () => {
       },
     });
     context.counterparty.supports.mockReturnValue(true);
-    context.counterparty.resolve.mockReturnValue({ mx: { httpStatus: 200 }, mt: {} });
+    context.counterparty.resolve.mockReturnValue({
+      mx: { httpStatus: 200 },
+      mt: {},
+    });
     context.service.resolve.mockReturnValue(routePreview());
 
     const response = responseOf(() =>
@@ -388,14 +652,17 @@ describe("SettlementController", () => {
     const previousOwnBic = process.env["OWN_BIC"];
     process.env["OWN_BIC"] = "DEMOHKHH";
     const rma = {
-      check: jest.fn(() => ({
-        decisionId: "RMA-DECISION-RECHECK",
+      check: jest.fn((rmaRequest: Record<string, unknown>) => ({
+        decisionId: rmaRequest["decisionId"],
         decision: "AUTHORISED",
         authorised: true,
         checkedAt: "2026-09-25T00:00:00.000Z",
         effectiveAt: "2026-09-25",
         rmaId: "RMA-SELECTED",
         rmaVersion: 3,
+        profileId: rmaRequest["profileId"],
+        pairedEvidenceProfileId: rmaRequest["pairedEvidenceProfileId"],
+        businessService: rmaRequest["businessService"],
       })),
     };
     const context = harness([], { rma });
@@ -455,7 +722,10 @@ describe("SettlementController", () => {
       },
     });
     context.counterparty.supports.mockReturnValue(true);
-    context.counterparty.resolve.mockReturnValue({ mx: { httpStatus: 200 }, mt: {} });
+    context.counterparty.resolve.mockReturnValue({
+      mx: { httpStatus: 200 },
+      mt: {},
+    });
     context.service.resolve.mockReturnValue(routePreview());
 
     const response = responseOf(() =>

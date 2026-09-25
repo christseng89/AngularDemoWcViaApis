@@ -90,6 +90,8 @@ export type Mt2SettlementResolutionRequest = Omit<
     nonCoverAttested?: true;
     attestationId?: string;
     attestationVersion?: string;
+    equivalentCoverRuleRecordId?: string;
+    equivalentCoverRuleRecordVersion?: string;
   }>;
   readonly initialTransferType?: "MT200" | "MT201";
   readonly selectedApplicabilityId?: string;

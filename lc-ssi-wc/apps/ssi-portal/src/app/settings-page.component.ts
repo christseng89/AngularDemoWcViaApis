@@ -13,9 +13,14 @@ import {
 import { firstValueFrom } from "rxjs";
 import { AlertComponent } from "./alert.component";
 import type { AlertModel } from "./alert.model";
-import { GovernanceIndexTableComponent, type GovernanceIndexColumn, type GovernanceIndexRow } from "./governance-index-table.component";
+import {
+  GovernanceIndexTableComponent,
+  type GovernanceIndexColumn,
+  type GovernanceIndexRow,
+} from "./governance-index-table.component";
 import {
   RuntimeSettingsService,
+  type DemoReloadAuthorization,
   type DemoReloadResult,
   type RuntimeSettings,
   type ResolutionCurrencyRow,
@@ -66,114 +71,152 @@ export type ThemeMode = "system" | "light" | "dark";
         }
       </section>
 
-      <div class="settings-tabs" role="tablist" aria-label="Settings data tools">
-        <button type="button" role="tab" id="reload-tab" aria-controls="reload-panel" [attr.aria-selected]="settingsTab() === 'reload'" [class.active]="settingsTab() === 'reload'" (click)="selectSettingsTab('reload')">Reload Test Data</button>
-        <button type="button" role="tab" id="currency-tab" aria-controls="currency-panel" [attr.aria-selected]="settingsTab() === 'currency'" [class.active]="settingsTab() === 'currency'" (click)="selectSettingsTab('currency')">Inquire Business Currency Index</button>
+      <div
+        class="settings-tabs"
+        role="tablist"
+        aria-label="Settings data tools"
+      >
+        <button
+          type="button"
+          role="tab"
+          id="reload-tab"
+          aria-controls="reload-panel"
+          [attr.aria-selected]="settingsTab() === 'reload'"
+          [class.active]="settingsTab() === 'reload'"
+          (click)="selectSettingsTab('reload')"
+        >
+          Reload Test Data
+        </button>
+        <button
+          type="button"
+          role="tab"
+          id="currency-tab"
+          aria-controls="currency-panel"
+          [attr.aria-selected]="settingsTab() === 'currency'"
+          [class.active]="settingsTab() === 'currency'"
+          (click)="selectSettingsTab('currency')"
+        >
+          Inquire Business Currency Index
+        </button>
       </div>
 
-      @if (settingsTab() === 'currency') {
-      <section id="currency-panel" class="currency-inquiry" role="tabpanel" aria-labelledby="currency-tab">
-        <div class="currency-heading">
-          <div>
-            <p class="eyebrow">CONTROLLED RESOLUTION DATA</p>
-            <h3 id="currency-title">{{ currencyConfig().title }}</h3>
+      @if (settingsTab() === "currency") {
+        <section
+          id="currency-panel"
+          class="currency-inquiry"
+          role="tabpanel"
+          aria-labelledby="currency-tab"
+        >
+          <div class="currency-heading">
+            <div>
+              <p class="eyebrow">CONTROLLED RESOLUTION DATA</p>
+              <h3 id="currency-title">{{ currencyConfig().title }}</h3>
+            </div>
+            @if (runtime()?.developmentEnabled) {
+              <button
+                type="button"
+                class="ghost"
+                [disabled]="currencyBusy() || currencyLoading()"
+                (click)="resyncCurrencies()"
+              >
+                {{ currencyBusy() ? "Resyncing…" : "Resync" }}
+              </button>
+            }
           </div>
-          @if (runtime()?.developmentEnabled) {
-            <button type="button" class="ghost" [disabled]="currencyBusy() || currencyLoading()" (click)="resyncCurrencies()">{{ currencyBusy() ? "Resyncing…" : "Resync" }}</button>
+          <label class="index-search" for="currency-search">
+            <span>{{ currencySearchLabel() }}</span>
+            <input
+              id="currency-search"
+              type="search"
+              [placeholder]="currencySearchPlaceholder()"
+              [value]="currencySearchInput()"
+              (input)="onCurrencySearchInput($any($event.target).value)"
+              (keydown.enter)="submitCurrencySearch()"
+            />
+          </label>
+          @if (currencyError(); as failure) {
+            <ssi-alert [model]="failure" variant="inline" />
+            <button type="button" class="ghost" (click)="loadCurrencyInquiry()">
+              Retry
+            </button>
+          } @else if (currencyLoading()) {
+            <p role="status">Loading business currencies…</p>
+          } @else if (currencyColumns().length) {
+            <ssi-governance-index-table
+              appearance="maintenance"
+              ariaLabel="Resolution currency inquiry"
+              kicker="RESOLUTION CURRENCY"
+              instruction="Controlled business currency coverage"
+              emptyText="No business currencies found."
+              recordLabel="records"
+              [columns]="currencyColumns()"
+              [trailingColumns]="[]"
+              [rows]="currencyRows()"
+              [interactiveRows]="false"
+              [currentPage]="currencyPage()"
+              [totalPages]="currencyTotalPages()"
+              [totalRecords]="currencyTotalItems()"
+              [pageSize]="currencyConfig().pageSize"
+              [sortPath]="currencySortBy()"
+              [sortDirection]="currencySortDirection()"
+              (sortRequested)="sortCurrencies($event)"
+              (pageRequested)="changeCurrencyPage($event)"
+            />
           }
-        </div>
-        <label class="index-search" for="currency-search">
-          <span>{{ currencySearchLabel() }}</span>
-          <input id="currency-search" type="search" [placeholder]="currencySearchPlaceholder()" [value]="currencySearchInput()" (input)="onCurrencySearchInput($any($event.target).value)" (keydown.enter)="submitCurrencySearch()" />
-        </label>
-        @if (currencyError(); as failure) {
-          <ssi-alert [model]="failure" variant="inline" />
-          <button type="button" class="ghost" (click)="loadCurrencyInquiry()">Retry</button>
-        } @else if (currencyLoading()) {
-          <p role="status">Loading business currencies…</p>
-        } @else if (currencyColumns().length) {
-          <ssi-governance-index-table
-            appearance="maintenance"
-            ariaLabel="Resolution currency inquiry"
-            kicker="RESOLUTION CURRENCY"
-            instruction="Controlled business currency coverage"
-            emptyText="No business currencies found."
-            recordLabel="records"
-            [columns]="currencyColumns()"
-            [trailingColumns]="[]"
-            [rows]="currencyRows()"
-            [interactiveRows]="false"
-            [currentPage]="currencyPage()"
-            [totalPages]="currencyTotalPages()"
-            [totalRecords]="currencyTotalItems()"
-            [pageSize]="currencyConfig().pageSize"
-            [sortPath]="currencySortBy()"
-            [sortDirection]="currencySortDirection()"
-            (sortRequested)="sortCurrencies($event)"
-            (pageRequested)="changeCurrencyPage($event)"
-          />
-        }
-        @if (currencyResyncResult(); as synced) {
-          <p role="status">Discovered {{ synced.discovered }} · Inserted {{ synced.inserted }} · Unchanged {{ synced.unchanged }} · Inactivated {{ synced.inactivated }}</p>
-        }
-      </section>
+          @if (currencyResyncResult(); as synced) {
+            <p role="status">
+              Discovered {{ synced.discovered }} · Inserted
+              {{ synced.inserted }} · Unchanged {{ synced.unchanged }} ·
+              Inactivated {{ synced.inactivated }}
+            </p>
+          }
+        </section>
       }
 
-      @if (settingsTab() === 'reload') {
-      <section id="reload-panel" class="reload-zone" role="tabpanel" aria-labelledby="reload-tab">
-        @if (runtime(); as current) {
-          <div class="reload-header">
-            <div>
-              <p class="eyebrow">DEVELOPMENT DATA</p>
-              <h3 id="reload-title">Reload Development Test Data</h3>
-              <p>
-                清除目前 demo 資料並從 canonical synthetic seed 完整重新匯入。
-              </p>
+      @if (settingsTab() === "reload") {
+        <section
+          id="reload-panel"
+          class="reload-zone"
+          role="tabpanel"
+          aria-labelledby="reload-tab"
+        >
+          @if (runtime(); as current) {
+            <div class="reload-header">
+              <div>
+                <p class="eyebrow">DEVELOPMENT DATA</p>
+                <h3 id="reload-title">Reload Development Test Data</h3>
+                <p>建立新的 Demo DB，完整重新匯入預設合規測試資料。</p>
+              </div>
             </div>
-          </div>
-          <dl class="seed-facts">
-            <div>
-              <dt>Fixture</dt>
-              <dd>{{ current.fixtureId || "Not configured" }}</dd>
+            @if (!current.developmentEnabled) {
+              <ssi-alert [model]="developmentOff" variant="inline" />
+            } @else if (!current.reloadAvailable) {
+              <ssi-alert [model]="reloadUnavailable" variant="inline" />
+            }
+            <div class="reload-footer">
+              <p>需輸入控制密碼。重載採單一交易執行；驗證失敗時保留原資料。</p>
+              <button
+                class="danger-secondary"
+                type="button"
+                [disabled]="!current.reloadAvailable || busy()"
+                (click)="openConfirmation()"
+              >
+                Reload test data
+              </button>
             </div>
-            <div>
-              <dt>Seed SHA-256</dt>
-              <dd>
-                <code [title]="current.seedSha256 || ''">{{
-                  compactIdentifier(current.seedSha256)
-                }}</code>
-              </dd>
-            </div>
-          </dl>
-          @if (!current.developmentEnabled) {
-            <ssi-alert [model]="developmentOff" variant="inline" />
-          } @else if (!current.reloadAvailable) {
-            <ssi-alert [model]="reloadUnavailable" variant="inline" />
           }
-          <div class="reload-footer">
-            <p>需輸入控制密碼。重載採單一交易執行；驗證失敗時保留原資料。</p>
-            <button
-              class="danger-secondary"
-              type="button"
-              [disabled]="!current.reloadAvailable || busy()"
-              (click)="openConfirmation()"
-            >
-              Reload test data
-            </button>
-          </div>
-        }
-        @if (result(); as completed) {
-          <ssi-alert [model]="successAlert(completed)" variant="banner" />
-        }
-        @if (error(); as failure) {
-          <ssi-alert
-            [model]="failure"
-            variant="blocking"
-            [dismissible]="true"
-            (dismiss)="error.set(null)"
-          />
-        }
-      </section>
+          @if (result(); as completed) {
+            <ssi-alert [model]="successAlert(completed)" variant="banner" />
+          }
+          @if (error(); as failure) {
+            <ssi-alert
+              [model]="failure"
+              variant="blocking"
+              [dismissible]="true"
+              (dismiss)="error.set(null)"
+            />
+          }
+        </section>
       }
     </section>
 
@@ -185,12 +228,21 @@ export type ThemeMode = "system" | "light" | "dark";
           aria-modal="true"
           aria-labelledby="reload-dialog-title"
           aria-describedby="reload-dialog-description"
+          (keydown.escape)="closeConfirmation()"
         >
+          <button
+            type="button"
+            class="dialog-close"
+            aria-label="Close"
+            [disabled]="busy()"
+            (click)="closeConfirmation()"
+          >
+            ×
+          </button>
           <p class="eyebrow">DESTRUCTIVE DEMO ACTION</p>
           <h2 id="reload-dialog-title">重新載入 Development Test Data？</h2>
           <p id="reload-dialog-description">
-            系統會在單一交易中清除目前資料，再由 canonical seed
-            匯入；驗證失敗時原資料保持不變。
+            密碼正確後，系統會顯示預設合規測試資料供確認。
           </p>
           <label for="demo-control-password">Control password</label>
           <input
@@ -200,24 +252,72 @@ export type ThemeMode = "system" | "light" | "dark";
             autocomplete="current-password"
             [value]="password()"
             (input)="password.set($any($event.target).value)"
-            (keydown.enter)="reload()"
+            (keydown.enter)="authorizeReload()"
           />
           <div class="dialog-actions">
             <button
               type="button"
-              class="ghost"
-              [disabled]="busy()"
-              (click)="closeConfirmation()"
+              class="danger-primary"
+              [disabled]="busy() || !password()"
+              (click)="authorizeReload()"
             >
-              取消
+              {{ busy() ? "Verifying…" : "Continue" }}
             </button>
+          </div>
+        </section>
+      </div>
+    }
+
+    @if (datasetConfirmationOpen() && authorization(); as authorized) {
+      <div class="dialog-backdrop">
+        <section
+          class="reload-dialog"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="dataset-dialog-title"
+          aria-describedby="dataset-dialog-description"
+          (keydown.escape)="cancelDatasetConfirmation()"
+        >
+          <button
+            type="button"
+            class="dialog-close"
+            aria-label="Close"
+            [disabled]="busy()"
+            (click)="cancelDatasetConfirmation()"
+          >
+            ×
+          </button>
+          <p class="eyebrow">DEFAULT COMPLIANT TEST DATA</p>
+          <h2 id="dataset-dialog-title">Confirm Reload Test Data</h2>
+          <p id="dataset-dialog-description">
+            系統會先備份目前 DB，再建立並驗證新的 DB。失敗時恢復原 DB。
+          </p>
+          <dl class="dataset-summary">
+            <div>
+              <dt>Data set</dt>
+              <dd>{{ authorized.dataset.displayName }}</dd>
+            </div>
+            <div>
+              <dt>Version</dt>
+              <dd>{{ authorized.dataset.version }}</dd>
+            </div>
+            <div>
+              <dt>Classification</dt>
+              <dd>{{ authorized.dataset.classification }}</dd>
+            </div>
+            <div>
+              <dt>Records</dt>
+              <dd>{{ authorized.dataset.estimatedRows }}</dd>
+            </div>
+          </dl>
+          <div class="dialog-actions">
             <button
               type="button"
               class="danger-primary"
-              [disabled]="busy() || !password()"
+              [disabled]="busy()"
               (click)="reload()"
             >
-              {{ busy() ? "Reloading data…" : "確認清除並重新匯入" }}
+              {{ busy() ? "Reloading data…" : "Confirm Reload" }}
             </button>
           </div>
         </section>
@@ -238,19 +338,25 @@ export class SettingsPageComponent implements OnInit, OnDestroy {
   readonly runtime = signal<RuntimeSettings | null>(null);
   readonly busy = signal(false);
   readonly confirmationOpen = signal(false);
+  readonly datasetConfirmationOpen = signal(false);
+  readonly authorization = signal<DemoReloadAuthorization | null>(null);
   readonly password = signal("");
   readonly result = signal<DemoReloadResult | null>(null);
   readonly error = signal<AlertModel | null>(null);
   readonly settingsTab = signal<"reload" | "currency">("reload");
   readonly currencyColumns = signal<readonly GovernanceIndexColumn[]>([]);
-  readonly currencyRows = signal<readonly GovernanceIndexRow<ResolutionCurrencyRow>[]>([]);
+  readonly currencyRows = signal<
+    readonly GovernanceIndexRow<ResolutionCurrencyRow>[]
+  >([]);
   readonly currencyPage = signal(1);
   readonly currencyTotalPages = signal(1);
   readonly currencyTotalItems = signal(0);
   readonly currencyLoading = signal(false);
   readonly currencyBusy = signal(false);
   readonly currencyError = signal<AlertModel | null>(null);
-  readonly currencyResyncResult = signal<ResolutionCurrencyResyncResult | null>(null);
+  readonly currencyResyncResult = signal<ResolutionCurrencyResyncResult | null>(
+    null,
+  );
   readonly currencySearchInput = signal("");
   readonly currencySearch = signal("");
   readonly currencySearchLabel = signal("Search Business Currency index");
@@ -271,7 +377,7 @@ export class SettingsPageComponent implements OnInit, OnDestroy {
   readonly reloadUnavailable: AlertModel = {
     severity: "error",
     title: "Reload 尚未配置",
-    message: "缺少伺服器控制密碼或 canonical seed。",
+    message: "缺少伺服器控制密碼。",
     impact: "現有資料不受影響。",
     code: "DEMO_RELOAD_NOT_CONFIGURED",
   };
@@ -291,9 +397,14 @@ export class SettingsPageComponent implements OnInit, OnDestroy {
   }
 
   currencyConfig() {
-    return this.runtime()?.resolutionCurrencyInquiry ?? {
-      title: "Inquire Business Currency Index", sortBy: "businessDomain", sortDirection: "asc" as const, pageSize: 10,
-    };
+    return (
+      this.runtime()?.resolutionCurrencyInquiry ?? {
+        title: "Inquire Business Currency Index",
+        sortBy: "businessDomain",
+        sortDirection: "asc" as const,
+        pageSize: 10,
+      }
+    );
   }
 
   submitCurrencySearch(): void {
@@ -305,12 +416,19 @@ export class SettingsPageComponent implements OnInit, OnDestroy {
   onCurrencySearchInput(value: string): void {
     this.currencySearchInput.set(value);
     if (this.currencySearchTimer) clearTimeout(this.currencySearchTimer);
-    this.currencySearchTimer = setTimeout(() => this.submitCurrencySearch(), 300);
+    this.currencySearchTimer = setTimeout(
+      () => this.submitCurrencySearch(),
+      300,
+    );
   }
 
   sortCurrencies(path: string): void {
     if (!this.currencyColumns().some((column) => column.path === path)) return;
-    this.currencySortDirection.set(this.currencySortBy() === path && this.currencySortDirection() === "asc" ? "desc" : "asc");
+    this.currencySortDirection.set(
+      this.currencySortBy() === path && this.currencySortDirection() === "asc"
+        ? "desc"
+        : "asc",
+    );
     this.currencySortBy.set(path);
     void this.loadCurrencyInquiry(1);
   }
@@ -323,23 +441,43 @@ export class SettingsPageComponent implements OnInit, OnDestroy {
       if (!this.runtime()) throw new Error("RUNTIME_SETTINGS_UNAVAILABLE");
       const [contract, result] = await Promise.all([
         firstValueFrom(this.service.currencyContract()),
-        firstValueFrom(this.service.resolutionCurrencies(page, this.currencyConfig().pageSize, this.currencySearch(), this.currencySortBy(), this.currencySortDirection())),
+        firstValueFrom(
+          this.service.resolutionCurrencies(
+            page,
+            this.currencyConfig().pageSize,
+            this.currencySearch(),
+            this.currencySortBy(),
+            this.currencySortDirection(),
+          ),
+        ),
       ]);
-      const inquiry = contract["x-ui-inquiries"]?.find(({ id }) => id === "resolution-currency");
-      if (inquiry?.mode !== "INDEX_ONLY" || inquiry.endpoint !== "settings/resolution-currencies" || !inquiry.columns.length)
+      const inquiry = contract["x-ui-inquiries"]?.find(
+        ({ id }) => id === "resolution-currency",
+      );
+      if (
+        inquiry?.mode !== "INDEX_ONLY" ||
+        inquiry.endpoint !== "settings/resolution-currencies" ||
+        !inquiry.columns.length
+      )
         throw new Error("RESOLUTION_CURRENCY_SCREEN_CONTRACT_MISSING");
       this.currencyColumns.set(inquiry.columns);
-      this.currencySearchLabel.set(inquiry.search?.label ?? "Search Business Currency index");
-      this.currencySearchPlaceholder.set(inquiry.search?.placeholder ?? "Search configured index fields");
-      this.currencyRows.set(result.items.map((row) => ({
-        id: `${row.businessDomain}-${row.currency}`,
-        cells: inquiry.columns.map(({ path }) => {
-          const value = row[path as keyof ResolutionCurrencyRow];
-          return value == null ? "—" : String(value);
-        }),
-        trailing: [],
-        source: row,
-      })));
+      this.currencySearchLabel.set(
+        inquiry.search?.label ?? "Search Business Currency index",
+      );
+      this.currencySearchPlaceholder.set(
+        inquiry.search?.placeholder ?? "Search configured index fields",
+      );
+      this.currencyRows.set(
+        result.items.map((row) => ({
+          id: `${row.businessDomain}-${row.currency}`,
+          cells: inquiry.columns.map(({ path }) => {
+            const value = row[path as keyof ResolutionCurrencyRow];
+            return value == null ? "—" : String(value);
+          }),
+          trailing: [],
+          source: row,
+        })),
+      );
       this.currencyPage.set(result.page);
       this.currencyTotalPages.set(Math.max(1, result.totalPages));
       this.currencyTotalItems.set(result.totalItems);
@@ -358,7 +496,8 @@ export class SettingsPageComponent implements OnInit, OnDestroy {
 
   changeCurrencyPage(delta: number): void {
     const next = this.currencyPage() + delta;
-    if (next >= 1 && next <= this.currencyTotalPages()) void this.loadCurrencyInquiry(next);
+    if (next >= 1 && next <= this.currencyTotalPages())
+      void this.loadCurrencyInquiry(next);
   }
 
   async resyncCurrencies(): Promise<void> {
@@ -366,13 +505,16 @@ export class SettingsPageComponent implements OnInit, OnDestroy {
     this.currencyBusy.set(true);
     this.currencyError.set(null);
     try {
-      this.currencyResyncResult.set(await firstValueFrom(this.service.resyncResolutionCurrencies()));
+      this.currencyResyncResult.set(
+        await firstValueFrom(this.service.resyncResolutionCurrencies()),
+      );
       await this.loadCurrencyInquiry(1);
     } catch {
       this.currencyError.set({
         severity: "error",
         title: "Business currency resync failed",
-        message: "Existing coverage remains available; retry after checking the service.",
+        message:
+          "Existing coverage remains available; retry after checking the service.",
         code: "RESOLUTION_CURRENCY_RESYNC_FAILED",
       });
     } finally {
@@ -410,16 +552,67 @@ export class SettingsPageComponent implements OnInit, OnDestroy {
     this.confirmationOpen.set(false);
   }
 
-  async reload(): Promise<void> {
+  async authorizeReload(): Promise<void> {
     if (this.busy() || !this.password()) return;
     this.busy.set(true);
     this.error.set(null);
     try {
+      const authorization = await firstValueFrom(
+        this.service.authorizeDevelopmentDataReload(this.password()),
+      );
+      this.authorization.set(authorization);
+      this.confirmationOpen.set(false);
+      this.datasetConfirmationOpen.set(true);
+    } catch (error_) {
+      const code = this.errorCode(error_);
+      this.error.set({
+        severity: "error",
+        title:
+          code === "INVALID_DEMO_CONTROL_PASSWORD"
+            ? "控制密碼不正確"
+            : "無法準備測試資料",
+        message:
+          code === "INVALID_DEMO_CONTROL_PASSWORD"
+            ? "密碼驗證失敗，資料庫未被修改。"
+            : "預設合規測試資料目前無法使用。",
+        impact: "現有資料保持不變。",
+        code,
+      });
+    } finally {
+      this.password.set("");
+      this.busy.set(false);
+    }
+  }
+
+  async cancelDatasetConfirmation(): Promise<void> {
+    if (this.busy()) return;
+    const authorization = this.authorization();
+    this.authorization.set(null);
+    this.datasetConfirmationOpen.set(false);
+    if (!authorization) return;
+    try {
+      await firstValueFrom(
+        this.service.cancelDevelopmentDataReload(
+          authorization.authorizationToken,
+        ),
+      );
+    } catch {
+      // The token is short-lived and single-use; closing remains a local cancel.
+    }
+  }
+
+  async reload(): Promise<void> {
+    const authorization = this.authorization();
+    if (this.busy() || !authorization) return;
+    this.busy.set(true);
+    this.error.set(null);
+    try {
       const result = await firstValueFrom(
-        this.service.reloadDevelopmentData(this.password()),
+        this.service.reloadDevelopmentData(authorization.authorizationToken),
       );
       this.result.set(result);
-      this.confirmationOpen.set(false);
+      this.authorization.set(null);
+      this.datasetConfirmationOpen.set(false);
       this.dataReloaded.emit(result);
       await this.loadRuntime();
       await this.loadCurrencyInquiry(1);
@@ -428,18 +621,17 @@ export class SettingsPageComponent implements OnInit, OnDestroy {
       this.error.set({
         severity: "error",
         title:
-          code === "INVALID_DEMO_CONTROL_PASSWORD"
-            ? "控制密碼不正確"
+          code === "INVALID_DEMO_RELOAD_AUTHORIZATION"
+            ? "Reload 授權已失效"
             : "Development data reload 失敗",
         message:
-          code === "INVALID_DEMO_CONTROL_PASSWORD"
-            ? "密碼驗證失敗，資料庫未被修改。"
+          code === "INVALID_DEMO_RELOAD_AUTHORIZATION"
+            ? "請重新輸入控制密碼。"
             : "伺服器未完成受控資料重載。",
-        impact: "現有資料保持不變；修正問題後可重試。",
+        impact: "舊 DB 已保留或恢復；修正問題後可重試。",
         code,
       });
     } finally {
-      this.password.set("");
       this.busy.set(false);
     }
   }

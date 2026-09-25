@@ -733,6 +733,21 @@ describe("RmaApplicationService.check", () => {
     expect(result.checkedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 
+  it("preserves the governed profile binding in the RMA decision", () => {
+    expect(
+      service([record()]).check({
+        ...request,
+        profileId: "MT2-MT202-PLAIN-SR2026",
+        pairedEvidenceProfileId: "PACS009-PLAIN-SR2026",
+        businessService: "swift.cbprplus.04",
+      }),
+    ).toMatchObject({
+      profileId: "MT2-MT202-PLAIN-SR2026",
+      pairedEvidenceProfileId: "PACS009-PLAIN-SR2026",
+      businessService: "swift.cbprplus.04",
+    });
+  });
+
   it("uses an exact message profile ahead of wildcard", () => {
     const exact = record({ id: "RMA-EXACT", messageTypes: ["MT700"] });
     const result = service([record(), exact]).check(request);

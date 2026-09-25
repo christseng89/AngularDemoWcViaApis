@@ -65,13 +65,19 @@ describe("SSI BFF forwarding contract", () => {
   });
 
   it("gives Demo Reload a longer non-retryable upstream window", async () => {
-    const intercept = jest.spyOn(UpstreamApiInterceptor.prototype, "intercept")
+    const intercept = jest
+      .spyOn(UpstreamApiInterceptor.prototype, "intercept")
       .mockResolvedValue(jsonResponse({ code: "DEMO_DATA_RELOADED" }, 201));
     try {
-      await controller["reloadDevelopmentData"]({ password: "entered" });
+      await controller["reloadDevelopmentData"]({
+        authorizationToken: "token",
+      });
       expect(intercept).toHaveBeenCalledWith(
         "http://ssi.test/api/settings/development-data/reload",
-        expect.objectContaining({ method: "POST", body: JSON.stringify({ password: "entered" }) }),
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ authorizationToken: "token" }),
+        }),
         120_000,
       );
       expect(intercept).toHaveBeenCalledTimes(1);
@@ -81,7 +87,8 @@ describe("SSI BFF forwarding contract", () => {
   });
 
   it("allows the Payment SSI execute request to finish beyond the default ten-second BFF window", async () => {
-    const intercept = jest.spyOn(UpstreamApiInterceptor.prototype, "intercept")
+    const intercept = jest
+      .spyOn(UpstreamApiInterceptor.prototype, "intercept")
       .mockResolvedValue(jsonResponse({ outcome: "RESOLVED" }));
     try {
       const body = { scenarioId: "MT202-OP-DIRECT" };
@@ -126,10 +133,26 @@ describe("SSI BFF forwarding contract", () => {
     {
       name: "development data reload",
       method: "reloadDevelopmentData",
-      args: [{ password: "entered" }],
+      args: [{ authorizationToken: "token" }],
       url: "http://ssi.test/api/settings/development-data/reload",
       httpMethod: "POST",
+      body: { authorizationToken: "token" },
+    },
+    {
+      name: "development data reload authorization",
+      method: "authorizeDevelopmentDataReload",
+      args: [{ password: "entered" }],
+      url: "http://ssi.test/api/settings/development-data/reload/authorize",
+      httpMethod: "POST",
       body: { password: "entered" },
+    },
+    {
+      name: "development data reload cancellation",
+      method: "cancelDevelopmentDataReload",
+      args: [{ authorizationToken: "token" }],
+      url: "http://ssi.test/api/settings/development-data/reload/cancel",
+      httpMethod: "POST",
+      body: { authorizationToken: "token" },
     },
     {
       name: "settlement resolution",
@@ -679,16 +702,43 @@ describe("SSI BFF forwarding contract", () => {
   });
 
   it.each([
-    ["resolutionCurrencyInquiry", [], "http://ssi.test/api/settings/resolution-currencies"],
+    [
+      "resolutionCurrencyInquiry",
+      [],
+      "http://ssi.test/api/settings/resolution-currencies",
+    ],
     [
       "list",
-      [{ status: "ACTIVE", ownershipType: "COUNTERPARTY", counterpartyId: "cp/a", page: "2", pageSize: "25", search: "Citi & Co", sortBy: "currency", sortDirection: "desc" }],
+      [
+        {
+          status: "ACTIVE",
+          ownershipType: "COUNTERPARTY",
+          counterpartyId: "cp/a",
+          page: "2",
+          pageSize: "25",
+          search: "Citi & Co",
+          sortBy: "currency",
+          sortDirection: "desc",
+        },
+      ],
       "http://ssi.test/api/ssis?status=ACTIVE&ownershipType=COUNTERPARTY&counterpartyId=cp%2Fa&page=2&pageSize=25&search=Citi+%26+Co&sortBy=currency&sortDirection=desc",
     ],
-    ["counterpartyCoverage", [], "http://ssi.test/api/ssis/counterparty-coverage?status=ACTIVE"],
+    [
+      "counterpartyCoverage",
+      [],
+      "http://ssi.test/api/ssis/counterparty-coverage?status=ACTIVE",
+    ],
     ["applicability", [], "http://ssi.test/api/ssis/applicability"],
-    ["finResolutionCatalogue", [], "http://ssi.test/api/reference/fin-resolution-catalogue?standardsRelease=SR2026"],
-    ["resolutionPageDefinitionIndex", [], "http://ssi.test/api/v1/resolution-page-definitions/index?standardsRelease=SR2026"],
+    [
+      "finResolutionCatalogue",
+      [],
+      "http://ssi.test/api/reference/fin-resolution-catalogue?standardsRelease=SR2026",
+    ],
+    [
+      "resolutionPageDefinitionIndex",
+      [],
+      "http://ssi.test/api/v1/resolution-page-definitions/index?standardsRelease=SR2026",
+    ],
     [
       "resolutionPageDefinitionIndex",
       ["SR2026", "PAYMENT"],
@@ -701,7 +751,15 @@ describe("SSI BFF forwarding contract", () => {
     ],
     [
       "resolutionPageDefinition",
-      ["SR2026", "MT2", "MT202", "OUTGOING", "DIRECT", "swift.cbprplus.04", "PAYMENT"],
+      [
+        "SR2026",
+        "MT2",
+        "MT202",
+        "OUTGOING",
+        "DIRECT",
+        "swift.cbprplus.04",
+        "PAYMENT",
+      ],
       "http://ssi.test/api/v1/resolution-page-definitions?standardsRelease=SR2026&messageFamily=MT2&messageType=MT202&direction=OUTGOING&businessScenarioId=DIRECT&businessService=swift.cbprplus.04&businessDomain=PAYMENT",
     ],
     [
@@ -739,8 +797,16 @@ describe("SSI BFF forwarding contract", () => {
       ["MT300", "B1", "USD", "HK01", "2026-09-21", "fixture/a"],
       "http://ssi.test/api/reference/fin-controlled-fixtures?messageType=MT300&currency=USD&bookingEntity=HK01&valueDate=2026-09-21&sequence=B1&bindingId=fixture%2Fa",
     ],
-    ["clearingSystems", [], "http://reference.test/mock/clearing-systems?currency=&settlementCountry="],
-    ["customers", [], "http://reference.test/mock/customers?page=1&pageSize=5&query="],
+    [
+      "clearingSystems",
+      [],
+      "http://reference.test/mock/clearing-systems?currency=&settlementCountry=",
+    ],
+    [
+      "customers",
+      [],
+      "http://reference.test/mock/customers?page=1&pageSize=5&query=",
+    ],
     ["nostros", [], "http://reference.test/mock/nostros?currency=&bankBic="],
   ])(
     "covers default and optional query behavior for %s",

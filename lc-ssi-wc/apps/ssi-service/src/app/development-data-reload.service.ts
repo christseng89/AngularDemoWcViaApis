@@ -1,14 +1,8 @@
-import {
-  HttpException,
-  Inject,
-  Injectable,
-  Optional,
-  type OnModuleInit,
-} from "@nestjs/common";
-import { createHash, timingSafeEqual } from "node:crypto";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { DatabaseSync } from "node:sqlite";
+import { HttpException, Inject, Injectable, Optional } from "@nestjs/common";
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { mkdirSync, readFileSync, rmSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { backup, DatabaseSync } from "node:sqlite";
 import { hashCanonical } from "./canonical-json";
 import { ResolutionCurrencyCoveragePolicy } from "./resolution-currency-policy";
 import { ResolutionCurrencyCoverageDiscoveryService } from "./resolution-currency-discovery";
@@ -63,6 +57,18 @@ export interface DemoReloadResult extends DemoReloadStatus {
   readonly snapshotHash: string;
   readonly snapshotIdentityMethod: string;
   readonly importedRows: Readonly<Record<string, number>>;
+}
+
+export interface DemoReloadAuthorization {
+  readonly code: "DEMO_RELOAD_AUTHORIZED";
+  readonly authorizationToken: string;
+  readonly expiresAt: string;
+  readonly dataset: {
+    readonly displayName: string;
+    readonly version: string;
+    readonly classification: string;
+    readonly estimatedRows: number;
+  };
 }
 
 const digest = (value: string | Buffer): string =>
@@ -134,10 +140,12 @@ const failure = (status: number, code: string): never => {
 };
 
 @Injectable()
-export class DevelopmentDataReloadService implements OnModuleInit {
+export class DevelopmentDataReloadService {
   private reloading = false;
-  private seedDescriptor:
-    { fixtureId: string; seedSha256: string } | null | undefined;
+  private readonly authorizations = new Map<
+    string,
+    { expiresAt: number; seedSha256: string }
+  >();
 
   constructor(
     @Optional()
@@ -145,124 +153,202 @@ export class DevelopmentDataReloadService implements OnModuleInit {
     private readonly environment: RuntimeEnvironment = process.env,
   ) {}
 
-  onModuleInit(): void {
-    this.seedDescriptor = this.loadSeedDescriptor();
-  }
-
-  private loadSeedDescriptor(): {
-    fixtureId: string;
-    seedSha256: string;
-  } | null {
-    try {
-      const raw = readFileSync(this.seedPath());
-      return {
-        fixtureId: parseSeed(raw.toString("utf8")).fixtureId,
-        seedSha256: digest(raw),
-      };
-    } catch {
-      return null;
-    }
-  }
-
   status(): DemoReloadStatus {
     const runtime = resolveRuntimeEnvironment(this.environment);
     const password = this.environment["SSI_DEMO_ADMIN_PASSWORD"]?.trim();
-    if (this.seedDescriptor === undefined)
-      this.seedDescriptor = this.loadSeedDescriptor();
-    if (this.seedDescriptor) {
-      return {
-        ...runtime,
-        reloadAvailable: runtime.developmentEnabled && Boolean(password),
-        ...this.seedDescriptor,
-        statusPolicyVersion: "SSI-CONFIG-HTTP-01",
-      };
-    }
     return {
       ...runtime,
-      reloadAvailable: false,
+      reloadAvailable: runtime.developmentEnabled && Boolean(password),
       statusPolicyVersion: "SSI-CONFIG-HTTP-01",
     };
   }
 
-  reload(password: string): DemoReloadResult {
+  authorize(password: string): DemoReloadAuthorization {
     const status = this.status();
     if (!status.developmentEnabled) failure(403, "DEVELOPMENT_MODE_REQUIRED");
     const expected = this.environment["SSI_DEMO_ADMIN_PASSWORD"]?.trim();
     if (!expected) failure(503, "DEMO_RELOAD_NOT_CONFIGURED");
     if (!password || !secureEquals(password, expected ?? ""))
       failure(401, "INVALID_DEMO_CONTROL_PASSWORD");
-    if (this.reloading) failure(409, "DEMO_RELOAD_IN_PROGRESS");
-
-    this.reloading = true;
-    const database = new DatabaseSync(this.databasePath());
     try {
       const raw = readFileSync(this.seedPath());
       const seed = parseSeed(raw.toString("utf8"));
-      this.validateSchema(database, seed);
-      const expectedIdentity = seedIdentity(seed);
-      database.exec(
-        "PRAGMA busy_timeout=5000; BEGIN IMMEDIATE; PRAGMA defer_foreign_keys=ON;",
-      );
-      try {
-        const tableNames = Object.keys(seed.tables).sort((left, right) =>
-          right.localeCompare(left),
-        );
-        for (const name of tableNames)
-          database.exec(`DELETE FROM ${quoteSqliteIdentifier(name)}`);
-        for (const name of Object.keys(seed.tables).sort((left, right) =>
-          left.localeCompare(right),
-        ))
-          this.insertTable(database, name, seed.tables[name]!);
-        const integrity = String(
-          (
-            database.prepare("PRAGMA integrity_check").get() as Record<
-              string,
-              unknown
-            >
-          )["integrity_check"],
-        );
-        if (integrity !== "ok")
-          throw new Error("SQLite integrity check failed");
-        const canonicalIdentity = databaseSnapshotIdentity(
-          database,
-          Object.keys(seed.tables),
-        );
-        if (
-          canonicalIdentity.sha256.toLowerCase() !==
-          expectedIdentity.toLowerCase()
-        )
-          throw new Error("logical snapshot identity mismatch");
-        if (seed.tables["ssi"] && seed.tables["ssi_applicability"])
-          this.rebuildResolutionCurrencyCoverage(database);
-        const identity = databaseSnapshotIdentity(database);
-        database.exec("COMMIT");
-        this.seedDescriptor = {
-          fixtureId: seed.fixtureId,
-          seedSha256: digest(raw),
-        };
-        return {
-          ...this.status(),
-          code: "DEMO_DATA_RELOADED",
-          completedAt: new Date().toISOString(),
-          snapshotHash: identity.sha256,
-          snapshotIdentityMethod: identity.method,
-          importedRows: Object.fromEntries(
-            Object.entries(seed.tables).map(([name, table]) => [
-              name,
-              table.rows.length,
-            ]),
+      const authorizationToken = randomBytes(32).toString("hex");
+      const expiresAt =
+        Date.now() +
+        1000 *
+          Number(this.environment["SSI_DEMO_RELOAD_AUTH_TTL_SECONDS"] ?? "300");
+      this.authorizations.set(digest(authorizationToken), {
+        expiresAt,
+        seedSha256: digest(raw),
+      });
+      return {
+        code: "DEMO_RELOAD_AUTHORIZED",
+        authorizationToken,
+        expiresAt: new Date(expiresAt).toISOString(),
+        dataset: {
+          displayName: "Default compliant development test data",
+          version: seed.schemaVersion,
+          classification: seed.classification,
+          estimatedRows: Object.values(seed.tables).reduce(
+            (total, table) => total + table.rows.length,
+            0,
           ),
-        };
-      } catch (error) {
-        database.exec("ROLLBACK");
-        throw error;
-      }
+        },
+      };
     } catch (error) {
+      if (error instanceof HttpException) throw error;
+      return failure(500, "DEMO_RELOAD_DATASET_UNAVAILABLE");
+    }
+  }
+
+  cancelAuthorization(authorizationToken: string): {
+    code: "DEMO_RELOAD_AUTHORIZATION_CANCELLED";
+  } {
+    this.authorizations.delete(digest(authorizationToken));
+    return { code: "DEMO_RELOAD_AUTHORIZATION_CANCELLED" };
+  }
+
+  async reload(authorizationToken: string): Promise<DemoReloadResult> {
+    const status = this.status();
+    if (!status.developmentEnabled) failure(403, "DEVELOPMENT_MODE_REQUIRED");
+    const authorizationKey = digest(authorizationToken);
+    const authorization = this.authorizations.get(authorizationKey);
+    this.authorizations.delete(authorizationKey);
+    const authorized =
+      authorization ?? failure(401, "INVALID_DEMO_RELOAD_AUTHORIZATION");
+    if (authorized.expiresAt <= Date.now())
+      failure(401, "INVALID_DEMO_RELOAD_AUTHORIZATION");
+    if (this.reloading) failure(409, "DEMO_RELOAD_IN_PROGRESS");
+
+    this.reloading = true;
+    const activePath = this.databasePath();
+    const backupPath = this.backupPath();
+    const shadowPath = this.shadowPath();
+    mkdirSync(dirname(backupPath), { recursive: true });
+    mkdirSync(dirname(shadowPath), { recursive: true });
+    rmSync(shadowPath, { force: true });
+    let backupCreated = false;
+    try {
+      const activeDatabase = new DatabaseSync(activePath);
+      try {
+        await backup(activeDatabase, backupPath);
+        backupCreated = true;
+      } finally {
+        activeDatabase.close();
+      }
+      const raw = readFileSync(this.seedPath());
+      if (digest(raw) !== authorized.seedSha256)
+        failure(409, "DEMO_RELOAD_DATASET_CHANGED");
+      const seed = parseSeed(raw.toString("utf8"));
+      const shadowDatabase = new DatabaseSync(shadowPath);
+      let identity: ReturnType<typeof databaseSnapshotIdentity>;
+      try {
+        identity = this.populateShadowDatabase(shadowDatabase, seed);
+      } finally {
+        shadowDatabase.close();
+      }
+      const validatedShadow = new DatabaseSync(shadowPath, { readOnly: true });
+      try {
+        await backup(validatedShadow, activePath);
+      } finally {
+        validatedShadow.close();
+      }
+      const activatedDatabase = new DatabaseSync(activePath, {
+        readOnly: true,
+      });
+      try {
+        if (
+          databaseSnapshotIdentity(activatedDatabase).sha256 !== identity.sha256
+        )
+          throw new Error("activated database snapshot mismatch");
+      } finally {
+        activatedDatabase.close();
+      }
+      return {
+        ...this.status(),
+        fixtureId: seed.fixtureId,
+        seedSha256: digest(raw),
+        code: "DEMO_DATA_RELOADED",
+        completedAt: new Date().toISOString(),
+        snapshotHash: identity.sha256,
+        snapshotIdentityMethod: identity.method,
+        importedRows: Object.fromEntries(
+          Object.entries(seed.tables).map(([name, table]) => [
+            name,
+            table.rows.length,
+          ]),
+        ),
+      };
+    } catch (error) {
+      if (backupCreated) await this.restoreBackup(backupPath, activePath);
       if (error instanceof HttpException) throw error;
       return failure(500, "DEMO_DATA_RELOAD_FAILED");
     } finally {
-      database.close();
+      rmSync(shadowPath, { force: true });
       this.reloading = false;
+    }
+  }
+
+  private populateShadowDatabase(
+    database: DatabaseSync,
+    seed: DemoSeed,
+  ): ReturnType<typeof databaseSnapshotIdentity> {
+    for (const item of seed.schema.filter(({ type }) => type === "table"))
+      database.exec(item.sql);
+    this.validateSchema(database, seed);
+    database.exec("BEGIN IMMEDIATE; PRAGMA defer_foreign_keys=ON;");
+    try {
+      for (const name of Object.keys(seed.tables).sort((left, right) =>
+        left.localeCompare(right),
+      ))
+        this.insertTable(database, name, seed.tables[name]!);
+      database.exec("COMMIT");
+    } catch (error) {
+      database.exec("ROLLBACK");
+      throw error;
+    }
+    for (const item of seed.schema.filter(({ type }) => type !== "table"))
+      database.exec(item.sql);
+    this.assertDatabaseIntegrity(database);
+    const canonicalIdentity = databaseSnapshotIdentity(
+      database,
+      Object.keys(seed.tables),
+    );
+    if (
+      canonicalIdentity.sha256.toLowerCase() !==
+      seedIdentity(seed).toLowerCase()
+    )
+      throw new Error("logical snapshot identity mismatch");
+    if (seed.tables["ssi"] && seed.tables["ssi_applicability"])
+      this.rebuildResolutionCurrencyCoverage(database);
+    this.assertDatabaseIntegrity(database);
+    return databaseSnapshotIdentity(database);
+  }
+
+  private assertDatabaseIntegrity(database: DatabaseSync): void {
+    const integrity = String(
+      (
+        database.prepare("PRAGMA integrity_check").get() as Record<
+          string,
+          unknown
+        >
+      )["integrity_check"],
+    );
+    if (integrity !== "ok") throw new Error("SQLite integrity check failed");
+  }
+
+  private async restoreBackup(
+    backupPath: string,
+    activePath: string,
+  ): Promise<void> {
+    const backupDatabase = new DatabaseSync(backupPath, { readOnly: true });
+    try {
+      await backup(backupDatabase, activePath);
+    } catch {
+      return failure(500, "DEMO_DATA_RESTORE_FAILED");
+    } finally {
+      backupDatabase.close();
     }
   }
 
@@ -288,7 +374,7 @@ export class DevelopmentDataReloadService implements OnModuleInit {
       JSON.stringify(nonDerived(expected))
     )
       throw new Error(
-        "active database schema does not match the canonical seed",
+        "new database schema does not match the selected test data",
       );
     for (const name of expected) {
       const columns = (
@@ -346,6 +432,20 @@ export class DevelopmentDataReloadService implements OnModuleInit {
     return resolve(
       this.environment["SSI_DEMO_SEED_PATH"] ??
         "./qa/fixtures/ssi/reload-test-data/ssi-demo.mt1-mt2.v1.approved.canonical.seed.json",
+    );
+  }
+
+  private backupPath(): string {
+    return resolve(
+      this.environment["SSI_DEMO_BACKUP_PATH"] ??
+        "./tmp/demo-reload/active-database.pre-reload.sqlite",
+    );
+  }
+
+  private shadowPath(): string {
+    return resolve(
+      this.environment["SSI_DEMO_SHADOW_PATH"] ??
+        "./tmp/demo-reload/new-database.loading.sqlite",
     );
   }
 }

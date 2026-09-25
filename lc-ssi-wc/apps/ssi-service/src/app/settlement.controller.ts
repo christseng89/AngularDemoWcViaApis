@@ -29,7 +29,10 @@ import {
   type SsiDataIssue,
 } from "./ssi-data-quality.service";
 import { scalarText } from "./scalar-text";
-import { RmaApplicationService, type RmaDecision } from "./rma/rma-application.service";
+import {
+  RmaApplicationService,
+  type RmaDecision,
+} from "./rma/rma-application.service";
 import { BankServiceDirectory } from "./bank-service-directory";
 import { EntityRepository } from "./entity/entity.repository";
 import { hashCanonical } from "./canonical-json";
@@ -724,6 +727,167 @@ export class SettlementController {
     );
   }
 
+  private assertCurrentRouteBinding(
+    request: ReturnType<typeof toMt2BankResolutionRequest>,
+  ): void {
+    if (!request.routeBindingId) return;
+    const currentSnapshot = this.snapshotIdentity.current();
+    const expectedRouteBindingId = hashCanonical({
+      ssi: { id: request.selectedSsiId, version: request.selectedSsiVersion },
+      applicability: {
+        id: request.selectedApplicabilityId,
+        version: request.selectedApplicabilityVersion,
+      },
+      nostro: {
+        id: request.selectedNostroId,
+        version: request.selectedNostroVersion,
+      },
+      rma: {
+        id: request.selectedRmaId,
+        version: request.selectedRmaVersion,
+        decisionId: request.selectedRmaDecisionId,
+      },
+      contextSha256: request.contextSnapshotId,
+    });
+    if (
+      expectedRouteBindingId !== request.routeBindingId ||
+      !request.databaseSnapshotId ||
+      request.databaseSnapshotId !== currentSnapshot.sha256 ||
+      request.snapshotIdentityMethod !== currentSnapshot.method
+    )
+      this.mt2GateFailure(
+        "STALE",
+        "The atomic route or logical database snapshot changed after discovery.",
+      );
+  }
+
+  private executionTransport(route: Json): "FIN" | "FINPLUS" {
+    const transport = scalarText(route["messagingService"]).toUpperCase();
+    if (transport !== "FIN" && transport !== "FINPLUS")
+      this.mt2GateFailure(
+        "PROFILE_INCOMPLETE",
+        "The selected route has no governed FIN/FINPLUS delivery policy.",
+      );
+    if (
+      transport === "FIN" &&
+      route["finContingencyApproved"] !== "true" &&
+      route["finContingencyApproved"] !== true
+    )
+      this.mt2GateFailure(
+        "PROFILE_INCOMPLETE",
+        "FIN requires an approved governed contingency binding.",
+      );
+    return transport;
+  }
+
+  private governedSettlementMethod(
+    accountWith: string,
+    actualReceiver: string,
+    senderBic: string,
+  ): "INDA" | "INGA" {
+    if (accountWith === actualReceiver) return "INDA";
+    if (accountWith === senderBic) return "INGA";
+    return this.mt2GateFailure(
+      "INVALID_CONTEXT_TOPOLOGY",
+      "The selected route does not support a governed INDA/INGA topology.",
+    );
+  }
+
+  private jurisdictionEvidence(
+    request: ReturnType<typeof toMt2BankResolutionRequest>,
+    actualReceiver: string,
+    senderBic: string,
+  ): Json | undefined {
+    if (!request.sourceMessageType?.startsWith("MT205")) return undefined;
+    const bank = this.bankServices
+      ?.search(actualReceiver)
+      .find((candidate) => candidate.bic === actualReceiver);
+    const entity = this.entities
+      ?.list("ACTIVE")
+      .find(
+        (candidate) =>
+          candidate.branchCode === request.bookingEntity &&
+          candidate.validFrom <= request.valueDate &&
+          (!candidate.validTo || candidate.validTo >= request.valueDate),
+      );
+    if (!bank || !entity)
+      this.mt2GateFailure(
+        "PROFILE_INCOMPLETE",
+        "Governed sender and selected-receiver jurisdiction sources are required.",
+      );
+    const senderCountry = entity.countryCode.toUpperCase();
+    const receiverCountry = bank.country.toUpperCase();
+    if (
+      senderBic.slice(4, 6).toUpperCase() !== senderCountry ||
+      actualReceiver.slice(4, 6).toUpperCase() !== receiverCountry
+    )
+      this.mt2GateFailure(
+        "JURISDICTION_EVIDENCE_CONFLICT",
+        "A BIC country component conflicts with its governed location source.",
+      );
+    if (senderCountry !== receiverCountry)
+      this.mt2GateFailure(
+        "JURISDICTION_NOT_PERMITTED",
+        "MT205/MT205COV requires sender and selected receiver in the same country.",
+      );
+    return {
+      senderCountry,
+      receiverCountry,
+      senderCountrySourceId: entity.id,
+      senderCountrySourceVersion: entity.version,
+      receiverCountrySourceId: bank.bankServiceId,
+      receiverCountrySourceVersion: 1,
+      actualReceiverBic: actualReceiver,
+    };
+  }
+
+  private routeRmaDecision(
+    request: ReturnType<typeof toMt2BankResolutionRequest>,
+    senderBic: string,
+    actualReceiver: string,
+    executionTransport: "FIN" | "FINPLUS",
+  ): RmaDecision | undefined {
+    if (!this.rma) return undefined;
+    if (!senderBic || !actualReceiver)
+      this.mt2GateFailure(
+        "RMA_NOT_AUTHORIZED",
+        "The selected route has no exact sender/receiver pair for RMA.",
+      );
+    const decision = this.rma.check({
+      ownBic: senderBic,
+      counterpartyBic: actualReceiver,
+      service: executionTransport,
+      direction: "OUTBOUND",
+      messageType: "pacs.009.001.08",
+      at: request.valueDate,
+      operationalOnly: true,
+      ...(request.selectedRmaDecisionId
+        ? { decisionId: request.selectedRmaDecisionId }
+        : {}),
+      ...(request.profileId ? { profileId: request.profileId } : {}),
+      ...(request.pairedEvidenceProfileId
+        ? { pairedEvidenceProfileId: request.pairedEvidenceProfileId }
+        : {}),
+      ...(request.businessService
+        ? { businessService: request.businessService }
+        : {}),
+    });
+    if (
+      !decision.authorised ||
+      decision.rmaId !== request.selectedRmaId ||
+      decision.rmaVersion !== request.selectedRmaVersion ||
+      decision.decisionId !== request.selectedRmaDecisionId ||
+      decision.profileId !== request.profileId ||
+      decision.pairedEvidenceProfileId !== request.pairedEvidenceProfileId ||
+      decision.businessService !== request.businessService
+    )
+      this.mt2GateFailure(
+        "RMA_NOT_AUTHORIZED",
+        "The selected route is not covered by the same active Four-eyes RMA record.",
+      );
+    return decision;
+  }
+
   private routeExecutionBinding(
     route: Json,
     request: ReturnType<typeof toMt2BankResolutionRequest>,
@@ -736,140 +900,30 @@ export class SettlementController {
     rmaDecision?: RmaDecision;
     jurisdictionEvidence?: Json;
   } {
-    if (request.routeBindingId) {
-      const currentSnapshot = this.snapshotIdentity.current();
-      const expectedRouteBindingId = hashCanonical({
-        ssi: { id: request.selectedSsiId, version: request.selectedSsiVersion },
-        applicability: {
-          id: request.selectedApplicabilityId,
-          version: request.selectedApplicabilityVersion,
-        },
-        nostro: {
-          id: request.selectedNostroId,
-          version: request.selectedNostroVersion,
-        },
-        rma: {
-          id: request.selectedRmaId,
-          version: request.selectedRmaVersion,
-          decisionId: request.selectedRmaDecisionId,
-        },
-        contextSha256: request.contextSnapshotId,
-      });
-      if (
-        expectedRouteBindingId !== request.routeBindingId ||
-        !request.databaseSnapshotId ||
-        request.databaseSnapshotId !== currentSnapshot.sha256 ||
-        request.snapshotIdentityMethod !== currentSnapshot.method
-      )
-        this.mt2GateFailure(
-          "STALE",
-          "The atomic route or logical database snapshot changed after discovery.",
-        );
-    }
-    const executionTransport = scalarText(route["messagingService"]).toUpperCase();
-    if (executionTransport !== "FIN" && executionTransport !== "FINPLUS")
-      this.mt2GateFailure(
-        "PROFILE_INCOMPLETE",
-        "The selected route has no governed FIN/FINPLUS delivery policy.",
-      );
-    if (
-      executionTransport === "FIN" &&
-      route["finContingencyApproved"] !== "true" &&
-      route["finContingencyApproved"] !== true
-    )
-      this.mt2GateFailure(
-        "PROFILE_INCOMPLETE",
-        "FIN requires an approved governed contingency binding.",
-      );
-
+    this.assertCurrentRouteBinding(request);
+    const executionTransport = this.executionTransport(route);
     const senderBic = scalarText(
       process.env["OWN_BIC"]?.trim().toUpperCase() ||
         route["senderBic"] ||
         route["debtorBic"] ||
         governedSenderBic,
     );
-    const settlementMethod =
-      accountWith === actualReceiver
-        ? "INDA"
-        : accountWith === senderBic
-          ? "INGA"
-          : undefined;
-    if (!settlementMethod)
-      this.mt2GateFailure(
-        "INVALID_CONTEXT_TOPOLOGY",
-        "The selected route does not support a governed INDA/INGA topology.",
-      );
-
-    let jurisdictionEvidence: Json | undefined;
-    if (request.sourceMessageType?.startsWith("MT205")) {
-      const bank = this.bankServices
-        ?.search(actualReceiver)
-        .find((candidate) => candidate.bic === actualReceiver);
-      const entity = this.entities
-        ?.list("ACTIVE")
-        .find(
-          (candidate) =>
-            candidate.branchCode === request.bookingEntity &&
-            candidate.validFrom <= request.valueDate &&
-            (!candidate.validTo || candidate.validTo >= request.valueDate),
-        );
-      if (!bank || !entity)
-        this.mt2GateFailure(
-          "PROFILE_INCOMPLETE",
-          "Governed sender and selected-receiver jurisdiction sources are required.",
-        );
-      const senderCountry = entity.countryCode.toUpperCase();
-      const receiverCountry = bank.country.toUpperCase();
-      if (
-        senderBic.slice(4, 6).toUpperCase() !== senderCountry ||
-        actualReceiver.slice(4, 6).toUpperCase() !== receiverCountry
-      )
-        this.mt2GateFailure(
-          "JURISDICTION_EVIDENCE_CONFLICT",
-          "A BIC country component conflicts with its governed location source.",
-        );
-      if (senderCountry !== receiverCountry)
-        this.mt2GateFailure(
-          "JURISDICTION_NOT_PERMITTED",
-          "MT205/MT205COV requires sender and selected receiver in the same country.",
-        );
-      jurisdictionEvidence = {
-        senderCountry,
-        receiverCountry,
-        senderCountrySourceId: entity.id,
-        senderCountrySourceVersion: entity.version,
-        receiverCountrySourceId: bank.bankServiceId,
-        receiverCountrySourceVersion: 1,
-        actualReceiverBic: actualReceiver,
-      };
-    }
-
-    let rmaDecision: RmaDecision | undefined;
-    if (this.rma) {
-      if (!senderBic || !actualReceiver)
-        this.mt2GateFailure(
-          "RMA_NOT_AUTHORIZED",
-          "The selected route has no exact sender/receiver pair for RMA.",
-        );
-      rmaDecision = this.rma.check({
-        ownBic: senderBic,
-        counterpartyBic: actualReceiver,
-        service: executionTransport,
-        direction: "OUTBOUND",
-        messageType: "pacs.009.001.08",
-        at: request.valueDate,
-        operationalOnly: true,
-      });
-      if (
-        !rmaDecision.authorised ||
-        rmaDecision.rmaId !== request.selectedRmaId ||
-        rmaDecision.rmaVersion !== request.selectedRmaVersion
-      )
-        this.mt2GateFailure(
-          "RMA_NOT_AUTHORIZED",
-          "The selected route is not covered by the same active Four-eyes RMA record.",
-        );
-    }
+    const settlementMethod = this.governedSettlementMethod(
+      accountWith,
+      actualReceiver,
+      senderBic,
+    );
+    const jurisdictionEvidence = this.jurisdictionEvidence(
+      request,
+      actualReceiver,
+      senderBic,
+    );
+    const rmaDecision = this.routeRmaDecision(
+      request,
+      senderBic,
+      actualReceiver,
+      executionTransport,
+    );
     return {
       executionTransport,
       settlementMethod,
@@ -1315,6 +1369,62 @@ export class SettlementController {
     );
   }
 
+  private scenarioOutcome(
+    body: Mt2SettlementResolutionRequest,
+    request: ReturnType<typeof toMt2BankResolutionRequest>,
+  ): unknown {
+    if (!body.scenarioCode) return undefined;
+    const contextError = this.counterpartySsi.validateContext(
+      request,
+      body as Record<string, unknown>,
+    );
+    if (contextError) {
+      const status = contextError["mx"] as Record<string, unknown>;
+      throw new HttpException(contextError, Number(status["httpStatus"]));
+    }
+    return this.ownAccountScenario(body);
+  }
+
+  private assertResolutionPreconditions(
+    body: Mt2SettlementResolutionRequest,
+    request: ReturnType<typeof toMt2BankResolutionRequest>,
+  ): void {
+    const precondition = this.counterpartySsi.precondition(
+      body as Record<string, unknown>,
+    );
+    if (precondition) {
+      const mx = precondition["mx"] as Record<string, unknown>;
+      throw new HttpException(precondition, Number(mx["httpStatus"]));
+    }
+    const dataIssues = this.dataQuality.issuesFor(request);
+    if (dataIssues.length) this.failClosedIncorrectSsi(body, dataIssues);
+  }
+
+  private resolveSupportedMt2(
+    body: Mt2SettlementResolutionRequest,
+    request: ReturnType<typeof toMt2BankResolutionRequest>,
+  ): unknown {
+    const result = this.counterpartySsi.resolve(
+      request,
+      body as Record<string, unknown>,
+    );
+    const status = result["mx"] as Record<string, unknown>;
+    if (
+      typeof status?.["httpStatus"] === "number" &&
+      status["httpStatus"] >= 400
+    )
+      throw new HttpException(result, status["httpStatus"]);
+    const preview = this.service.resolve(request) as Mt2RoutePreview;
+    if (preview.decision === "SSI_AMBIGUOUS") this.failClosedAmbiguous(preview);
+    if (!preview.recommendedRoute) this.failClosedWithoutSsi(preview);
+    return this.governedMt2Contract(
+      result as Json,
+      preview,
+      request,
+      body as Record<string, unknown>,
+    );
+  }
+
   @Post("resolve")
   @HttpCode(200)
   resolve(@Body() body: Mt2SettlementResolutionRequest): unknown {
@@ -1323,49 +1433,11 @@ export class SettlementController {
         body,
         this.paymentMessageIndex,
       );
-      if (body.scenarioCode) {
-        const contextError = this.counterpartySsi.validateContext(
-          request,
-          body as Record<string, unknown>,
-        );
-        if (contextError) {
-          const status = contextError["mx"] as Record<string, unknown>;
-          throw new HttpException(contextError, Number(status["httpStatus"]));
-        }
-        const ownAccount = this.ownAccountScenario(body);
-        if (ownAccount) return ownAccount;
-      }
-      const precondition = this.counterpartySsi.precondition(
-        body as Record<string, unknown>,
-      );
-      if (precondition) {
-        const mx = precondition["mx"] as Record<string, unknown>;
-        throw new HttpException(precondition, Number(mx["httpStatus"]));
-      }
-      const dataIssues = this.dataQuality.issuesFor(request);
-      if (dataIssues.length) this.failClosedIncorrectSsi(body, dataIssues);
-      if (this.counterpartySsi.supports(request.sourceMessageType ?? "")) {
-        const result = this.counterpartySsi.resolve(
-          request,
-          body as Record<string, unknown>,
-        );
-        const status = result["mx"] as Record<string, unknown>;
-        if (
-          typeof status?.["httpStatus"] === "number" &&
-          status["httpStatus"] >= 400
-        )
-          throw new HttpException(result, status["httpStatus"]);
-        const preview = this.service.resolve(request) as Mt2RoutePreview;
-        if (preview.decision === "SSI_AMBIGUOUS")
-          this.failClosedAmbiguous(preview);
-        if (!preview.recommendedRoute) this.failClosedWithoutSsi(preview);
-        return this.governedMt2Contract(
-          result as Json,
-          preview,
-          request,
-          body as Record<string, unknown>,
-        );
-      }
+      const scenarioOutcome = this.scenarioOutcome(body, request);
+      if (scenarioOutcome) return scenarioOutcome;
+      this.assertResolutionPreconditions(body, request);
+      if (this.counterpartySsi.supports(request.sourceMessageType ?? ""))
+        return this.resolveSupportedMt2(body, request);
       return this.service.resolve(request);
     } catch (error) {
       if (this.isGovernedHttpException(error)) throw error;

@@ -26,13 +26,29 @@ export interface DemoReloadResult {
   readonly importedRows: Readonly<Record<string, number>>;
 }
 
+export interface DemoReloadAuthorization {
+  readonly code: "DEMO_RELOAD_AUTHORIZED";
+  readonly authorizationToken: string;
+  readonly expiresAt: string;
+  readonly dataset: {
+    readonly displayName: string;
+    readonly version: string;
+    readonly classification: string;
+    readonly estimatedRows: number;
+  };
+}
+
 export interface CurrencyInquiryContract {
   readonly "x-ui-inquiries": readonly {
     readonly id: string;
     readonly endpoint: string;
     readonly mode: string;
     readonly search?: { readonly label: string; readonly placeholder: string };
-    readonly columns: readonly { readonly path: string; readonly label: string; readonly presentation?: "strong" | "status" }[];
+    readonly columns: readonly {
+      readonly path: string;
+      readonly label: string;
+      readonly presentation?: "strong" | "status";
+    }[];
   }[];
 }
 
@@ -73,21 +89,58 @@ export class RuntimeSettingsService {
     return this.http.get<RuntimeSettings>(`${this.api}/runtime`);
   }
 
-  reloadDevelopmentData(password: string): Observable<DemoReloadResult> {
-    return this.http.post<DemoReloadResult>(`${this.api}/development-data/reload`, { password });
+  authorizeDevelopmentDataReload(
+    password: string,
+  ): Observable<DemoReloadAuthorization> {
+    return this.http.post<DemoReloadAuthorization>(
+      `${this.api}/development-data/reload/authorize`,
+      { password },
+    );
+  }
+
+  reloadDevelopmentData(
+    authorizationToken: string,
+  ): Observable<DemoReloadResult> {
+    return this.http.post<DemoReloadResult>(
+      `${this.api}/development-data/reload`,
+      { authorizationToken },
+    );
+  }
+
+  cancelDevelopmentDataReload(
+    authorizationToken: string,
+  ): Observable<{ code: string }> {
+    return this.http.post<{ code: string }>(
+      `${this.api}/development-data/reload/cancel`,
+      { authorizationToken },
+    );
   }
 
   currencyContract(): Observable<CurrencyInquiryContract> {
-    return this.http.get<CurrencyInquiryContract>("/openapi/swift-data-service.v1.json");
+    return this.http.get<CurrencyInquiryContract>(
+      "/openapi/swift-data-service.v1.json",
+    );
   }
 
-  resolutionCurrencies(page: number, pageSize: number, search: string, sortBy: string, sortDirection: "asc" | "desc"): Observable<ResolutionCurrencyPage> {
-    return this.http.get<ResolutionCurrencyPage>(`${this.api}/resolution-currencies`, {
-      params: { page, pageSize, search, sortBy, sortDirection },
-    });
+  resolutionCurrencies(
+    page: number,
+    pageSize: number,
+    search: string,
+    sortBy: string,
+    sortDirection: "asc" | "desc",
+  ): Observable<ResolutionCurrencyPage> {
+    return this.http.get<ResolutionCurrencyPage>(
+      `${this.api}/resolution-currencies`,
+      {
+        params: { page, pageSize, search, sortBy, sortDirection },
+      },
+    );
   }
 
   resyncResolutionCurrencies(): Observable<ResolutionCurrencyResyncResult> {
-    return this.http.post<ResolutionCurrencyResyncResult>(`${this.api}/resolution-currencies/resync`, {});
+    return this.http.post<ResolutionCurrencyResyncResult>(
+      `${this.api}/resolution-currencies/resync`,
+      {},
+    );
   }
 }

@@ -54,8 +54,11 @@ async function forward(
     throw new BadGatewayException("Upstream service is unavailable");
   }
 }
-const forwardSsi = (path: string, init?: RequestInit, timeoutOverrideMs?: number) =>
-  forward(`${serviceUrl()}/api`, path, init, timeoutOverrideMs);
+const forwardSsi = (
+  path: string,
+  init?: RequestInit,
+  timeoutOverrideMs?: number,
+) => forward(`${serviceUrl()}/api`, path, init, timeoutOverrideMs);
 const forwardReference = (path: string) =>
   forward(`${referenceUrl()}/mock`, path);
 
@@ -93,20 +96,35 @@ class BffController {
     @Query("sortBy") sortBy = "",
     @Query("sortDirection") sortDirection = "",
   ): Promise<unknown> {
-    return forwardSsi(`settings/resolution-currencies${listQuery({
-      page, pageSize, businessDomain, status, search, sortBy, sortDirection,
-    })}`);
+    return forwardSsi(
+      `settings/resolution-currencies${listQuery({
+        page,
+        pageSize,
+        businessDomain,
+        status,
+        search,
+        sortBy,
+        sortDirection,
+      })}`,
+    );
   }
-  @Post("settings/resolution-currencies/resync") resyncResolutionCurrencies(): Promise<unknown> {
-    return forwardSsi("settings/resolution-currencies/resync", { method: "POST" });
+  @Post("settings/resolution-currencies/resync")
+  resyncResolutionCurrencies(): Promise<unknown> {
+    return forwardSsi("settings/resolution-currencies/resync", {
+      method: "POST",
+    });
   }
   @Post("settings/development-data/reload") reloadDevelopmentData(
     @Body() body: unknown,
   ): Promise<unknown> {
-    return forwardSsi("settings/development-data/reload", {
-      method: "POST",
-      body: JSON.stringify(body),
-    }, DEMO_RELOAD_TIMEOUT_MS);
+    return forwardSsi(
+      "settings/development-data/reload",
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      },
+      DEMO_RELOAD_TIMEOUT_MS,
+    );
   }
   @Get("dashboard") async dashboard(): Promise<unknown> {
     const ssis = (await forwardSsi("ssis")) as Array<{ status: string }>;
@@ -121,6 +139,21 @@ class BffController {
   }
   @Get("ssis") list(@Query() query: SsiListQuery = {}): Promise<unknown> {
     return forwardSsi(`ssis${listQuery(query)}`);
+  }
+  @Post("settings/development-data/reload/authorize")
+  authorizeDevelopmentDataReload(@Body() body: unknown): Promise<unknown> {
+    return forwardSsi("settings/development-data/reload/authorize", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  }
+  @Post("settings/development-data/reload/cancel") cancelDevelopmentDataReload(
+    @Body() body: unknown,
+  ): Promise<unknown> {
+    return forwardSsi("settings/development-data/reload/cancel", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
   }
   @Get("ssis/summary") ssiSummary(): Promise<unknown> {
     return forwardSsi("ssis/summary");
@@ -419,10 +452,14 @@ class BffController {
   @HttpCode(200)
   @Post("v1/resolution-page-definitions/execute")
   executeResolutionPage(@Body() body: unknown): Promise<unknown> {
-    return forwardSsi("v1/resolution-page-definitions/execute", {
-      method: "POST",
-      body: JSON.stringify(body),
-    }, PAYMENT_RESOLUTION_TIMEOUT_MS);
+    return forwardSsi(
+      "v1/resolution-page-definitions/execute",
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      },
+      PAYMENT_RESOLUTION_TIMEOUT_MS,
+    );
   }
   @Get("reference/fin-controlled-fixtures") finControlledFixtures(
     @Query("messageType") messageType = "",

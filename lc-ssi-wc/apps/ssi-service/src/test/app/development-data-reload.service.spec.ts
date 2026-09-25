@@ -18,6 +18,21 @@ const codeOf = (action: () => unknown): { status: number; code: string } => {
   }
 };
 
+const asyncCodeOf = async (
+  action: () => Promise<unknown>,
+): Promise<{ status: number; code: string }> => {
+  try {
+    await action();
+    throw new Error("expected action to fail");
+  } catch (error) {
+    if (!(error instanceof HttpException)) throw error;
+    return {
+      status: error.getStatus(),
+      code: String((error.getResponse() as { code: string }).code),
+    };
+  }
+};
+
 describe("DevelopmentDataReloadService", () => {
   let directory: string;
   let databasePath: string;
@@ -43,6 +58,8 @@ describe("DevelopmentDataReloadService", () => {
     SSI_DEMO_ADMIN_PASSWORD: "secret",
     SSI_DATABASE_PATH: databasePath,
     SSI_DEMO_SEED_PATH: seedPath,
+    SSI_DEMO_BACKUP_PATH: join(directory, "backup.sqlite"),
+    SSI_DEMO_SHADOW_PATH: join(directory, "shadow.sqlite"),
     ...overrides,
   });
 
@@ -75,37 +92,53 @@ describe("DevelopmentDataReloadService", () => {
     }
   };
 
-  it("reports a configured server-derived demo capability without secrets", () => {
+  const authorizeAndReload = async (service: DevelopmentDataReloadService) => {
+    const authorization = service.authorize("secret");
+    return service.reload(authorization.authorizationToken);
+  };
+
+  it("reports a configured server-derived demo capability without inspecting seed metadata", () => {
     const status = new DevelopmentDataReloadService(environment()).status();
     expect(status).toMatchObject({
       runtimeEnvironment: "demo",
       developmentEnabled: true,
       reloadAvailable: true,
-      fixtureId: "TEST-CANONICAL",
       statusPolicyVersion: "SSI-CONFIG-HTTP-01",
     });
-    expect(status.seedSha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(status.fixtureId).toBeUndefined();
+    expect(status.seedSha256).toBeUndefined();
     expect(JSON.stringify(status)).not.toContain("secret");
   });
 
-  it("keeps the seed identity loaded on first use instead of rereading it for every Settings request", () => {
+  it("does not read seed identity when Settings status is requested", () => {
     const service = new DevelopmentDataReloadService(environment());
     const first = service.status();
     writeSeed([["CHANGED", "new"]]);
-    expect(service.status().seedSha256).toBe(first.seedSha256);
+    expect(service.status()).toEqual(first);
+  });
+
+  it("does not gate the Settings reload capability on canonical seed metadata", () => {
+    const status = new DevelopmentDataReloadService(
+      environment({ SSI_DEMO_SEED_PATH: join(directory, "missing-seed.json") }),
+    ).status();
+    expect(status).toMatchObject({
+      developmentEnabled: true,
+      reloadAvailable: true,
+    });
+    expect(status.fixtureId).toBeUndefined();
+    expect(status.seedSha256).toBeUndefined();
   });
 
   it("uses the approved MT1/MT2 canonical seed as the default reload source", () => {
-    const status = new DevelopmentDataReloadService(
+    const authorization = new DevelopmentDataReloadService(
       environment({ SSI_DEMO_SEED_PATH: undefined }),
-    ).status();
-    expect(status).toMatchObject({
-      reloadAvailable: true,
-      fixtureId: "SSI-DEMO-MT1-MT2-PACS008-PACS009-V1",
+    ).authorize("secret");
+    expect(authorization).toMatchObject({
+      code: "DEMO_RELOAD_AUTHORIZED",
+      dataset: {
+        classification: "SYNTHETIC_DEMO_QA_UAT",
+      },
     });
-    expect(status.seedSha256).toBe(
-      "4d17a179eccb45212dac6bff5e242aff1388f490486a67072ea49e4605cbc1aa",
-    );
   });
 
   it("reloads the approved MT1/MT2 seed twice into an isolated Development DB", async () => {
@@ -137,7 +170,7 @@ describe("DevelopmentDataReloadService", () => {
         SSI_DEMO_SEED_PATH: undefined,
       }),
     );
-    const first = service.reload("secret");
+    const first = await authorizeAndReload(service);
     const coverageDb = new DatabaseSync(canonicalPath, { readOnly: true });
     try {
       expect(
@@ -152,7 +185,7 @@ describe("DevelopmentDataReloadService", () => {
     } finally {
       coverageDb.close();
     }
-    const second = service.reload("secret");
+    const second = await authorizeAndReload(service);
     expect(first).toMatchObject({
       code: "DEMO_DATA_RELOADED",
       fixtureId: "SSI-DEMO-MT1-MT2-PACS008-PACS009-V1",
@@ -160,7 +193,7 @@ describe("DevelopmentDataReloadService", () => {
     });
     expect(second.snapshotHash).toBe(first.snapshotHash);
     expect(second.importedRows).toEqual(first.importedRows);
-  });
+  }, 60_000);
 
   it.each([
     [{ SSI_RUNTIME_ENV: "production" }, 403, "DEVELOPMENT_MODE_REQUIRED"],
@@ -170,7 +203,7 @@ describe("DevelopmentDataReloadService", () => {
     (override, status, code) => {
       expect(
         codeOf(() =>
-          new DevelopmentDataReloadService(environment(override)).reload(
+          new DevelopmentDataReloadService(environment(override)).authorize(
             "secret",
           ),
         ),
@@ -182,7 +215,7 @@ describe("DevelopmentDataReloadService", () => {
   it("rejects a wrong password without changing data", () => {
     expect(
       codeOf(() =>
-        new DevelopmentDataReloadService(environment()).reload("wrong"),
+        new DevelopmentDataReloadService(environment()).authorize("wrong"),
       ),
     ).toEqual({
       status: 401,
@@ -191,18 +224,73 @@ describe("DevelopmentDataReloadService", () => {
     expect(rows()).toEqual([{ id: "OLD", value: "old" }]);
   });
 
-  it("rejects a concurrent reload", () => {
+  it("uses a short-lived, single-use authorization that can be cancelled", async () => {
     const service = new DevelopmentDataReloadService(environment());
+    const cancelled = service.authorize("secret");
+    expect(service.cancelAuthorization(cancelled.authorizationToken)).toEqual({
+      code: "DEMO_RELOAD_AUTHORIZATION_CANCELLED",
+    });
+    await expect(
+      asyncCodeOf(() => service.reload(cancelled.authorizationToken)),
+    ).resolves.toEqual({
+      status: 401,
+      code: "INVALID_DEMO_RELOAD_AUTHORIZATION",
+    });
+
+    const accepted = service.authorize("secret");
+    await expect(
+      service.reload(accepted.authorizationToken),
+    ).resolves.toMatchObject({ code: "DEMO_DATA_RELOADED" });
+    await expect(
+      asyncCodeOf(() => service.reload(accepted.authorizationToken)),
+    ).resolves.toEqual({
+      status: 401,
+      code: "INVALID_DEMO_RELOAD_AUTHORIZATION",
+    });
+  });
+
+  it("rejects an expired authorization without changing data", async () => {
+    const service = new DevelopmentDataReloadService(
+      environment({ SSI_DEMO_RELOAD_AUTH_TTL_SECONDS: "-1" }),
+    );
+    const authorization = service.authorize("secret");
+    await expect(
+      asyncCodeOf(() => service.reload(authorization.authorizationToken)),
+    ).resolves.toEqual({
+      status: 401,
+      code: "INVALID_DEMO_RELOAD_AUTHORIZATION",
+    });
+    expect(rows()).toEqual([{ id: "OLD", value: "old" }]);
+  });
+
+  it("rejects test data changed after authorization", async () => {
+    const service = new DevelopmentDataReloadService(environment());
+    const authorization = service.authorize("secret");
+    writeSeed([["CHANGED", "changed"]]);
+    await expect(
+      asyncCodeOf(() => service.reload(authorization.authorizationToken)),
+    ).resolves.toEqual({
+      status: 409,
+      code: "DEMO_RELOAD_DATASET_CHANGED",
+    });
+    expect(rows()).toEqual([{ id: "OLD", value: "old" }]);
+  });
+
+  it("rejects a concurrent reload", async () => {
+    const service = new DevelopmentDataReloadService(environment());
+    const authorization = service.authorize("secret");
     (service as unknown as { reloading: boolean }).reloading = true;
-    expect(codeOf(() => service.reload("secret"))).toEqual({
+    await expect(
+      asyncCodeOf(() => service.reload(authorization.authorizationToken)),
+    ).resolves.toEqual({
       status: 409,
       code: "DEMO_RELOAD_IN_PROGRESS",
     });
   });
 
-  it("reloads every seed row transactionally and returns verification metadata", () => {
-    const result = new DevelopmentDataReloadService(environment()).reload(
-      "secret",
+  it("reloads every seed row into a new database and returns verification metadata", async () => {
+    const result = await authorizeAndReload(
+      new DevelopmentDataReloadService(environment()),
     );
     expect(result).toMatchObject({
       code: "DEMO_DATA_RELOADED",
@@ -214,7 +302,7 @@ describe("DevelopmentDataReloadService", () => {
     expect(rows()).toEqual([{ id: "NEW", value: "new" }]);
   });
 
-  it("reloads multiple tables in deterministic dependency order", () => {
+  it("reloads multiple tables in deterministic dependency order", async () => {
     const database = new DatabaseSync(databasePath);
     database.exec(
       "CREATE TABLE alpha (id TEXT PRIMARY KEY, value TEXT NOT NULL)",
@@ -247,9 +335,9 @@ describe("DevelopmentDataReloadService", () => {
       }),
     );
 
-    expect(
-      new DevelopmentDataReloadService(environment()).reload("secret"),
-    ).toMatchObject({
+    await expect(
+      authorizeAndReload(new DevelopmentDataReloadService(environment())),
+    ).resolves.toMatchObject({
       code: "DEMO_DATA_RELOADED",
       importedRows: { alpha: 1, record: 1 },
     });
@@ -263,46 +351,46 @@ describe("DevelopmentDataReloadService", () => {
     }
   });
 
-  it("rolls the complete reload back when imported data is invalid", () => {
+  it("restores the old database when imported data is invalid", async () => {
     writeSeed([
       ["DUPLICATE", "one"],
       ["DUPLICATE", "two"],
     ]);
-    expect(
-      codeOf(() =>
-        new DevelopmentDataReloadService(environment()).reload("secret"),
-      ),
-    ).toEqual({
+    const service = new DevelopmentDataReloadService(environment());
+    const authorization = service.authorize("secret");
+    await expect(
+      asyncCodeOf(() => service.reload(authorization.authorizationToken)),
+    ).resolves.toEqual({
       status: 500,
       code: "DEMO_DATA_RELOAD_FAILED",
     });
     expect(rows()).toEqual([{ id: "OLD", value: "old" }]);
   });
 
-  it("rejects a seed whose schema does not match the active database", () => {
+  it("rejects test data whose declared columns do not match its schema", async () => {
     const seed = JSON.parse(readFileSync(seedPath, "utf8"));
     seed.tables.record.columns = ["id"];
     writeFileSync(seedPath, JSON.stringify(seed));
-    expect(
-      codeOf(() =>
-        new DevelopmentDataReloadService(environment()).reload("secret"),
-      ),
-    ).toEqual({
+    const service = new DevelopmentDataReloadService(environment());
+    const authorization = service.authorize("secret");
+    await expect(
+      asyncCodeOf(() => service.reload(authorization.authorizationToken)),
+    ).resolves.toEqual({
       status: 500,
       code: "DEMO_DATA_RELOAD_FAILED",
     });
     expect(rows()).toEqual([{ id: "OLD", value: "old" }]);
   });
 
-  it("reports malformed canonical seed data as a reload failure", () => {
+  it("reports malformed test data during authorization without changing the DB", () => {
     writeFileSync(seedPath, "{}");
     expect(
       codeOf(() =>
-        new DevelopmentDataReloadService(environment()).reload("secret"),
+        new DevelopmentDataReloadService(environment()).authorize("secret"),
       ),
     ).toEqual({
       status: 500,
-      code: "DEMO_DATA_RELOAD_FAILED",
+      code: "DEMO_RELOAD_DATASET_UNAVAILABLE",
     });
     expect(rows()).toEqual([{ id: "OLD", value: "old" }]);
   });

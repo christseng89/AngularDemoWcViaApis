@@ -46,36 +46,41 @@ const governedRaw = (
       };
   const suppliedPrevious = raw["previousMessage"];
   return {
-  ...(source.endsWith("COV")
-    ? {
-        block3: { "119": "COV" },
-        incoming121: "123e4567-e89b-12d3-a456-426614174000",
-        sequenceB: { "50A": "DEMOHKHH", "59": "CUSTOMER" },
-        underlyingCustomerCreditTransfer: true,
-      }
-    : {}),
-  ...(source.startsWith("MT205")
-    ? {
-        previousMessage: basePrevious,
-        senderCountry: "US",
-        receiverCountry: "US",
-        senderCountrySourceId: "ENTITY-US",
-        senderCountrySourceVersion: "1",
-        receiverCountrySourceId: "BANK-SVC-CITIUS33",
-        receiverCountrySourceVersion: "1",
-      }
-    : {}),
-    ...raw,
-    ...(source.startsWith("MT205") && suppliedPrevious && typeof suppliedPrevious === "object"
+    ...(source.endsWith("COV")
       ? {
-          previousMessage: { ...basePrevious, ...(suppliedPrevious as Record<string, unknown>) },
+          block3: { "119": "COV" },
+          incoming121: "123e4567-e89b-12d3-a456-426614174000",
+          sequenceB: { "50A": "DEMOHKHH", "59": "CUSTOMER" },
+          underlyingCustomerCreditTransfer: true,
+        }
+      : {}),
+    ...(source.startsWith("MT205")
+      ? {
+          previousMessage: basePrevious,
+          senderCountry: "US",
+          receiverCountry: "US",
+          senderCountrySourceId: "ENTITY-US",
+          senderCountrySourceVersion: "1",
+          receiverCountrySourceId: "BANK-SVC-CITIUS33",
+          receiverCountrySourceVersion: "1",
+        }
+      : {}),
+    ...raw,
+    ...(source.startsWith("MT205") &&
+    suppliedPrevious &&
+    typeof suppliedPrevious === "object"
+      ? {
+          previousMessage: {
+            ...basePrevious,
+            ...(suppliedPrevious as Record<string, unknown>),
+          },
           ...(["MT200", "MT201"].includes(
             String((suppliedPrevious as Record<string, unknown>)["type"] ?? ""),
           )
             ? {
-                initialTransferType: (suppliedPrevious as Record<string, unknown>)[
-                  "type"
-                ],
+                initialTransferType: (
+                  suppliedPrevious as Record<string, unknown>
+                )["type"],
               }
             : {}),
         }
@@ -206,6 +211,31 @@ describe("CounterpartySsiResolutionService", () => {
         canonicalScenario: "FI_TO_FI_TRANSFER",
       },
       mt: { tags: { "58A": "CITIUS33" } },
+    });
+  });
+
+  it("applies the governed 52a equals 58a equivalence to an initial MT201", () => {
+    const result = service.resolve(
+      { ...request, sourceMessageType: "MT205" },
+      governedRaw("MT205", {
+        previousMessage: {
+          type: "MT201",
+          "20": "MT201-REFERENCE",
+          "21": "RELATED",
+          senderBic: "CHASUS33",
+          nonCoverAttested: true,
+          attestationId: "MT205-MT201",
+          attestationVersion: "1.0.0",
+          artifactSha256: "a".repeat(64),
+        },
+      }),
+    );
+    expect(result["mt"]).toMatchObject({
+      tags: {
+        "21": "MT201-REFERENCE",
+        "52A": "CHASUS33",
+        "58A": "CHASUS33",
+      },
     });
   });
 
@@ -346,6 +376,11 @@ describe("CounterpartySsiResolutionService", () => {
       "MT205",
       { ownAccountSubScenario: "BOOK_TRANSFER_SAME_RECEIVER" },
       "PROFILE_INCOMPLETE",
+    ],
+    [
+      "MT205",
+      { bicCountryConsistency: "CONFLICT" },
+      "JURISDICTION_EVIDENCE_CONFLICT",
     ],
     [
       "MT202COV",
