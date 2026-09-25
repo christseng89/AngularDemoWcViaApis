@@ -154,7 +154,10 @@ try {
       });
       await resolve.waitFor();
       await resolve.click({ trial: true, timeout: 15_000 });
-      assert(!(await resolve.isDisabled()), `${journey.code}: Resolve SSI disabled`);
+      assert(
+        !(await resolve.isDisabled()),
+        `${journey.code}: Resolve SSI disabled`,
+      );
       const [request] = await Promise.all([
         page.waitForRequest(
           (candidate) =>
@@ -176,10 +179,28 @@ try {
         scenarioId: payload.scenarioId,
         valueCount: Object.keys(payload.values).length,
       };
+      const resultDialog = page.getByRole("dialog", {
+        name: "Resolution result",
+      });
+      await resultDialog.waitFor();
+      await resultDialog
+        .getByRole("button", { name: "Cancel resolution result" })
+        .click();
+      await resultDialog.waitFor({ state: "hidden" });
     }
 
-    const back = page.getByRole("button", { name: "Back to transaction index" });
+    const back = page
+      .locator("ssi-generic-parameter-form")
+      .getByRole("button", { name: "Back", exact: true });
     await back.click();
+    if (scenario.scenarioCount > 1) {
+      const drawer = page.getByRole("dialog", { name: "Select a scenario" });
+      await drawer.waitFor();
+      await drawer
+        .getByRole("button", { name: "Cancel scenario index" })
+        .click();
+      await drawer.waitFor({ state: "hidden" });
+    }
     await page
       .getByRole("heading", { name: "Search Payment Message Index" })
       .waitFor();
@@ -221,8 +242,14 @@ try {
     name: "Resolve SSI",
     exact: true,
   });
-  assert(await failedResolve.isDisabled(), "Resolve remains enabled after lookup failure");
-  assert(executionRequests === 0, "execution request emitted after lookup failure");
+  assert(
+    await failedResolve.isDisabled(),
+    "Resolve remains enabled after lookup failure",
+  );
+  assert(
+    executionRequests === 0,
+    "execution request emitted after lookup failure",
+  );
   await failurePage.close();
 
   console.log(
