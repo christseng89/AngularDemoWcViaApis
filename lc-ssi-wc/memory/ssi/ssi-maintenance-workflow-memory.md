@@ -118,6 +118,8 @@ This matrix is the final Product Owner ruling for record-level actions in SSI-re
 - Browser code never reads a server path, writes a DB, executes SQL, performs backup, or restores data. BFF forwards typed requests; SSI Service owns all state changes.
 - Upload content supplies records only. Its declared schema must exactly match the active server-governed schema, and no uploaded SQL／DDL／command may be executed.
 - Reload backs up the active DB, builds and validates a new shadow DB, activates it only after complete verification, and restores the original DB on every failure.
+- Reload first blocks new maintenance mutations and waits for in-flight mutations to drain. Activation and restore use SQLite online backup into the stable active DB and complete a non-busy WAL checkpoint before maintenance writes resume.
+- Ordinary Settings capability loading remains identity-free. Exact-candidate QA may use the password-protected development evidence API to read the current logical snapshot; that endpoint is not called or displayed by the Settings UI.
 - Success and failure both create persistent audit evidence without passwords. The evidence records actor, environment, dataset and seed identity, previous/new logical snapshots, imported row counts, timestamp, outcome and safe error code.
 - Active MT1／MT2 reload data is under `data/reload-test-data/`. Superseded v15.x paths, deleted historical reports, build/scanner output and manual governance SHA sidecars are not active validation dependencies.
 - This simplification does not waive security, backup/restore, audit, DBA, `npm run verify`, SonarQube, Browser UAT, Proposal regression or Independent BA／QA review of the same exact candidate commit.

@@ -139,6 +139,13 @@ class BffController {
       DEMO_RELOAD_TIMEOUT_MS,
     );
   }
+  @Post("settings/development-data/evidence")
+  developmentDataEvidence(@Body() body: unknown): Promise<unknown> {
+    return forwardSsi("settings/development-data/evidence", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  }
   @Post("settings/development-data/reload/upload")
   @UseInterceptors(
     FileInterceptor("file", {

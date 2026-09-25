@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { ModuleRef } from "@nestjs/core";
+import { APP_INTERCEPTOR } from "@nestjs/core";
 import { SsiController } from "./ssi.controller";
 import { SsiApplicationService } from "./ssi-application.service";
 import { SqliteSsiRepository } from "./sqlite-ssi.repository";
@@ -39,6 +40,10 @@ import { DatabaseSnapshotIdentityService } from "./database-snapshot-identity.se
 import { SsiDataQualityService } from "./ssi-data-quality.service";
 import { RuntimeSettingsController } from "./runtime-settings.controller";
 import { DevelopmentDataReloadService } from "./development-data-reload.service";
+import {
+  DatabaseMutationCoordinator,
+  DatabaseMutationInterceptor,
+} from "./database-mutation-coordinator";
 import { FinControlledFixtureService } from "./fin-controlled-fixture.service";
 import { FinControlledResolutionService } from "./fin-controlled-resolution.service";
 import { MappingResolutionPageDefinitionSource } from "./page-parameters/mapping-resolution-page-definition.source";
@@ -137,6 +142,11 @@ import {
     },
     PaymentResolutionPageSubmissionAdapter,
     DevelopmentDataReloadService,
+    DatabaseMutationCoordinator,
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: DatabaseMutationInterceptor,
+    },
     FinControlledFixtureService,
     FinControlledResolutionService,
     MappingResolutionPageDefinitionSource,

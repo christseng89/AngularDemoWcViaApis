@@ -538,7 +538,13 @@ describe("SettlementController", () => {
     );
     expect(contract).toMatchObject({
       code: "SSI_RESOLVED",
+      profileKind: "SSI_RESOLUTION_ONLY",
+      paymentExecutable: false,
       payloadGenerated: false,
+      confirmedResolutionCreated: false,
+      repairQueueCreated: false,
+      ssiApplicability: "REQUIRED",
+      resolutionOutcome: "ELIGIBLE_COMPLETE_ROUTE",
       mx: {
         httpStatus: 200,
         code: "SSI_RESOLVED",
@@ -547,20 +553,6 @@ describe("SettlementController", () => {
           selectedSsi: "SSI-DEMO-024",
           creditor: "BARCGB22",
           creditorSource: "REQUEST_PASS_THROUGH",
-        },
-        messageComposerContext: {
-          SttlmMtd: {
-            value: "INDA",
-            source: "BA-TOPOLOGY-INDA-INGA-001",
-          },
-          Dbtr: { value: "DEMOHKHH", source: "OWN_ENTITY" },
-          SttlmAcct: {
-            value: "NOSTRO-USD",
-            source: "OWN_SSI_NOSTRO",
-            nostroId: "NOSTRO-ID-USD",
-            nostroVersion: 7,
-          },
-          Cdtr: { value: "BARCGB22", source: "REQUEST_PASS_THROUGH" },
         },
       },
       mt: {
@@ -578,6 +570,7 @@ describe("SettlementController", () => {
         applicabilityVersion: 6,
         routePurpose: "INTERBANK_TRANSFER",
         selectedBy: "EXACT_BUSINESS_PURPOSE_MATCH",
+        settlementAccountReference: "NOSTRO-USD",
       },
       roleProvenance: {
         instructedAgent: {
@@ -608,6 +601,10 @@ describe("SettlementController", () => {
         "pacs.009.CdtrAgt": { outcome: "INCLUDE" },
       },
     });
+    expect(contract).not.toHaveProperty("messageComposerContext");
+    expect((contract as Json)["mx"]).not.toHaveProperty(
+      "messageComposerContext",
+    );
     expect(supported.counterparty.resolve).toHaveBeenCalled();
   });
 
@@ -1079,14 +1076,19 @@ describe("SettlementController", () => {
     );
 
     expect(mxOf(response)).toMatchObject({
-      httpStatus: 422,
-      decision: "SSI_AMBIGUOUS",
-      code: "SSI_AMBIGUOUS",
+      httpStatus: 409,
+      decision: "AMBIGUOUS_ROUTE",
+      code: "AMBIGUOUS_ROUTE",
+      profileKind: "SSI_RESOLUTION_ONLY",
+      paymentExecutable: false,
       payloadGenerated: false,
+      confirmedResolutionCreated: false,
+      repairQueueCreated: false,
+      ssiApplicability: "REQUIRED",
+      resolutionOutcome: "AMBIGUOUS_ROUTE",
       chosenRoute: null,
       canonicalRoles: null,
       roleProvenance: null,
-      messageComposerContext: null,
       candidates: [
         {
           ssiCode: "SSI-DEMO-003",
@@ -1128,23 +1130,23 @@ describe("SettlementController", () => {
         },
       ],
       rankingRuleId: "EC-RANK-01",
-      repairQueue: { required: true, makerCheckerRequired: true },
     });
     expect(mtOf(response)).toEqual({
       validation: "FAIL",
-      code: "SSI_AMBIGUOUS",
+      code: "AMBIGUOUS_ROUTE",
       payloadGenerated: false,
     });
     expect(response).toMatchObject({
-      resolutionDecision: "SSI_AMBIGUOUS",
+      resolutionDecision: "AMBIGUOUS_ROUTE",
       chosenRoute: null,
       roleProvenance: null,
-      messageComposerContext: null,
       payloadGenerated: false,
       rankingRuleId: "EC-RANK-01",
       ambiguityReason: "TIED_ON_CONTROLLED_RANK_KEYS",
       tiedOn: ["priority", "routePreference", "specificity"],
     });
+    expect(response).not.toHaveProperty("repairQueue");
+    expect(response).not.toHaveProperty("messageComposerContext");
     expect(response).not.toHaveProperty("lowerRankedEligibleCandidates");
     expect(mxOf(response)).not.toHaveProperty("lowerRankedEligibleCandidates");
   });

@@ -1,12 +1,9 @@
 {
   "schemaVersion": 1,
-  "expectedCaseCount": 139,
-  "workbook": "../../../fixtures/mt2/MT2XX_測試案例_SSI與NOSTRO_v6.2_FINAL.xlsx",
-  "workbookSha256": "DF3328998BA24B904B1E8944F1680699F75A916A77716BB0AD831D4A4CAA2BED",
+  "expectedCaseCount": 101,
+  "proposalCaseFile": "../../../../data/qa/mt2/mt2-pacs009-proposal-case-groups.json",
   "expectedRuntime": {
-    "fixtureId": "SSI-DEMO-MT1-MT2-PACS008-PACS009-V1",
-    "seedSha256": "4D17A179ECCB45212DAC6BFF5E242AFF1388F490486A67072EA49E4605CBC1AA",
-    "snapshotSha256": "62BCAA7900D3404C9ED2AF8AB54BB5C5DB644DD2C667FBC780112C124E7EF0F4",
+    "snapshotSha256": "73281B77CE80995D61D635831F9963ADF183E3970FF88E0C3BF9177F3F64139F",
     "snapshotMethod": "SQLITE_WAL_AWARE_LOGICAL_SNAPSHOT_V1"
   },
   "baselineArtifacts": [
@@ -16,49 +13,24 @@
       "role": "CANONICAL_POSITIVE_SEED"
     },
     {
-      "file": "../../../fixtures/mt2/baselines/swift-data-service.v1.current.json",
-      "sha256": "85AF6B8C83EC733C313764B0F9A712E2A29FA8913CD53265E09EEC71D775D018",
+      "file": "../../../../data/qa/mt2/mt2-pacs009-proposal-case-groups.json",
+      "sha256": "BDAF6CC2B73333A840161523BDC5AAFE7B298D52FE72E3FF6D72A2D0A8E58A1F",
+      "role": "PROPOSAL_CASE_CATALOGUE"
+    },
+    {
+      "file": "../../../../openapi/swift-data-service.v1.json",
+      "sha256": "84A11461FA83EED8AFF01346DC342887720E7C0EA4BF2FB4400F70AA24D7874B",
       "role": "CURRENT_OAS"
     },
     {
-      "file": "../../../fixtures/mt2/baselines/ssi-demo.consistent-snapshot.sqlite",
-      "sha256": "7492CC264BCDBC7EE43DC7028CDCDC12385898BFD4BDCCA02798D2B5A3AB4EF3",
-      "role": "SQLITE_CONSISTENT_SNAPSHOT"
+      "file": "../../../../parameters/resolution-page-fixtures.mt2-pacs009.sr2026.json",
+      "sha256": "1A3E75ED1C2CF49C9297DA7DA8195F432A5C6F8DF3700C3EACDAA152AB2588AF",
+      "role": "CONTROLLED_FIXTURE_BINDINGS"
     },
     {
-      "file": "../../../fixtures/mt2/baselines/nostro-active.current.json",
-      "sha256": "2A4B100379C791104C2CEFCD442D43F85C6B3B5308D77542BE700235A111863D",
-      "role": "OWN_NOSTRO"
-    },
-    {
-      "file": "../../../fixtures/mt2/baselines/ssi-bank-counterparty-active.current.json",
-      "sha256": "F6859FF4F4D27F59217B019D00E443FC49BA457D2DB05A7A4FFB1B1AA77C3835",
-      "role": "BANK_COUNTERPARTY_SSI"
-    },
-    {
-      "file": "../../../fixtures/mt2/baselines/ssi-customer-active-negative.current.json",
-      "sha256": "51434DFD94469136F06C5B8C3099EEE7D30838903D1DF93A60A09020951ABD6A",
-      "role": "CUSTOMER_SSI_NEGATIVE"
-    },
-    {
-      "file": "../../../fixtures/mt2/baselines/rma-active-outbound.current.json",
-      "sha256": "7EFA38BE3FDBFA991D8DBAB7907000F136A66584BBE68F58E899FD0DC0202B75",
-      "role": "RMA_OUTBOUND"
-    },
-    {
-      "file": "../../../fixtures/mt2/baselines/payment-message-scenario-index.v6.proposed.json",
-      "sha256": "5EC3B6E926C4E8DF74073680F73B2106B11A750CFFF8E05202259FAB2B12EDEB",
-      "role": "MESSAGE_SCENARIO_INDEX"
-    },
-    {
-      "file": "../../../fixtures/mt2/baselines/proposed-qa-seed-data.json",
-      "sha256": "97118C5EA43BDEBB7790F00E359BE16C8811B66244207F44444D0D27E9506ABE",
-      "role": "QA_SEED_DATA"
-    },
-    {
-      "file": "../../../fixtures/mt2/baselines/bank-service.current.json",
-      "sha256": "DC02207FFC433F4F72C0913AE0028D217B6EBF7A5D70A8C5A96866AB44811885",
-      "role": "BANK_SERVICE"
+      "file": "../../../../parameters/resolution-page-scenarios.mt2-pacs009.sr2026.json",
+      "sha256": "7024B1F978FECFD2E4F5A6376BBA929F46E08AFA4A9C699F099E944A8C481707",
+      "role": "CONTROLLED_SCENARIOS"
     }
   ],
   "resultFile": "../../../reports/latest/mt2/executable-case-results.json",
@@ -83,8 +55,8 @@
   },
   "gates": [
     {
-      "id": "EXECUTE_139_CASES",
-      "command": ["node", "scripts/mt2-final-qa/execute-cases.mjs"]
+      "id": "PROPOSAL_CASE_GATE",
+      "command": ["node", "scripts/mt2-final-qa/mt2-pacs009-proposal-gate.mjs"]
     },
     {
       "id": "LINT",

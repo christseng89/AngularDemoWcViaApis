@@ -19,6 +19,7 @@ import { SqliteSsiRepository } from "./sqlite-ssi.repository";
 import { MappingCatalogueService } from "./mapping-catalogue.service";
 import { MappingResolutionPageDefinitionSource } from "./page-parameters/mapping-resolution-page-definition.source";
 import { PaymentResolutionPageDefinitionSource } from "./page-parameters/payment-resolution-page-definition.source";
+import { DatabaseMutationCoordinator } from "./database-mutation-coordinator";
 import {
   databaseSnapshotIdentity,
   normalizeSqliteValue,
@@ -122,6 +123,13 @@ export interface DemoExportResult {
   readonly dataset: DemoDatasetSummary;
 }
 
+export interface DemoRuntimeEvidence {
+  readonly currentSnapshot: {
+    readonly sha256: string;
+    readonly method: string;
+  };
+}
+
 const digest = (value: string | Buffer): string =>
   createHash("sha256").update(value).digest("hex");
 
@@ -216,6 +224,8 @@ export class DevelopmentDataReloadService {
     @Optional()
     @Inject("SSI_RUNTIME_ENVIRONMENT")
     private readonly environment: RuntimeEnvironment = process.env,
+    @Optional()
+    private readonly mutations: DatabaseMutationCoordinator = new DatabaseMutationCoordinator(),
   ) {}
 
   status(): DemoReloadStatus {
@@ -228,13 +238,24 @@ export class DevelopmentDataReloadService {
     };
   }
 
+  evidence(password: string): DemoRuntimeEvidence {
+    this.assertControlPassword(password);
+    const database = new DatabaseSync(this.databasePath(), { readOnly: true });
+    try {
+      const identity = databaseSnapshotIdentity(database);
+      return {
+        currentSnapshot: {
+          sha256: identity.sha256,
+          method: identity.method,
+        },
+      };
+    } finally {
+      database.close();
+    }
+  }
+
   authorize(password: string): DemoReloadAuthorization {
-    const status = this.status();
-    if (!status.developmentEnabled) failure(403, "DEVELOPMENT_MODE_REQUIRED");
-    const expected = this.environment["SSI_DEMO_ADMIN_PASSWORD"]?.trim();
-    if (!expected) failure(503, "DEMO_RELOAD_NOT_CONFIGURED");
-    if (!password || !secureEquals(password, expected ?? ""))
-      failure(401, "INVALID_DEMO_CONTROL_PASSWORD");
+    this.assertControlPassword(password);
     try {
       this.purgeExpiredAuthorizations();
       const datasets = this.availableDatasets();
@@ -364,6 +385,7 @@ export class DevelopmentDataReloadService {
     }
 
     this.reloading = true;
+    const releaseReload = await this.mutations.beginReload();
     const activePath = this.databasePath();
     const backupPath = this.backupPath();
     const shadowPath = this.shadowPath();
@@ -418,6 +440,7 @@ export class DevelopmentDataReloadService {
       } finally {
         activatedDatabase.close();
       }
+      this.checkpointActiveDatabase(activePath);
       importedRows = Object.fromEntries(
         Object.entries(seed.tables).map(([name, table]) => [
           name,
@@ -480,6 +503,7 @@ export class DevelopmentDataReloadService {
       rmSync(shadowPath, { force: true });
       this.cleanupAuthorization(authorized);
       this.reloading = false;
+      releaseReload();
     }
   }
 
@@ -730,11 +754,35 @@ export class DevelopmentDataReloadService {
     const backupDatabase = new DatabaseSync(backupPath, { readOnly: true });
     try {
       await backup(backupDatabase, activePath);
+      this.checkpointActiveDatabase(activePath);
     } catch {
       return failure(500, "DEMO_DATA_RESTORE_FAILED");
     } finally {
       backupDatabase.close();
     }
+  }
+
+  private checkpointActiveDatabase(activePath: string): void {
+    const database = new DatabaseSync(activePath);
+    try {
+      database.exec("PRAGMA busy_timeout=5000");
+      const result = database
+        .prepare("PRAGMA wal_checkpoint(TRUNCATE)")
+        .get() as { busy?: unknown };
+      if (Number(result.busy ?? 0) !== 0)
+        throw new Error("active database WAL checkpoint is busy");
+    } finally {
+      database.close();
+    }
+  }
+
+  private assertControlPassword(password: string): void {
+    const status = this.status();
+    if (!status.developmentEnabled) failure(403, "DEVELOPMENT_MODE_REQUIRED");
+    const expected = this.environment["SSI_DEMO_ADMIN_PASSWORD"]?.trim();
+    if (!expected) return failure(503, "DEMO_RELOAD_NOT_CONFIGURED");
+    if (!password || !secureEquals(password, expected))
+      failure(401, "INVALID_DEMO_CONTROL_PASSWORD");
   }
 
   private async restoreAfterReloadFailure(

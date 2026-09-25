@@ -14,9 +14,7 @@ const sha256 = (path) =>
     .toUpperCase();
 
 test("controlled MT347 fixtures preserve the TDD v5 identities and isolation", () => {
-  const manifest = readJson(
-    "qa/fixtures/mt347/mt347-fixtures.v1.manifest.json",
-  );
+  const manifest = readJson("data/qa/mt347/mt347-fixtures.v1.manifest.json");
   assert.equal(
     manifest.sourceWorkbookSha256,
     "82C6ABCFD91E7D35E1382F8C86BF796D8DBF05CF8C8D94F9F0C7B5889AB52C9A",
@@ -25,7 +23,7 @@ test("controlled MT347 fixtures preserve the TDD v5 identities and isolation", (
   const identities = new Set();
   for (const [name, count] of Object.entries(expected)) {
     const artifact = manifest.artifacts[name];
-    const relativePath = `qa/fixtures/mt347/mt347-${name}.v1.json`;
+    const relativePath = `data/qa/mt347/mt347-${name}.v1.json`;
     const data = readJson(relativePath);
     assert.equal(artifact.count, count);
     assert.equal(data.records.length, count);
@@ -79,10 +77,10 @@ test("the governed catalogue carries the corrected v5 NVR semantics", () => {
 });
 
 test("canonical seed contains every executable MT347 binding and excludes scope boundaries", () => {
-  const positive = readJson("qa/fixtures/mt347/mt347-positive.v1.json").records;
-  const negative = readJson("qa/fixtures/mt347/mt347-negative.v1.json").records;
+  const positive = readJson("data/qa/mt347/mt347-positive.v1.json").records;
+  const negative = readJson("data/qa/mt347/mt347-negative.v1.json").records;
   const seed = readJson(
-    "qa/fixtures/rma/reload-test-data/ssi-demo.v15.8.pacs009-repaired-isolated.canonical.seed.json",
+    "data/reload-test-data/ssi-demo.mt1-mt2.v1.approved.canonical.seed.json",
   );
   const payloads = (table) =>
     seed.tables[table].rows.map((row) =>
@@ -146,7 +144,7 @@ test("canonical seed contains every executable MT347 binding and excludes scope 
 
 test("fixture role inputs are sourced independently from expected assertions", () => {
   const configuration = readJson("parameters/mt347-fixture-inputs.v1.json");
-  const positive = readJson("qa/fixtures/mt347/mt347-positive.v1.json");
+  const positive = readJson("data/qa/mt347/mt347-positive.v1.json");
   assert.equal(configuration.sourcePolicy, "INPUT_ONLY_NO_EXPECTED_ORACLE");
   for (const record of positive.records) {
     assert.equal(
@@ -167,7 +165,7 @@ test("fixture role inputs are sourced independently from expected assertions", (
 });
 
 test("canonical role ownership follows the governed FIN profile", () => {
-  const positive = readJson("qa/fixtures/mt347/mt347-positive.v1.json").records;
+  const positive = readJson("data/qa/mt347/mt347-positive.v1.json").records;
   const catalogue = readJson("parameters/ssi-mappings.sr2026.json").mappings;
   for (const record of positive) {
     const allowedSsiRoles = new Set(
@@ -233,20 +231,24 @@ test("canonical role ownership follows the governed FIN profile", () => {
 
 test("transaction-owned roles are kept outside standing SSI route data", () => {
   const seed = readJson(
-    "qa/fixtures/rma/reload-test-data/ssi-demo.v15.8.pacs009-repaired-isolated.canonical.seed.json",
+    "data/reload-test-data/ssi-demo.mt1-mt2.v1.approved.canonical.seed.json",
   );
   const payloads = (table) =>
     seed.tables[table].rows.map((row) =>
       JSON.parse(row[seed.tables[table].columns.indexOf("payload")]),
     );
   const fixtureSsis = payloads("ssi").filter(
-    (row) => row.fixtureFamily === "MT347-SR2026-SSI",
+    (row) =>
+      row.fixtureFamily === "MT347-SR2026-SSI" &&
+      row.fixtureVariantVersion !== "MT347-DEMO-ORACLE-V1.1",
   );
   const fixtureApplicability = payloads("ssi_applicability").filter(
-    (row) => row.fixtureFamily === "MT347-SR2026-SSI",
+    (row) =>
+      row.fixtureFamily === "MT347-SR2026-SSI" &&
+      row.fixtureVariantVersion !== "MT347-DEMO-ORACLE-V1.1",
   );
   const variants = readJson(
-    "qa/fixtures/mt347/mt347-executable-counterparties.v4.json",
+    "data/qa/mt347/mt347-executable-counterparties.v4.json",
   );
   assert.deepEqual(variants.supportedCurrencies, [
     "USD",
@@ -288,7 +290,7 @@ test("transaction-owned roles are kept outside standing SSI route data", () => {
 
 test("MT300-001 offers three governed SSI counterparties in each controlled currency", () => {
   const seed = readJson(
-    "qa/fixtures/rma/reload-test-data/ssi-demo.v15.8.pacs009-repaired-isolated.canonical.seed.json",
+    "data/reload-test-data/ssi-demo.mt1-mt2.v1.approved.canonical.seed.json",
   );
   const payloads = (table) =>
     seed.tables[table].rows.map((row) =>
@@ -308,6 +310,7 @@ test("MT300-001 offers three governed SSI counterparties in each controlled curr
   const candidates = payloads("ssi").filter(
     (row) =>
       row.fixtureFamily === "MT347-SR2026-SSI" &&
+      row.fixtureVariantVersion !== "MT347-DEMO-ORACLE-V1.1" &&
       (row.route.fixtureGroupId ?? row.fixtureBindingId) ===
         "FIX-MT300-001@v1" &&
       applicabilityBySsi.has(row.id),

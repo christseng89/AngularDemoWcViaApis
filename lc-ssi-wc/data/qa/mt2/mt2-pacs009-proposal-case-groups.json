@@ -1,0 +1,149 @@
+{
+  "schemaVersion": 1,
+  "proposalSha256": "2F516FABB725308EB41BCABB720AAC6A59A5F5A949B498208E9D0283948CF1AB",
+  "direction": "OUTWARD",
+  "localRole": "INSTRUCTING_AGENT",
+  "profiles": [
+    "MT2-MT202-PLAIN-SR2026",
+    "MT2-MT202COV-COV-SR2026",
+    "MT2-MT205-PLAIN-SR2026",
+    "MT2-MT205COV-COV-SR2026"
+  ],
+  "expectedExpandedCaseCount": 101,
+  "sideEffects": {
+    "paymentExecutable": false,
+    "payloadGenerated": false,
+    "confirmedResolutionCreated": false,
+    "repairQueueCreated": false
+  },
+  "groups": [
+    {
+      "id": "MT2-V1-DIR-001",
+      "variants": "A..B",
+      "outcomes": ["UNSUPPORTED_DIRECTION"]
+    },
+    {
+      "id": "MT2-V1-PROFILE-002",
+      "variants": "A..G",
+      "outcomes": ["ELIGIBLE_COMPLETE_ROUTE", "UNSUPPORTED_PROFILE"]
+    },
+    {
+      "id": "MT2-V1-RMA-003",
+      "variants": "A..L",
+      "outcomes": ["ELIGIBLE_COMPLETE_ROUTE", "RMA_NOT_AUTHORIZED"]
+    },
+    {
+      "id": "MT2-V1-202COV-004",
+      "variants": "A..D",
+      "outcomes": ["INVALID_UPSTREAM_CONTEXT"]
+    },
+    {
+      "id": "MT2-V1-205-005",
+      "variants": "A..H",
+      "outcomes": ["ELIGIBLE_COMPLETE_ROUTE", "INVALID_UPSTREAM_CONTEXT"]
+    },
+    {
+      "id": "MT2-V1-205COV-006",
+      "variants": "A..G",
+      "outcomes": ["ELIGIBLE_COMPLETE_ROUTE", "INVALID_UPSTREAM_CONTEXT"]
+    },
+    {
+      "id": "MT2-V1-CUSTOMER-007",
+      "variants": "SINGLE",
+      "outcomes": ["ELIGIBLE_COMPLETE_ROUTE"]
+    },
+    {
+      "id": "MT2-V1-PRESENCE-007",
+      "variants": "A",
+      "outcomes": ["PROFILE_INCOMPLETE"]
+    },
+    {
+      "id": "MT2-V1-STTLM-008",
+      "variants": "A..D",
+      "outcomes": ["ELIGIBLE_COMPLETE_ROUTE", "INVALID_CONTEXT_TOPOLOGY"]
+    },
+    {
+      "id": "MT2-V1-ACCOUNT-009",
+      "variants": "SINGLE",
+      "outcomes": ["PROFILE_INCOMPLETE"]
+    },
+    {
+      "id": "MT2-V1-PICKER-010",
+      "variants": "SINGLE",
+      "outcomes": ["ELIGIBLE_COMPLETE_ROUTE", "STALE"]
+    },
+    {
+      "id": "MT2-V1-ROUTE-011",
+      "variants": "A..C",
+      "outcomes": [
+        "NO_ELIGIBLE_SSI",
+        "AMBIGUOUS_ROUTE",
+        "ELIGIBLE_COMPLETE_ROUTE"
+      ]
+    },
+    {
+      "id": "MT2-V1-MAP-012",
+      "variants": "SINGLE",
+      "outcomes": ["PROFILE_INCOMPLETE"]
+    },
+    {
+      "id": "MT2-V1-NOTREQ-013",
+      "variants": "A..D",
+      "outcomes": [
+        "BILATERAL_RELATIONSHIP_CONFIRMED",
+        "INVALID_UPSTREAM_CONTEXT"
+      ]
+    },
+    {
+      "id": "MT2-V1-CONFIG-014",
+      "variants": "SINGLE",
+      "outcomes": ["PROFILE_INCOMPLETE"]
+    },
+    {
+      "id": "MT2-V1-PRECEDENCE-015",
+      "variants": "A..B",
+      "outcomes": ["PROFILE_INCOMPLETE", "JURISDICTION_NOT_PERMITTED"]
+    },
+    {
+      "id": "MT2-V1-OPTIONS-016",
+      "variants": "SINGLE",
+      "outcomes": ["ELIGIBLE_COMPLETE_ROUTE", "PROFILE_INCOMPLETE"]
+    },
+    {
+      "id": "MT2-V1-SNAPSHOT-017",
+      "variants": "SINGLE",
+      "outcomes": ["STALE"]
+    },
+    {
+      "id": "MT2-V1-JURIS-018",
+      "variants": "A..G",
+      "outcomes": [
+        "ELIGIBLE_COMPLETE_ROUTE",
+        "JURISDICTION_NOT_PERMITTED",
+        "JURISDICTION_EVIDENCE_CONFLICT"
+      ]
+    },
+    {
+      "id": "MT2-V1-NONCOVER-019",
+      "variants": "A..C",
+      "outcomes": ["ELIGIBLE_COMPLETE_ROUTE", "INVALID_UPSTREAM_CONTEXT"]
+    },
+    {
+      "id": "MT2-V1-OWNACCT-020",
+      "variants": "A..F",
+      "outcomes": ["ELIGIBLE_COMPLETE_ROUTE", "PROFILE_INCOMPLETE"]
+    },
+    {
+      "id": "MT2-V1-C81-021",
+      "variants": "A..D",
+      "profileMatrix": true,
+      "outcomes": ["ELIGIBLE_COMPLETE_ROUTE", "NO_ELIGIBLE_SSI"]
+    },
+    {
+      "id": "MT2-V1-C81-021",
+      "variants": "E..F",
+      "profileMatrix": true,
+      "outcomes": ["ELIGIBLE_COMPLETE_ROUTE", "NO_ELIGIBLE_SSI"]
+    }
+  ]
+}

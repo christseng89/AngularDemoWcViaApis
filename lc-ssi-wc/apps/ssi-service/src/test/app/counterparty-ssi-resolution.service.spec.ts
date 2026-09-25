@@ -102,8 +102,10 @@ describe("CounterpartySsiResolutionService", () => {
     );
     expect(result?.["mx"]).toMatchObject({
       httpStatus: 422,
-      code: "PROFILE_INCOMPLETE",
+      code: "INVALID_UPSTREAM_CONTEXT",
       payloadGenerated: false,
+      ssiApplicability: "NOT_EVALUATED",
+      resolutionOutcome: "INVALID_UPSTREAM_CONTEXT",
     });
   });
 
@@ -242,13 +244,18 @@ describe("CounterpartySsiResolutionService", () => {
   it("returns the MT C81 envelope rather than emitting a partial route", () => {
     expect(
       service.resolve(request, { "56A": "HSBCHKHH", "57A": null }),
-    ).toEqual({
+    ).toMatchObject({
+      profileKind: "SSI_RESOLUTION_ONLY",
+      paymentExecutable: false,
+      payloadGenerated: false,
+      confirmedResolutionCreated: false,
+      repairQueueCreated: false,
+      ssiApplicability: "REQUIRED",
+      resolutionOutcome: "OPTION_CONSTRAINT_VIOLATION",
       mx: {
         httpStatus: 422,
         code: "OPTION_CONSTRAINT_VIOLATION",
-        redirectDomain: null,
         payloadGenerated: false,
-        detail: "",
       },
       mt: { validation: "FAIL", error: "C81" },
     });
@@ -339,8 +346,8 @@ describe("CounterpartySsiResolutionService", () => {
       "PROFILE_INCOMPLETE",
     ],
     ["MT202COV", { missing: ["B.50a"] }, "MESSAGE_CONTEXT_MISSING"],
-    ["MT202COV", { coverSequenceB: null }, "MESSAGE_CONTEXT_MISSING"],
-    ["MT202COV", { block3: { "119": "CORE" } }, "PROFILE_INCOMPLETE"],
+    ["MT202COV", { coverSequenceB: null }, "INVALID_UPSTREAM_CONTEXT"],
+    ["MT202COV", { block3: { "119": "CORE" } }, "INVALID_UPSTREAM_CONTEXT"],
     ["MT202COV", { sequenceB: { "59": "X" } }, "MESSAGE_CONTEXT_MISSING"],
     ["MT202COV", { sequenceB: { "50A": "X" } }, "MESSAGE_CONTEXT_MISSING"],
     [
@@ -358,7 +365,7 @@ describe("CounterpartySsiResolutionService", () => {
     [
       "MT202COV",
       { underlyingCustomerCreditTransfer: false },
-      "PROFILE_INCOMPLETE",
+      "INVALID_UPSTREAM_CONTEXT",
     ],
     ["MT202COV", { before: "x", after: "y" }, "OPTION_CONSTRAINT_VIOLATION"],
     ["MT202COV", { modified: ["B.50A"] }, "OPTION_CONSTRAINT_VIOLATION"],

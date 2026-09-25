@@ -31,6 +31,10 @@ describe("RuntimeSettingsController", () => {
       authorizationToken,
       file,
     })),
+    evidence: jest.fn((password: string) => ({
+      passwordAccepted: password === "entered",
+      currentSnapshot: { sha256: "b".repeat(64), method: "LOGICAL" },
+    })),
   } as unknown as DevelopmentDataReloadService;
   const controller = new RuntimeSettingsController(reloadService);
 
@@ -83,6 +87,17 @@ describe("RuntimeSettingsController", () => {
       originalName: "selected.seed.json",
       buffer: Buffer.from("{}"),
     });
+  });
+
+  it("returns password-protected QA evidence without adding it to ordinary Settings status", () => {
+    expect(controller.runtime()).not.toHaveProperty("currentSnapshot");
+    expect(controller.developmentDataEvidence({ password: "entered" })).toEqual(
+      {
+        passwordAccepted: true,
+        currentSnapshot: { sha256: "b".repeat(64), method: "LOGICAL" },
+      },
+    );
+    expect(reloadService.evidence).toHaveBeenCalledWith("entered");
   });
 
   it("cancels a pending one-time reload authorization", () => {

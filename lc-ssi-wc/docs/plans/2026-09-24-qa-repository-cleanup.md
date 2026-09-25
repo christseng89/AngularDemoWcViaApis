@@ -24,7 +24,7 @@
 
 **Files:**
 
-- Move current family fixtures to `qa/fixtures/<family>/`.
+- Move current family fixtures to `data/qa/<family>/`.
 - Move executable QA runners/oracles to `qa/tests/<scope>/`.
 - Move controlled TDD files to `qa/tdd/<family>/`.
 - Move only current summary evidence to `qa/reports/latest/<family>/`.

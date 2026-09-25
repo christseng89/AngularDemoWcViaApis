@@ -1364,7 +1364,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT300-001@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "b006b443-a420-542d-9b01-a9a85a570d52",
@@ -1492,7 +1492,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT300-002@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "41301d25-d09c-56f4-980d-4aa298b014c2",
@@ -1576,7 +1576,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT300-003@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "b11eb36e-4b91-5f52-86dd-b119f9bcf82f",
@@ -1660,7 +1660,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT300-004@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "105b1a3c-c40a-559c-b5fa-6ad986c323ac",
@@ -1749,7 +1749,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT300-005@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "1d4f5f4a-23ff-5ba7-b5ba-17d0b84b5827",
@@ -1900,7 +1900,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT300-006@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "41714b20-c566-542b-b61f-1b7a155801ed",
@@ -2052,7 +2052,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT300-007@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "a94d1a96-e283-5087-b2de-7e388e9eb72b",
@@ -2136,7 +2136,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT300-008@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "31fb022a-1272-5515-9778-5939fdbd16dc",
@@ -2220,7 +2220,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT300-009@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "705a550b-605d-5c38-b706-ecfa3e9c485b",
@@ -2309,7 +2309,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT300-010@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "4a780ec2-d95f-5c3f-898d-f018b5329d3c",
@@ -2460,7 +2460,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT300-011@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "41d3fb5e-e787-5565-875a-37643167d576",
@@ -2612,7 +2612,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT300-012@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "d4af05e3-cefe-5bb9-aae5-6c1d4f3a8c23",
@@ -2696,7 +2696,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT300-013@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "f34b9973-84af-5817-b4d1-ffae43bfeebe",
@@ -2780,7 +2780,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT300-014@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "78ef238c-ff99-56a5-a2eb-955d5d021d35",
@@ -2869,7 +2869,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT300-015@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "d3f1c5cf-70cc-5398-8498-362a46669115",
@@ -3001,7 +3001,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT304-001@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "e570ce30-b01a-512f-a826-5307d98458a2",
@@ -3129,7 +3129,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT304-002@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "56028ca7-dc7c-5d44-82c9-de4f54e63657",
@@ -3213,7 +3213,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT304-003@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "5d292148-c4c8-5259-8212-9bd98a10802b",
@@ -3297,7 +3297,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT304-004@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "9ff0b29b-947b-5230-9a00-f38ce66bcbcf",
@@ -3386,7 +3386,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT304-005@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "c5cbab7a-be9d-5fcd-85cc-7bdbe5e5fc04",
@@ -3537,7 +3537,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT304-006@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "7a3f49fd-bdc4-59fe-ba91-c50d43145dfa",
@@ -3689,7 +3689,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT304-007@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "a1a67d02-1d3a-570a-ac85-de99ab6d2baa",
@@ -3773,7 +3773,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT304-008@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "1d2c7893-3051-5a52-afc1-4c1429f2af6e",
@@ -3857,7 +3857,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT304-009@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "4f2a670a-f23e-5ca6-bd25-e078924fb2b9",
@@ -3946,7 +3946,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT304-010@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "292ecb9c-d1c7-552c-8157-ef5bef0f3a55",
@@ -4097,7 +4097,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT304-011@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "37c4fde8-be44-545b-ab9c-9d4b21dee50c",
@@ -4249,7 +4249,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT304-012@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "197bf109-5275-540f-9128-03b471e08da1",
@@ -4333,7 +4333,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT304-013@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "b1f69cc7-0537-5373-9c4b-57017f93efa7",
@@ -4417,7 +4417,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT304-014@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "7d88c646-32ff-51f4-acec-8849abf383c4",
@@ -4506,7 +4506,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT304-015@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "bcade199-7ec9-540f-84fd-20e9d9204457",
@@ -4638,7 +4638,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT305-001@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "900b46ab-96bf-505c-9208-8122066435d3",
@@ -4766,7 +4766,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT305-002@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "fab01759-710b-55c1-afb1-bba041d3d371",
@@ -4850,7 +4850,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT305-003@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "fb1b13f8-9508-565d-a922-c72445036081",
@@ -4934,7 +4934,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT305-004@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "5bf1f730-38b2-5e61-9f36-1e26cc3ba247",
@@ -5023,7 +5023,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT305-005@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "79835cbc-1943-5e40-a803-8f976f4fa572",
@@ -5174,7 +5174,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT306-001@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "095f7312-2353-5f11-9726-9adb21b4c1ee",
@@ -5326,7 +5326,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT306-002@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "56958b92-385e-596d-b36c-8b1aa710b0ea",
@@ -5410,7 +5410,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT306-003@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "437de773-8085-5431-ac6a-b60a85cb17bb",
@@ -5494,7 +5494,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT306-004@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "3898b2ed-7460-5e02-9c02-cf7f5293c43f",
@@ -5583,7 +5583,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT306-005@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "0c3c9111-a5ce-58d0-8576-79388918a382",
@@ -5684,7 +5684,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT306-006@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "296f8ac2-3d93-556e-ba1e-e1f7e09300ab",
@@ -5830,7 +5830,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT306-007@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "33b73c76-ff2d-5162-8afe-3fb9a7aeae4f",
@@ -5982,7 +5982,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT306-008@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "3d89ced2-84d1-54d1-b682-5ec01fb74df3",
@@ -6066,7 +6066,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT306-009@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "b37d7a3c-da99-52fc-8e5f-26b13d22db49",
@@ -6150,7 +6150,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT306-010@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "2a07516b-8aa8-58eb-9cb2-9f698f17b9e5",
@@ -6239,7 +6239,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT306-011@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "1e188ce2-8a52-5097-9119-22e0dbd71b78",
@@ -6340,7 +6340,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT306-012@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "55550eaa-63f3-5639-baca-dc2afc3abf12",
@@ -6467,7 +6467,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT306-013@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "ac71cff3-79a7-5e1f-9346-73927f17f1bf",
@@ -6595,7 +6595,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT306-014@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "535fd73a-e749-5d1e-a4bc-52c1d17f5d65",
@@ -6679,7 +6679,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT306-015@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "5d17c965-d763-5190-b6e2-46270b451d50",
@@ -6763,7 +6763,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT306-016@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "21abcec9-9cf6-53e4-90ba-86c2d5569ccc",
@@ -6852,7 +6852,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT306-017@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "dc9126b4-b905-518c-ad10-9dde56ab1348",
@@ -6953,7 +6953,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT306-018@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "a19bc03a-6372-56d6-a40e-3003ffd99c6c",
@@ -7099,7 +7099,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT320-001@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "05424953-041c-5822-a83c-0bddc147c743",
@@ -7251,7 +7251,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT320-002@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "ab740092-98aa-5208-9408-ec5d5d0d35ad",
@@ -7335,7 +7335,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT320-003@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "eb59e2df-e26f-51ce-96ae-0e0da140b9de",
@@ -7419,7 +7419,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT320-004@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "1d4739fc-166e-5a90-aec4-f7697e89d1bf",
@@ -7508,7 +7508,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT320-005@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "11263aa3-9114-5e10-b46a-7d379040145c",
@@ -7609,7 +7609,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT320-006@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "5bf5a7c7-e19b-570b-acde-1a25100ec1c8",
@@ -7755,7 +7755,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT320-007@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "edeaedfa-e417-5e89-80d4-1394af7848d1",
@@ -7907,7 +7907,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT320-008@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "36448874-b8c6-536f-89e3-daf4aa3c0830",
@@ -7991,7 +7991,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT320-009@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "95993a5a-da52-5c1e-90e6-19764534e9a6",
@@ -8075,7 +8075,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT320-010@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "a1952d06-7c6d-5716-b40c-9d975c581dff",
@@ -8164,7 +8164,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT320-011@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "96f68bd3-44da-5439-9be4-88cef41e1142",
@@ -8265,7 +8265,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT320-012@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "d3b47e9b-db35-5b51-b3a6-aae894022d9d",
@@ -8411,7 +8411,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT320-013@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "1699d960-c66c-51f4-984c-69b26e4a8f1d",
@@ -8563,7 +8563,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT320-014@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "27109afb-0bbe-599e-b150-f99f39635a50",
@@ -8647,7 +8647,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT320-015@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "f14842d7-be30-5481-bddf-e3b25a90aa21",
@@ -8731,7 +8731,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT320-016@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "746da3f0-e3aa-52fd-951e-958663ab247b",
@@ -8820,7 +8820,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT320-017@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "2e339bff-ba3b-5296-a36d-7c423ab17854",
@@ -8921,7 +8921,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT320-018@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "85231a0e-b43a-5e94-a3e7-89379bccf1be",
@@ -9067,7 +9067,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT320-019@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "c8f9bad1-c93c-503e-a7fe-d34f86924e8b",
@@ -9219,7 +9219,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT320-020@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "03789d53-d1a0-53fd-b648-a15bf7eb832b",
@@ -9303,7 +9303,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT320-021@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "c0e7a747-e35b-515d-b64f-c1cbaa4a1ef0",
@@ -9387,7 +9387,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT320-022@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "6f6eb23c-c5bc-5d3c-a6ac-09335e7d627e",
@@ -9476,7 +9476,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT320-023@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "b2456e98-fbf6-5683-9152-b7c7587b2741",
@@ -9577,7 +9577,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT320-024@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "a6051ff4-243a-514b-bb41-c59be0c3da76",
@@ -9704,7 +9704,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT320-025@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "9e1ee2bf-3843-5899-b6d4-eea8738cb519",
@@ -9832,7 +9832,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT320-026@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "15f6cbe9-ad28-59d4-9e57-b877f5073f17",
@@ -9916,7 +9916,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT320-027@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "529661e6-9a4d-58cb-9980-9fc15804e9d8",
@@ -10000,7 +10000,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT320-028@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "1912c10c-f9de-5322-8038-37ce9b32806a",
@@ -10089,7 +10089,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT320-029@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "a234280a-ee36-5520-abe9-710c29c9f42f",
@@ -10190,7 +10190,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT320-030@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "1ff6b25b-cdea-58cc-b085-68f3d04327a7",
@@ -10336,7 +10336,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT330-001@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "3c69a79a-372a-51dc-9f66-28184fc59437",
@@ -10488,7 +10488,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT330-002@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "81664bc1-d5c6-5759-9cd0-2798d17a5240",
@@ -10572,7 +10572,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT330-003@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "ef9299f8-020d-513a-88d7-f50cfe0f095a",
@@ -10656,7 +10656,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT330-004@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "1fa50f23-557b-54c4-a1d1-50bb3d89d678",
@@ -10745,7 +10745,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT330-005@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "f7c710b8-9aa6-59a1-b8f3-4a2446efde64",
@@ -10846,7 +10846,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT330-006@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "a3f7d14e-6337-5fc8-ba56-7d81f4642523",
@@ -10992,7 +10992,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT330-007@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "2175332c-8601-5cc8-9244-e1ef9c30e011",
@@ -11144,7 +11144,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT330-008@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "b8a8c304-4295-5ccf-9bf5-27393a787c7c",
@@ -11228,7 +11228,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT330-009@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "69892abe-2d15-552c-8f00-f93d34025775",
@@ -11312,7 +11312,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT330-010@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "590ff4fd-8b83-5220-aac4-d8f4ca7b66b0",
@@ -11401,7 +11401,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT330-011@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "18446a2f-0a38-5b7e-90c9-1efafd22e99d",
@@ -11502,7 +11502,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT330-012@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "27b20814-c799-59da-96f9-90e015ee6130",
@@ -11648,7 +11648,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT330-013@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "1348e8f6-597f-538a-a2a2-405992f2f4a0",
@@ -11800,7 +11800,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT330-014@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "49a8b402-3b89-5916-abf2-1e2555d472de",
@@ -11884,7 +11884,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT330-015@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "d2a8d438-51a9-5176-bc09-7978c6ca8797",
@@ -11968,7 +11968,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT330-016@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "fdf6d2f9-cd6e-55a8-ac5a-9af43cd0b86b",
@@ -12057,7 +12057,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT330-017@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "3b231d1a-5110-507f-a145-ce010d907349",
@@ -12158,7 +12158,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT330-018@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "754356d2-e5a7-566b-a1c1-cee70b166fb4",
@@ -12304,7 +12304,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT330-019@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "1872c264-3721-5884-bf6d-cd6a65f54b15",
@@ -12456,7 +12456,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT330-020@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "e8016d2f-f811-5065-97ea-d7d200bb0fbd",
@@ -12540,7 +12540,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT330-021@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "30eab7a5-b045-549d-8665-dce544e76f18",
@@ -12624,7 +12624,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT330-022@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "725b1039-5919-5902-81ca-8cd8b2c1f2bc",
@@ -12713,7 +12713,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT330-023@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "55363e0a-664e-5edd-95fe-97571c8d2f00",
@@ -12814,7 +12814,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT330-024@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "fc29a789-9595-5316-88a2-ba13f5c06422",
@@ -12960,7 +12960,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT340-001@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "960249a2-e1bf-55a5-977b-acb35085d884",
@@ -13112,7 +13112,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT340-002@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "6e8e6067-ab92-5042-99fc-99926da01e73",
@@ -13196,7 +13196,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT340-003@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "3acadf9a-e516-52fb-9b95-004ae5b6163b",
@@ -13280,7 +13280,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT340-004@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "960bd20f-3f71-55a6-bc5c-fd05ce38fe02",
@@ -13369,7 +13369,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT340-005@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "8db2783e-5123-5081-8dc0-f4f1a0bb9d18",
@@ -13470,7 +13470,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT340-006@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "246f39d4-fcb4-52d5-aee9-01d0b0eb7d6a",
@@ -13616,7 +13616,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT340-007@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "b8a034ce-755c-5110-9a1b-b207526aecd0",
@@ -13768,7 +13768,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT340-008@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "3365cff7-8154-5f68-a5ba-c69dfd3c77e2",
@@ -13852,7 +13852,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT340-009@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "2ec62d59-73eb-5b6d-930f-320c74f19548",
@@ -13936,7 +13936,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT340-010@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "dd522bf2-9b1b-5a01-9c46-23aaf8a718da",
@@ -14025,7 +14025,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT340-011@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "5fc60c88-1fc7-5873-bda0-3023a1afca75",
@@ -14126,7 +14126,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT340-012@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "af84974a-b72e-5693-8b7d-316a506f005a",
@@ -14253,7 +14253,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT340-013@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "17fe9e69-1e62-5a07-8eed-3c2b248e0871",
@@ -14381,7 +14381,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT340-014@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "618e656a-eee2-5677-8ed4-d98e1910f519",
@@ -14465,7 +14465,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT340-015@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "c1a1c32b-2178-52c8-ab5e-9f716916c40f",
@@ -14549,7 +14549,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT340-016@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "8dcfd8c2-be09-5dac-ae89-37b476bb2b40",
@@ -14638,7 +14638,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT340-017@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "240b64d0-7f62-554d-ae21-9173a02dd0c8",
@@ -14739,7 +14739,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT340-018@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "c585b7d7-e354-58fe-8f58-e744e98a4780",
@@ -14885,7 +14885,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT341-001@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "a145cb00-64d8-5604-b4a3-08a662d48608",
@@ -15037,7 +15037,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT341-002@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "63d7a591-9d9a-50c3-a584-8a507c59ee3a",
@@ -15121,7 +15121,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT341-003@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "714a80c3-fbde-5b2b-b60d-1a8ed1869c93",
@@ -15205,7 +15205,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT341-004@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "166dfe09-e4e5-551c-a146-238eb15a9d1d",
@@ -15294,7 +15294,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT341-005@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "ea11e2fc-116b-5d66-a250-1c7f36c39f9a",
@@ -15395,7 +15395,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT341-006@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "bfcdd3e6-61cb-5d3b-ab5f-a46c4adc6847",
@@ -15541,7 +15541,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT350-001@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "cb4cb7ac-b47d-56e8-9eaf-2526795a1ae3",
@@ -15693,7 +15693,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT350-002@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "2ba75ae8-82ce-5be0-b8b6-500e53b067c0",
@@ -15777,7 +15777,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT350-003@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "8657f556-dcda-51c5-b1c8-b16e2512a6b6",
@@ -15861,7 +15861,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT350-004@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "806e2523-1896-5981-9c49-d311845be2e9",
@@ -15950,7 +15950,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT350-005@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "acb2cab0-25ed-5b66-ab42-a9f2d117299d",
@@ -16051,7 +16051,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT350-006@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "74a158b6-a39b-55ec-8e85-012cffee2250",
@@ -16178,7 +16178,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT360-001@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "b014cbdd-d2eb-592f-86d8-72c0d56f1f70",
@@ -16306,7 +16306,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT360-002@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "c7ffe8a4-bc85-5cb2-8ca9-d449804efe9b",
@@ -16390,7 +16390,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT360-003@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "222315e9-0abf-5ea1-8365-98a622739a71",
@@ -16474,7 +16474,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT360-004@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "5c78201a-d421-5b92-835f-432d46ab452a",
@@ -16563,7 +16563,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT360-005@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "32c91c67-17c5-50d7-aaf5-cce82b048da7",
@@ -16664,7 +16664,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT360-006@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "ece26aa6-6ab0-5ea3-8210-747ac5fed1bc",
@@ -16748,7 +16748,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT360-007@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "a8594cba-24cb-5fc9-bc47-8de09c6f5980",
@@ -16875,7 +16875,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT360-008@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "bb451fb2-81a6-55a2-9f52-1b874ff2ddab",
@@ -17003,7 +17003,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT360-009@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "0b4bf7c5-e325-59dd-97cb-77d225d4d804",
@@ -17087,7 +17087,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT360-010@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "837839dc-97a6-501f-80be-b9111df1a314",
@@ -17171,7 +17171,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT360-011@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "d5246f7a-6275-5c32-95cc-a4249728c281",
@@ -17260,7 +17260,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT360-012@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "1305d9b6-9c32-5aff-955a-7339c2af0bfb",
@@ -17361,7 +17361,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT360-013@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "37d403e4-7a20-5e5c-a9b8-1545848848b5",
@@ -17445,7 +17445,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT360-014@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "f8990430-7424-5d38-9105-bdfa38e47391",
@@ -17572,7 +17572,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT360-015@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "e8a0f697-0318-5084-8d3a-6b72fbe2954a",
@@ -17700,7 +17700,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT360-016@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "80a77424-61c6-5e42-87c4-d4f9a051fb66",
@@ -17784,7 +17784,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT360-017@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "29ddf87e-fb47-590f-954a-65500661516f",
@@ -17868,7 +17868,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT360-018@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "e8752d69-dba7-5e04-9b81-ed4ae8929ab5",
@@ -17957,7 +17957,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT360-019@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "f9d38065-d18b-5734-bd5d-181fdd9c8705",
@@ -18058,7 +18058,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT360-020@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "0b568798-c836-5baf-9aa8-d54b66e077b9",
@@ -18155,7 +18155,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT360-021@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "53e37326-9c2a-5bf9-83c4-cdc26d3785df",
@@ -18282,7 +18282,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT360-022@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "b0781077-123c-5477-8918-7a64e076e71a",
@@ -18410,7 +18410,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT360-023@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "9dee4918-e81c-5db8-834c-7614a4a5f793",
@@ -18494,7 +18494,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT360-024@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "d0f27ba6-a647-517f-8560-2a5d04e307fc",
@@ -18578,7 +18578,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT360-025@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "0c7d6039-4db4-5d20-b602-54c17b574043",
@@ -18667,7 +18667,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT360-026@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "17626e3f-0e1e-548c-8b0f-32ec5891e65c",
@@ -18768,7 +18768,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT360-027@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "d40a89c9-3d2e-5dc3-816d-b529050e1a7c",
@@ -18865,7 +18865,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT360-028@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "0eee4eed-8357-59e6-be0a-7de03938f1d0",
@@ -18992,7 +18992,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT361-001@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "c0876029-f4d4-5d78-a794-d8edaf9d624a",
@@ -19120,7 +19120,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT361-002@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "f18d6849-4908-5b3b-bd84-5d560d8edf84",
@@ -19204,7 +19204,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT361-003@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "8cbd544d-a339-51a9-ba4b-e37591fac750",
@@ -19288,7 +19288,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT361-004@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "9185675a-3bf6-544c-a011-30c691f7957f",
@@ -19377,7 +19377,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT361-005@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "3648625c-0f2e-5fcc-ae75-f9df09daa290",
@@ -19478,7 +19478,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT361-006@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "4c601b6d-b628-597b-b939-760fd8f32229",
@@ -19562,7 +19562,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT361-007@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "861cc092-a569-59b5-a1fd-3ccaffed4647",
@@ -19689,7 +19689,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT361-008@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "8a6b7ee4-c0d4-5440-97b7-0acb61aa3dc1",
@@ -19817,7 +19817,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT361-009@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "aa4f48fb-fa2b-5623-bf21-575e9d33fa50",
@@ -19901,7 +19901,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT361-010@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "c06a6413-3368-5736-994d-4cbeefa3d5a1",
@@ -19985,7 +19985,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT361-011@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "11666800-cd5c-5c6d-b851-e9e49e704083",
@@ -20074,7 +20074,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT361-012@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "46a4def5-94be-5435-b5b0-49271039cc04",
@@ -20175,7 +20175,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT361-013@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "0c2e7b70-02dc-5c3a-9eff-4892dbf5c05e",
@@ -20259,7 +20259,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT361-014@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "57c38422-a53b-500a-8baf-61eabb849d59",
@@ -20386,7 +20386,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT361-015@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "97ef854b-3ead-5d4b-9391-38b77e720047",
@@ -20514,7 +20514,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT361-016@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "1dc8a2fb-c801-5d22-b80e-02c0db504fdc",
@@ -20598,7 +20598,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT361-017@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "43887968-b267-5b3a-b70d-04ad053fed3b",
@@ -20682,7 +20682,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT361-018@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "de5aaae8-ee8f-578a-82b9-b1c78c8da742",
@@ -20771,7 +20771,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT361-019@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "b8748d52-a303-5e2b-94df-328ffcd8d30a",
@@ -20872,7 +20872,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT361-020@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "a014e308-0a77-5f5e-9181-9a905059eff0",
@@ -20956,7 +20956,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT361-021@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "9913d391-6a45-5521-890b-b410f9b99570",
@@ -21083,7 +21083,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT361-022@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "94096ea2-b93c-5e4f-b9cb-dd84cd9bc285",
@@ -21211,7 +21211,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT361-023@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "871e8e8a-a96f-5c81-8749-028a278c3a1f",
@@ -21295,7 +21295,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT361-024@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "7c65dc8d-87d8-5f06-b0c4-8a5b9e6e53a4",
@@ -21379,7 +21379,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT361-025@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "a5612bff-aa76-54c3-8593-9c8f1f188b55",
@@ -21468,7 +21468,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT361-026@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "4d5a396d-4dc5-5425-b1ed-5514d05ed2da",
@@ -21569,7 +21569,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT361-027@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "a17a04b1-a80c-5869-86a8-b2445cac3572",
@@ -21653,7 +21653,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT361-028@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "d48b993a-ca6c-5059-bfe6-7e3e3d297faf",
@@ -21780,7 +21780,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT361-029@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "ae249bfb-31bd-5258-8051-1c5ec36503bc",
@@ -21908,7 +21908,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT361-030@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "fd6cc2ba-0a1c-5db6-93b4-fb24e75aeedd",
@@ -21992,7 +21992,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT361-031@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "05bdf777-08f5-5cd5-9434-24b25d19b58c",
@@ -22076,7 +22076,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT361-032@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "c0052b28-62a6-5095-bd7b-1d424fb48a11",
@@ -22165,7 +22165,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT361-033@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "17e0b297-7236-5d1f-b0ea-0641cca6929c",
@@ -22266,7 +22266,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT361-034@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "c52409e1-a3f1-5e7a-9af8-e051db01fd20",
@@ -22363,7 +22363,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT361-035@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "399b4db4-73c2-5b1e-9aa6-3ca622fd7f84",
@@ -22490,7 +22490,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT361-036@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "ee0d0c05-3bfb-5243-991a-4cca362e0f65",
@@ -22618,7 +22618,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT361-037@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "fa4e99e4-a8bb-5215-97d5-cd4b2e1f03f5",
@@ -22702,7 +22702,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT361-038@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "71b322f0-ca61-536b-82f0-de240f342066",
@@ -22786,7 +22786,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT361-039@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "be505d56-4649-58ac-9436-1cf34d22f42f",
@@ -22875,7 +22875,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT361-040@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "d8660484-8090-5c98-a14d-332d896fbf93",
@@ -22976,7 +22976,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT361-041@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "0a1326c9-6636-57d9-b3e5-a282d0c55f44",
@@ -23073,7 +23073,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT361-042@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "b5885cfd-6fa1-57ec-b1b0-2607dabca450",
@@ -23200,7 +23200,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT362-001@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "ef692079-55b9-58d3-bd31-345301ff0a33",
@@ -23328,7 +23328,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT362-002@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "3e2e2ac3-f638-5290-890f-47df49cc5287",
@@ -23412,7 +23412,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT362-003@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "7199cce8-e3f5-598d-a067-064f54d97236",
@@ -23496,7 +23496,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT362-004@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "3f9841c5-17a3-59fa-a150-a2c68d390a1f",
@@ -23585,7 +23585,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT362-005@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "bd33027e-bb61-51ad-a1e7-59dec2e1d7da",
@@ -23686,7 +23686,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT362-006@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "6397606b-43c8-56a9-9d31-afa505064150",
@@ -23784,7 +23784,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT362-007@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "526b546a-c1b6-5e81-b239-49fba2bf9e98",
@@ -23911,7 +23911,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT362-008@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "57856ae3-08e4-5ee5-9679-da9b6e993010",
@@ -24039,7 +24039,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT362-009@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "f5134dc0-5071-5c5c-ba4c-61ec45dd4fa8",
@@ -24123,7 +24123,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT362-010@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "e1afccac-e922-5441-9bc4-4a458cb5825a",
@@ -24207,7 +24207,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT362-011@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "3860e54b-c6cc-5e25-a59a-22cc56cc61ba",
@@ -24296,7 +24296,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT362-012@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "1bb64742-cf43-53d9-a8e8-9e5e0be96907",
@@ -24397,7 +24397,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT362-013@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "45727e69-4da3-54eb-baf0-efcd91c0c1c2",
@@ -24495,7 +24495,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT362-014@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "a76d0f43-6d67-585f-9910-03d720531fc0",
@@ -24622,7 +24622,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT364-001@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "f1c3da28-3c58-5485-934f-1b7cbec6e4b8",
@@ -24750,7 +24750,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT364-002@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "b35f2c7d-8634-5ba7-a762-b63fe18a5185",
@@ -24834,7 +24834,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT364-003@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "1e718568-4005-51a2-ae74-61ca1671d34e",
@@ -24918,7 +24918,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT364-004@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "1bb0b01e-804a-583b-9137-3b9af8c234e6",
@@ -25007,7 +25007,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT364-005@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "602fc131-7b5a-5af2-a759-211c0aecffe3",
@@ -25108,7 +25108,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT364-006@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "01439488-f3a9-57dd-85cd-38bba2f635d9",
@@ -25235,7 +25235,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT364-007@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "162e5924-ac7c-5b0c-8bd9-e001f11782b2",
@@ -25363,7 +25363,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT364-008@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "72011a6a-c2d3-56a7-b51a-637cdb1c0a66",
@@ -25447,7 +25447,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT364-009@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "ffabaf8f-85ae-54a2-ab68-d879cf303b81",
@@ -25531,7 +25531,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT364-010@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "a2e8838a-37fc-59f6-9312-29f983609f6b",
@@ -25620,7 +25620,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT364-011@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "877ae68a-e573-5990-97ad-741c7336722e",
@@ -25721,7 +25721,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT364-012@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "d3f5d838-429b-5d0c-8c3c-42a4ca2ead83",
@@ -25848,7 +25848,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT365-001@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "315f0b14-a99e-55f2-b361-fc1ec8f1a238",
@@ -25976,7 +25976,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT365-002@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "997cf472-0b25-54e6-9a80-094def2df519",
@@ -26060,7 +26060,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT365-003@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "2446f062-b3ad-5256-8424-bb96282807b6",
@@ -26144,7 +26144,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT365-004@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "c6362d78-909d-5aab-b6e5-bf3d3317f148",
@@ -26233,7 +26233,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT365-005@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "be277a3e-71c8-55f7-bd1e-e60dfbe5b9dc",
@@ -26334,7 +26334,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT365-006@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "57acf0fd-a3d4-5151-8f02-c19a244df332",
@@ -26461,7 +26461,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT365-007@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "a03c111d-084b-588e-b2b7-fea5a91e5970",
@@ -26589,7 +26589,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT365-008@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "4510d277-e548-5d64-ae76-2dae0701e123",
@@ -26673,7 +26673,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT365-009@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "b62b6a03-6cfa-5be5-8ca9-672e2a4bfb19",
@@ -26757,7 +26757,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT365-010@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "deb834a0-e585-5065-83c0-71f88aba8c27",
@@ -26846,7 +26846,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT365-011@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "28d1f2c0-988f-5412-b159-a7e08add2421",
@@ -26947,7 +26947,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT365-012@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "19b030ee-9bcf-5d0b-a79d-8650531cbefc",
@@ -27074,7 +27074,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT365-013@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "e461f43e-37ae-5d5e-b8fd-86690b5388e2",
@@ -27202,7 +27202,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT365-014@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "8a7f7447-c15a-5394-9168-13e2e9f91c4c",
@@ -27286,7 +27286,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT365-015@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "659b4387-80a4-5beb-9f2b-c407bb91ccaa",
@@ -27370,7 +27370,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT365-016@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "83a10e2c-2f35-5216-992c-b908ab57556c",
@@ -27459,7 +27459,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT365-017@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "a7f51cf4-6ca8-56b1-9bc3-cd35ca2fa0f3",
@@ -27560,7 +27560,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT365-018@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "52fdac61-0dfe-5a3b-8bef-ba17db0ce8f2",
@@ -27687,7 +27687,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT365-019@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "a7da7061-0c32-51da-8f95-c17f04f73eba",
@@ -27815,7 +27815,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT365-020@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "a11392a6-4538-53c6-977f-6c2301606aff",
@@ -27899,7 +27899,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT365-021@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "fa25fee2-7984-534e-8607-a92e1c693e0d",
@@ -27983,7 +27983,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT365-022@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "f96db86c-c9d9-51b6-96b6-a139e48d8829",
@@ -28072,7 +28072,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT365-023@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "9c82f6fa-e06d-59a3-950e-bda5b532005f",
@@ -28173,7 +28173,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT365-024@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "74d610f3-c8d0-5923-ab90-4d2fe7465caf",
@@ -28319,7 +28319,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT400-001@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "9598419b-fc09-51c3-8f44-09ca0986151a",
@@ -28403,7 +28403,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT400-002@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "2abe03db-dc96-531e-ab8e-fb753fbaedad",
@@ -28487,7 +28487,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT400-003@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "d09806b5-0559-5249-877c-860c87bee40d",
@@ -28576,7 +28576,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT400-004@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "d9146149-8b9a-5f6e-ba05-d8df92f63467",
@@ -28693,7 +28693,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT730-001@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "195c497c-0b65-5e47-a8d2-ea828dfa50eb",
@@ -28777,7 +28777,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT730-002@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "eeea0f5e-dfdf-5159-82bc-3938110e9d2a",
@@ -28861,7 +28861,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT730-003@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "d28737c0-32d7-5ae4-8180-5bad23fcd34b",
@@ -28950,7 +28950,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT730-004@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "3051147e-5a20-52e4-939d-ad1399d38aa8",
@@ -29067,7 +29067,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT734-001@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "af158f2b-10d4-5722-960b-1efc99494d96",
@@ -29151,7 +29151,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT734-002@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "d982c1cc-2470-50dc-a49c-2763425d9d35",
@@ -29235,7 +29235,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT734-003@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "bad4347b-ce1d-52b9-bd19-56f25b1294a8",
@@ -29324,7 +29324,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT734-004@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "29ca672e-5918-52b1-aaa1-4b665b6426c8",
@@ -29441,7 +29441,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT742-001@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "11ea2c9e-fd05-5c52-9551-84dfe024c71d",
@@ -29525,7 +29525,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT742-002@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "6b9bf33a-7327-5fa3-86b8-c9cb317c3199",
@@ -29609,7 +29609,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT742-003@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "711342e1-2d0f-54e4-9e9f-a66f58a5a7d4",
@@ -29698,7 +29698,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT742-004@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "d756c7f9-09c1-5c9c-ae52-f52888e4601c",
@@ -29815,7 +29815,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT750-001@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "2a1526fc-cdf2-5b96-b041-35de70a5a633",
@@ -29899,7 +29899,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT750-002@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "fb705130-aba8-5084-a876-b457e9b11b73",
@@ -29983,7 +29983,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT750-003@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "95255886-9c85-5e25-b4e2-9d8c17ff8e1d",
@@ -30072,7 +30072,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT750-004@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "55fcb509-34da-54e5-80ca-f1d301064790",
@@ -30204,7 +30204,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT752-001@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "26bc9e3f-05f4-555f-ac00-2e0384d3c09d",
@@ -30288,7 +30288,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT752-002@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "beb715d7-f8df-51b5-b917-eb1452ce1c7b",
@@ -30372,7 +30372,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT752-003@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "5af91590-dfc3-5175-80e1-9cc7f47d2408",
@@ -30461,7 +30461,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT752-004@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "b03cb126-db75-5d85-83a2-4c8959710243",
@@ -30578,7 +30578,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT754-001@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "512fd063-233b-5a78-832b-1cb853ab3c1f",
@@ -30662,7 +30662,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT754-002@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "08d10d41-380e-5c0d-9bc4-c4774a7af556",
@@ -30746,7 +30746,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT754-003@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "ec25c6fc-c6bb-5b5d-b2ab-79ead3836694",
@@ -30835,7 +30835,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT754-004@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "e692420d-6ec9-597e-9943-6835c78ee352",
@@ -30967,7 +30967,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT756-001@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "f67c761f-f853-506a-a7e4-cf51ad1cde28",
@@ -31051,7 +31051,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT756-002@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "466849a9-2eff-5fef-810c-210d93bad27a",
@@ -31135,7 +31135,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT756-003@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "7d2d8be2-2e0f-5d03-8d00-ef3427b4c6a1",
@@ -31224,7 +31224,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT756-004@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "ae2153df-b997-51e5-80a6-5626ed926e11",
@@ -31341,7 +31341,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT765-001@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "4408e144-f8d6-589e-b8f6-0f036f104863",
@@ -31450,7 +31450,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT765-002@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "1a5cafaf-ea84-580d-bd91-ce8d306ff367",
@@ -31534,7 +31534,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT765-003@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "d5a3171c-ac1f-5474-8997-b06554529d4f",
@@ -31618,7 +31618,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT765-004@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "e403fd0d-f19a-595b-b0c6-5d9e5fa7104a",
@@ -31707,7 +31707,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT765-005@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "3af5fe34-672b-5fdf-b61c-642e0f721e97",
@@ -31824,7 +31824,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT768-001@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "d0e4e438-20d8-511d-bb55-c4af9eef9f12",
@@ -31908,7 +31908,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT768-002@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "30959339-334d-5f8c-9032-5e476c36c111",
@@ -31992,7 +31992,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT768-003@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "1e87b366-ceda-5844-b05e-1b204a9faaef",
@@ -32081,7 +32081,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT768-004@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "ba7f8c5b-3a61-52c2-bbe5-6e7ca38103da",
@@ -32198,7 +32198,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT769-001@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "0eb401fd-bfa2-537c-8d4a-9a6ed7b53ffb",
@@ -32282,7 +32282,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT769-002@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "323aa60d-c730-5b4b-8c0a-020cabc91035",
@@ -32366,7 +32366,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT769-003@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "c10f2c43-ed0d-57e3-9664-478774d347c5",
@@ -32455,7 +32455,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT769-004@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "21ba0104-8417-5593-b263-cfd1216dbff5",
@@ -32544,7 +32544,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT400-005@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "3eb66e1a-2412-5dae-8878-50da0fd1e81c",
@@ -32654,7 +32654,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT400-006@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "984bc15d-7e7c-5a83-966d-c790ab8137fd",
@@ -32738,7 +32738,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT730-005@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "ac232d18-5db7-5e77-b536-1725c744ff2a",
@@ -32847,7 +32847,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT730-006@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "58a30b01-a4a8-5183-a427-9f8c767d18ea",
@@ -32939,7 +32939,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT754-005@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "7612fd83-a88a-5b39-96a1-b837c5299a16",
@@ -33031,7 +33031,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT754-006@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "9e7cca2f-f88e-5946-8913-60c5bca54d4e",
@@ -33127,7 +33127,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT754-007@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "2fe4c1d7-3950-5ecd-951d-a1d0935add5b",
@@ -33211,7 +33211,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT768-005@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "bb9c1e53-d190-5b17-a030-ad2e3fefa75f",
@@ -33320,7 +33320,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT768-006@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "ee081ae8-249e-5a95-b376-8875237b7346",
@@ -33404,7 +33404,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT769-005@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "24cb4e78-745f-5c5e-8e21-ef9ced829545",
@@ -33513,7 +33513,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT769-006@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "5912d6a2-9881-5b42-acf6-1c3b8aed6d65",
@@ -33619,7 +33619,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT300-016@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "5de7f3bc-daf6-59aa-89f6-a3bf94794508",
@@ -33711,7 +33711,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT304-016@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "424eecd9-a84f-5f60-8cf3-16c0300f97c8",
@@ -33817,7 +33817,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT305-006@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "a258df01-7c1d-5370-b235-478369071e16",
@@ -33923,7 +33923,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT306-019@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "a3bcc694-c723-5ad0-ba6f-79c07faf74ab",
@@ -34029,7 +34029,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT320-031@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "a1f68302-ab40-5fee-939a-0b5e637eef1e",
@@ -34135,7 +34135,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT330-025@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "898b728e-d54a-5bf4-8a61-d2f0b5f53941",
@@ -34241,7 +34241,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT340-019@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "19aa884f-bab0-5075-97c9-518c759b7c5e",
@@ -34347,7 +34347,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT341-007@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "3181e997-d393-5f08-b81e-915253b1b7dc",
@@ -34453,7 +34453,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT350-007@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "63edb152-3a48-5a7d-a945-e2e8c4db3be0",
@@ -34559,7 +34559,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT360-029@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "753f7e02-8dab-5e40-a027-a14fc9a07d50",
@@ -34665,7 +34665,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT361-043@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "1853d0bc-ab30-5dec-ad8d-3670d27a4c5d",
@@ -34771,7 +34771,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT362-015@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "f53b75b2-1703-5086-b133-8f2e5dd43dee",
@@ -34877,7 +34877,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT364-013@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "326d9d07-ff83-507b-97f3-a81c83892131",
@@ -34983,7 +34983,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT365-025@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "60a01175-5aac-5f9c-b145-b9e14c9765d8",
@@ -35075,7 +35075,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT400-007@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "62d52c13-c41a-56ab-a2dc-1883a0440359",
@@ -35167,7 +35167,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT730-007@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "a6ea29ca-338d-50d4-b804-ed49e9503d9f",
@@ -35259,7 +35259,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT734-005@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "95919353-c033-52ee-b049-59c36686bad4",
@@ -35351,7 +35351,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT742-005@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "3eca0307-a5a0-5ca3-89a2-b184d51c1499",
@@ -35443,7 +35443,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT750-005@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "a8ad6261-43c3-5fc0-b9c2-1bb84289bf8c",
@@ -35535,7 +35535,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT752-005@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "f7af7ee4-eea5-5bae-9ebe-5eb1f4d4c796",
@@ -35627,7 +35627,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT754-008@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "84781e7f-f9fa-5609-8c3e-91bd78e5e204",
@@ -35719,7 +35719,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT756-005@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "2a72c87d-dc2d-5a90-89ca-7cf95f74a0df",
@@ -35811,7 +35811,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT765-006@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "221417b9-2666-569a-8e9d-f4b3db5c3b57",
@@ -35903,7 +35903,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT768-007@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "c260da0d-c8ac-58ac-b329-8fcba398a26b",
@@ -35995,7 +35995,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT769-007@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "ffc33473-e052-568f-be7b-f6e3b7444bc4",
@@ -36089,7 +36089,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT742-006@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "17fecba0-e053-5a6a-bd3c-8237e1a50739",
@@ -36191,7 +36191,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT742-007@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "ce079ff9-bd90-5acd-8343-c1c8ffce1850",
@@ -36275,7 +36275,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT742-008@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "d437d036-bde0-577c-a58f-d80f7f67d3ab",
@@ -36359,7 +36359,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT742-009@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "f4c6e8bb-7b71-52ab-b114-e0d6ef4d550e",
@@ -36448,7 +36448,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT742-010@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "4406994c-6149-5b49-8c6a-41a91cee00c4",
@@ -36532,7 +36532,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT742-011@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "e1cf61ed-47dd-5077-a9cb-5878133e2a28",
@@ -36624,7 +36624,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT742-012@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "e40fa4ef-7ea0-5488-b5b2-ce86007a4539",
@@ -36708,7 +36708,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT754-009@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "dc951608-641e-503d-a645-3f7f31699ec2",
@@ -36792,7 +36792,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT754-010@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "63d380e2-5e27-598d-bfdc-6ea177969798",
@@ -36891,7 +36891,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT754-011@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "4cb71de9-c041-59bc-98c9-f20b2c8c37be",
@@ -36983,7 +36983,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT754-012@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "c802d887-c60b-528e-a916-6319ca412bfe",
@@ -37075,7 +37075,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT756-006@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "c08b96d8-472d-57e5-bfdd-c950878cb1a3",
@@ -37159,7 +37159,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT756-007@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "4fbac20b-b813-52f0-9de1-a490e8a75862",
@@ -37243,7 +37243,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT756-008@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "291dbd16-3307-5187-8060-2319c24774e6",
@@ -37327,7 +37327,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT756-009@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "c72a1e24-1a40-5736-9eda-8196459f3fd8",
@@ -37411,7 +37411,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT756-010@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "b75a7892-2034-5461-8560-28184e466082",
@@ -37513,7 +37513,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT756-011@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "27630ae0-949f-5ae5-be37-76d77d0950b6",
@@ -37619,7 +37619,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT756-012@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "f487685c-6556-5cd2-8f2d-9a036ac783a1",
@@ -37703,7 +37703,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT416-AUDIT-001@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-boundary.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-boundary.v1.json",
         "identity": {
           "ssi": {
             "id": null,
@@ -37787,7 +37787,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT785-AUDIT-001@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-boundary.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-boundary.v1.json",
         "identity": {
           "ssi": {
             "id": null,
@@ -37881,7 +37881,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT742-013@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "de8c9920-b13a-509e-bb11-d90ffb6cedc5",
@@ -37965,7 +37965,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT742-014@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "183784e1-c9f1-55f2-97c5-d7eb41d912ff",
@@ -38059,7 +38059,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT754-013@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-positive.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
         "identity": {
           "ssi": {
             "id": "0bc47589-93b5-56a8-8a47-a227ec4e27c3",
@@ -38143,7 +38143,7 @@
       },
       "fixtureBinding": {
         "bindingId": "FIX-MT754-014@v1",
-        "sourceFile": "qa/fixtures/mt347/mt347-negative.v1.json",
+        "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
         "identity": {
           "ssi": {
             "id": "63201a94-e90a-5f0b-b5b6-2158fd58ca8e",

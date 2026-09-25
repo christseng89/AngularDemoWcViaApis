@@ -742,12 +742,10 @@ export class PaymentResolutionPageSubmissionAdapter {
                 "No registered optional MT SSI projection applies to the selected route.",
             },
           ];
-    const mx = object(raw["mx"]);
-    const composer = object(mx["messageComposerContext"]);
-    const settlementAccount = object(composer["SttlmAcct"]);
-    const settlementMethod = scalarText(
-      object(composer["SttlmMtd"])["value"] ?? chosen["settlementMethod"],
+    const settlementAccountReference = scalarText(
+      chosen["settlementAccountReference"],
     );
+    const settlementMethod = scalarText(chosen["settlementMethod"]);
     const topologyRulingId = scalarText(chosen["topologyRulingId"]);
     const topologyRulingVersion = scalarText(chosen["topologyRulingVersion"]);
     const governedTopology =
@@ -759,7 +757,7 @@ export class PaymentResolutionPageSubmissionAdapter {
         "PAYMENT_RESOLVER_TOPOLOGY_EVIDENCE_REQUIRED",
       );
     const mxProjections: ResolutionPageEvidenceCard["evidenceProjections"] = [
-      ...(scalarText(settlementAccount["value"])
+      ...(settlementAccountReference
         ? [
             {
               projectionId: "MX-STTLM-ACCT",
@@ -767,7 +765,7 @@ export class PaymentResolutionPageSubmissionAdapter {
               role: "SETTLEMENT_ACCOUNT",
               isoPath: "/Document/FICdtTrf/GrpHdr/SttlmInf/SttlmAcct",
               valueType: "ACCOUNT_REFERENCE" as const,
-              value: scalarText(settlementAccount["value"]),
+              value: settlementAccountReference,
               sourceRecordType: "OWN_NOSTRO_ACCOUNT" as const,
               sourceRecordId: nostroId,
               sourceRecordVersion: nostroVersion,

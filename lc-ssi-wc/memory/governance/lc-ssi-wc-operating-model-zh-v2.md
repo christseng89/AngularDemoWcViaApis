@@ -1,7 +1,7 @@
 # lc-ssi-wc 全專案作業模式與交付治理 — 中文版 v2
 
 **狀態：CONTROLLED**  
-**文件版本：v2.8.26**
+**文件版本：v2.8.28**
 **生效日期：2026-09-18**
 **適用範圍：MT1／pacs.008、MT2／pacs.009 plain/COV/ADV、MT3＋MT4＋MT7（MT347）及未來所有 Message Family**
 
@@ -296,23 +296,26 @@ MT347 已實作且可供所有 Message Family 重用的完整 normative pattern�
 
 ## 11. QA 目錄與封存
 
-- 正式結構使用 `qa/<message-family>/`，例如 `qa/mt1/`、`qa/mt2/`、`qa/mt347/`。
-- `tdd/`、`reports/`、`test_cases/`、`uat/`、`fixtures/` 均置於各自 family 下，避免不同系列互相封存或覆蓋。
-- 本機 workspace 內只保留最新版與正式 FINAL；DRAFT、被取代版本及舊 evidence 移至 `C:\Users\samfi\Downloads\outputs\lc-ssi-wc\docs\archive\<message-family>\...`。除非 Product Owner 另行明確授權，本機 governance、Proposal、Checker report 與 SHA evidence 不 commit、不 push 到 Git remote。
+- Active QA test data／fixture／case catalogue 一律置於 `data/qa/<message-family>/`；測試程式與 Gate 置於 `qa/tests/<message-family>/` 或 `scripts/<message-family>-final-qa/`。Active Gate 不得從 `qa/fixtures/`、workbook 或 archived path 另讀第二份資料。
+- 本機 workspace 的 active tree 只保留最新版與正式 FINAL。DRAFT、被取代 workbook、舊 runner、舊 fixture／baseline／overlay 與歷史 evidence 一律移至 repo-local、Git-ignored 的 `qa-archived/<message-family>/`，不得與 active `data/qa`／`qa/tests` 並存，也不得被 active config、package script 或 Gate 引用。
+- 除非 Product Owner 另行明確授權，本機 governance、Proposal、Checker report 與 SHA evidence 不 commit、不 push 到 Git remote。
 - 「最新版」對 active Git-tracked repository 文件由 repo path、外部交接指定的 exact Git commit、Git 歷史與 supersession 記錄共同判斷；semantic version 若存在只是可選的人類／release label。對非 Git 外部證據才使用其受控 checksum。不得只依檔案日期；尚未被新版取代且為現行 runner/config 的檔案不因名稱較舊而自動封存。
-- `qa` 保留各 family 最新受控 TDD、FINAL 報告、現行 fixture/config、runner 及必要 evidence；DRAFT、superseded、舊 run 與 migration backup 送封存。
+- `qa` 只保留各 family 最新受控 TDD、現行 test program／config 與必要 contract；active test data 只在 `data/qa`。DRAFT、superseded、舊 run 與 migration backup 送 `qa-archived`。
 - 封存前後產生 archive manifest，記錄原路徑、新路徑、SHA-256、狀態、原因與日期；不得刪除稽核軌跡。
-- `qa-archived` 必須位於 Git repository 外，不得被追蹤或提交；各 family 使用獨立子目錄，避免互相覆蓋。
+- `qa-archived` 是 repo-local 但 Git-ignored 的本機封存區，不得被追蹤或提交；各 family 使用獨立子目錄。封存內容不得參與 build、runtime、Gate 或測試分母。
 
 ### 11.1 Settings／Development Test Data Reload 的現行驗證規則
 
 - 開啟 Settings 只讀取 server capability；不得讀取、驗證或顯示 canonical seed、Fixture ID 或 Seed SHA。資料驗證只在密碼授權後的 dataset 選取／upload／Reload API 流程執行。
 - Reload、Export、Upload、Authorize 與 Cancel 必須由 Browser 經 BFF 呼叫受控 API；Browser 不得直接讀寫 server filesystem、DB、SQL 或 restore 流程。
-- 受控預設資料位於 `data/reload-test-data/`；MT1／MT2 active Gate 不得再引用已廢止的 `qa/fixtures/rma/reload-test-data/ssi-demo.v15.8...`。舊 v15.x runner、DRAFT workbook、歷史報告與已刪除路徑不得作為目前 Quality Gate 分母。
+- 受控預設資料位於 `data/reload-test-data/`；MT1／MT2 active Gate 不得再引用已廢止的 `data/qa/rma/reload-test-data/ssi-demo.v15.8...`。舊 v15.x runner、DRAFT workbook、歷史報告與已刪除路徑不得作為目前 Quality Gate 分母。
+- MT2／pacs.009 Proposal 的 active QA catalogue 位於 `data/qa/mt2/mt2-pacs009-proposal-case-groups.json`；active Gate 只以三方通過 Proposal、該 catalogue 與現行 controller／adapter tests 判定。舊 139 workbook 及其 runner 全部封存於 `qa-archived`，不得與 Proposal Gate 同時執行或計入分母。
 - `qa/reports/`、`artifacts/`、`outputs/`、`Claude outputs/`、`.quality/` 與 scanner／coverage／build output 是本機可重建 evidence，不是 runtime dependency，預設不進 Git。每次候選仍須重新產生同一 exact commit 的必要外部 evidence。
 - Active Git-tracked governance 不使用 `memory/integrity/`、manifest 或 `*.sha256.txt` 手工 SHA chain；repository path 加外部 review evidence 記錄的 exact candidate commit 才是身分。非 Git 外部證據仍須保留受控 checksum。
 - Upload 檔只可提供受控 metadata 與 records。Server 必須以 active governed schema 建立 replacement DB，拒絕任何不一致 schema，且絕不可執行 client-supplied SQL／DDL／command。
 - Reload 必須先備份 active DB，在 shadow DB 完整建立、驗證後才切換；任何失敗必須 restore 原 DB。成功與失敗都必須留下不含密碼的持久 audit，至少記錄 actor、environment、dataset、seed SHA、前後 logical snapshot、row counts、時間、outcome 與安全 error code。
+- Reload 開始前必須以 process-wide mutation barrier 阻擋新 maintenance write 並等待既有 write 完成；成功 activation 或失敗 restore 均須完成非 busy 的 WAL checkpoint 才可解除 barrier。採 SQLite online backup 寫入固定 active DB 時，既有 read connection 可保留；不得使用會讓 repository 指向舊 inode 的未治理 file swap。
+- Settings 一般 capability API 與畫面仍不得讀取或顯示 seed／snapshot identity。Exact-candidate QA 可用密碼保護、development-only、Browser UI 不呼叫的 evidence API 讀取 current logical snapshot；該 API 不回傳 filesystem path、SQL 或密碼。
 - 以上規則只淘汰舊 evidence/path presence Gate，不得豁免 `npm run verify`、changed-file format、完整 SonarQube、SQL/schema 安全、backup/restore、audit、DBA evidence、Browser UAT、Proposal regression 或同一 exact commit 的 Independent BA／QA Gate。
 
 ## 12. Block 管理與進度回報
@@ -453,7 +456,7 @@ Block 一經發現立即回報，格式固定如下：
 2. 變更必須提交至隔離 branch 並產生新的 Git candidate commit；原有 4-EYES 簽認不得沿用。Semantic version／release label 可按發布需要選擇性更新，不是每次修改的必要步驟或 Gate。
 3. 涉及 SWIFT 語意、TDD、DB fixture 或 release gate 時，須由 Maker + Independent Checker 重新確認。
 4. 同步檢查 `CLAUDE.md`、ADR、各 family Memory/TDD 與 QA template 是否需要更新；以連結引用為主，避免複製出多套規則。
-5. 舊版移至 repo 外 `qa-archived/governance/` 備查；Git repo 內只保留最新 CONTROLLED 版本。
+5. 舊版移至 repo-local、Git-ignored 的 `qa-archived/governance/` 備查；Git-tracked tree 只保留最新 CONTROLLED 版本。
 6. 修改完成後，在文件的變更紀錄登錄日期、摘要、簽認狀態及可選的 semantic version／release label；exact Git commit 只留在外部交接／review evidence。
 
 ### 15.1 變更紀錄
@@ -497,3 +500,5 @@ Block 一經發現立即回報，格式固定如下：
 | v2.8.24 | 2026-09-18 | 依 Product Owner 簡化治理：active Git-tracked repository 文件以 repo path＋外部 evidence 記錄的 exact Git commit 識別；semantic version 僅為可選標籤，manifest 非身分／角色／簽核權威，並移除手工 document／manifest SHA chain。Main 禁止直接修改／commit，所有受控變更經 Task Branch（緊急時 Hotfix Branch）、適用測試與 4-EYES。Exact base／candidate commit 僅放外部交接與 4-EYES evidence。流程固定為獨立 branch/worktree、explicit staging、local commit/no push；Designer／QA 對同一 commit PASS 後檢查 Main：Main 有變即 rebase、re-test 並對新 commit 重跑完整 4-EYES，未變才 fast-forward，確保 reviewed commit 就是進入 Main 的 commit；之後 Main integration PASS、local Baseline／Release Tag、明確 Main sealed，最後才 cleanup 本任務已合併 branch/worktree，且禁止移除未合併、失敗、調查保留或他人 branch/worktree | Governance Maker `/root/angular_lazy_defer_engineer`；待 Independent Governance／QA Checker 對同一外部 candidate commit 重驗，未簽認前為 NOT_ACCEPTED       |
 | v2.8.25 | 2026-09-18 | 依 Product Owner 指示新增誠信與故意怠工紅線：經可驗證證據、Violation ID、Independent Checker及PM／PO程序確認的故意謊報、偽造、歪曲、重大隱瞞或故意不作為，不適用第一次警告，立即stop-work、撤銷專案角色、移出專案並換人；凍結既有產出／簽認，由接任者獨立重建baseline。同步保障善意報錯、真實BLOCKED、批准暫停、環境故障與合理等待依賴，正式人事解僱仍只由管理層／HR決定                                                                                                                                                                                                                                                                                                                                                                                                                                                         | Governance Integrity Maker `/root/governance_integrity_maker`；待 Independent Governance／QA Checker 對同一外部candidate commit重驗，未簽認前為NOT_ACCEPTED |
 | v2.8.26 | 2026-09-25 | 依 Product Owner 裁定更新 Settings／Development Test Data Reload Gate：Settings 開啟不檢查或顯示 seed identity；舊 v15.x path／report presence／manual SHA sidecar 不再是 active Gate；Reload 全程使用 API、server-controlled active schema、禁止 client SQL，並保留 backup/restore、持久 audit、DBA、Sonar、verify 與同一 commit BA／QA Gate                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Governance Maker `/root`；規則已通知 Independent BA／QA，待其對最終 exact candidate commit 重驗，未簽認前為 NOT_ACCEPTED                                    |
+| v2.8.27 | 2026-09-25 | 收斂獨立 DBA 發現：Reload 採 process-wide maintenance mutation barrier、等待 in-flight write、SQLite online backup 固定 active DB identity、成功／restore 後 WAL checkpoint；一般 Settings 不讀 identity，exact-candidate QA 只經密碼保護的 development evidence API 驗 current logical snapshot                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Governance Maker `/root`；待 Independent DBA／BA／QA 對最終 exact candidate commit 與 snapshot 重驗，未簽認前為 NOT_ACCEPTED                                |
+| v2.8.28 | 2026-09-25 | 依 Product Owner 裁定收斂 QA 資料與封存：active fixture／catalogue 一律位於 `data/qa`，測試程式位於 `qa/tests`／`scripts`；superseded workbook、runner、baseline、overlay 與 evidence 一律移至 Git-ignored `qa-archived`，禁止 active／archived 並存或由 Gate 引用。MT2 active Gate 改以三方通過 Proposal 與 101-case catalogue，舊 139 workbook 全面退役。                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | Governance Maker `/root`；待 Independent BA／QA／DBA 對最終 exact candidate commit 與 snapshot 重驗，未簽認前為 NOT_ACCEPTED                                |

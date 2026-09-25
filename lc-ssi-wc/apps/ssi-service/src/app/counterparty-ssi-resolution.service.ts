@@ -235,12 +235,24 @@ export class CounterpartySsiResolutionService {
     mt: Context,
     detail = "",
   ): Context {
+    const ssiApplicability =
+      code === "INVALID_UPSTREAM_CONTEXT" ? "NOT_EVALUATED" : "REQUIRED";
+    const envelope = {
+      profileKind: "SSI_RESOLUTION_ONLY",
+      paymentExecutable: false,
+      payloadGenerated: false,
+      confirmedResolutionCreated: false,
+      repairQueueCreated: false,
+      ssiApplicability,
+      resolutionOutcome: code,
+    };
     return {
+      ...envelope,
       mx: {
+        ...envelope,
         httpStatus: status,
         code,
         redirectDomain: null,
-        payloadGenerated: false,
         detail,
       },
       mt,
@@ -475,7 +487,7 @@ export class CounterpartySsiResolutionService {
     if (raw["coverSequenceB"] === null)
       return this.failure(
         422,
-        "MESSAGE_CONTEXT_MISSING",
+        "INVALID_UPSTREAM_CONTEXT",
         { validation: "FAIL", payloadGenerated: false },
         "Cover Sequence B is mandatory upstream context",
       );
@@ -489,7 +501,7 @@ export class CounterpartySsiResolutionService {
     )
       return this.failure(
         422,
-        "PROFILE_INCOMPLETE",
+        "INVALID_UPSTREAM_CONTEXT",
         { validation: "FAIL", payloadGenerated: false },
         "Genuine-cover context is mandatory",
       );
@@ -498,7 +510,7 @@ export class CounterpartySsiResolutionService {
       isObject(raw["block3"]) &&
       raw["block3"]["119"] !== "COV"
     )
-      return this.failure(503, "PROFILE_INCOMPLETE", {
+      return this.failure(422, "INVALID_UPSTREAM_CONTEXT", {
         validation: "FAIL",
         missing: ["119:COV"],
       });

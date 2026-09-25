@@ -15,13 +15,10 @@ from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_SOURCE = (
-    ROOT
-    / "qa/fixtures/mt2/overlays/ssi-demo.v15.3-unified-qa-uat.sqlite"
-)
+DEFAULT_SOURCE = ROOT / "data/ssi-demo.sqlite"
 DEFAULT_SEED = (
     ROOT
-    / "qa/fixtures/rma/reload-test-data/ssi-demo.v15.8.pacs009-repaired-isolated.canonical.seed.json"
+    / "data/reload-test-data/ssi-demo.mt1-mt2.v1.approved.canonical.seed.json"
 )
 DEFAULT_TARGET = ROOT / "data/ssi-demo.sqlite"
 IDENTITY_METHOD = "SQLITE_WAL_AWARE_LOGICAL_SNAPSHOT_V1"

@@ -46,7 +46,7 @@
 **Files:**
 - Modify: `apps/ssi-service/src/app/fin-controlled-fixture.service.ts`
 - Modify: typed SQLite repository/model files under `apps/ssi-service/src/app/`
-- Modify: `qa/fixtures/mt347/mt347-negative.v1.json`
+- Modify: `data/qa/mt347/mt347-negative.v1.json`
 - Modify: `parameters/mt347-fixture-binding-manifest.sr2026.json`
 - Test: fixture, provenance, ownership, ambiguity, and fail-closed specs
 

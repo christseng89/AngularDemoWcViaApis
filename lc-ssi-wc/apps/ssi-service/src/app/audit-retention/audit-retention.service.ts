@@ -5,6 +5,7 @@ import {
   AuditRetentionRepository,
   GOVERNED_AUDIT_TABLES,
 } from "./audit-retention.repository";
+import { DatabaseMutationCoordinator } from "../database-mutation-coordinator";
 
 export const HOURS_IN_MILLISECONDS = 60 * 60 * 1_000;
 
@@ -35,6 +36,7 @@ export class AuditRetentionService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly policy: AuditRetentionPolicy,
     private readonly repository: AuditRetentionRepository,
+    private readonly mutations: DatabaseMutationCoordinator = new DatabaseMutationCoordinator(),
   ) {
     this.healthState = this.baseHealth("UP");
   }
@@ -53,21 +55,26 @@ export class AuditRetentionService implements OnModuleInit, OnModuleDestroy {
   }
 
   processLifecycle(now: Date): AuditLifecycleResult {
-    const result = this.repository.runLifecycle(
-      this.policy.archiveCutoffUtc(now),
-      this.policy.archivePurgeCutoffUtc(now),
-      now.toISOString(),
-    );
-    this.healthState = {
-      ...this.baseHealth("UP"),
-      lastRunAtUtc: now.toISOString(),
-      nextRunAtUtc: new Date(
-        now.getTime() + this.scheduleIntervalMilliseconds(),
-      ).toISOString(),
-      onlineCutoffUtc: this.policy.onlineCutoffUtc(now),
-      ...result,
-    };
-    return result;
+    const release = this.mutations.beginMutation();
+    try {
+      const result = this.repository.runLifecycle(
+        this.policy.archiveCutoffUtc(now),
+        this.policy.archivePurgeCutoffUtc(now),
+        now.toISOString(),
+      );
+      this.healthState = {
+        ...this.baseHealth("UP"),
+        lastRunAtUtc: now.toISOString(),
+        nextRunAtUtc: new Date(
+          now.getTime() + this.scheduleIntervalMilliseconds(),
+        ).toISOString(),
+        onlineCutoffUtc: this.policy.onlineCutoffUtc(now),
+        ...result,
+      };
+      return result;
+    } finally {
+      release();
+    }
   }
 
   health(): AuditRetentionHealth {

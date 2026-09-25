@@ -3,18 +3,15 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import ExcelJS from "exceljs";
 import { loadConfig } from "./config-loader.mjs";
 import { MetricGate } from "./metric-gate.mjs";
 import { ProcessGate } from "./process-gate.mjs";
 import { QaOrchestrator } from "./orchestrator.mjs";
 import { QualityGate, failed, passed } from "./quality-gate.mjs";
-import { evaluateInventory, WorkbookGate } from "./workbook-gate.mjs";
 import {
   validateExpectedOutput,
   validateResolutionIdentity,
 } from "./expected-output-validator.mjs";
-import { CaseResultGate } from "./case-result-gate.mjs";
 import {
   analysisMatchesCommit,
   analysisMatchesIdentity,
@@ -138,16 +135,22 @@ test("metric boundaries are strictly greater than 95 and less than 1", async () 
   );
 });
 
-test("production config loads the frozen 139-case workbook", async () => {
+test("production config loads only the current Proposal case catalogue", () => {
   const config = loadConfig("qa/tests/mt2/final/mt2-final-qa.config.json");
-  const result = await new WorkbookGate(config).execute();
-  assert.equal(result.status, "PASS", result.reason);
-  assert.equal(result.evidence.total, 139);
-  assert.equal(config.baselineArtifacts.length, 10);
+  assert.equal(config.expectedCaseCount, 101);
+  assert.match(
+    config.proposalCaseFile,
+    /data[\\/]qa[\\/]mt2[\\/]mt2-pacs009-proposal-case-groups\.json$/,
+  );
+  assert.equal(config.baselineArtifacts.length, 4);
   assert.ok(
     config.baselineArtifacts.some(
       ({ role }) => role === "CANONICAL_POSITIVE_SEED",
     ),
+  );
+  assert.equal(
+    JSON.stringify(config).includes("MT2XX_測試案例_SSI與NOSTRO"),
+    false,
   );
 });
 
@@ -256,96 +259,6 @@ test("process gate fails closed for legacy shell strings or other executables", 
     ).execute();
     assert.equal(result.status, "FAIL");
   }
-});
-
-test("workbook gate reports invalid headers", async () => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "mt2-workbook-"));
-  const file = path.join(directory, "invalid.xlsx");
-  const workbook = new ExcelJS.Workbook();
-  const sheet = workbook.addWorksheet("Test Cases");
-  sheet.addRow(["Wrong", "Headers"]);
-  await workbook.xlsx.writeFile(file);
-  const result = await new WorkbookGate({
-    workbook: file,
-    expectedCaseCount: 139,
-  }).execute();
-  assert.equal(result.status, "FAIL");
-  assert.match(result.reason, /columns/);
-});
-
-test("workbook gate reports malformed JSON and unreadable workbooks", async () => {
-  const directory = fs.mkdtempSync(
-    path.join(os.tmpdir(), "mt2-workbook-json-"),
-  );
-  const malformed = evaluateInventory(
-    "TEST",
-    [
-      [
-        "Test Case No.",
-        "Message Type",
-        "Input",
-        "MX expected Output",
-        "MT expected Output",
-      ],
-      ["CASE-1", "MT202", "{", "{}", "{}"],
-    ],
-    1,
-  );
-  assert.equal(malformed.status, "FAIL");
-  assert.match(malformed.reason, /invalid Input JSON/);
-
-  const unreadable = await new WorkbookGate({
-    workbook: path.join(directory, "missing.xlsx"),
-    expectedCaseCount: 1,
-  }).execute();
-  assert.equal(unreadable.status, "FAIL");
-});
-
-test("case result gate rejects duplicate and unexpected case ids", async () => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "mt2-result-"));
-  const resultFile = path.join(directory, "results.json");
-  fs.writeFileSync(
-    resultFile,
-    JSON.stringify({
-      results: [
-        { testCaseNo: "A", status: "PASS" },
-        { testCaseNo: "A", status: "PASS" },
-        { testCaseNo: "X", status: "PASS" },
-      ],
-    }),
-  );
-  const result = await new CaseResultGate(
-    { resultFile },
-    { evidence: { caseIds: ["A", "B"] } },
-  ).execute();
-  assert.equal(result.status, "FAIL");
-  assert.deepEqual(result.evidence.duplicateIds, ["A"]);
-  assert.deepEqual(result.evidence.unexpectedIds, ["X"]);
-  assert.deepEqual(result.evidence.missing, ["B"]);
-});
-
-test("case result gate reports missing evidence and accepts a complete result", async () => {
-  const directory = fs.mkdtempSync(
-    path.join(os.tmpdir(), "mt2-result-complete-"),
-  );
-  const resultFile = path.join(directory, "results.json");
-  const missing = await new CaseResultGate(
-    { resultFile },
-    { evidence: { caseIds: ["A"] } },
-  ).execute();
-  assert.equal(missing.status, "FAIL");
-  assert.match(missing.reason, /missing executable-case results/);
-
-  fs.writeFileSync(
-    resultFile,
-    JSON.stringify({ results: [{ testCaseNo: "A", status: "PASS" }] }),
-  );
-  const complete = await new CaseResultGate(
-    { resultFile },
-    { evidence: { caseIds: ["A"] } },
-  ).execute();
-  assert.equal(complete.status, "PASS");
-  assert.equal(complete.evidence.passed, 1);
 });
 
 test("Sonar task identity and current revision are explicit", () => {

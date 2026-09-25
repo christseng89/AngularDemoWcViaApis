@@ -146,6 +146,14 @@ describe("SSI BFF forwarding contract", () => {
       httpMethod: "POST",
     },
     {
+      name: "development data QA evidence",
+      method: "developmentDataEvidence",
+      args: [{ password: "entered" }],
+      url: "http://ssi.test/api/settings/development-data/evidence",
+      httpMethod: "POST",
+      body: { password: "entered" },
+    },
+    {
       name: "development data reload authorization",
       method: "authorizeDevelopmentDataReload",
       args: [{ password: "entered" }],

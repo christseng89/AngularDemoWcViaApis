@@ -57,6 +57,13 @@ export class RuntimeSettingsController {
     return this.reloadService.exportCurrentDatabase();
   }
 
+  @Post("development-data/evidence")
+  developmentDataEvidence(@Body() body: { password?: unknown }): unknown {
+    return this.reloadService.evidence(
+      typeof body?.password === "string" ? body.password : "",
+    );
+  }
+
   @Post("development-data/reload/upload")
   @UseInterceptors(
     FileInterceptor("file", {

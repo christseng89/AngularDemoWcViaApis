@@ -323,16 +323,20 @@ export class SettlementController {
   private ambiguousResponse(preview: Mt2RoutePreview): Json {
     const snapshotIdentity = this.snapshotIdentity.current();
     const candidates = this.ambiguityCandidates(preview);
-    const repairQueue = {
-      required: true,
-      reasonCode: "TOP_RANK_TIE",
-      makerCheckerRequired: true,
+    const evidenceOnly = {
+      profileKind: "SSI_RESOLUTION_ONLY",
+      paymentExecutable: false,
+      payloadGenerated: false,
+      confirmedResolutionCreated: false,
+      repairQueueCreated: false,
+      ssiApplicability: "REQUIRED",
+      resolutionOutcome: "AMBIGUOUS_ROUTE",
     };
     const contract = {
+      ...evidenceOnly,
       chosenRoute: null,
       canonicalRoles: null,
       roleProvenance: null,
-      messageComposerContext: null,
       candidates,
       rankingRuleId: CONTROLLED_RANK_RULE_ID,
       ambiguityReason: "TIED_ON_CONTROLLED_RANK_KEYS",
@@ -340,29 +344,27 @@ export class SettlementController {
       snapshotHash: snapshotIdentity.sha256,
       snapshotIdentityMethod: snapshotIdentity.method,
       resolutionToken: preview.attemptId,
-      payloadGenerated: false,
-      repairQueue,
     };
     return {
-      resolutionDecision: "SSI_AMBIGUOUS",
+      resolutionDecision: "AMBIGUOUS_ROUTE",
       ...contract,
       mx: {
-        httpStatus: 422,
-        decision: "SSI_AMBIGUOUS",
-        code: "SSI_AMBIGUOUS",
+        httpStatus: 409,
+        decision: "AMBIGUOUS_ROUTE",
+        code: "AMBIGUOUS_ROUTE",
         redirectDomain: null,
         ...contract,
       },
       mt: {
         validation: "FAIL",
-        code: "SSI_AMBIGUOUS",
+        code: "AMBIGUOUS_ROUTE",
         payloadGenerated: false,
       },
     };
   }
 
   private failClosedAmbiguous(preview: Mt2RoutePreview): never {
-    throw new HttpException(this.ambiguousResponse(preview), 422);
+    throw new HttpException(this.ambiguousResponse(preview), 409);
   }
 
   private failClosedIncorrectSsi(
@@ -568,6 +570,8 @@ export class SettlementController {
             settlementMethod: execution.settlementMethod,
             topologyRulingId: "BA-TOPOLOGY-INDA-INGA-001",
             topologyRulingVersion: "1.0.0",
+            settlementAccountReference:
+              nostroEvidence["accountReference"] ?? "",
             ...(execution.jurisdictionEvidence
               ? { jurisdictionEvidence: execution.jurisdictionEvidence }
               : {}),
@@ -592,21 +596,6 @@ export class SettlementController {
         businessRank: undefined,
       };
     });
-  }
-
-  private settlementAccountContext(
-    canonicalSettlement: Json,
-    nostroEvidence: Json,
-  ): Json {
-    if (!canonicalSettlement["settlementAccountReference"]) return {};
-    return {
-      SttlmAcct: {
-        value: canonicalSettlement["settlementAccountReference"],
-        source: "OWN_SSI_NOSTRO",
-        nostroId: nostroEvidence["nostroId"],
-        nostroVersion: nostroEvidence["nostroVersion"],
-      },
-    };
   }
 
   private mt202OmissionDecision(
@@ -979,7 +968,7 @@ export class SettlementController {
       accountWith,
     );
     const tags = { ...((mt["tags"] ?? {}) as Json) };
-    const renderedCreditor = this.applyCreditorContext(roles, creditor);
+    this.applyCreditorContext(roles, creditor);
     const omitted = new Set(Array.isArray(mt["omitted"]) ? mt["omitted"] : []);
     this.omitMt202AccountWithWhenReceiverMatches(
       tags,
@@ -1013,6 +1002,12 @@ export class SettlementController {
     const snapshotIdentity = this.snapshotIdentity.current();
     return {
       ...rendered,
+      profileKind: "SSI_RESOLUTION_ONLY",
+      paymentExecutable: false,
+      confirmedResolutionCreated: false,
+      repairQueueCreated: false,
+      ssiApplicability: "REQUIRED",
+      resolutionOutcome: "ELIGIBLE_COMPLETE_ROUTE",
       mx: {
         ...mx,
         decision: preview.decision,
@@ -1022,22 +1017,12 @@ export class SettlementController {
         alternatives,
         roleProvenance,
         canonicalRoles: roles,
-        messageComposerContext: {
-          SttlmMtd: {
-            value: execution.settlementMethod,
-            source: "BA-TOPOLOGY-INDA-INGA-001",
-            rulingVersion: "1.0.0",
-          },
-          Dbtr: {
-            value: route["senderBic"] ?? "DEMOHKHH",
-            source: "OWN_ENTITY",
-          },
-          ...this.settlementAccountContext(canonicalSettlement, nostroEvidence),
-          Cdtr: {
-            value: renderedCreditor.value,
-            source: renderedCreditor.source,
-          },
-        },
+        profileKind: "SSI_RESOLUTION_ONLY",
+        paymentExecutable: false,
+        confirmedResolutionCreated: false,
+        repairQueueCreated: false,
+        ssiApplicability: "REQUIRED",
+        resolutionOutcome: "ELIGIBLE_COMPLETE_ROUTE",
       },
       mt: { ...mt, tags, omitted: [...omitted] },
       chosenRoute,

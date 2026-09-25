@@ -55,13 +55,14 @@ Alternative approaches considered:
 
 ### Backend
 
-- A settings status endpoint returns only the resolved runtime environment, development flag, reload availability, and status policy version. Seed and logical snapshot identities are resolved only inside the authorized reload workflow and its server-side audit evidence.
+- A settings status endpoint returns only the resolved runtime environment, development flag, reload availability, and status policy version. Seed and logical snapshot identities are not loaded by the ordinary Settings screen. A password-protected development QA evidence endpoint may return the current logical snapshot identity for exact-candidate verification; the browser Settings workflow does not call or display it.
 - A password-protected authorization endpoint checks the runtime gate and password before offering the default data set and the browser file picker.
 - A one-time upload endpoint accepts only the authorized seed JSON, stores it under repository-local `tmp/`, validates its controlled metadata, and returns a selectable data-set identity. The original filename is display-only.
 - It validates the selected record data against the server-controlled active schema, backs up the active DB, builds and validates a new shadow DB, then replaces the active DB. Any build, validation, replacement, or restore failure fails closed; restore failure still produces persistent failure audit evidence.
 - No client-supplied seed path, target path, SQL, or command is accepted.
 - Export responses contain only the governed dataset identity and display name; server filesystem paths never cross the API boundary or appear in the browser.
-- Repositories must release and reopen database connections around the atomic replacement so no process continues reading the old inode or an incomplete database.
+- The service places all state-changing maintenance requests behind a process-wide mutation barrier and waits for in-flight mutations to drain. It activates the validated shadow database into the stable active database through SQLite online backup, so existing read connections retain the governed active-file identity. New maintenance writes remain fail-closed until activation or restore completes.
+- Successful activation and failure restore both run a governed `wal_checkpoint(TRUNCATE)` before releasing the mutation barrier; a busy checkpoint fails closed.
 - The audit record contains actor, timestamp, environment, seed SHA-256, previous/new logical snapshot SHA-256, imported row counts, and success/failure; never the password.
 
 ## API behavior

@@ -13,8 +13,8 @@
 ### Task 1: Domain contracts and canonical identities
 
 **Files:**
-- Create: `qa/fixtures/rma/governed-data-repair/domain.ts`
-- Test: `qa/fixtures/rma/governed-data-repair/domain.test.ts`
+- Create: `data/qa/rma/governed-data-repair/domain.ts`
+- Test: `data/qa/rma/governed-data-repair/domain.test.ts`
 
 1. Write failing tests for BIC8/BIC11 normalization and the four domain keys.
 2. Run the focused Node test and retain RED evidence.
@@ -24,8 +24,8 @@
 ### Task 2: Four-domain Dry Run planner
 
 **Files:**
-- Create: `qa/fixtures/rma/governed-data-repair/planner.ts`
-- Test: `qa/fixtures/rma/governed-data-repair/planner.test.ts`
+- Create: `data/qa/rma/governed-data-repair/planner.ts`
+- Test: `data/qa/rma/governed-data-repair/planner.test.ts`
 
 1. Write failing tests for Entities, Nostro, SSI, RMA and cross-table issues.
 2. Run tests and retain RED evidence.
@@ -35,9 +35,9 @@
 ### Task 3: Snapshot and reporting adapters
 
 **Files:**
-- Create: `qa/fixtures/rma/governed-data-repair/api-snapshot.repository.ts`
-- Create: `qa/fixtures/rma/governed-data-repair/json-report.writer.ts`
-- Create: `qa/fixtures/rma/governed-data-repair/cli.ts`
+- Create: `data/qa/rma/governed-data-repair/api-snapshot.repository.ts`
+- Create: `data/qa/rma/governed-data-repair/json-report.writer.ts`
+- Create: `data/qa/rma/governed-data-repair/cli.ts`
 - Modify: `package.json`
 
 1. Add contract tests that reject grouped/paged responses where raw arrays are required.

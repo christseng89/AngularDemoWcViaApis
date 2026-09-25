@@ -17,13 +17,13 @@ from operator import itemgetter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-SEED = ROOT / "qa/fixtures/rma/reload-test-data/ssi-demo.v15.8.pacs009-repaired-isolated.canonical.seed.json"
-POSITIVE_SOURCE = ROOT / "qa/fixtures/mt347/mt347-positive.v1.json"
-NEGATIVE_SOURCE = ROOT / "qa/fixtures/mt347/mt347-negative.v1.json"
+SEED = ROOT / "data/reload-test-data/ssi-demo.mt1-mt2.v1.approved.canonical.seed.json"
+POSITIVE_SOURCE = ROOT / "data/qa/mt347/mt347-positive.v1.json"
+NEGATIVE_SOURCE = ROOT / "data/qa/mt347/mt347-negative.v1.json"
 SCENARIOS = ROOT / "parameters/resolution-page-scenarios.sr2026.json"
 INPUTS = ROOT / "parameters/mt347-fixture-inputs.v1.json"
-OUTPUT = ROOT / "qa/fixtures/mt347/mt347-executable-counterparties.v4.json"
-MANIFEST = ROOT / "qa/fixtures/mt347/mt347-fixtures.v2.manifest.json"
+OUTPUT = ROOT / "data/qa/mt347/mt347-executable-counterparties.v4.json"
+MANIFEST = ROOT / "data/qa/mt347/mt347-fixtures.v2.manifest.json"
 FAMILY = "MT347-SR2026-SSI"
 VARIANT_VERSION = "MT347-EXECUTABLE-MULTI-CURRENCY-COUNTERPARTY-OPTIONS-v4"
 MANAGED_VARIANT_VERSIONS = {

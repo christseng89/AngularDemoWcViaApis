@@ -4,9 +4,9 @@ import { resolve } from "node:path";
 
 const root = process.cwd();
 const fixtureFiles = [
-  ["qa/fixtures/mt347/mt347-positive.v1.json", "CANONICAL"],
-  ["qa/fixtures/mt347/mt347-negative.v1.json", "TRANSACTIONAL_NEGATIVE"],
-  ["qa/fixtures/mt347/mt347-boundary.v1.json", "BOUNDARY"],
+  ["data/qa/mt347/mt347-positive.v1.json", "CANONICAL"],
+  ["data/qa/mt347/mt347-negative.v1.json", "TRANSACTIONAL_NEGATIVE"],
+  ["data/qa/mt347/mt347-boundary.v1.json", "BOUNDARY"],
 ];
 const read = (path) => readFileSync(resolve(root, path));
 const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");

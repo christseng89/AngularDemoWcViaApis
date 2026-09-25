@@ -774,7 +774,7 @@ def insert_positive_database(
     records: list[dict[str, Any]],
     input_configuration: dict[str, Any],
 ) -> dict[str, Any]:
-    output = root / "qa/fixtures/mt347/ssi-demo.mt347-positive.v1.sqlite"
+    output = root / "data/qa/mt347/ssi-demo.mt347-positive.v1.sqlite"
     if output.exists():
         output.unlink()
     for suffix in ("-wal", "-shm"):
@@ -831,7 +831,7 @@ def insert_positive_database(
     export_result = rebuild_module.export_seed(
         output,
         root
-        / "qa/fixtures/rma/reload-test-data/ssi-demo.v15.8.pacs009-repaired-isolated.canonical.seed.json",
+        / "data/qa/mt347/ssi-demo.mt347-positive.v1.canonical.seed.json",
     )
     return {"sqlite": output.as_posix(), "sqliteSha256": sha256(output), "seed": export_result}
 
@@ -855,12 +855,12 @@ def main() -> None:
         raise AssertionError("MT347 fixture input configuration must prohibit expected-oracle input")
     fixtures = write_fixture_artifacts(
         workbook,
-        root / "qa/fixtures/mt347",
+        root / "data/qa/mt347",
         catalogue,
         input_configuration,
     )
     positive = json.loads(
-        (root / "qa/fixtures/mt347/mt347-positive.v1.json").read_text(encoding="utf-8")
+        (root / "data/qa/mt347/mt347-positive.v1.json").read_text(encoding="utf-8")
     )["records"]
     database = insert_positive_database(root, positive, input_configuration)
     print(json.dumps({"catalogue": catalogue_result, "fixtures": fixtures, "database": database}, indent=2))

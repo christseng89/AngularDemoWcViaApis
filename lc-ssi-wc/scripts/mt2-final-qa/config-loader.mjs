@@ -27,16 +27,10 @@ export const loadConfig = (configPath) => {
   const ids = config.gates.map(({ id }) => id);
   assert(new Set(ids).size === ids.length, "gate ids must be unique");
   const resolve = (value) => path.resolve(root, value);
-  const workbook = resolve(config.workbook);
-  assert(fs.existsSync(workbook), `workbook does not exist: ${workbook}`);
-  const workbookSha256 = crypto
-    .createHash("sha256")
-    .update(fs.readFileSync(workbook))
-    .digest("hex")
-    .toUpperCase();
+  const proposalCaseFile = resolve(config.proposalCaseFile);
   assert(
-    workbookSha256 === config.workbookSha256,
-    `workbook SHA-256 mismatch: ${workbookSha256}`,
+    fs.existsSync(proposalCaseFile),
+    `proposal case catalogue does not exist: ${proposalCaseFile}`,
   );
   assert(
     Array.isArray(config.baselineArtifacts) &&
@@ -60,8 +54,7 @@ export const loadConfig = (configPath) => {
   return Object.freeze({
     ...config,
     configPath: absolute,
-    workbook,
-    workbookSha256,
+    proposalCaseFile,
     baselineArtifacts: Object.freeze(baselineArtifacts),
     resultFile: resolve(config.resultFile),
     evidenceDirectory: resolve(config.evidenceDirectory),

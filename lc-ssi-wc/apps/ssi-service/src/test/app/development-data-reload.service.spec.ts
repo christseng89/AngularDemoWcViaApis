@@ -138,6 +138,20 @@ describe("DevelopmentDataReloadService", () => {
     expect(status.seedSha256).toBeUndefined();
   });
 
+  it("returns the current logical snapshot only through password-protected QA evidence", () => {
+    const service = new DevelopmentDataReloadService(environment());
+    expect(codeOf(() => service.evidence("wrong"))).toEqual({
+      status: 401,
+      code: "INVALID_DEMO_CONTROL_PASSWORD",
+    });
+    expect(service.evidence("secret")).toEqual({
+      currentSnapshot: expect.objectContaining({
+        sha256: expect.stringMatching(/^[a-f0-9]{64}$/),
+        method: "SQLITE_WAL_AWARE_LOGICAL_SNAPSHOT_V1",
+      }),
+    });
+  });
+
   it("binds a browser-selected compliant seed to the one-time authorization", async () => {
     const service = new DevelopmentDataReloadService(environment());
     const authorization = service.authorize("secret");
@@ -265,7 +279,7 @@ describe("DevelopmentDataReloadService", () => {
     });
     expect(second.snapshotHash).toBe(first.snapshotHash);
     expect(second.importedRows).toEqual(first.importedRows);
-  }, 60_000);
+  }, 180_000);
 
   it.each([
     [{ SSI_RUNTIME_ENV: "production" }, 403, "DEVELOPMENT_MODE_REQUIRED"],

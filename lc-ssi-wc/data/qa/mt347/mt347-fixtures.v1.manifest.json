@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1.0",
+  "fixtureFamily": "MT347-SR2026-SSI",
+  "sourceWorkbookSha256": "82C6ABCFD91E7D35E1382F8C86BF796D8DBF05CF8C8D94F9F0C7B5889AB52C9A",
+  "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
+  "artifacts": {
+    "positive": {
+      "path": "data/qa/mt347/mt347-positive.v1.json",
+      "count": 152,
+      "sha256": "3E8D6B1F0FB82E38382E6C65C1744D68571F72C75D8CD0B9C51ACA9717F5780A"
+    },
+    "negative": {
+      "path": "data/qa/mt347/mt347-negative.v1.json",
+      "count": 208,
+      "sha256": "473665D99EDBFFF5E99B04856E4C49FF488B7EC9C3CB6504ADC6A92C394510CD"
+    },
+    "boundary": {
+      "path": "data/qa/mt347/mt347-boundary.v1.json",
+      "count": 2,
+      "sha256": "77A8943AAB0A7E10459C314A3BB071C8B1B89149B5501A2204AC114EBE42DD0B"
+    }
+  }
+}
