@@ -29,7 +29,7 @@ const variantCount = ({ variants, profileMatrix }) => {
   return profileMatrix ? count * 4 : count;
 };
 
-export const validateProposalCases = (catalogue, proposalHash) => {
+export const validateProposalCases = (catalogue, proposalHash, fixtures) => {
   const errors = [];
   if (catalogue.proposalSha256 !== proposalHash)
     errors.push("Proposal SHA-256 binding does not match the controlled file.");
@@ -71,6 +71,18 @@ export const validateProposalCases = (catalogue, proposalHash) => {
       errors.push(
         `Explicit case ${proposalCase.caseId} lacks fixture/request/expected/test binding.`,
       );
+    if (!fixtures?.bindings?.[proposalCase.fixtureBindingId])
+      errors.push(
+        `Explicit case ${proposalCase.caseId} has no controlled fixture binding.`,
+      );
+    if (
+      !proposalCase.expected?.resolutionOutcome ||
+      Array.isArray(proposalCase.expected?.resolutionOutcome) ||
+      proposalCase.expected?.allowedResolutionOutcomes
+    )
+      errors.push(
+        `Explicit case ${proposalCase.caseId} must have one exact outcome oracle.`,
+      );
     for (const sideEffect of Object.keys(catalogue.sideEffects))
       if (proposalCase.expected?.[sideEffect] !== false)
         errors.push(
@@ -91,8 +103,12 @@ export const validateProposalCases = (catalogue, proposalHash) => {
   return { errors, expandedCaseCount, outcomes: [...outcomes].sort() };
 };
 
-export const proposalCaseReport = (catalogue, validation, passed) => ({
-  status: passed ? "PASS" : "FAIL",
+export const proposalCaseReport = (catalogue, validation, caseResults) => ({
+  status: catalogue.cases.every(
+    ({ caseId }) => caseResults.get(caseId) === "PASS",
+  )
+    ? "PASS"
+    : "FAIL",
   proposalSha256: catalogue.proposalSha256,
   scope: { direction: catalogue.direction, profiles: catalogue.profiles },
   expandedCaseCount: validation.expandedCaseCount,
@@ -100,7 +116,7 @@ export const proposalCaseReport = (catalogue, validation, passed) => ({
   sideEffects: catalogue.sideEffects,
   cases: catalogue.cases.map((proposalCase) => ({
     ...proposalCase,
-    actual: passed ? "PASS" : "FAIL",
+    actual: caseResults.get(proposalCase.caseId) ?? "NOT_EXECUTED",
   })),
   legacyWorkbook: "INFORMATIONAL_ONLY",
 });

@@ -15,8 +15,13 @@
     },
     {
       "file": "../../../../data/qa/mt2/mt2-pacs009-proposal-case-groups.json",
-      "sha256": "808BDE0BC25BFD454F059579A970DB3F2D7896DC2E7743B1EDB96014E0C7F394",
+      "sha256": "67666338F971E24A994760B721F507FF49319CF6773557A3161406F5839C7B8F",
       "role": "PROPOSAL_CASE_CATALOGUE"
+    },
+    {
+      "file": "../../../../data/qa/mt2/mt2-pacs009-proposal-fixtures.json",
+      "sha256": "9B31F52565096B2732D509988792F3AC60F54F179551273B3799E6604048943F",
+      "role": "PROPOSAL_EXECUTABLE_FIXTURES"
     },
     {
       "file": "../../../../openapi/swift-data-service.v1.json",

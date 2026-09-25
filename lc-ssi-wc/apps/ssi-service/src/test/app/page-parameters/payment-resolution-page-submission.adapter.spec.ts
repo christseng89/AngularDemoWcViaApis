@@ -766,6 +766,65 @@ describe("PaymentResolutionPageSubmissionAdapter", () => {
     }
   });
 
+  it.each([
+    ["context.swift21NONE", "incoming21"],
+    ["context.swift121NONE", "incoming121"],
+    ["context.swift119NONE", "block3"],
+    ["context.sequenceB50A", "sequenceB"],
+    ["context.sequenceB59", "sequenceB"],
+  ])(
+    "passes missing governed COV context %s to the resolver for the Proposal envelope",
+    (fieldId, requestField) => {
+      const definition = definitionFor("MT202COV");
+      const scenario = scenarioFor(definition, "MT202COV-OP-STANDARD");
+      const rejection = {
+        httpStatus: 422,
+        profileKind: "SSI_RESOLUTION_ONLY",
+        paymentExecutable: false,
+        payloadGenerated: false,
+        confirmedResolutionCreated: false,
+        repairQueueCreated: false,
+        ssiApplicability: "NOT_EVALUATED",
+        resolutionOutcome: "INVALID_UPSTREAM_CONTEXT",
+      };
+      const context = harness(rejection);
+      const submission = submissionFor(definition, scenario, { [fieldId]: "" });
+
+      expect(() =>
+        context.adapter.execute({ definition, scenario, submission }),
+      ).toThrow(HttpException);
+      expect(context.resolver.resolve).toHaveBeenCalledWith(
+        expect.objectContaining({ [requestField]: expect.anything() }),
+      );
+    },
+  );
+
+  it("passes an invalid governed cover-purpose attestation to the resolver", () => {
+    const definition = definitionFor("MT202COV");
+    const scenario = scenarioFor(definition, "MT202COV-OP-STANDARD");
+    const rejection = {
+      httpStatus: 422,
+      profileKind: "SSI_RESOLUTION_ONLY",
+      paymentExecutable: false,
+      payloadGenerated: false,
+      confirmedResolutionCreated: false,
+      repairQueueCreated: false,
+      ssiApplicability: "NOT_EVALUATED",
+      resolutionOutcome: "INVALID_UPSTREAM_CONTEXT",
+    };
+    const context = harness(rejection);
+    const submission = submissionFor(definition, scenario, {
+      "context.underlyingCustomerCreditTransfer": false,
+    });
+
+    expect(() =>
+      context.adapter.execute({ definition, scenario, submission }),
+    ).toThrow(HttpException);
+    expect(context.resolver.resolve).toHaveBeenCalledWith(
+      expect.objectContaining({ underlyingCustomerCreditTransfer: false }),
+    );
+  });
+
   it("preserves governed-equivalent cover rule provenance for MT205COV", () => {
     const definition = definitionFor("MT205COV");
     const baseScenario = scenarioFor(definition, "MT205COV-OP-CONTINUATION");

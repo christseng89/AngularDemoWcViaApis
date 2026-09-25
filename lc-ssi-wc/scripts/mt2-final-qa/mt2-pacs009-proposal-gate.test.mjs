@@ -10,6 +10,9 @@ import {
 const catalogue = JSON.parse(
   fs.readFileSync("data/qa/mt2/mt2-pacs009-proposal-case-groups.json", "utf8"),
 );
+const fixtures = JSON.parse(
+  fs.readFileSync("data/qa/mt2/mt2-pacs009-proposal-fixtures.json", "utf8"),
+);
 const proposalHash = crypto
   .createHash("sha256")
   .update(
@@ -21,7 +24,7 @@ const proposalHash = crypto
   .toUpperCase();
 
 test("Proposal catalogue excludes out-of-scope messages and covers every outcome", () => {
-  const result = validateProposalCases(catalogue, proposalHash);
+  const result = validateProposalCases(catalogue, proposalHash, fixtures);
   assert.deepEqual(result.errors, []);
   assert.equal(result.expandedCaseCount, 101);
   assert.equal(catalogue.cases.length, 101);
@@ -45,7 +48,7 @@ test("Proposal catalogue rejects legacy vocabulary and any side effect", () => {
   const bad = structuredClone(catalogue);
   bad.groups[0].outcomes = ["SSI_AMBIGUOUS"];
   bad.sideEffects.repairQueueCreated = true;
-  const result = validateProposalCases(bad, proposalHash);
+  const result = validateProposalCases(bad, proposalHash, fixtures);
   assert.ok(
     result.errors.some((error) => error.includes("unsupported outcome")),
   );
@@ -57,14 +60,20 @@ test("Proposal catalogue rejects legacy vocabulary and any side effect", () => {
 test("Proposal catalogue rejects an unbound explicit case", () => {
   const bad = structuredClone(catalogue);
   delete bad.cases[0].executableTest;
-  const result = validateProposalCases(bad, proposalHash);
+  const result = validateProposalCases(bad, proposalHash, fixtures);
   assert.ok(result.errors.some((error) => error.includes("lacks fixture")));
 });
 
 test("Proposal report records every explicit case result", () => {
-  const validation = validateProposalCases(catalogue, proposalHash);
-  const passed = proposalCaseReport(catalogue, validation, true);
-  const failed = proposalCaseReport(catalogue, validation, false);
+  const validation = validateProposalCases(catalogue, proposalHash, fixtures);
+  const passedResults = new Map(
+    catalogue.cases.map(({ caseId }) => [caseId, "PASS"]),
+  );
+  const failedResults = new Map(
+    catalogue.cases.map(({ caseId }) => [caseId, "FAIL"]),
+  );
+  const passed = proposalCaseReport(catalogue, validation, passedResults);
+  const failed = proposalCaseReport(catalogue, validation, failedResults);
   assert.equal(passed.status, "PASS");
   assert.equal(passed.cases.length, 101);
   assert.equal(

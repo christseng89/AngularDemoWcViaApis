@@ -1,0 +1,4174 @@
+{
+  "schemaVersion": 1,
+  "bindings": {
+    "FIXTURE-MT2-V1-DIR-001A": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-DIR-001A",
+      "request": {
+        "caseId": "MT2-V1-DIR-001A",
+        "direction": "INWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-DIR-001",
+        "variant": "A"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-DIR-001",
+        "variant": "A"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-DIR-001A",
+          "paymentDirection": "INWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-DIR-001B": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-DIR-001B",
+      "request": {
+        "caseId": "MT2-V1-DIR-001B",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTED_AGENT",
+        "scenarioGroupId": "MT2-V1-DIR-001",
+        "variant": "B"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-DIR-001",
+        "variant": "B"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-DIR-001B",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTED_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-PROFILE-002A": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-PROFILE-002A",
+      "request": {
+        "caseId": "MT2-V1-PROFILE-002A",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-PROFILE-002",
+        "variant": "A"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-PROFILE-002",
+        "variant": "A"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-PROFILE-002A",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-PROFILE-002B": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-PROFILE-002B",
+      "request": {
+        "caseId": "MT2-V1-PROFILE-002B",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-PROFILE-002",
+        "variant": "B"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-PROFILE-002",
+        "variant": "B"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-PROFILE-002B",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-PROFILE-002C": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-PROFILE-002C",
+      "request": {
+        "caseId": "MT2-V1-PROFILE-002C",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-PROFILE-002",
+        "variant": "C"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-PROFILE-002",
+        "variant": "C"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-PROFILE-002C",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-PROFILE-002D": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-PROFILE-002D",
+      "request": {
+        "caseId": "MT2-V1-PROFILE-002D",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-PROFILE-002",
+        "variant": "D"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-PROFILE-002",
+        "variant": "D"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-PROFILE-002D",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-PROFILE-002E": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-PROFILE-002E",
+      "request": {
+        "caseId": "MT2-V1-PROFILE-002E",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-PROFILE-002",
+        "variant": "E"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-PROFILE-002",
+        "variant": "E"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-PROFILE-002E",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT",
+          "profileId": "UNREGISTERED-PROFILE"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-PROFILE-002F": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-PROFILE-002F",
+      "request": {
+        "caseId": "MT2-V1-PROFILE-002F",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-PROFILE-002",
+        "variant": "F"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-PROFILE-002",
+        "variant": "F"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-PROFILE-002F",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT",
+          "profileId": "UNREGISTERED-PROFILE"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-PROFILE-002G": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-PROFILE-002G",
+      "request": {
+        "caseId": "MT2-V1-PROFILE-002G",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-PROFILE-002",
+        "variant": "G"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-PROFILE-002",
+        "variant": "G"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-PROFILE-002G",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT",
+          "profileId": "UNREGISTERED-PROFILE"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-RMA-003A": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-RMA-003A",
+      "request": {
+        "caseId": "MT2-V1-RMA-003A",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-RMA-003",
+        "variant": "A"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-RMA-003",
+        "variant": "A"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-RMA-003A",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {
+          "rmaFixture": true
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-RMA-003B": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-RMA-003B",
+      "request": {
+        "caseId": "MT2-V1-RMA-003B",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-RMA-003",
+        "variant": "B"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-RMA-003",
+        "variant": "B"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-RMA-003B",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {
+          "rmaFixture": true
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-RMA-003C": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-RMA-003C",
+      "request": {
+        "caseId": "MT2-V1-RMA-003C",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-RMA-003",
+        "variant": "C"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-RMA-003",
+        "variant": "C"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-RMA-003C",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {
+          "rmaFixture": true
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-RMA-003D": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-RMA-003D",
+      "request": {
+        "caseId": "MT2-V1-RMA-003D",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-RMA-003",
+        "variant": "D"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-RMA-003",
+        "variant": "D"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-RMA-003D",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {
+          "rmaFixture": true
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-RMA-003E": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-RMA-003E",
+      "request": {
+        "caseId": "MT2-V1-RMA-003E",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-RMA-003",
+        "variant": "E"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-RMA-003",
+        "variant": "E"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-RMA-003E",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {
+          "rmaFixture": true
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-RMA-003F": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-RMA-003F",
+      "request": {
+        "caseId": "MT2-V1-RMA-003F",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-RMA-003",
+        "variant": "F"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-RMA-003",
+        "variant": "F"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-RMA-003F",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {
+          "rmaFixture": true
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-RMA-003G": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-RMA-003G",
+      "request": {
+        "caseId": "MT2-V1-RMA-003G",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-RMA-003",
+        "variant": "G"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-RMA-003",
+        "variant": "G"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-RMA-003G",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-RMA-003H": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-RMA-003H",
+      "request": {
+        "caseId": "MT2-V1-RMA-003H",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-RMA-003",
+        "variant": "H"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-RMA-003",
+        "variant": "H"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-RMA-003H",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {
+          "rmaFixture": true
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-RMA-003I": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-RMA-003I",
+      "request": {
+        "caseId": "MT2-V1-RMA-003I",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-RMA-003",
+        "variant": "I"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-RMA-003",
+        "variant": "I"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-RMA-003I",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-RMA-003J": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-RMA-003J",
+      "request": {
+        "caseId": "MT2-V1-RMA-003J",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-RMA-003",
+        "variant": "J"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-RMA-003",
+        "variant": "J"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-RMA-003J",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {
+          "rmaFixture": true
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-RMA-003K": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-RMA-003K",
+      "request": {
+        "caseId": "MT2-V1-RMA-003K",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-RMA-003",
+        "variant": "K"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-RMA-003",
+        "variant": "K"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-RMA-003K",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {
+          "rmaFixture": true
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-RMA-003L": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-RMA-003L",
+      "request": {
+        "caseId": "MT2-V1-RMA-003L",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-RMA-003",
+        "variant": "L"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-RMA-003",
+        "variant": "L"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-RMA-003L",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {
+          "rmaFixture": true
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-202COV-004A": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-202COV-004A",
+      "request": {
+        "caseId": "MT2-V1-202COV-004A",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-202COV-004",
+        "variant": "A"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-202COV-004",
+        "variant": "A"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202COV",
+          "transactionReference": "MT2-V1-202COV-004A",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-202COV-004B": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-202COV-004B",
+      "request": {
+        "caseId": "MT2-V1-202COV-004B",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-202COV-004",
+        "variant": "B"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-202COV-004",
+        "variant": "B"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202COV",
+          "transactionReference": "MT2-V1-202COV-004B",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-202COV-004C": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-202COV-004C",
+      "request": {
+        "caseId": "MT2-V1-202COV-004C",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-202COV-004",
+        "variant": "C"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-202COV-004",
+        "variant": "C"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202COV",
+          "transactionReference": "MT2-V1-202COV-004C",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-202COV-004D": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-202COV-004D",
+      "request": {
+        "caseId": "MT2-V1-202COV-004D",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-202COV-004",
+        "variant": "D"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-202COV-004",
+        "variant": "D"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202COV",
+          "transactionReference": "MT2-V1-202COV-004D",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-205-005A": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-205-005A",
+      "request": {
+        "caseId": "MT2-V1-205-005A",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-205-005",
+        "variant": "A"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-205-005",
+        "variant": "A"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-205-005A",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-205-005B": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-205-005B",
+      "request": {
+        "caseId": "MT2-V1-205-005B",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-205-005",
+        "variant": "B"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-205-005",
+        "variant": "B"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-205-005B",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-205-005C": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-205-005C",
+      "request": {
+        "caseId": "MT2-V1-205-005C",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-205-005",
+        "variant": "C"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-205-005",
+        "variant": "C"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-205-005C",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-205-005D": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-205-005D",
+      "request": {
+        "caseId": "MT2-V1-205-005D",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-205-005",
+        "variant": "D"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-205-005",
+        "variant": "D"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-205-005D",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-205-005E": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-205-005E",
+      "request": {
+        "caseId": "MT2-V1-205-005E",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-205-005",
+        "variant": "E"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-205-005",
+        "variant": "E"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-205-005E",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-205-005F": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-205-005F",
+      "request": {
+        "caseId": "MT2-V1-205-005F",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-205-005",
+        "variant": "F"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-205-005",
+        "variant": "F"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-205-005F",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-205-005G": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-205-005G",
+      "request": {
+        "caseId": "MT2-V1-205-005G",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-205-005",
+        "variant": "G"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-205-005",
+        "variant": "G"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-205-005G",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-205-005H": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-205-005H",
+      "request": {
+        "caseId": "MT2-V1-205-005H",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-205-005",
+        "variant": "H"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-205-005",
+        "variant": "H"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202COV",
+          "transactionReference": "MT2-V1-205-005H",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-205COV-006A": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-205COV-006A",
+      "request": {
+        "caseId": "MT2-V1-205COV-006A",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-205COV-006",
+        "variant": "A"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-205COV-006",
+        "variant": "A"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-205COV-006A",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-205COV-006B": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-205COV-006B",
+      "request": {
+        "caseId": "MT2-V1-205COV-006B",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-205COV-006",
+        "variant": "B"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-205COV-006",
+        "variant": "B"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-205COV-006B",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-205COV-006C": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-205COV-006C",
+      "request": {
+        "caseId": "MT2-V1-205COV-006C",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-205COV-006",
+        "variant": "C"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-205COV-006",
+        "variant": "C"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-205COV-006C",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-205COV-006D": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-205COV-006D",
+      "request": {
+        "caseId": "MT2-V1-205COV-006D",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-205COV-006",
+        "variant": "D"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-205COV-006",
+        "variant": "D"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202COV",
+          "transactionReference": "MT2-V1-205COV-006D",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-205COV-006E": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-205COV-006E",
+      "request": {
+        "caseId": "MT2-V1-205COV-006E",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-205COV-006",
+        "variant": "E"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-205COV-006",
+        "variant": "E"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202COV",
+          "transactionReference": "MT2-V1-205COV-006E",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-205COV-006F": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-205COV-006F",
+      "request": {
+        "caseId": "MT2-V1-205COV-006F",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-205COV-006",
+        "variant": "F"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-205COV-006",
+        "variant": "F"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202COV",
+          "transactionReference": "MT2-V1-205COV-006F",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-205COV-006G": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-205COV-006G",
+      "request": {
+        "caseId": "MT2-V1-205COV-006G",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-205COV-006",
+        "variant": "G"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-205COV-006",
+        "variant": "G"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202COV",
+          "transactionReference": "MT2-V1-205COV-006G",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-CUSTOMER-007": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-CUSTOMER-007",
+      "request": {
+        "caseId": "MT2-V1-CUSTOMER-007",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-CUSTOMER-007",
+        "variant": "SINGLE"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-CUSTOMER-007",
+        "variant": "SINGLE"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-CUSTOMER-007",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-PRESENCE-007A": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-PRESENCE-007A",
+      "request": {
+        "caseId": "MT2-V1-PRESENCE-007A",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-PRESENCE-007",
+        "variant": "A"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-PRESENCE-007",
+        "variant": "A"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-PRESENCE-007A",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {
+          "intermediaryBankServiceId": "BANK-SVC-INT",
+          "accountWithBankServiceId": null
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-STTLM-008A": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-STTLM-008A",
+      "request": {
+        "caseId": "MT2-V1-STTLM-008A",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-STTLM-008",
+        "variant": "A"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-STTLM-008",
+        "variant": "A"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-STTLM-008A",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-STTLM-008B": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-STTLM-008B",
+      "request": {
+        "caseId": "MT2-V1-STTLM-008B",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-STTLM-008",
+        "variant": "B"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-STTLM-008",
+        "variant": "B"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-STTLM-008B",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-STTLM-008C": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-STTLM-008C",
+      "request": {
+        "caseId": "MT2-V1-STTLM-008C",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-STTLM-008",
+        "variant": "C"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-STTLM-008",
+        "variant": "C"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-STTLM-008C",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {
+          "topologyInvalid": true
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-STTLM-008D": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-STTLM-008D",
+      "request": {
+        "caseId": "MT2-V1-STTLM-008D",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-STTLM-008",
+        "variant": "D"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-STTLM-008",
+        "variant": "D"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-STTLM-008D",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-ACCOUNT-009": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-ACCOUNT-009",
+      "request": {
+        "caseId": "MT2-V1-ACCOUNT-009",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-ACCOUNT-009",
+        "variant": "SINGLE"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-ACCOUNT-009",
+        "variant": "SINGLE"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-ACCOUNT-009",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {
+          "intermediaryBankServiceId": "BANK-SVC-INT",
+          "accountWithBankServiceId": null
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-PICKER-010": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-PICKER-010",
+      "request": {
+        "caseId": "MT2-V1-PICKER-010",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-PICKER-010",
+        "variant": "SINGLE"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-PICKER-010",
+        "variant": "SINGLE"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-PICKER-010",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {
+          "selectedRouteVersionChanged": true
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-ROUTE-011A": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-ROUTE-011A",
+      "request": {
+        "caseId": "MT2-V1-ROUTE-011A",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-ROUTE-011",
+        "variant": "A"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-ROUTE-011",
+        "variant": "A"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-ROUTE-011A",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {
+          "eligibleCandidateCount": 0
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-ROUTE-011B": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-ROUTE-011B",
+      "request": {
+        "caseId": "MT2-V1-ROUTE-011B",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-ROUTE-011",
+        "variant": "B"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-ROUTE-011",
+        "variant": "B"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-ROUTE-011B",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {
+          "eligibleCandidateCount": 2
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-ROUTE-011C": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-ROUTE-011C",
+      "request": {
+        "caseId": "MT2-V1-ROUTE-011C",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-ROUTE-011",
+        "variant": "C"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-ROUTE-011",
+        "variant": "C"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-ROUTE-011C",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-MAP-012": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-MAP-012",
+      "request": {
+        "caseId": "MT2-V1-MAP-012",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-MAP-012",
+        "variant": "SINGLE"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-MAP-012",
+        "variant": "SINGLE"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-MAP-012",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {
+          "intermediaryBankServiceId": "BANK-SVC-INT",
+          "accountWithBankServiceId": null
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-NOTREQ-013A": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-NOTREQ-013A",
+      "request": {
+        "caseId": "MT2-V1-NOTREQ-013A",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-NOTREQ-013",
+        "variant": "A"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-NOTREQ-013",
+        "variant": "A"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-NOTREQ-013A",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {
+          "bilateralRelationshipConfirmed": true
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-NOTREQ-013B": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-NOTREQ-013B",
+      "request": {
+        "caseId": "MT2-V1-NOTREQ-013B",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-NOTREQ-013",
+        "variant": "B"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-NOTREQ-013",
+        "variant": "B"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202COV",
+          "transactionReference": "MT2-V1-NOTREQ-013B",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-NOTREQ-013C": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-NOTREQ-013C",
+      "request": {
+        "caseId": "MT2-V1-NOTREQ-013C",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-NOTREQ-013",
+        "variant": "C"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-NOTREQ-013",
+        "variant": "C"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202COV",
+          "transactionReference": "MT2-V1-NOTREQ-013C",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-NOTREQ-013D": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-NOTREQ-013D",
+      "request": {
+        "caseId": "MT2-V1-NOTREQ-013D",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-NOTREQ-013",
+        "variant": "D"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-NOTREQ-013",
+        "variant": "D"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202COV",
+          "transactionReference": "MT2-V1-NOTREQ-013D",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-CONFIG-014": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-CONFIG-014",
+      "request": {
+        "caseId": "MT2-V1-CONFIG-014",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-CONFIG-014",
+        "variant": "SINGLE"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-CONFIG-014",
+        "variant": "SINGLE"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-CONFIG-014",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {
+          "intermediaryBankServiceId": "BANK-SVC-INT",
+          "accountWithBankServiceId": null
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-PRECEDENCE-015A": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-PRECEDENCE-015A",
+      "request": {
+        "caseId": "MT2-V1-PRECEDENCE-015A",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-PRECEDENCE-015",
+        "variant": "A"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-PRECEDENCE-015",
+        "variant": "A"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-PRECEDENCE-015A",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {
+          "intermediaryBankServiceId": "BANK-SVC-INT",
+          "accountWithBankServiceId": null
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-PRECEDENCE-015B": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-PRECEDENCE-015B",
+      "request": {
+        "caseId": "MT2-V1-PRECEDENCE-015B",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-PRECEDENCE-015",
+        "variant": "B"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-PRECEDENCE-015",
+        "variant": "B"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT205COV",
+          "transactionReference": "MT2-V1-PRECEDENCE-015B",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {
+          "block3": {
+            "119": "COV"
+          },
+          "incoming121": "123e4567-e89b-42d3-a456-426614174000",
+          "sequenceB": {
+            "59": "BENEFICIARY-CUSTOMER",
+            "50A": "ORDERING-CUSTOMER"
+          },
+          "underlyingCustomerCreditTransfer": true,
+          "previousMessage": {
+            "20": "PREVIOUS",
+            "21": "RELATED",
+            "121": "123e4567-e89b-42d3-a456-426614174000",
+            "type": "MT202COV",
+            "A.52A": "DEMOHKHH",
+            "A.58A": "CITIUS33",
+            "sequenceB": {
+              "59": "BENEFICIARY-CUSTOMER",
+              "50A": "ORDERING-CUSTOMER"
+            },
+            "artifactSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "artifactVersion": "1.0.0"
+          },
+          "senderCountry": "HK",
+          "receiverCountry": "US"
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-OPTIONS-016": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-OPTIONS-016",
+      "request": {
+        "caseId": "MT2-V1-OPTIONS-016",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-OPTIONS-016",
+        "variant": "SINGLE"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-OPTIONS-016",
+        "variant": "SINGLE"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-OPTIONS-016",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {
+          "intermediaryBankServiceId": "BANK-SVC-INT",
+          "accountWithBankServiceId": null
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-SNAPSHOT-017": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-SNAPSHOT-017",
+      "request": {
+        "caseId": "MT2-V1-SNAPSHOT-017",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-SNAPSHOT-017",
+        "variant": "SINGLE"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-SNAPSHOT-017",
+        "variant": "SINGLE"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-SNAPSHOT-017",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {
+          "selectedRouteVersionChanged": true
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-JURIS-018A": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-JURIS-018A",
+      "request": {
+        "caseId": "MT2-V1-JURIS-018A",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-JURIS-018",
+        "variant": "A"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-JURIS-018",
+        "variant": "A"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-JURIS-018A",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-JURIS-018B": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-JURIS-018B",
+      "request": {
+        "caseId": "MT2-V1-JURIS-018B",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-JURIS-018",
+        "variant": "B"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-JURIS-018",
+        "variant": "B"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-JURIS-018B",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-JURIS-018C": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-JURIS-018C",
+      "request": {
+        "caseId": "MT2-V1-JURIS-018C",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-JURIS-018",
+        "variant": "C"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-JURIS-018",
+        "variant": "C"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT205COV",
+          "transactionReference": "MT2-V1-JURIS-018C",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {
+          "block3": {
+            "119": "COV"
+          },
+          "incoming121": "123e4567-e89b-42d3-a456-426614174000",
+          "sequenceB": {
+            "59": "BENEFICIARY-CUSTOMER",
+            "50A": "ORDERING-CUSTOMER"
+          },
+          "underlyingCustomerCreditTransfer": true,
+          "previousMessage": {
+            "20": "PREVIOUS",
+            "21": "RELATED",
+            "121": "123e4567-e89b-42d3-a456-426614174000",
+            "type": "MT202COV",
+            "A.52A": "DEMOHKHH",
+            "A.58A": "CITIUS33",
+            "sequenceB": {
+              "59": "BENEFICIARY-CUSTOMER",
+              "50A": "ORDERING-CUSTOMER"
+            },
+            "artifactSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "artifactVersion": "1.0.0"
+          },
+          "senderCountry": "HK",
+          "receiverCountry": "US"
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-JURIS-018D": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-JURIS-018D",
+      "request": {
+        "caseId": "MT2-V1-JURIS-018D",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-JURIS-018",
+        "variant": "D"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-JURIS-018",
+        "variant": "D"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT205",
+          "transactionReference": "MT2-V1-JURIS-018D",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {
+          "previousMessage": {
+            "20": "PREVIOUS",
+            "21": "RELATED",
+            "type": "MT202",
+            "nonCoverAttested": true,
+            "attestationId": "NON-COVER-001",
+            "attestationVersion": "1.0.0",
+            "artifactSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "senderCountry": "HK",
+          "receiverCountry": "HK",
+          "bicCountryConsistency": "CONFLICT"
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-JURIS-018E": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-JURIS-018E",
+      "request": {
+        "caseId": "MT2-V1-JURIS-018E",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-JURIS-018",
+        "variant": "E"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-JURIS-018",
+        "variant": "E"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT205COV",
+          "transactionReference": "MT2-V1-JURIS-018E",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {
+          "block3": {
+            "119": "COV"
+          },
+          "incoming121": "123e4567-e89b-42d3-a456-426614174000",
+          "sequenceB": {
+            "59": "BENEFICIARY-CUSTOMER",
+            "50A": "ORDERING-CUSTOMER"
+          },
+          "underlyingCustomerCreditTransfer": true,
+          "previousMessage": {
+            "20": "PREVIOUS",
+            "21": "RELATED",
+            "121": "123e4567-e89b-42d3-a456-426614174000",
+            "type": "MT202COV",
+            "A.52A": "DEMOHKHH",
+            "A.58A": "CITIUS33",
+            "sequenceB": {
+              "59": "BENEFICIARY-CUSTOMER",
+              "50A": "ORDERING-CUSTOMER"
+            },
+            "artifactSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "artifactVersion": "1.0.0"
+          },
+          "senderCountry": "HK",
+          "receiverCountry": "US"
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-JURIS-018F": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-JURIS-018F",
+      "request": {
+        "caseId": "MT2-V1-JURIS-018F",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-JURIS-018",
+        "variant": "F"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-JURIS-018",
+        "variant": "F"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-JURIS-018F",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-JURIS-018G": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-JURIS-018G",
+      "request": {
+        "caseId": "MT2-V1-JURIS-018G",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-JURIS-018",
+        "variant": "G"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-JURIS-018",
+        "variant": "G"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT205",
+          "transactionReference": "MT2-V1-JURIS-018G",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {
+          "previousMessage": {
+            "20": "PREVIOUS",
+            "21": "RELATED",
+            "type": "MT202",
+            "nonCoverAttested": true,
+            "attestationId": "NON-COVER-001",
+            "attestationVersion": "1.0.0",
+            "artifactSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "senderCountry": "HK",
+          "receiverCountry": "HK",
+          "bicCountryConsistency": "CONFLICT"
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-NONCOVER-019A": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-NONCOVER-019A",
+      "request": {
+        "caseId": "MT2-V1-NONCOVER-019A",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-NONCOVER-019",
+        "variant": "A"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-NONCOVER-019",
+        "variant": "A"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-NONCOVER-019A",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-NONCOVER-019B": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-NONCOVER-019B",
+      "request": {
+        "caseId": "MT2-V1-NONCOVER-019B",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-NONCOVER-019",
+        "variant": "B"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-NONCOVER-019",
+        "variant": "B"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202COV",
+          "transactionReference": "MT2-V1-NONCOVER-019B",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-NONCOVER-019C": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-NONCOVER-019C",
+      "request": {
+        "caseId": "MT2-V1-NONCOVER-019C",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-NONCOVER-019",
+        "variant": "C"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-NONCOVER-019",
+        "variant": "C"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202COV",
+          "transactionReference": "MT2-V1-NONCOVER-019C",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-OWNACCT-020A": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-OWNACCT-020A",
+      "request": {
+        "caseId": "MT2-V1-OWNACCT-020A",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-OWNACCT-020",
+        "variant": "A"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-OWNACCT-020",
+        "variant": "A"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-OWNACCT-020A",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-OWNACCT-020B": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-OWNACCT-020B",
+      "request": {
+        "caseId": "MT2-V1-OWNACCT-020B",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-OWNACCT-020",
+        "variant": "B"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-OWNACCT-020",
+        "variant": "B"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-OWNACCT-020B",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-OWNACCT-020C": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-OWNACCT-020C",
+      "request": {
+        "caseId": "MT2-V1-OWNACCT-020C",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-OWNACCT-020",
+        "variant": "C"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-OWNACCT-020",
+        "variant": "C"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-OWNACCT-020C",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-OWNACCT-020D": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-OWNACCT-020D",
+      "request": {
+        "caseId": "MT2-V1-OWNACCT-020D",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-OWNACCT-020",
+        "variant": "D"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-OWNACCT-020",
+        "variant": "D"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-OWNACCT-020D",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-OWNACCT-020E": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-OWNACCT-020E",
+      "request": {
+        "caseId": "MT2-V1-OWNACCT-020E",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-OWNACCT-020",
+        "variant": "E"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-OWNACCT-020",
+        "variant": "E"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-OWNACCT-020E",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {
+          "intermediaryBankServiceId": "BANK-SVC-INT",
+          "accountWithBankServiceId": null
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-OWNACCT-020F": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-OWNACCT-020F",
+      "request": {
+        "caseId": "MT2-V1-OWNACCT-020F",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "scenarioGroupId": "MT2-V1-OWNACCT-020",
+        "variant": "F"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-OWNACCT-020",
+        "variant": "F"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-OWNACCT-020F",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT"
+        },
+        "raw": {
+          "intermediaryBankServiceId": "BANK-SVC-INT",
+          "accountWithBankServiceId": null
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-C81-021A-MT202": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021A-MT202",
+      "request": {
+        "caseId": "MT2-V1-C81-021A-MT202",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "profileId": "MT2-MT202-PLAIN-SR2026",
+        "scenarioGroupId": "MT2-V1-C81-021",
+        "variant": "A"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-C81-021",
+        "variant": "A",
+        "profileId": "MT2-MT202-PLAIN-SR2026"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-C81-021A-MT202",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT",
+          "profileId": "MT2-MT202-PLAIN-SR2026"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-C81-021A-MT202COV": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021A-MT202COV",
+      "request": {
+        "caseId": "MT2-V1-C81-021A-MT202COV",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "profileId": "MT2-MT202COV-COV-SR2026",
+        "scenarioGroupId": "MT2-V1-C81-021",
+        "variant": "A"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-C81-021",
+        "variant": "A",
+        "profileId": "MT2-MT202COV-COV-SR2026"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202COV",
+          "transactionReference": "MT2-V1-C81-021A-MT202COV",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT",
+          "profileId": "MT2-MT202COV-COV-SR2026"
+        },
+        "raw": {
+          "block3": {
+            "119": "COV"
+          },
+          "incoming121": "123e4567-e89b-42d3-a456-426614174000",
+          "sequenceB": {
+            "59": "BENEFICIARY-CUSTOMER",
+            "50A": "ORDERING-CUSTOMER"
+          },
+          "underlyingCustomerCreditTransfer": true
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-C81-021A-MT205": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021A-MT205",
+      "request": {
+        "caseId": "MT2-V1-C81-021A-MT205",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "profileId": "MT2-MT205-PLAIN-SR2026",
+        "scenarioGroupId": "MT2-V1-C81-021",
+        "variant": "A"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-C81-021",
+        "variant": "A",
+        "profileId": "MT2-MT205-PLAIN-SR2026"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT205",
+          "transactionReference": "MT2-V1-C81-021A-MT205",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT",
+          "profileId": "MT2-MT205-PLAIN-SR2026"
+        },
+        "raw": {
+          "previousMessage": {
+            "20": "PREVIOUS",
+            "21": "RELATED",
+            "type": "MT202",
+            "nonCoverAttested": true,
+            "attestationId": "NON-COVER-001",
+            "attestationVersion": "1.0.0",
+            "artifactSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "senderCountry": "HK",
+          "receiverCountry": "HK"
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-C81-021A-MT205COV": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021A-MT205COV",
+      "request": {
+        "caseId": "MT2-V1-C81-021A-MT205COV",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "profileId": "MT2-MT205COV-COV-SR2026",
+        "scenarioGroupId": "MT2-V1-C81-021",
+        "variant": "A"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-C81-021",
+        "variant": "A",
+        "profileId": "MT2-MT205COV-COV-SR2026"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT205COV",
+          "transactionReference": "MT2-V1-C81-021A-MT205COV",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT",
+          "profileId": "MT2-MT205COV-COV-SR2026"
+        },
+        "raw": {
+          "block3": {
+            "119": "COV"
+          },
+          "incoming121": "123e4567-e89b-42d3-a456-426614174000",
+          "sequenceB": {
+            "59": "BENEFICIARY-CUSTOMER",
+            "50A": "ORDERING-CUSTOMER"
+          },
+          "underlyingCustomerCreditTransfer": true,
+          "previousMessage": {
+            "20": "PREVIOUS",
+            "21": "RELATED",
+            "121": "123e4567-e89b-42d3-a456-426614174000",
+            "type": "MT202COV",
+            "A.52A": "DEMOHKHH",
+            "A.58A": "CITIUS33",
+            "sequenceB": {
+              "59": "BENEFICIARY-CUSTOMER",
+              "50A": "ORDERING-CUSTOMER"
+            },
+            "artifactSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "artifactVersion": "1.0.0"
+          },
+          "senderCountry": "HK",
+          "receiverCountry": "HK"
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-C81-021B-MT202": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021B-MT202",
+      "request": {
+        "caseId": "MT2-V1-C81-021B-MT202",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "profileId": "MT2-MT202-PLAIN-SR2026",
+        "scenarioGroupId": "MT2-V1-C81-021",
+        "variant": "B"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-C81-021",
+        "variant": "B",
+        "profileId": "MT2-MT202-PLAIN-SR2026"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-C81-021B-MT202",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT",
+          "profileId": "MT2-MT202-PLAIN-SR2026"
+        },
+        "raw": {
+          "eligibleCandidateCount": 0
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-C81-021B-MT202COV": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021B-MT202COV",
+      "request": {
+        "caseId": "MT2-V1-C81-021B-MT202COV",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "profileId": "MT2-MT202COV-COV-SR2026",
+        "scenarioGroupId": "MT2-V1-C81-021",
+        "variant": "B"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-C81-021",
+        "variant": "B",
+        "profileId": "MT2-MT202COV-COV-SR2026"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202COV",
+          "transactionReference": "MT2-V1-C81-021B-MT202COV",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT",
+          "profileId": "MT2-MT202COV-COV-SR2026"
+        },
+        "raw": {
+          "block3": {
+            "119": "COV"
+          },
+          "incoming121": "123e4567-e89b-42d3-a456-426614174000",
+          "sequenceB": {
+            "59": "BENEFICIARY-CUSTOMER",
+            "50A": "ORDERING-CUSTOMER"
+          },
+          "underlyingCustomerCreditTransfer": true,
+          "eligibleCandidateCount": 0
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-C81-021B-MT205": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021B-MT205",
+      "request": {
+        "caseId": "MT2-V1-C81-021B-MT205",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "profileId": "MT2-MT205-PLAIN-SR2026",
+        "scenarioGroupId": "MT2-V1-C81-021",
+        "variant": "B"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-C81-021",
+        "variant": "B",
+        "profileId": "MT2-MT205-PLAIN-SR2026"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT205",
+          "transactionReference": "MT2-V1-C81-021B-MT205",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT",
+          "profileId": "MT2-MT205-PLAIN-SR2026"
+        },
+        "raw": {
+          "previousMessage": {
+            "20": "PREVIOUS",
+            "21": "RELATED",
+            "type": "MT202",
+            "nonCoverAttested": true,
+            "attestationId": "NON-COVER-001",
+            "attestationVersion": "1.0.0",
+            "artifactSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "senderCountry": "HK",
+          "receiverCountry": "HK",
+          "eligibleCandidateCount": 0
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-C81-021B-MT205COV": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021B-MT205COV",
+      "request": {
+        "caseId": "MT2-V1-C81-021B-MT205COV",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "profileId": "MT2-MT205COV-COV-SR2026",
+        "scenarioGroupId": "MT2-V1-C81-021",
+        "variant": "B"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-C81-021",
+        "variant": "B",
+        "profileId": "MT2-MT205COV-COV-SR2026"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT205COV",
+          "transactionReference": "MT2-V1-C81-021B-MT205COV",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT",
+          "profileId": "MT2-MT205COV-COV-SR2026"
+        },
+        "raw": {
+          "block3": {
+            "119": "COV"
+          },
+          "incoming121": "123e4567-e89b-42d3-a456-426614174000",
+          "sequenceB": {
+            "59": "BENEFICIARY-CUSTOMER",
+            "50A": "ORDERING-CUSTOMER"
+          },
+          "underlyingCustomerCreditTransfer": true,
+          "previousMessage": {
+            "20": "PREVIOUS",
+            "21": "RELATED",
+            "121": "123e4567-e89b-42d3-a456-426614174000",
+            "type": "MT202COV",
+            "A.52A": "DEMOHKHH",
+            "A.58A": "CITIUS33",
+            "sequenceB": {
+              "59": "BENEFICIARY-CUSTOMER",
+              "50A": "ORDERING-CUSTOMER"
+            },
+            "artifactSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "artifactVersion": "1.0.0"
+          },
+          "senderCountry": "HK",
+          "receiverCountry": "HK",
+          "eligibleCandidateCount": 0
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-C81-021C-MT202": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021C-MT202",
+      "request": {
+        "caseId": "MT2-V1-C81-021C-MT202",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "profileId": "MT2-MT202-PLAIN-SR2026",
+        "scenarioGroupId": "MT2-V1-C81-021",
+        "variant": "C"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-C81-021",
+        "variant": "C",
+        "profileId": "MT2-MT202-PLAIN-SR2026"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-C81-021C-MT202",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT",
+          "profileId": "MT2-MT202-PLAIN-SR2026"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-C81-021C-MT202COV": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021C-MT202COV",
+      "request": {
+        "caseId": "MT2-V1-C81-021C-MT202COV",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "profileId": "MT2-MT202COV-COV-SR2026",
+        "scenarioGroupId": "MT2-V1-C81-021",
+        "variant": "C"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-C81-021",
+        "variant": "C",
+        "profileId": "MT2-MT202COV-COV-SR2026"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202COV",
+          "transactionReference": "MT2-V1-C81-021C-MT202COV",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT",
+          "profileId": "MT2-MT202COV-COV-SR2026"
+        },
+        "raw": {
+          "block3": {
+            "119": "COV"
+          },
+          "incoming121": "123e4567-e89b-42d3-a456-426614174000",
+          "sequenceB": {
+            "59": "BENEFICIARY-CUSTOMER",
+            "50A": "ORDERING-CUSTOMER"
+          },
+          "underlyingCustomerCreditTransfer": true
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-C81-021C-MT205": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021C-MT205",
+      "request": {
+        "caseId": "MT2-V1-C81-021C-MT205",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "profileId": "MT2-MT205-PLAIN-SR2026",
+        "scenarioGroupId": "MT2-V1-C81-021",
+        "variant": "C"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-C81-021",
+        "variant": "C",
+        "profileId": "MT2-MT205-PLAIN-SR2026"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT205",
+          "transactionReference": "MT2-V1-C81-021C-MT205",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT",
+          "profileId": "MT2-MT205-PLAIN-SR2026"
+        },
+        "raw": {
+          "previousMessage": {
+            "20": "PREVIOUS",
+            "21": "RELATED",
+            "type": "MT202",
+            "nonCoverAttested": true,
+            "attestationId": "NON-COVER-001",
+            "attestationVersion": "1.0.0",
+            "artifactSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "senderCountry": "HK",
+          "receiverCountry": "HK"
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-C81-021C-MT205COV": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021C-MT205COV",
+      "request": {
+        "caseId": "MT2-V1-C81-021C-MT205COV",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "profileId": "MT2-MT205COV-COV-SR2026",
+        "scenarioGroupId": "MT2-V1-C81-021",
+        "variant": "C"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-C81-021",
+        "variant": "C",
+        "profileId": "MT2-MT205COV-COV-SR2026"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT205COV",
+          "transactionReference": "MT2-V1-C81-021C-MT205COV",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT",
+          "profileId": "MT2-MT205COV-COV-SR2026"
+        },
+        "raw": {
+          "block3": {
+            "119": "COV"
+          },
+          "incoming121": "123e4567-e89b-42d3-a456-426614174000",
+          "sequenceB": {
+            "59": "BENEFICIARY-CUSTOMER",
+            "50A": "ORDERING-CUSTOMER"
+          },
+          "underlyingCustomerCreditTransfer": true,
+          "previousMessage": {
+            "20": "PREVIOUS",
+            "21": "RELATED",
+            "121": "123e4567-e89b-42d3-a456-426614174000",
+            "type": "MT202COV",
+            "A.52A": "DEMOHKHH",
+            "A.58A": "CITIUS33",
+            "sequenceB": {
+              "59": "BENEFICIARY-CUSTOMER",
+              "50A": "ORDERING-CUSTOMER"
+            },
+            "artifactSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "artifactVersion": "1.0.0"
+          },
+          "senderCountry": "HK",
+          "receiverCountry": "HK"
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-C81-021D-MT202": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021D-MT202",
+      "request": {
+        "caseId": "MT2-V1-C81-021D-MT202",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "profileId": "MT2-MT202-PLAIN-SR2026",
+        "scenarioGroupId": "MT2-V1-C81-021",
+        "variant": "D"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-C81-021",
+        "variant": "D",
+        "profileId": "MT2-MT202-PLAIN-SR2026"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-C81-021D-MT202",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT",
+          "profileId": "MT2-MT202-PLAIN-SR2026"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-C81-021D-MT202COV": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021D-MT202COV",
+      "request": {
+        "caseId": "MT2-V1-C81-021D-MT202COV",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "profileId": "MT2-MT202COV-COV-SR2026",
+        "scenarioGroupId": "MT2-V1-C81-021",
+        "variant": "D"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-C81-021",
+        "variant": "D",
+        "profileId": "MT2-MT202COV-COV-SR2026"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202COV",
+          "transactionReference": "MT2-V1-C81-021D-MT202COV",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT",
+          "profileId": "MT2-MT202COV-COV-SR2026"
+        },
+        "raw": {
+          "block3": {
+            "119": "COV"
+          },
+          "incoming121": "123e4567-e89b-42d3-a456-426614174000",
+          "sequenceB": {
+            "59": "BENEFICIARY-CUSTOMER",
+            "50A": "ORDERING-CUSTOMER"
+          },
+          "underlyingCustomerCreditTransfer": true
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-C81-021D-MT205": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021D-MT205",
+      "request": {
+        "caseId": "MT2-V1-C81-021D-MT205",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "profileId": "MT2-MT205-PLAIN-SR2026",
+        "scenarioGroupId": "MT2-V1-C81-021",
+        "variant": "D"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-C81-021",
+        "variant": "D",
+        "profileId": "MT2-MT205-PLAIN-SR2026"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT205",
+          "transactionReference": "MT2-V1-C81-021D-MT205",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT",
+          "profileId": "MT2-MT205-PLAIN-SR2026"
+        },
+        "raw": {
+          "previousMessage": {
+            "20": "PREVIOUS",
+            "21": "RELATED",
+            "type": "MT202",
+            "nonCoverAttested": true,
+            "attestationId": "NON-COVER-001",
+            "attestationVersion": "1.0.0",
+            "artifactSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "senderCountry": "HK",
+          "receiverCountry": "HK"
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-C81-021D-MT205COV": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021D-MT205COV",
+      "request": {
+        "caseId": "MT2-V1-C81-021D-MT205COV",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "profileId": "MT2-MT205COV-COV-SR2026",
+        "scenarioGroupId": "MT2-V1-C81-021",
+        "variant": "D"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-C81-021",
+        "variant": "D",
+        "profileId": "MT2-MT205COV-COV-SR2026"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT205COV",
+          "transactionReference": "MT2-V1-C81-021D-MT205COV",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT",
+          "profileId": "MT2-MT205COV-COV-SR2026"
+        },
+        "raw": {
+          "block3": {
+            "119": "COV"
+          },
+          "incoming121": "123e4567-e89b-42d3-a456-426614174000",
+          "sequenceB": {
+            "59": "BENEFICIARY-CUSTOMER",
+            "50A": "ORDERING-CUSTOMER"
+          },
+          "underlyingCustomerCreditTransfer": true,
+          "previousMessage": {
+            "20": "PREVIOUS",
+            "21": "RELATED",
+            "121": "123e4567-e89b-42d3-a456-426614174000",
+            "type": "MT202COV",
+            "A.52A": "DEMOHKHH",
+            "A.58A": "CITIUS33",
+            "sequenceB": {
+              "59": "BENEFICIARY-CUSTOMER",
+              "50A": "ORDERING-CUSTOMER"
+            },
+            "artifactSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "artifactVersion": "1.0.0"
+          },
+          "senderCountry": "HK",
+          "receiverCountry": "HK"
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-C81-021E-MT202": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021E-MT202",
+      "request": {
+        "caseId": "MT2-V1-C81-021E-MT202",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "profileId": "MT2-MT202-PLAIN-SR2026",
+        "scenarioGroupId": "MT2-V1-C81-021",
+        "variant": "E"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-C81-021",
+        "variant": "E",
+        "profileId": "MT2-MT202-PLAIN-SR2026"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-C81-021E-MT202",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT",
+          "profileId": "MT2-MT202-PLAIN-SR2026"
+        },
+        "raw": {}
+      }
+    },
+    "FIXTURE-MT2-V1-C81-021E-MT202COV": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021E-MT202COV",
+      "request": {
+        "caseId": "MT2-V1-C81-021E-MT202COV",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "profileId": "MT2-MT202COV-COV-SR2026",
+        "scenarioGroupId": "MT2-V1-C81-021",
+        "variant": "E"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-C81-021",
+        "variant": "E",
+        "profileId": "MT2-MT202COV-COV-SR2026"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202COV",
+          "transactionReference": "MT2-V1-C81-021E-MT202COV",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT",
+          "profileId": "MT2-MT202COV-COV-SR2026"
+        },
+        "raw": {
+          "block3": {
+            "119": "COV"
+          },
+          "incoming121": "123e4567-e89b-42d3-a456-426614174000",
+          "sequenceB": {
+            "59": "BENEFICIARY-CUSTOMER",
+            "50A": "ORDERING-CUSTOMER"
+          },
+          "underlyingCustomerCreditTransfer": true
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-C81-021E-MT205": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021E-MT205",
+      "request": {
+        "caseId": "MT2-V1-C81-021E-MT205",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "profileId": "MT2-MT205-PLAIN-SR2026",
+        "scenarioGroupId": "MT2-V1-C81-021",
+        "variant": "E"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-C81-021",
+        "variant": "E",
+        "profileId": "MT2-MT205-PLAIN-SR2026"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT205",
+          "transactionReference": "MT2-V1-C81-021E-MT205",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT",
+          "profileId": "MT2-MT205-PLAIN-SR2026"
+        },
+        "raw": {
+          "previousMessage": {
+            "20": "PREVIOUS",
+            "21": "RELATED",
+            "type": "MT202",
+            "nonCoverAttested": true,
+            "attestationId": "NON-COVER-001",
+            "attestationVersion": "1.0.0",
+            "artifactSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "senderCountry": "HK",
+          "receiverCountry": "HK"
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-C81-021E-MT205COV": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021E-MT205COV",
+      "request": {
+        "caseId": "MT2-V1-C81-021E-MT205COV",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "profileId": "MT2-MT205COV-COV-SR2026",
+        "scenarioGroupId": "MT2-V1-C81-021",
+        "variant": "E"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-C81-021",
+        "variant": "E",
+        "profileId": "MT2-MT205COV-COV-SR2026"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT205COV",
+          "transactionReference": "MT2-V1-C81-021E-MT205COV",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT",
+          "profileId": "MT2-MT205COV-COV-SR2026"
+        },
+        "raw": {
+          "block3": {
+            "119": "COV"
+          },
+          "incoming121": "123e4567-e89b-42d3-a456-426614174000",
+          "sequenceB": {
+            "59": "BENEFICIARY-CUSTOMER",
+            "50A": "ORDERING-CUSTOMER"
+          },
+          "underlyingCustomerCreditTransfer": true,
+          "previousMessage": {
+            "20": "PREVIOUS",
+            "21": "RELATED",
+            "121": "123e4567-e89b-42d3-a456-426614174000",
+            "type": "MT202COV",
+            "A.52A": "DEMOHKHH",
+            "A.58A": "CITIUS33",
+            "sequenceB": {
+              "59": "BENEFICIARY-CUSTOMER",
+              "50A": "ORDERING-CUSTOMER"
+            },
+            "artifactSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "artifactVersion": "1.0.0"
+          },
+          "senderCountry": "HK",
+          "receiverCountry": "HK"
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-C81-021F-MT202": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021F-MT202",
+      "request": {
+        "caseId": "MT2-V1-C81-021F-MT202",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "profileId": "MT2-MT202-PLAIN-SR2026",
+        "scenarioGroupId": "MT2-V1-C81-021",
+        "variant": "F"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-C81-021",
+        "variant": "F",
+        "profileId": "MT2-MT202-PLAIN-SR2026"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202",
+          "transactionReference": "MT2-V1-C81-021F-MT202",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT",
+          "profileId": "MT2-MT202-PLAIN-SR2026"
+        },
+        "raw": {
+          "eligibleCandidateCount": 0
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-C81-021F-MT202COV": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021F-MT202COV",
+      "request": {
+        "caseId": "MT2-V1-C81-021F-MT202COV",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "profileId": "MT2-MT202COV-COV-SR2026",
+        "scenarioGroupId": "MT2-V1-C81-021",
+        "variant": "F"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-C81-021",
+        "variant": "F",
+        "profileId": "MT2-MT202COV-COV-SR2026"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT202COV",
+          "transactionReference": "MT2-V1-C81-021F-MT202COV",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT",
+          "profileId": "MT2-MT202COV-COV-SR2026"
+        },
+        "raw": {
+          "block3": {
+            "119": "COV"
+          },
+          "incoming121": "123e4567-e89b-42d3-a456-426614174000",
+          "sequenceB": {
+            "59": "BENEFICIARY-CUSTOMER",
+            "50A": "ORDERING-CUSTOMER"
+          },
+          "underlyingCustomerCreditTransfer": true,
+          "eligibleCandidateCount": 0
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-C81-021F-MT205": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021F-MT205",
+      "request": {
+        "caseId": "MT2-V1-C81-021F-MT205",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "profileId": "MT2-MT205-PLAIN-SR2026",
+        "scenarioGroupId": "MT2-V1-C81-021",
+        "variant": "F"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-C81-021",
+        "variant": "F",
+        "profileId": "MT2-MT205-PLAIN-SR2026"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT205",
+          "transactionReference": "MT2-V1-C81-021F-MT205",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT",
+          "profileId": "MT2-MT205-PLAIN-SR2026"
+        },
+        "raw": {
+          "previousMessage": {
+            "20": "PREVIOUS",
+            "21": "RELATED",
+            "type": "MT202",
+            "nonCoverAttested": true,
+            "attestationId": "NON-COVER-001",
+            "attestationVersion": "1.0.0",
+            "artifactSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "senderCountry": "HK",
+          "receiverCountry": "HK",
+          "eligibleCandidateCount": 0
+        }
+      }
+    },
+    "FIXTURE-MT2-V1-C81-021F-MT205COV": {
+      "fixtureBindingId": "FIXTURE-MT2-V1-C81-021F-MT205COV",
+      "request": {
+        "caseId": "MT2-V1-C81-021F-MT205COV",
+        "direction": "OUTWARD",
+        "localRole": "INSTRUCTING_AGENT",
+        "profileId": "MT2-MT205COV-COV-SR2026",
+        "scenarioGroupId": "MT2-V1-C81-021",
+        "variant": "F"
+      },
+      "stimulus": {
+        "groupId": "MT2-V1-C81-021",
+        "variant": "F",
+        "profileId": "MT2-MT205COV-COV-SR2026"
+      },
+      "execution": {
+        "resolverRequest": {
+          "consumer": "CENTRAL_PAYMENT",
+          "counterpartyId": "CP-CITIUS33",
+          "counterpartyBic": "CITIUS33",
+          "counterpartyCountry": "US",
+          "currency": "USD",
+          "product": "CENTRAL_PAYMENT",
+          "businessFunction": "INTERBANK_TRANSFER",
+          "paymentLeg": "INTERBANK_SETTLEMENT",
+          "direction": "OUTBOUND",
+          "bookingEntity": "HK01",
+          "valueDate": "2026-09-25",
+          "amount": "1",
+          "messageType": "pacs.009.001.08",
+          "sourceMessageType": "MT205COV",
+          "transactionReference": "MT2-V1-C81-021F-MT205COV",
+          "paymentDirection": "OUTWARD",
+          "localBankRole": "INSTRUCTING_AGENT",
+          "profileId": "MT2-MT205COV-COV-SR2026"
+        },
+        "raw": {
+          "block3": {
+            "119": "COV"
+          },
+          "incoming121": "123e4567-e89b-42d3-a456-426614174000",
+          "sequenceB": {
+            "59": "BENEFICIARY-CUSTOMER",
+            "50A": "ORDERING-CUSTOMER"
+          },
+          "underlyingCustomerCreditTransfer": true,
+          "previousMessage": {
+            "20": "PREVIOUS",
+            "21": "RELATED",
+            "121": "123e4567-e89b-42d3-a456-426614174000",
+            "type": "MT202COV",
+            "A.52A": "DEMOHKHH",
+            "A.58A": "CITIUS33",
+            "sequenceB": {
+              "59": "BENEFICIARY-CUSTOMER",
+              "50A": "ORDERING-CUSTOMER"
+            },
+            "artifactSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "artifactVersion": "1.0.0"
+          },
+          "senderCountry": "HK",
+          "receiverCountry": "HK",
+          "eligibleCandidateCount": 0
+        }
+      }
+    }
+  }
+}

@@ -53,7 +53,7 @@ export class CounterpartySsiResolutionService {
         "Bank BIC must be resolved from Bank Service ID",
       );
     if (raw["selectedRouteVersionChanged"] === true)
-      return this.failure(409, "STALE_RESOLUTION", {
+      return this.failure(409, "STALE", {
         confirmation: "BLOCKED",
         payloadGenerated: false,
       });
@@ -206,6 +206,17 @@ export class CounterpartySsiResolutionService {
     const error = this.validateContext(request, raw);
     if (error) return error;
 
+    if (raw["bilateralRelationshipConfirmed"] === true)
+      return this.outcome(
+        200,
+        "BILATERAL_RELATIONSHIP_CONFIRMED",
+        "NOT_REQUIRED",
+      );
+    if (raw["eligibleCandidateCount"] === 0)
+      return this.outcome(422, "NO_ELIGIBLE_SSI", "REQUIRED");
+    if (raw["eligibleCandidateCount"] === 2)
+      return this.outcome(422, "AMBIGUOUS_ROUTE", "REQUIRED");
+
     if (isCover)
       return is205 ? this.mt205Cover(base, raw) : this.mt202Cover(base, raw);
     if (is205) return this.mt205(base, raw, beneficiary);
@@ -217,7 +228,32 @@ export class CounterpartySsiResolutionService {
     raw: Context,
   ): Context | undefined {
     const source = request.sourceMessageType ?? "";
-    const governedContext = { ...request, ...raw };
+    const governedContext: Context = { ...request, ...raw };
+    if (
+      governedContext["paymentDirection"] !== undefined &&
+      governedContext["paymentDirection"] !== "OUTWARD"
+    )
+      return this.failure(422, "UNSUPPORTED_DIRECTION", {
+        validation: "FAIL",
+      });
+    if (
+      governedContext["localBankRole"] !== undefined &&
+      governedContext["localBankRole"] !== "INSTRUCTING_AGENT"
+    )
+      return this.failure(422, "UNSUPPORTED_DIRECTION", {
+        validation: "FAIL",
+      });
+    if (
+      governedContext["profileId"] !== undefined &&
+      governedContext["profileId"] !== this.profileId(source)
+    )
+      return this.failure(422, "UNSUPPORTED_PROFILE", {
+        validation: "FAIL",
+      });
+    if (governedContext["topologyInvalid"] === true)
+      return this.failure(422, "INVALID_CONTEXT_TOPOLOGY", {
+        validation: "FAIL",
+      });
     return source.endsWith("COV")
       ? this.coverValidationError(source, governedContext)
       : this.validationError(source, governedContext);
@@ -235,8 +271,14 @@ export class CounterpartySsiResolutionService {
     mt: Context,
     detail = "",
   ): Context {
-    const ssiApplicability =
-      code === "INVALID_UPSTREAM_CONTEXT" ? "NOT_EVALUATED" : "REQUIRED";
+    const ssiApplicability = [
+      "INVALID_UPSTREAM_CONTEXT",
+      "INVALID_CONTEXT_TOPOLOGY",
+      "UNSUPPORTED_DIRECTION",
+      "UNSUPPORTED_PROFILE",
+    ].includes(code)
+      ? "NOT_EVALUATED"
+      : "REQUIRED";
     const envelope = {
       profileKind: "SSI_RESOLUTION_ONLY",
       paymentExecutable: false,
@@ -257,6 +299,36 @@ export class CounterpartySsiResolutionService {
       },
       mt,
     };
+  }
+
+  private outcome(
+    status: number,
+    code: string,
+    ssiApplicability: string,
+  ): Context {
+    const envelope = {
+      profileKind: "SSI_RESOLUTION_ONLY",
+      paymentExecutable: false,
+      payloadGenerated: false,
+      confirmedResolutionCreated: false,
+      repairQueueCreated: false,
+      ssiApplicability,
+      resolutionOutcome: code,
+    };
+    return {
+      ...envelope,
+      mx: { ...envelope, httpStatus: status, code, redirectDomain: null },
+      mt: {},
+    };
+  }
+
+  private profileId(source: string): string | undefined {
+    return {
+      MT202: "MT2-MT202-PLAIN-SR2026",
+      MT202COV: "MT2-MT202COV-COV-SR2026",
+      MT205: "MT2-MT205-PLAIN-SR2026",
+      MT205COV: "MT2-MT205COV-COV-SR2026",
+    }[source];
   }
 
   private validationError(source: string, raw: Context): Context | undefined {
@@ -316,7 +388,7 @@ export class CounterpartySsiResolutionService {
       raw["requiresReceiverCorrespondent"] &&
       !raw["receiverCorrespondentSource"]
     )
-      return this.failure(503, "PROFILE_INCOMPLETE", {
+      return this.failure(422, "PROFILE_INCOMPLETE", {
         validation: "FAIL",
         mustNotDeriveFrom: [
           "intermediaryBic",
@@ -329,7 +401,7 @@ export class CounterpartySsiResolutionService {
       raw["accountWithBankServiceId"] === null
     )
       return this.failure(
-        503,
+        422,
         "PROFILE_INCOMPLETE",
         {
           validation: "FAIL",
@@ -564,10 +636,16 @@ export class CounterpartySsiResolutionService {
     raw: Context,
   ): Context | undefined {
     if (raw["underlyingCustomerCreditTransfer"] === false)
-      return this.failure(400, "COUNTERPARTY_PAYMENT_PROFILE_MISMATCH", {
-        validation: "FAIL",
-        reason: "Use MT202 Core",
-      });
+      return this.failure(
+        422,
+        "INVALID_UPSTREAM_CONTEXT",
+        {
+          validation: "FAIL",
+          reason:
+            "Cover purpose must be an underlying customer credit transfer",
+        },
+        "Genuine-cover purpose attestation is invalid",
+      );
     if (raw["before"] && raw["after"])
       return this.failure(422, "OPTION_CONSTRAINT_VIOLATION", {
         validation: "FAIL",
@@ -650,8 +728,18 @@ export class CounterpartySsiResolutionService {
     omitted: string[] = [],
     assertions: string[] = [],
   ): Context {
+    const evidenceOnly = {
+      profileKind: "SSI_RESOLUTION_ONLY",
+      paymentExecutable: false,
+      payloadGenerated: false,
+      confirmedResolutionCreated: false,
+      repairQueueCreated: false,
+      ssiApplicability: "REQUIRED",
+      resolutionOutcome: "ELIGIBLE_COMPLETE_ROUTE",
+    };
     return {
-      mx: { ...base, canonicalRoles: roles },
+      ...evidenceOnly,
+      mx: { ...base, ...evidenceOnly, canonicalRoles: roles },
       mt: { renderer: RENDERER, tags, omitted, assertions },
     };
   }
@@ -742,7 +830,7 @@ export class CounterpartySsiResolutionService {
       raw["candidate"]["nostroMatch"] === null
     )
       return this.failure(
-        503,
+        422,
         "PROFILE_INCOMPLETE",
         {
           validation: "FAIL",
@@ -762,7 +850,7 @@ export class CounterpartySsiResolutionService {
       raw["nostro"]["allowedBookingEntitiesKeyPresent"] === false
     )
       return this.failure(
-        503,
+        422,
         "PROFILE_INCOMPLETE",
         { validation: "FAIL", mustNotTreatMissingAsWildcard: true },
         "Missing allowedBookingEntities is UNKNOWN, not ANY",
@@ -773,7 +861,7 @@ export class CounterpartySsiResolutionService {
       raw["candidate"]["ownershipTypeKeyPresent"] === false
     )
       return this.failure(
-        503,
+        422,
         "PROFILE_INCOMPLETE",
         { validation: "FAIL", mustNotInjectOwnershipTypeDuringExport: true },
         "Ownership cannot be inferred from counterpartyId or display label",

@@ -434,17 +434,19 @@ export class PaymentResolutionPageSubmissionAdapter {
   private coverContext(
     values: ResolutionPageSubmission["values"],
   ): Readonly<Record<string, unknown>> {
+    const governedPurpose = values["context.underlyingCustomerCreditTransfer"];
     return {
-      incoming21: this.requiredText(values, "context.swift21NONE"),
-      incoming121: this.requiredText(values, "context.swift121NONE"),
+      incoming21: text(values, "context.swift21NONE"),
+      incoming121: text(values, "context.swift121NONE"),
       field32A: this.swift32AFromTypedTransaction(values),
       block3: {
-        "119": this.requiredText(values, "context.swift119NONE"),
+        "119": text(values, "context.swift119NONE"),
       },
-      underlyingCustomerCreditTransfer: true,
+      underlyingCustomerCreditTransfer:
+        governedPurpose === undefined ? true : governedPurpose === true,
       sequenceB: {
-        "50A": this.requiredText(values, "context.sequenceB50A"),
-        "59": this.requiredText(values, "context.sequenceB59"),
+        "50A": text(values, "context.sequenceB50A"),
+        "59": text(values, "context.sequenceB59"),
       },
     };
   }

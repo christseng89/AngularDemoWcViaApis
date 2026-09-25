@@ -74,9 +74,9 @@ export type Mt2SettlementResolutionRequest = Omit<
   readonly incoming21?: string;
   readonly incoming121?: string;
   readonly field32A?: string;
-  readonly block3?: Readonly<{ "119": "COV" }>;
-  readonly underlyingCustomerCreditTransfer?: true;
-  readonly sequenceB?: Readonly<{ "50A": string; "59": string }>;
+  readonly block3?: Readonly<{ "119": string }>;
+  readonly underlyingCustomerCreditTransfer?: boolean;
+  readonly sequenceB?: Readonly<{ "50A"?: string; "59"?: string }>;
   readonly previousMessage?: Readonly<{
     type: string;
     "20": string;

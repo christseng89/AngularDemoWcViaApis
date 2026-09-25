@@ -274,7 +274,7 @@ describe("CounterpartySsiResolutionService", () => {
     expect(
       service.resolve(request, { candidate: { nostroMatch: null } }),
     ).toMatchObject({
-      mx: { httpStatus: 503, code: "PROFILE_INCOMPLETE" },
+      mx: { httpStatus: 422, code: "PROFILE_INCOMPLETE" },
       mt: {
         validation: "FAIL",
         missingRelationship:
@@ -286,7 +286,7 @@ describe("CounterpartySsiResolutionService", () => {
 
   it.each([
     [{ counterpartyBic: "CITIUS33" }, "OPTION_CONSTRAINT_VIOLATION"],
-    [{ selectedRouteVersionChanged: true }, "STALE_RESOLUTION"],
+    [{ selectedRouteVersionChanged: true }, "STALE"],
     [{ paymentBeneficiaryInstitutionInput: null }, "MESSAGE_CONTEXT_MISSING"],
     [{ userOverride58A: true }, "OPTION_CONSTRAINT_VIOLATION"],
     [{ manual5xTags: { "57a": "BANK" } }, "OPTION_CONSTRAINT_VIOLATION"],
