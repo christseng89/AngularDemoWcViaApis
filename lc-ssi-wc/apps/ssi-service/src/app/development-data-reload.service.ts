@@ -450,14 +450,12 @@ export class DevelopmentDataReloadService {
       });
       return result;
     } catch (error) {
-      let terminalError: unknown = error;
-      if (backupCreated) {
-        try {
-          await this.restoreBackup(backupPath, activePath);
-        } catch (restoreError) {
-          terminalError = restoreError;
-        }
-      }
+      const terminalError = await this.restoreAfterReloadFailure(
+        error,
+        backupCreated,
+        backupPath,
+        activePath,
+      );
       const errorCode =
         terminalError instanceof HttpException
           ? String((terminalError.getResponse() as { code?: unknown }).code)
@@ -736,6 +734,21 @@ export class DevelopmentDataReloadService {
       return failure(500, "DEMO_DATA_RESTORE_FAILED");
     } finally {
       backupDatabase.close();
+    }
+  }
+
+  private async restoreAfterReloadFailure(
+    reloadError: unknown,
+    backupCreated: boolean,
+    backupPath: string,
+    activePath: string,
+  ): Promise<unknown> {
+    if (!backupCreated) return reloadError;
+    try {
+      await this.restoreBackup(backupPath, activePath);
+      return reloadError;
+    } catch (restoreError) {
+      return restoreError;
     }
   }
 
