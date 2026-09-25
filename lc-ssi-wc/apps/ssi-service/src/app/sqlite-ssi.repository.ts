@@ -95,6 +95,12 @@ export interface SsiApplicabilityRecord {
   profileIds?: string[];
   businessServices?: string[];
   settlementContexts?: string[];
+  mt1Bindings?: Array<{
+    fixtureBindingId: string;
+    profileId: string;
+    businessService: string;
+    settlementContext: string;
+  }>;
 }
 export type SsiApplicabilityInput = Omit<
   SsiApplicabilityRecord,
@@ -121,6 +127,7 @@ export interface Mt1SsiCandidateQuery {
   readonly profileId: string;
   readonly businessService: string;
   readonly settlementContext: string;
+  readonly searchTerm?: string;
   readonly fixtureBindingId: string;
   readonly currency: string;
   readonly bookingEntity: string;
@@ -1032,7 +1039,7 @@ export class SqliteSsiRepository implements OnModuleDestroy {
                   ) AS route_rank
            FROM ssi AS s
            JOIN ssi_applicability AS a ON a.ssi_id = s.id
-           JOIN nostro_account AS n
+           JOIN nostro_account AS n INDEXED BY idx_nostro_mt1_candidate_lookup
              ON COALESCE(
                   json_extract(n.payload,'$.accountReference'),
                   json_extract(n.payload,'$.maskedAccountRef')
@@ -1060,24 +1067,20 @@ export class SqliteSsiRepository implements OnModuleDestroy {
                 OR instr(',' || replace(COALESCE(json_extract(s.payload,'$.route.sourceMessageTypes'),''),' ','') || ',', ',' || ? || ',') > 0
               )
               AND EXISTS (
-                SELECT 1 FROM json_each(json_extract(a.payload,'$.fixtureBindingIds'))
-                WHERE value = ?
-              )
-              AND EXISTS (
-                SELECT 1 FROM json_each(json_extract(a.payload,'$.profileIds'))
-                WHERE value = ?
-              )
-              AND EXISTS (
-                SELECT 1 FROM json_each(json_extract(a.payload,'$.businessServices'))
-                WHERE value = ?
-              )
-              AND EXISTS (
-                SELECT 1 FROM json_each(json_extract(a.payload,'$.settlementContexts'))
-                WHERE value = ?
+                SELECT 1 FROM json_each(json_extract(a.payload,'$.mt1Bindings')) AS binding
+                WHERE json_extract(binding.value,'$.fixtureBindingId') = ?
+                  AND json_extract(binding.value,'$.profileId') = ?
+                  AND json_extract(binding.value,'$.businessService') = ?
+                  AND json_extract(binding.value,'$.settlementContext') = ?
               )
              AND json_extract(n.payload,'$.status') = 'ACTIVE'
              AND json_extract(n.payload,'$.currency') = ?
              AND json_extract(n.payload,'$.purpose') = 'SETTLEMENT'
+             AND (
+               ? = ''
+               OR instr(upper(json_extract(n.payload,'$.accountServicerBic')), ?) > 0
+               OR instr(upper(COALESCE(json_extract(n.payload,'$.accountServicerName'),'')), ?) > 0
+             )
              AND json_extract(n.payload,'$.validFrom') <= ?
              AND json_extract(n.payload,'$.validTo') >= ?
              AND (
@@ -1111,6 +1114,9 @@ export class SqliteSsiRepository implements OnModuleDestroy {
         query.businessService,
         query.settlementContext,
         query.currency,
+        query.searchTerm?.trim().toUpperCase() ?? "",
+        query.searchTerm?.trim().toUpperCase() ?? "",
+        query.searchTerm?.trim().toUpperCase() ?? "",
         query.valueDate,
         query.valueDate,
         query.bookingEntity,

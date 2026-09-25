@@ -1271,6 +1271,91 @@ describe("SQLite governed repositories", () => {
     }
   });
 
+  it("uses both dedicated MT1 indexes for the full candidate query plan", () => {
+    const repository = new SqliteSsiRepository();
+    const nostroRepository = new NostroRepository();
+    const db = new DatabaseSync(process.env["SSI_DATABASE_PATH"]!, {
+      readOnly: true,
+    });
+    try {
+      const plan = db
+        .prepare(
+          `EXPLAIN QUERY PLAN
+           WITH eligible AS (
+             SELECT s.payload AS ssi_payload,
+                    a.payload AS applicability_payload,
+                    n.payload AS nostro_payload,
+                    ROW_NUMBER() OVER (
+                      PARTITION BY json_extract(n.payload,'$.accountServicerBic')
+                      ORDER BY CAST(COALESCE(json_extract(s.payload,'$.route.priority'),'999999') AS INTEGER),
+                               s.id, a.id
+                    ) AS route_rank
+             FROM ssi AS s
+             JOIN ssi_applicability AS a ON a.ssi_id = s.id
+             JOIN nostro_account AS n INDEXED BY idx_nostro_mt1_candidate_lookup
+               ON COALESCE(
+                    json_extract(n.payload,'$.accountReference'),
+                    json_extract(n.payload,'$.maskedAccountRef')
+                  ) = json_extract(s.payload,'$.route.accountId')
+              AND json_extract(n.payload,'$.accountServicerBic') IN (
+                 json_extract(s.payload,'$.route.accountWithBic'),
+                 json_extract(s.payload,'$.route.bic'),
+                 json_extract(s.payload,'$.route.actualReceiverBic')
+               )
+             WHERE json_extract(s.payload,'$.status') = 'ACTIVE'
+               AND json_extract(a.payload,'$.status') = 'ACTIVE'
+               AND json_extract(a.payload,'$.validFrom') <= '2026-09-25'
+               AND json_extract(a.payload,'$.validTo') >= '2026-09-25'
+               AND json_extract(a.payload,'$.direction') IN ('OUTBOUND','ANY')
+               AND json_extract(a.payload,'$.paymentLeg') IN ('INTERBANK_SETTLEMENT','ANY')
+               AND json_extract(s.payload,'$.route.currency') = 'JPY'
+               AND json_extract(s.payload,'$.route.bookingEntity') IN ('HK01', 'ANY')
+               AND COALESCE(json_extract(s.payload,'$.route.validFrom'),'0000-01-01') <= '2026-09-25'
+               AND COALESCE(json_extract(s.payload,'$.route.validTo'),'9999-12-31') >= '2026-09-25'
+               AND instr(',' || replace(COALESCE(json_extract(s.payload,'$.route.messageTypes'),''),' ','') || ',', ',pacs.008.001.08,') > 0
+               AND instr(',' || replace(COALESCE(json_extract(s.payload,'$.route.sourceMessageTypes'),''),' ','') || ',', ',MT103,') > 0
+               AND EXISTS (
+                 SELECT 1 FROM json_each(json_extract(a.payload,'$.mt1Bindings')) AS binding
+                 WHERE json_extract(binding.value,'$.fixtureBindingId') = 'FIXTURE-MT1-INDA-SSI'
+                   AND json_extract(binding.value,'$.profileId') = 'MT103-BASE-SR2026'
+                   AND json_extract(binding.value,'$.businessService') = 'FIN-MT103-BASE'
+                   AND json_extract(binding.value,'$.settlementContext') = 'INDA'
+               )
+               AND json_extract(n.payload,'$.status') = 'ACTIVE'
+               AND json_extract(n.payload,'$.currency') = 'JPY'
+               AND json_extract(n.payload,'$.purpose') = 'SETTLEMENT'
+               AND instr(upper(json_extract(n.payload,'$.accountServicerBic')), 'SMBC') > 0
+               AND json_extract(n.payload,'$.validFrom') <= '2026-09-25'
+               AND json_extract(n.payload,'$.validTo') >= '2026-09-25'
+               AND (
+                 json_extract(n.payload,'$.ownLegalEntityId') = 'HK01'
+                 OR EXISTS (
+                   SELECT 1 FROM json_each(json_extract(n.payload,'$.allowedBookingEntities'))
+                   WHERE value IN ('HK01', 'ANY')
+                 )
+               )
+           )
+           SELECT ssi_payload, applicability_payload, nostro_payload
+           FROM eligible
+           WHERE route_rank = 1
+           ORDER BY CAST(json_extract(nostro_payload,'$.priority') AS INTEGER),
+                    json_extract(nostro_payload,'$.accountServicerBic'),
+                    json_extract(nostro_payload,'$.id')`,
+        )
+        .all()
+        .map((row) => String((row as { detail: unknown }).detail));
+
+      expect(plan.join(" ")).toContain(
+        "idx_ssi_applicability_mt1_candidate_lookup",
+      );
+      expect(plan.join(" ")).toContain("idx_nostro_mt1_candidate_lookup");
+    } finally {
+      db.close();
+      nostroRepository.onModuleDestroy();
+      repository.onModuleDestroy();
+    }
+  });
+
   it("finds exact RMA authorisations inside SQLite without leaking QA fixtures", () => {
     const repository = new RmaRepository();
     const makeRecord = (

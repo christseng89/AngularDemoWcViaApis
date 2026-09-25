@@ -311,11 +311,7 @@ export class Mt1SsiDemoRouteRepository {
     this.issuedSnapshots.add(snapshot.sha256);
     const contextSha256 = this.contextSha256(input);
     const term = input.query?.trim().toUpperCase() ?? "";
-    const routes = this.routes(input).filter(
-      ({ bic, bankName }) =>
-        !term ||
-        [bic, bankName].some((value) => value.toUpperCase().includes(term)),
-    );
+    const routes = this.routes(input, term);
     const items = routes.map((route) => ({
       provider: "SSI_COUNTERPARTY" as const,
       action: "SSI_COUNTERPARTY" as const,
@@ -420,8 +416,11 @@ export class Mt1SsiDemoRouteRepository {
     };
   }
 
-  private routes(input: Mt1SsiRouteLookupQuery): DbRoute[] {
-    const bindings = this.ssi.findMt1CandidateBindings(input);
+  private routes(input: Mt1SsiRouteLookupQuery, searchTerm = ""): DbRoute[] {
+    const bindings = this.ssi.findMt1CandidateBindings({
+      ...input,
+      searchTerm,
+    });
     return bindings.map((binding) => {
       const bank = this.bank(binding.nostro.accountServicerBic);
       return {

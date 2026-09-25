@@ -87,6 +87,65 @@ describe("Mt1SsiDemoRouteRepository", () => {
     );
   });
 
+  it("pushes governed text filtering into the database query", () => {
+    let captured: Record<string, unknown> | undefined;
+    const database = {
+      findMt1CandidateBindings: (query: Record<string, unknown>) => {
+        captured = query;
+        return [];
+      },
+    };
+    const repository = new Mt1SsiDemoRouteRepository(database as never);
+
+    repository.lookup({
+      definitionId: "PAYMENT-MT103-BASE-SR2026",
+      definitionVersion: "V1",
+      fixtureBindingId: "FIXTURE-MT1-INDA-SSI",
+      scenarioId: "MT103-BASE-SR2026:MT1-INDA-SSI",
+      messageType: "MT103",
+      resolutionMessageType: "pacs.008.001.08",
+      profileId: "MT103-BASE-SR2026",
+      businessService: "FIN-MT103-BASE",
+      settlementContext: "INDA",
+      sequence: "SSI_ROUTE",
+      currency: "JPY",
+      bookingEntity: "HK01",
+      valueDate: "2026-09-25",
+      query: " smbc ",
+    });
+
+    expect(captured).toMatchObject({ searchTerm: "SMBC" });
+  });
+
+  it.each([
+    { businessService: "FIN-MT103-STP" },
+    { settlementContext: "INGA" as const },
+    {
+      profileId: "PACS008-PLAIN-SR2026",
+      businessService: "FIN-MT103-BASE",
+    },
+  ])("fails closed for a non-atomic governed binding %#", (override) => {
+    const repository = new Mt1SsiDemoRouteRepository();
+    const lookup = repository.lookup({
+      definitionId: "PAYMENT-MT103-BASE-SR2026",
+      definitionVersion: "V1",
+      fixtureBindingId: "FIXTURE-MT1-INDA-SSI",
+      scenarioId: "MT103-BASE-SR2026:MT1-INDA-SSI",
+      messageType: "MT103",
+      resolutionMessageType: "pacs.008.001.08",
+      profileId: "MT103-BASE-SR2026",
+      businessService: "FIN-MT103-BASE",
+      settlementContext: "INDA",
+      sequence: "SSI_ROUTE",
+      currency: "EUR",
+      bookingEntity: "HK01",
+      valueDate: "2026-09-25",
+      ...override,
+    });
+
+    expect(lookup.items).toEqual([]);
+  });
+
   it("does not treat an unbound SSI as a wildcard for an unknown fixture", () => {
     const repository = new Mt1SsiDemoRouteRepository();
     const lookup = repository.lookup({
