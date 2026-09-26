@@ -16,6 +16,8 @@ import { hashCanonical } from "../../../app/canonical-json";
 import { MappingCatalogueService } from "../../../app/mapping-catalogue.service";
 import { ResolutionPageScenarioCatalogueService } from "../../../app/page-parameters/resolution-page-scenario-catalogue.service";
 import { ResolutionPageFixtureManifestService } from "../../../app/page-parameters/resolution-page-fixture-manifest.service";
+import { Mt1SsiResolutionPageDefinitionSource } from "../../../app/page-parameters/mt1-ssi-resolution-page-definition.source";
+import { Mt1SsiDemoRouteRepository } from "../../../app/mt1-ssi-demo-route.repository";
 
 const SHA = "a".repeat(64);
 const mapping = {
@@ -295,6 +297,94 @@ describe("ResolutionPageSubmissionAdapter", () => {
     controlled as never,
     banks as never,
   );
+
+  it("accepts an unchanged MT103 COVE route selected by the governed picker", () => {
+    const mt1Source = new Mt1SsiResolutionPageDefinitionSource();
+    const mt1Pages = new ResolutionPageAggregationService(
+      mt1Source,
+      new PageParameterEnvironmentPolicy("DEMO"),
+    );
+    const mt1Definition = mt1Source
+      .all("SR2026")
+      .find(({ profile }) => profile.profileId === "MT103-BASE-SR2026")!;
+    const mt1Scenario = mt1Definition.scenarios.find(({ scenarioId }) =>
+      scenarioId.endsWith(":MT1-COVE-SSI"),
+    )!;
+    const mt1Envelope = mt1Pages.getByIdentity(
+      mt1Definition.definitionId,
+      mt1Definition.definitionVersion,
+    );
+    const routes = new Mt1SsiDemoRouteRepository();
+    const lookup = routes.lookup({
+      definitionId: mt1Definition.definitionId,
+      definitionVersion: mt1Definition.definitionVersion,
+      fixtureBindingId: mt1Scenario.fixture.bindingId,
+      scenarioId: mt1Scenario.scenarioId,
+      messageType: mt1Definition.messageType,
+      profileId: mt1Definition.profile.profileId,
+      businessService: mt1Definition.profile.businessService ?? "",
+      settlementContext: "COVE",
+      sequence: mt1Definition.sequences[0]!.sequenceId,
+      currency: "USD",
+      bookingEntity: "HK01",
+      valueDate: "2026-09-24",
+    });
+    const selected = lookup.items.find(({ bic }) => bic === "CITIUS33")!;
+    const result = { payloadGenerated: false, marker: "MT1-COVE" };
+    const mt1 = { execute: jest.fn(() => result) };
+    const routed = new ResolutionPageSubmissionAdapter(
+      mt1Pages,
+      fixtures as never,
+      controlled as never,
+      banks as never,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      mt1 as never,
+    );
+
+    const mt1Submission = {
+      definitionId: mt1Definition.definitionId,
+      definitionVersion: mt1Definition.definitionVersion,
+      contractSha256: mt1Envelope.contractSha256,
+      scenarioId: mt1Scenario.scenarioId,
+      fixtureBindingId: mt1Scenario.fixture.bindingId,
+      eligibilitySnapshot: lookup.eligibilitySnapshot,
+      selectedRouteIdentity: selected.selectedRouteIdentity,
+      values: {
+        ...Object.fromEntries(
+          (mt1Scenario.fieldPolicies ?? [])
+            .filter(({ inputOwnership }) => inputOwnership === "TRANSACTION_USER")
+            .map(({ fieldId }) => {
+              const field = mt1Definition.fields.find(
+                (candidate) => candidate.fieldId === fieldId,
+              )!;
+              return [
+                fieldId,
+                mt1Scenario.inputValues?.[fieldId] ?? field.defaultValue ?? "",
+              ];
+            }),
+        ),
+        "context.currency": "USD",
+        "context.bookingEntity": "HK01",
+        "context.valueDate": "2026-09-24",
+        "context.counterpartyBankServiceId": selected.bankServiceId!,
+      },
+    };
+
+    expect(routed.execute(mt1Submission)).toBe(result);
+    expect(mt1.execute).toHaveBeenCalledTimes(1);
+    expect(() =>
+      routed.execute({
+        ...mt1Submission,
+        values: { ...mt1Submission.values, "context.currency": "EUR" },
+      }),
+    ).toThrow("Conflict Exception");
+  });
 
   it("returns HTTP 422 for a governed out-of-scope boundary decision", () => {
     const boundaryContract = {

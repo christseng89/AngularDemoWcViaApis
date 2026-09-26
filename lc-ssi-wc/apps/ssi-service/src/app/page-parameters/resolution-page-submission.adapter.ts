@@ -419,26 +419,26 @@ export class ResolutionPageSubmissionAdapter {
         repairQueueCreated: false,
       });
     if (!route && !snapshot) return;
-    const contextSha256 = hashCanonical({
-      scenarioId: submission.scenarioId,
-      messageType: definition.messageType,
-      sequence: definition.sequences[0]?.sequenceId ?? "",
-      currency: textValue(submission.values, "context.currency"),
-      bookingEntity: textValue(submission.values, "context.bookingEntity"),
-      valueDate: textValue(submission.values, "context.valueDate"),
-      fixtureBindingId: scenario.fixture.bindingId,
-    });
+    const contextSha256 = this.routeSelectionContextSha256(
+      submission,
+      definition,
+      scenario,
+    );
+    if (!route || !snapshot)
+      throw new ConflictException({
+        code: "PAGE_ROUTE_ELIGIBILITY_CONFLICT",
+        payloadGenerated: false,
+        confirmedResolutionCreated: false,
+        repairQueueCreated: false,
+      });
     if (
-      !route ||
-      !snapshot ||
-      route.definitionId !== definition.definitionId ||
-      route.definitionVersion !== definition.definitionVersion ||
-      route.fixtureBindingId !== scenario.fixture.bindingId ||
-      snapshot.contextSha256 !== contextSha256 ||
-      !/^[a-f0-9]{64}$/i.test(route.contextSha256) ||
-      (definition.messageFamily !== "MT1_PACS008" &&
-        this.snapshots !== undefined &&
-        snapshot.snapshotId !== this.snapshots.current().sha256)
+      this.routeBindingConflicts(
+        route,
+        snapshot,
+        definition,
+        scenario,
+        contextSha256,
+      )
     )
       throw new ConflictException({
         code: "PAGE_ROUTE_ELIGIBILITY_CONFLICT",
@@ -515,6 +515,63 @@ export class ResolutionPageSubmissionAdapter {
           repairQueueCreated: false,
         });
     }
+  }
+
+  private routeBindingConflicts(
+    route: NonNullable<ResolutionPageSubmission["selectedRouteIdentity"]>,
+    snapshot: NonNullable<ResolutionPageSubmission["eligibilitySnapshot"]>,
+    definition: ResolutionPageDefinition,
+    scenario: ResolutionPageScenario,
+    contextSha256: string,
+  ): boolean {
+    return (
+      route.definitionId !== definition.definitionId ||
+      route.definitionVersion !== definition.definitionVersion ||
+      route.fixtureBindingId !== scenario.fixture.bindingId ||
+      snapshot.contextSha256 !== contextSha256 ||
+      !/^[a-f0-9]{64}$/i.test(route.contextSha256) ||
+      (definition.messageFamily === "MT1_PACS008" &&
+        route.contextSha256 !== contextSha256) ||
+      (definition.messageFamily !== "MT1_PACS008" &&
+        this.snapshots !== undefined &&
+        snapshot.snapshotId !== this.snapshots.current().sha256)
+    );
+  }
+
+  private routeSelectionContextSha256(
+    submission: ResolutionPageSubmission,
+    definition: ResolutionPageDefinition,
+    scenario: ResolutionPageScenario,
+  ): string {
+    const base = {
+      scenarioId: submission.scenarioId,
+      messageType: definition.messageType,
+      sequence: definition.sequences[0]?.sequenceId ?? "",
+      currency: textValue(submission.values, "context.currency"),
+      bookingEntity: textValue(submission.values, "context.bookingEntity"),
+      valueDate: textValue(submission.values, "context.valueDate"),
+      fixtureBindingId: scenario.fixture.bindingId,
+    };
+    return hashCanonical(
+      definition.messageFamily === "MT1_PACS008"
+        ? {
+            scenarioId: base.scenarioId,
+            messageType: base.messageType,
+            profileId: definition.profile.profileId,
+            businessService: definition.profile.businessService ?? "",
+            settlementContext:
+              textValue(submission.values, "context.settlementContext") ||
+              String(
+                scenario.inputValues?.["context.settlementContext"] ?? "",
+              ),
+            sequence: base.sequence,
+            currency: base.currency,
+            bookingEntity: base.bookingEntity,
+            valueDate: base.valueDate,
+            fixtureBindingId: base.fixtureBindingId,
+          }
+        : base,
+    );
   }
 
   private validateScenarioFieldOptions(

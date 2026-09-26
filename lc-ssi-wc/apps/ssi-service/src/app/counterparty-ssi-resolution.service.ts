@@ -240,7 +240,7 @@ export class CounterpartySsiResolutionService {
     let resolved: Context;
     if (isCover)
       resolved = is205
-        ? this.mt205Cover(base, context)
+        ? this.mt205Cover(base, context, this.previousCoverProjection(raw))
         : this.mt202Cover(base, context);
     else
       resolved = is205
@@ -303,6 +303,17 @@ export class CounterpartySsiResolutionService {
           isObject(value) ? this.governedResolverContext(value) : value,
         ]),
     );
+  }
+
+  private previousCoverProjection(raw: Context): Context {
+    const previous = isObject(raw["previousMessage"])
+      ? raw["previousMessage"]
+      : {};
+    return {
+      type: previous["type"],
+      "A.52A": previous["A.52A"],
+      "A.58A": previous["A.58A"],
+    };
   }
 
   private beneficiary(request: RouteResolutionRequest, raw: Context): string {
@@ -1258,11 +1269,16 @@ export class CounterpartySsiResolutionService {
     );
   }
 
-  private mt205Cover(base: Context, raw: Context): Context {
-    const previous = isObject(raw["previousMessage"])
-      ? raw["previousMessage"]
-      : {};
-    if (previous["type"] === "MT202COV") {
+  private mt205Cover(
+    base: Context,
+    raw: Context,
+    previous: Context,
+  ): Context {
+    if (
+      ["MT202COV", "MT205COV", "GOVERNED_EQUIVALENT_COVER"].includes(
+        scalarText(previous["type"]),
+      )
+    ) {
       return this.mt205CoverFromMt202Cover(base, raw, previous);
     }
     if (raw["incoming21"])

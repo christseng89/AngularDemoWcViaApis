@@ -35,6 +35,16 @@ import { revisionWipExpiresAt } from "./shared/sqlite-governed.repository";
 import { ResolutionCurrencyCoverageCoordinator } from "./resolution-currency-coordinator";
 import type { ResolutionCurrencyApplyResult } from "./resolution-currency-store";
 
+const REQUIRED_APPLICABILITY_TEXT_FIELDS = [
+  "consumer",
+  "product",
+  "businessFunction",
+  "paymentLeg",
+  "direction",
+  "validFrom",
+  "validTo",
+] as const;
+
 export interface CreateSsiCommand {
   counterpartyId: string;
   scope: "STANDING" | "TRANSACTION_SPECIFIC";
@@ -382,18 +392,10 @@ export class SsiApplicationService {
       throw new BadRequestException("SSI_APPLICABILITY_REQUIRED");
     for (const row of body.records) {
       if (
-        [
-          "consumer",
-          "product",
-          "businessFunction",
-          "paymentLeg",
-          "direction",
-          "validFrom",
-          "validTo",
-        ].some(
-          (field) =>
-            !String(row[field as keyof SsiApplicabilityInput] ?? "").trim(),
-        )
+        REQUIRED_APPLICABILITY_TEXT_FIELDS.some((field) => {
+          const value: unknown = row[field];
+          return typeof value !== "string" || !value.trim();
+        })
       )
         throw new BadRequestException("SSI_APPLICABILITY_FIELDS_REQUIRED");
       if (

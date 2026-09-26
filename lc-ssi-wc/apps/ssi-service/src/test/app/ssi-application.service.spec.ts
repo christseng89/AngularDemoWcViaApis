@@ -413,6 +413,10 @@ describe("SsiApplicationService governed lifecycle", () => {
       "SSI_APPLICABILITY_FIELDS_REQUIRED",
     ],
     [
+      { actor: "ops", records: [{ ...applicability, consumer: {} }] },
+      "SSI_APPLICABILITY_FIELDS_REQUIRED",
+    ],
+    [
       {
         actor: "ops",
         records: [(({ consumer: _consumer, ...row }) => row)(applicability)],

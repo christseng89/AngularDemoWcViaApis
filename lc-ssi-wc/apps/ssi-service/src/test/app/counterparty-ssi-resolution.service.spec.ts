@@ -48,6 +48,37 @@ describe("CounterpartySsiResolutionService new-rule boundary", () => {
     });
   });
 
+  it("renders governed MT205COV sequence A evidence without using it for SSI routing", () => {
+    expect(
+      resolver.resolve(request("MT205COV"), {
+        upstreamAttestation: attestation("MT205COV"),
+        previousMessage: {
+          type: "MT202COV",
+          "A.52A": "HSBCHKHH",
+          "A.58A": "HSBCHKHH",
+          sequenceB: {
+            "50A": "UPSTREAM ORDERING CUSTOMER",
+            "59": "UPSTREAM BENEFICIARY CUSTOMER",
+          },
+        },
+      }),
+    ).toMatchObject({
+      mx: {
+        httpStatus: 200,
+        canonicalRoles: {
+          creditor: "HSBCHKHH",
+          creditorSource: "UPSTREAM_MESSAGE_CONTEXT",
+        },
+      },
+      mt: {
+        tags: {
+          "A.52A": "HSBCHKHH",
+          "A.58A": "HSBCHKHH",
+        },
+      },
+    });
+  });
+
   it("fails closed when a required attestation is missing", () => {
     expect(resolver.resolve(request("MT205"), {})).toMatchObject({
       mx: { httpStatus: 422, code: "INVALID_UPSTREAM_CONTEXT" },
