@@ -17,6 +17,10 @@ const ssiTs = readFileSync(
   join(join(process.cwd(), "apps/ssi-portal/src/app"), "ssi-maintenance-feature", "ssi-index.facade.ts"),
   "utf8",
 );
+const styles = readFileSync(
+  join(join(process.cwd(), "apps/ssi-portal/src"), "styles.css"),
+  "utf8",
+);
 
 describe("maintenance index action host adapters", () => {
   it("wires RMA Entity and Nostro through the shared action columns", () => {
@@ -61,6 +65,13 @@ describe("maintenance index action host adapters", () => {
     expect(ssi).toContain(
       "$event.preventDefault(); host.reviewForChecker(row)",
     );
+  });
+  it("uses the shared dark secondary style for the Counterparty SSI Back action", () => {
+    expect(ssi).toContain('class="ghost index-back-button"');
+    expect(ssi).not.toContain('class="ghost strong index-back-button"');
+    expect(styles).toContain(".ghost.index-back-button {");
+    expect(styles).toContain("background: var(--ui-secondary);");
+    expect(styles).toContain("color: var(--ui-secondary-text);");
   });
   it("stops action-button propagation and retains existing handlers", () => {
     for (const handler of ["act(row, 'submit')", "edit(row)", "revise(row)"]) {

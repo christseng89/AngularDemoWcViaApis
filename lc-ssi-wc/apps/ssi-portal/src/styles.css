@@ -636,6 +636,11 @@ td button {
   border: 1px solid #93a6a2;
   background: #fff;
 }
+.ghost.index-back-button {
+  border-color: var(--ui-control-border);
+  background: var(--ui-secondary);
+  color: var(--ui-secondary-text);
+}
 button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
