@@ -202,8 +202,8 @@ describe("NostroApplicationService", () => {
       priority: 20,
       version: 3,
       source: "LICENSED_IMPORT",
-      dataUse: "OPERATIONAL_DEMO",
     });
+    expect(updated).not.toHaveProperty("dataUse");
 
     const wip = record({
       status: "WIP",

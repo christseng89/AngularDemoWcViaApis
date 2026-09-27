@@ -60,11 +60,14 @@ export class NostroApplicationService {
   create(c: NostroCommand): NostroRecord {
     this.validate(c);
     const now = new Date().toISOString();
+    const source = c.source ?? "SYNTHETIC_DEMO";
     const record: NostroRecord = {
       id: randomUUID(),
       ...c,
-      source: c.source ?? "SYNTHETIC_DEMO",
-      dataUse: "OPERATIONAL_DEMO",
+      source,
+      ...(source === "SYNTHETIC_DEMO"
+        ? ({ dataUse: "OPERATIONAL_DEMO" } as const)
+        : {}),
       status: "DRAFT",
       version: 1,
       createdAt: now,
@@ -110,15 +113,18 @@ export class NostroApplicationService {
       throw new ConflictException("Only original maker can update DRAFT");
     }
     this.validate(c);
-    const next = {
+    const source = c.source ?? current.source;
+    const next: NostroRecord = {
       ...current,
       ...c,
-      source: c.source ?? current.source,
-      dataUse: current.dataUse ?? "OPERATIONAL_DEMO",
+      source,
       status: "DRAFT",
       version: current.version + 1,
       updatedAt: new Date().toISOString(),
     };
+    if (source === "SYNTHETIC_DEMO")
+      next.dataUse = current.dataUse ?? "OPERATIONAL_DEMO";
+    else delete next.dataUse;
     delete next.revisionWipExpiresAt;
     this.repository.save(next, "UPDATED", c.maker, "NOSTRO");
     return next;

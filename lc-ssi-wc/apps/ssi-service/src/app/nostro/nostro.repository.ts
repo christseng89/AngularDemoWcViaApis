@@ -63,12 +63,13 @@ export class NostroRepository extends SqliteGovernedRepository<NostroRecord> {
       json_extract(payload,'$.validTo')
     );
     DROP INDEX IF EXISTS idx_nostro_operational_index;
-    CREATE INDEX IF NOT EXISTS idx_nostro_operational_page_v2 ON nostro_account(
+    DROP INDEX IF EXISTS idx_nostro_operational_page_v2;
+    CREATE INDEX IF NOT EXISTS idx_nostro_operational_page_v3 ON nostro_account(
       json_extract(payload,'$.status'), updated_at DESC, id DESC
     ) WHERE
-      (json_extract(payload,'$.dataUse')='OPERATIONAL_DEMO'
-        OR (json_extract(payload,'$.dataUse') IS NULL
-          AND json_extract(payload,'$.source')='SYNTHETIC_DEMO'))
+      json_extract(payload,'$.source')='SYNTHETIC_DEMO'
+      AND (json_extract(payload,'$.dataUse')='OPERATIONAL_DEMO'
+        OR json_extract(payload,'$.dataUse') IS NULL)
       AND json_extract(payload,'$.ownLegalEntityId') NOT LIKE 'BASELINE-%'
       AND json_extract(payload,'$.fixtureFamily') IS NULL
       AND json_extract(payload,'$.fixtureBindingId') IS NULL
@@ -80,9 +81,9 @@ export class NostroRepository extends SqliteGovernedRepository<NostroRecord> {
   protected override listPageScope() {
     return {
       clauses: [
+        `json_extract(payload,'$.source')='SYNTHETIC_DEMO'`,
         `(json_extract(payload,'$.dataUse')='OPERATIONAL_DEMO'
-          OR (json_extract(payload,'$.dataUse') IS NULL
-            AND json_extract(payload,'$.source')='SYNTHETIC_DEMO'))`,
+          OR json_extract(payload,'$.dataUse') IS NULL)`,
         `json_extract(payload,'$.ownLegalEntityId') NOT LIKE 'BASELINE-%'`,
         `json_extract(payload,'$.fixtureFamily') IS NULL`,
         `json_extract(payload,'$.fixtureBindingId') IS NULL`,
@@ -173,9 +174,9 @@ export class NostroRepository extends SqliteGovernedRepository<NostroRecord> {
   override explainListPage(status = "ACTIVE"): string[] {
     return this.explainQueryPlan(
       `SELECT payload FROM nostro_account
-       WHERE (json_extract(payload,'$.dataUse')='OPERATIONAL_DEMO'
-          OR (json_extract(payload,'$.dataUse') IS NULL
-            AND json_extract(payload,'$.source')='SYNTHETIC_DEMO'))
+       WHERE json_extract(payload,'$.source')='SYNTHETIC_DEMO'
+         AND (json_extract(payload,'$.dataUse')='OPERATIONAL_DEMO'
+          OR json_extract(payload,'$.dataUse') IS NULL)
          AND json_extract(payload,'$.ownLegalEntityId') NOT LIKE 'BASELINE-%'
          AND json_extract(payload,'$.fixtureFamily') IS NULL
          AND json_extract(payload,'$.fixtureBindingId') IS NULL

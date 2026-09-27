@@ -183,6 +183,12 @@ describe("maintenance index ALL operating-record denominator", () => {
       },
       {
         ...base,
+        id: "NOSTRO-LICENSED-MISCLASSIFIED",
+        dataUse: "OPERATIONAL_DEMO",
+        source: "LICENSED_IMPORT",
+      },
+      {
+        ...base,
         id: "NOSTRO-HISTORY",
         status: "SUPERSEDED",
       },
@@ -200,7 +206,7 @@ describe("maintenance index ALL operating-record denominator", () => {
     expect(page.items.map((row) => row.id)).toEqual(["NOSTRO-OPERATIONAL"]);
     expect(repository.find("NOSTRO-FIXTURE")).toBeDefined();
     const plan = repository.explainListPage("ACTIVE");
-    expect(plan.join("\n")).toContain("idx_nostro_operational_page_v2");
+    expect(plan.join("\n")).toContain("idx_nostro_operational_page_v3");
     expect(plan.join("\n")).not.toContain("TEMP B-TREE");
   });
 

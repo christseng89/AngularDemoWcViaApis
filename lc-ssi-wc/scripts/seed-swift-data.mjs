@@ -223,12 +223,8 @@ for (const item of activeSsis) {
         source: "SYNTHETIC_DEMO",
       });
     }
-    await activate(
-      "nostro-accounts",
-      record,
-      "maker.swiftdata",
-      "checker.swiftdata",
-    );
+    // Demo seed is deliberately Maker-only. New or revised records remain DRAFT
+    // until a distinct Checker explicitly approves them through the UI/API.
   }
 }
 for (const scope of rmaScopes.values()) {
