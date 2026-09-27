@@ -578,6 +578,9 @@ export class SqliteSsiRepository implements OnModuleDestroy {
          FROM ssi
          WHERE ${ownershipExpression}='COUNTERPARTY'
            ${statusClause}
+           AND json_type(payload,'$.fixtureBindingId') IS NULL
+           AND substr(COALESCE(json_extract(payload,'$.usageScope'),''),1,3) <> 'QA_'
+           AND COALESCE(json_extract(payload,'$.operationalVisible'),1)=1
            AND ${counterpartyExpression} IS NOT NULL
          GROUP BY ${counterpartyExpression}
          ORDER BY ${counterpartyExpression}`,

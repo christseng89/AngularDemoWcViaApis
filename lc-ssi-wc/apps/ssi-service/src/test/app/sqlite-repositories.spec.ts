@@ -824,6 +824,30 @@ describe("SQLite governed repositories", () => {
       "CREATED",
       "maker.test",
     );
+    repository.save(
+      {
+        ...makeRecord("SSI-FIXTURE", "BARCGB22", "USD"),
+        fixtureBindingId: "FIX-DEMO@v1",
+      } as SsiRecord,
+      "CREATED",
+      "maker.test",
+    );
+    repository.save(
+      {
+        ...makeRecord("SSI-QA", "BARCGB22", "JPY"),
+        usageScope: "QA_POSITIVE",
+      } as SsiRecord,
+      "CREATED",
+      "maker.test",
+    );
+    repository.save(
+      {
+        ...makeRecord("SSI-HIDDEN", "BARCGB22", "HKD"),
+        operationalVisible: false,
+      } as SsiRecord,
+      "CREATED",
+      "maker.test",
+    );
 
     expect(repository.counterpartyCoverage("ACTIVE")).toEqual([
       {
