@@ -27,7 +27,6 @@ export interface NostroCommand {
   validTo: string;
   maker: string;
   source?: "SYNTHETIC_DEMO" | "LICENSED_IMPORT";
-  dataUse?: "OPERATIONAL_DEMO" | "BASELINE" | "FIXTURE" | "QA";
 }
 export interface PinnedNostroRequest {
   readonly nostroId: string;
@@ -65,7 +64,7 @@ export class NostroApplicationService {
       id: randomUUID(),
       ...c,
       source: c.source ?? "SYNTHETIC_DEMO",
-      dataUse: c.dataUse ?? "OPERATIONAL_DEMO",
+      dataUse: "OPERATIONAL_DEMO",
       status: "DRAFT",
       version: 1,
       createdAt: now,
@@ -73,6 +72,31 @@ export class NostroApplicationService {
     };
     this.repository.save(record, "CREATED", c.maker, "NOSTRO");
     return record;
+  }
+  createDemoSeed(c: NostroCommand): NostroRecord {
+    this.validate(c);
+    if (c.maker !== "maker.swiftdata" || c.source === "LICENSED_IMPORT")
+      throw new BadRequestException("DEMO_SEED_PROVENANCE_REQUIRED");
+    const now = new Date().toISOString();
+    const seedBusinessKey = NostroRepository.demoSeedBusinessKey(c);
+    const reserved = this.repository.reserveDemoSeed({
+      id: NostroRepository.demoSeedId(seedBusinessKey),
+      ...c,
+      source: "SYNTHETIC_DEMO",
+      dataUse: "OPERATIONAL_DEMO",
+      seedBusinessKey,
+      status: "DRAFT",
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
+    });
+    if (
+      ["WIP", "REVOKED", "SUPERSEDED", "SUPPRESSED"].includes(reserved.status)
+    )
+      throw new ConflictException(`DEMO_SEED_STATE_${reserved.status}`);
+    if (reserved.maker !== c.maker && reserved.status !== "ACTIVE")
+      throw new ConflictException("DEMO_SEED_OWNED_BY_ANOTHER_MAKER");
+    return reserved;
   }
   update(id: string, c: NostroCommand): NostroRecord {
     const current = this.require(id);
@@ -90,7 +114,7 @@ export class NostroApplicationService {
       ...current,
       ...c,
       source: c.source ?? current.source,
-      dataUse: c.dataUse ?? current.dataUse ?? "OPERATIONAL_DEMO",
+      dataUse: current.dataUse ?? "OPERATIONAL_DEMO",
       status: "DRAFT",
       version: current.version + 1,
       updatedAt: new Date().toISOString(),

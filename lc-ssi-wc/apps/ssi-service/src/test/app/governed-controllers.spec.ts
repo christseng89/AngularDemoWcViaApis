@@ -12,7 +12,11 @@ const governedService = () => ({
   create: jest.fn((body: unknown) => ({ body })),
   update: jest.fn((id: string, body: unknown) => ({ id, body })),
   revise: jest.fn((id: string, maker: string) => ({ id, maker })),
-  suppress: jest.fn((id: string, maker: string, reason: string) => ({ id, maker, reason })),
+  suppress: jest.fn((id: string, maker: string, reason: string) => ({
+    id,
+    maker,
+    reason,
+  })),
   cancelRevision: jest.fn((id: string, actor: string) => ({ id, actor })),
   transition: jest.fn((id: string, action: string, actor: string) => ({
     id,
@@ -32,15 +36,20 @@ describe("governed HTTP controller contracts", () => {
     const service = {
       ...governedService(),
       resolve: jest.fn((body: unknown) => ({ body })),
+      createDemoSeed: jest.fn((body: unknown) => ({ seeded: body })),
     };
     const controller = new NostroController(
       service as unknown as NostroApplicationService,
     );
     const command = { accountReference: "ACCOUNT-1" } as never;
 
-    expect(controller.list()).toEqual(["listed"]);
+    expect(controller.list()).toEqual({ request: {} });
     expect(controller.list("ACTIVE", "2", "10", "usd")).toEqual({
-      request: expect.objectContaining({ page: 2, pageSize: 10, search: "usd" }),
+      request: expect.objectContaining({
+        page: 2,
+        pageSize: 10,
+        search: "usd",
+      }),
     });
     expect(
       controller.resolve({
@@ -50,6 +59,7 @@ describe("governed HTTP controller contracts", () => {
       }),
     ).toEqual({ body: expect.any(Object) });
     expect(controller.create(command)).toEqual({ body: command });
+    expect(controller.createDemoSeed(command)).toEqual({ seeded: command });
     expect(controller.update("n-1", command)).toEqual({
       id: "n-1",
       body: command,
@@ -58,7 +68,9 @@ describe("governed HTTP controller contracts", () => {
       id: "n-1",
       maker: "maker",
     });
-    expect(controller.suppress("n-1", { maker: "maker", reason: "closed" })).toEqual({
+    expect(
+      controller.suppress("n-1", { maker: "maker", reason: "closed" }),
+    ).toEqual({
       id: "n-1",
       maker: "maker",
       reason: "closed",
@@ -93,7 +105,11 @@ describe("governed HTTP controller contracts", () => {
 
     expect(controller.list()).toEqual(["listed"]);
     expect(controller.list("ACTIVE", "1", "20", "DEMO")).toEqual({
-      request: expect.objectContaining({ page: 1, pageSize: 20, search: "DEMO" }),
+      request: expect.objectContaining({
+        page: 1,
+        pageSize: 20,
+        search: "DEMO",
+      }),
     });
     expect(controller.messageTypes()).toEqual(["MT300"]);
     expect(controller.messageTypePolicy()).toEqual({ version: "SR2026" });
@@ -119,7 +135,9 @@ describe("governed HTTP controller contracts", () => {
       id: "r-1",
       maker: "maker",
     });
-    expect(controller.suppress("r-1", { maker: "maker", reason: "closed" })).toEqual({
+    expect(
+      controller.suppress("r-1", { maker: "maker", reason: "closed" }),
+    ).toEqual({
       id: "r-1",
       maker: "maker",
       reason: "closed",

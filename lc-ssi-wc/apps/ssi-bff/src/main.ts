@@ -738,6 +738,14 @@ class BffController {
       body: JSON.stringify(body),
     });
   }
+  @Post("nostro-accounts/demo-seed") createDemoSeedNostro(
+    @Body() body: unknown,
+  ): Promise<unknown> {
+    return forwardSsi("nostro-accounts/demo-seed", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  }
   @Put("nostro-accounts/:id") updateNostro(
     @Param("id") id: string,
     @Body() body: unknown,

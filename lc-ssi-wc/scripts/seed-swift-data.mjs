@@ -1,10 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { URL } from "node:url";
-import {
-  duplicateActiveNostros,
-  findCurrentSeedNostro,
-} from "./nostro-demo-seed-key.mjs";
 
 const api = process.env.SSI_BFF_URL ?? "http://localhost:3100/api";
 const get = async (path) => {
@@ -58,25 +54,7 @@ const activate = async (endpoint, record, maker, checker) => {
 };
 
 let rmas = await get("rma-authorisations");
-let nostros = await get("nostro-accounts");
 let entities = await get("booking-branch-entities");
-for (const duplicate of duplicateActiveNostros(nostros)) {
-  let suppression = await send(
-    `nostro-accounts/${duplicate.id}/suppress`,
-    "POST",
-    {
-      maker: "maker.seed-cleanup",
-      reason: "Duplicate operational demo business key",
-    },
-  );
-  suppression = await send(`nostro-accounts/${suppression.id}/submit`, "POST", {
-    actor: "maker.seed-cleanup",
-  });
-  await send(`nostro-accounts/${suppression.id}/approve`, "POST", {
-    actor: "checker.seed-cleanup",
-  });
-}
-nostros = await get("nostro-accounts");
 for (const entity of [
   {
     branchCode: "HK01",
@@ -216,24 +194,17 @@ for (const item of activeSsis) {
       purpose: "SETTLEMENT",
       maskedAccountRef,
     };
-    let record = findCurrentSeedNostro(nostros, desired, "maker.swiftdata");
-    if (!record)
-      record = await send("nostro-accounts", "POST", {
-        ownLegalEntityId: item.route.bookingEntity ?? "HK01",
-        allowedBookingEntities: ["ANY"],
-        accountServicerBic: item.route.accountWithBic,
-        currency: item.route.currency,
-        maskedAccountRef,
-        accountReference: item.route.accountId,
-        purpose: "SETTLEMENT",
-        priority,
-        validFrom: "2026-01-01",
-        validTo: "2027-12-31",
-        maker: "maker.swiftdata",
-        source: "SYNTHETIC_DEMO",
-        dataUse: "OPERATIONAL_DEMO",
-      });
-    else if (record.accountReference !== item.route.accountId) {
+    let record = await send("nostro-accounts/demo-seed", "POST", {
+      ...desired,
+      allowedBookingEntities: ["ANY"],
+      accountReference: item.route.accountId,
+      priority,
+      validFrom: "2026-01-01",
+      validTo: "2027-12-31",
+      maker: "maker.swiftdata",
+      source: "SYNTHETIC_DEMO",
+    });
+    if (record.accountReference !== item.route.accountId) {
       record = await send(`nostro-accounts/${record.id}/revise`, "POST", {
         maker: "maker.swiftdata",
       });
@@ -250,7 +221,6 @@ for (const item of activeSsis) {
         validTo: "2027-12-31",
         maker: "maker.swiftdata",
         source: "SYNTHETIC_DEMO",
-        dataUse: "OPERATIONAL_DEMO",
       });
     }
     await activate(
@@ -260,7 +230,6 @@ for (const item of activeSsis) {
       "checker.swiftdata",
     );
   }
-  nostros = await get("nostro-accounts");
 }
 for (const scope of rmaScopes.values()) {
   const messageTypes = [...scope.messageTypes];
@@ -316,14 +285,16 @@ for (const scope of rmaScopes.values()) {
   rmas = await get("rma-authorisations");
 }
 const activeRma = rmas.filter((record) => record.status === "ACTIVE");
-const activeNostro = nostros.filter((record) => record.status === "ACTIVE");
+const activeNostroPage = await get(
+  "nostro-accounts?status=ACTIVE&page=1&pageSize=1",
+);
 console.log(
   JSON.stringify(
     {
       catalogueVersion: catalogue.catalogueVersion,
       disclaimer: catalogue.disclaimer,
       activeRma: activeRma.length,
-      activeNostro: activeNostro.length,
+      activeNostro: activeNostroPage.totalItems,
       activeEntities: entities.filter((record) => record.status === "ACTIVE")
         .length,
       coveredActiveSsis: activeSsis.length,

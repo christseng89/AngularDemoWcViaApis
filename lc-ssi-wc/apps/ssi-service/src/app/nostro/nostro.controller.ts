@@ -27,7 +27,10 @@ export class NostroController {
     @Query("search") search?: string,
   ): unknown {
     const request = pagedListQuery({ status, page, pageSize, search });
-    return request ? this.service.listPage(request) : this.lifecycle.list(status);
+    return this.service.listPage(request ?? {});
+  }
+  @Post("demo-seed") createDemoSeed(@Body() body: NostroCommand): unknown {
+    return this.service.createDemoSeed(body);
   }
   @Post("resolve") resolve(
     @Body()

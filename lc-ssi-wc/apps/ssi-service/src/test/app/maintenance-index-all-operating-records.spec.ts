@@ -177,6 +177,12 @@ describe("maintenance index ALL operating-record denominator", () => {
       },
       {
         ...base,
+        id: "NOSTRO-LICENSED-UNCLASSIFIED",
+        dataUse: undefined,
+        source: "LICENSED_IMPORT",
+      },
+      {
+        ...base,
         id: "NOSTRO-HISTORY",
         status: "SUPERSEDED",
       },
@@ -193,6 +199,9 @@ describe("maintenance index ALL operating-record denominator", () => {
     expect(page).toMatchObject({ totalItems: 1, totalPages: 1 });
     expect(page.items.map((row) => row.id)).toEqual(["NOSTRO-OPERATIONAL"]);
     expect(repository.find("NOSTRO-FIXTURE")).toBeDefined();
+    const plan = repository.explainListPage("ACTIVE");
+    expect(plan.join("\n")).toContain("idx_nostro_operational_page_v2");
+    expect(plan.join("\n")).not.toContain("TEMP B-TREE");
   });
 
   it("groups RMA ALL by business identity and operating status only", () => {

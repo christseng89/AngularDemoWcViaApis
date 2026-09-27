@@ -597,6 +597,14 @@ describe("SSI BFF forwarding contract", () => {
       body: { currency: "USD" },
     },
     {
+      name: "Nostro demo seed reservation",
+      method: "createDemoSeedNostro",
+      args: [{ currency: "USD" }],
+      url: "http://ssi.test/api/nostro-accounts/demo-seed",
+      httpMethod: "POST",
+      body: { currency: "USD" },
+    },
+    {
       name: "Nostro update",
       method: "updateNostro",
       args: ["nostro/a", { actor: "maker" }],

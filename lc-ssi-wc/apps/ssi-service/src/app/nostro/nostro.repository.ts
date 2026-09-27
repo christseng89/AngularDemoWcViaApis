@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { createHash, randomUUID } from "node:crypto";
 import {
   SqliteGovernedRepository,
   type GovernedRecord,
@@ -24,6 +25,7 @@ export interface NostroRecord extends GovernedRecord {
   usageGroup?: string;
   fixtureBindingIds?: string[];
   dataUse?: "OPERATIONAL_DEMO" | "BASELINE" | "FIXTURE" | "QA";
+  seedBusinessKey?: string;
 }
 export interface NostroEligibilityQuery {
   ownLegalEntityId?: string;
@@ -60,26 +62,132 @@ export class NostroRepository extends SqliteGovernedRepository<NostroRecord> {
       json_extract(payload,'$.validFrom'),
       json_extract(payload,'$.validTo')
     );
-    CREATE INDEX IF NOT EXISTS idx_nostro_operational_index ON nostro_account(
-      json_extract(payload,'$.status'),
-      json_extract(payload,'$.dataUse'),
-      json_extract(payload,'$.ownLegalEntityId'),
-      updated_at DESC,
-      id DESC
-    )`);
+    DROP INDEX IF EXISTS idx_nostro_operational_index;
+    CREATE INDEX IF NOT EXISTS idx_nostro_operational_page_v2 ON nostro_account(
+      json_extract(payload,'$.status'), updated_at DESC, id DESC
+    ) WHERE
+      (json_extract(payload,'$.dataUse')='OPERATIONAL_DEMO'
+        OR (json_extract(payload,'$.dataUse') IS NULL
+          AND json_extract(payload,'$.source')='SYNTHETIC_DEMO'))
+      AND json_extract(payload,'$.ownLegalEntityId') NOT LIKE 'BASELINE-%'
+      AND json_extract(payload,'$.fixtureFamily') IS NULL
+      AND json_extract(payload,'$.fixtureBindingId') IS NULL
+      AND COALESCE(json_array_length(json_extract(payload,'$.fixtureBindingIds')),0)=0
+      AND (json_extract(payload,'$.usageGroup') IS NULL
+        OR json_extract(payload,'$.usageGroup')='')`);
   }
 
   protected override listPageScope() {
     return {
       clauses: [
-        `COALESCE(json_extract(payload,'$.dataUse'),'OPERATIONAL_DEMO')='OPERATIONAL_DEMO'`,
+        `(json_extract(payload,'$.dataUse')='OPERATIONAL_DEMO'
+          OR (json_extract(payload,'$.dataUse') IS NULL
+            AND json_extract(payload,'$.source')='SYNTHETIC_DEMO'))`,
         `json_extract(payload,'$.ownLegalEntityId') NOT LIKE 'BASELINE-%'`,
         `json_extract(payload,'$.fixtureFamily') IS NULL`,
+        `json_extract(payload,'$.fixtureBindingId') IS NULL`,
         `COALESCE(json_array_length(json_extract(payload,'$.fixtureBindingIds')),0)=0`,
         `(json_extract(payload,'$.usageGroup') IS NULL OR json_extract(payload,'$.usageGroup')='')`,
       ],
       parameters: [],
     };
+  }
+
+  static demoSeedBusinessKey(
+    record: Pick<
+      NostroRecord,
+      | "ownLegalEntityId"
+      | "accountServicerBic"
+      | "currency"
+      | "purpose"
+      | "maskedAccountRef"
+    >,
+  ): string {
+    return [
+      record.ownLegalEntityId,
+      record.accountServicerBic,
+      record.currency,
+      record.purpose,
+      record.maskedAccountRef,
+    ]
+      .map((value) => value.trim().toUpperCase())
+      .join("|");
+  }
+
+  static demoSeedId(seedBusinessKey: string): string {
+    const hex = createHash("sha256")
+      .update(seedBusinessKey)
+      .digest("hex")
+      .slice(0, 32);
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20)}`;
+  }
+
+  reserveDemoSeed(record: NostroRecord): NostroRecord {
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const existingRow = this.db
+        .prepare(
+          `SELECT payload FROM nostro_account
+           WHERE json_extract(payload,'$.seedBusinessKey')=?
+           ORDER BY CASE json_extract(payload,'$.status')
+             WHEN 'ACTIVE' THEN 6 WHEN 'APPROVED' THEN 5
+             WHEN 'PENDING_APPROVAL' THEN 4 WHEN 'DRAFT' THEN 3
+             WHEN 'WIP' THEN 2 ELSE 1 END DESC,
+             updated_at DESC LIMIT 1`,
+        )
+        .get(record.seedBusinessKey!) as { payload: unknown } | undefined;
+      if (existingRow) {
+        this.db.exec("COMMIT");
+        return JSON.parse(String(existingRow.payload)) as NostroRecord;
+      }
+      const now = new Date().toISOString();
+      this.db
+        .prepare(
+          "INSERT INTO nostro_account(id,payload,updated_at) VALUES(?,?,?)",
+        )
+        .run(record.id, JSON.stringify(record), now);
+      this.db
+        .prepare(
+          "INSERT INTO nostro_audit_event(record_id,action,actor,payload,occurred_at) VALUES(?,?,?,?,?)",
+        )
+        .run(record.id, "CREATED", record.maker, JSON.stringify(record), now);
+      this.db
+        .prepare(
+          "INSERT INTO swift_data_outbox(event_id,aggregate_type,event_type,payload,created_at) VALUES(?,?,?,?,?)",
+        )
+        .run(
+          randomUUID(),
+          "NOSTRO",
+          "NOSTRO_CREATED",
+          JSON.stringify(record),
+          now,
+        );
+      this.db.exec("COMMIT");
+      return record;
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
+  override explainListPage(status = "ACTIVE"): string[] {
+    return this.explainQueryPlan(
+      `SELECT payload FROM nostro_account
+       WHERE (json_extract(payload,'$.dataUse')='OPERATIONAL_DEMO'
+          OR (json_extract(payload,'$.dataUse') IS NULL
+            AND json_extract(payload,'$.source')='SYNTHETIC_DEMO'))
+         AND json_extract(payload,'$.ownLegalEntityId') NOT LIKE 'BASELINE-%'
+         AND json_extract(payload,'$.fixtureFamily') IS NULL
+         AND json_extract(payload,'$.fixtureBindingId') IS NULL
+         AND COALESCE(json_array_length(json_extract(payload,'$.fixtureBindingIds')),0)=0
+         AND (json_extract(payload,'$.usageGroup') IS NULL
+           OR json_extract(payload,'$.usageGroup')='')
+         AND json_extract(payload,'$.status')=?
+       ORDER BY updated_at DESC, id DESC LIMIT ? OFFSET ?`,
+      status,
+      20,
+      0,
+    );
   }
 
   findEligible(query: NostroEligibilityQuery): NostroRecord[] {

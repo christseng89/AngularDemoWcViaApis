@@ -95,6 +95,14 @@ function harness(
       else records.push(item);
       return item;
     }),
+    reserveDemoSeed: jest.fn((item: NostroRecord) => {
+      const existing = records.find(
+        (current) => current.seedBusinessKey === item.seedBusinessKey,
+      );
+      if (existing) return existing;
+      records.push(item);
+      return item;
+    }),
     approveSuppression: jest.fn(() => options.approveSuppressionResult ?? null),
     hasOpenRevision: jest.fn(() => options.hasOpenRevision ?? false),
     saveRevisionWorkInProgress: options.legacyReservation
@@ -142,6 +150,41 @@ describe("NostroApplicationService", () => {
       "maker",
       "NOSTRO",
     );
+  });
+
+  it("atomically reserves and reuses an operational demo seed key", () => {
+    const { service, repository } = harness();
+    const first = service.createDemoSeed(
+      command({ maker: "maker.swiftdata", source: "SYNTHETIC_DEMO" }),
+    );
+    const second = service.createDemoSeed(
+      command({ maker: "maker.swiftdata", source: "SYNTHETIC_DEMO" }),
+    );
+    expect(second.id).toBe(first.id);
+    expect(first).toMatchObject({
+      dataUse: "OPERATIONAL_DEMO",
+      status: "DRAFT",
+      seedBusinessKey: "HK01|CITIUS33|USD|SETTLEMENT|DEMO-NOSTRO-001",
+    });
+    expect(repository.reserveDemoSeed).toHaveBeenCalledTimes(2);
+  });
+
+  it("fails closed for ungoverned demo seed provenance and WIP", () => {
+    expect(() =>
+      harness().service.createDemoSeed(
+        command({ maker: "maker.other", source: "SYNTHETIC_DEMO" }),
+      ),
+    ).toThrow("DEMO_SEED_PROVENANCE_REQUIRED");
+    const existing = record({
+      status: "WIP",
+      maker: "maker.swiftdata",
+      seedBusinessKey: "HK01|CITIUS33|USD|SETTLEMENT|DEMO-NOSTRO-001",
+    });
+    expect(() =>
+      harness([existing]).service.createDemoSeed(
+        command({ maker: "maker.swiftdata", source: "SYNTHETIC_DEMO" }),
+      ),
+    ).toThrow("DEMO_SEED_STATE_WIP");
   });
 
   it("updates only the original maker's draft and preserves its source", () => {

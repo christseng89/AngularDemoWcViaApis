@@ -1364,6 +1364,22 @@
         }
       }
     },
+    "/nostro-accounts/demo-seed": {
+      "post": {
+        "operationId": "reserveOperationalDemoNostroSeed",
+        "description": "Internal demo bootstrap operation. The server derives and atomically reserves the stable business key; it never submits or approves lifecycle records.",
+        "requestBody": { "$ref": "#/components/requestBodies/Nostro" },
+        "responses": {
+          "201": {
+            "description": "Existing governed state returned or one DRAFT atomically created"
+          },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "409": {
+            "description": "Existing WIP or terminal seed state requires explicit operator action"
+          }
+        }
+      }
+    },
     "/nostro-accounts/{id}/suppress": {
       "post": {
         "operationId": "createNostroSuppressionDraft",
@@ -3518,12 +3534,6 @@
           "maker": {
             "type": "string",
             "minLength": 1
-          },
-          "dataUse": {
-            "type": "string",
-            "enum": ["OPERATIONAL_DEMO", "BASELINE", "FIXTURE", "QA"],
-            "default": "OPERATIONAL_DEMO",
-            "description": "Server-governed data-purpose classification. Non-operational classes remain available to controlled resolution and QA flows but are excluded from the operational maintenance index."
           }
         }
       },
