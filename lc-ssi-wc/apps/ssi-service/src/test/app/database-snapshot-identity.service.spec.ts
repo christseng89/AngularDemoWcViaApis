@@ -1,4 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   DatabaseSnapshotIdentityService,
   SQLITE_SNAPSHOT_IDENTITY_METHOD,
@@ -50,16 +53,27 @@ describe("database snapshot identity", () => {
     expect(databaseSnapshotFingerprint("missing-snapshot.sqlite")).toContain(
       "MISSING",
     );
-    expect(databaseSnapshotFingerprint("package.json")).toContain("package.json:");
+    expect(databaseSnapshotFingerprint("package.json")).toContain(
+      "package.json:",
+    );
     expect(() => databaseSnapshotFingerprint("\0")).toThrow();
   });
 
   it("caches an unchanged logical snapshot", () => {
-    const service = new DatabaseSnapshotIdentityService("data/ssi-demo.sqlite");
-    const first = service.current();
-    const second = service.current();
+    const directory = mkdtempSync(join(tmpdir(), "snapshot-cache-test-"));
+    const databasePath = join(directory, "stable.sqlite");
+    const database = new DatabaseSync(databasePath);
+    database.exec("CREATE TABLE stable_record (id TEXT PRIMARY KEY)");
+    database.close();
+    try {
+      const service = new DatabaseSnapshotIdentityService(databasePath);
+      const first = service.current();
+      const second = service.current();
 
-    expect(first).toEqual(second);
-    expect(first.method).toBe(SQLITE_SNAPSHOT_IDENTITY_METHOD);
+      expect(first).toEqual(second);
+      expect(first.method).toBe(SQLITE_SNAPSHOT_IDENTITY_METHOD);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 });

@@ -23,6 +23,7 @@ export interface NostroRecord extends GovernedRecord {
   fixtureFamily?: string;
   usageGroup?: string;
   fixtureBindingIds?: string[];
+  dataUse?: "OPERATIONAL_DEMO" | "BASELINE" | "FIXTURE" | "QA";
 }
 export interface NostroEligibilityQuery {
   ownLegalEntityId?: string;
@@ -58,7 +59,27 @@ export class NostroRepository extends SqliteGovernedRepository<NostroRecord> {
       COALESCE(json_extract(payload,'$.accountReference'), json_extract(payload,'$.maskedAccountRef')),
       json_extract(payload,'$.validFrom'),
       json_extract(payload,'$.validTo')
+    );
+    CREATE INDEX IF NOT EXISTS idx_nostro_operational_index ON nostro_account(
+      json_extract(payload,'$.status'),
+      json_extract(payload,'$.dataUse'),
+      json_extract(payload,'$.ownLegalEntityId'),
+      updated_at DESC,
+      id DESC
     )`);
+  }
+
+  protected override listPageScope() {
+    return {
+      clauses: [
+        `COALESCE(json_extract(payload,'$.dataUse'),'OPERATIONAL_DEMO')='OPERATIONAL_DEMO'`,
+        `json_extract(payload,'$.ownLegalEntityId') NOT LIKE 'BASELINE-%'`,
+        `json_extract(payload,'$.fixtureFamily') IS NULL`,
+        `COALESCE(json_array_length(json_extract(payload,'$.fixtureBindingIds')),0)=0`,
+        `(json_extract(payload,'$.usageGroup') IS NULL OR json_extract(payload,'$.usageGroup')='')`,
+      ],
+      parameters: [],
+    };
   }
 
   findEligible(query: NostroEligibilityQuery): NostroRecord[] {

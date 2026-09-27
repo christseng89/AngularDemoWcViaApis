@@ -27,6 +27,7 @@ export interface NostroCommand {
   validTo: string;
   maker: string;
   source?: "SYNTHETIC_DEMO" | "LICENSED_IMPORT";
+  dataUse?: "OPERATIONAL_DEMO" | "BASELINE" | "FIXTURE" | "QA";
 }
 export interface PinnedNostroRequest {
   readonly nostroId: string;
@@ -64,6 +65,7 @@ export class NostroApplicationService {
       id: randomUUID(),
       ...c,
       source: c.source ?? "SYNTHETIC_DEMO",
+      dataUse: c.dataUse ?? "OPERATIONAL_DEMO",
       status: "DRAFT",
       version: 1,
       createdAt: now,
@@ -88,6 +90,7 @@ export class NostroApplicationService {
       ...current,
       ...c,
       source: c.source ?? current.source,
+      dataUse: c.dataUse ?? current.dataUse ?? "OPERATIONAL_DEMO",
       status: "DRAFT",
       version: current.version + 1,
       updatedAt: new Date().toISOString(),

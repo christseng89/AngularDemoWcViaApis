@@ -132,6 +132,7 @@ describe("NostroApplicationService", () => {
       status: "DRAFT",
       version: 1,
       source: "SYNTHETIC_DEMO",
+      dataUse: "OPERATIONAL_DEMO",
       maker: "maker",
     });
     expect(created.id).toMatch(/^[0-9a-f-]{36}$/);
@@ -158,6 +159,7 @@ describe("NostroApplicationService", () => {
       priority: 20,
       version: 3,
       source: "LICENSED_IMPORT",
+      dataUse: "OPERATIONAL_DEMO",
     });
 
     const wip = record({

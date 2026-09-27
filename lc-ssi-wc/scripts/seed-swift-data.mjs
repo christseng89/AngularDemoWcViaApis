@@ -1,6 +1,10 @@
 import { readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { URL } from "node:url";
+import {
+  duplicateActiveNostros,
+  findCurrentSeedNostro,
+} from "./nostro-demo-seed-key.mjs";
 
 const api = process.env.SSI_BFF_URL ?? "http://localhost:3100/api";
 const get = async (path) => {
@@ -56,6 +60,23 @@ const activate = async (endpoint, record, maker, checker) => {
 let rmas = await get("rma-authorisations");
 let nostros = await get("nostro-accounts");
 let entities = await get("booking-branch-entities");
+for (const duplicate of duplicateActiveNostros(nostros)) {
+  let suppression = await send(
+    `nostro-accounts/${duplicate.id}/suppress`,
+    "POST",
+    {
+      maker: "maker.seed-cleanup",
+      reason: "Duplicate operational demo business key",
+    },
+  );
+  suppression = await send(`nostro-accounts/${suppression.id}/submit`, "POST", {
+    actor: "maker.seed-cleanup",
+  });
+  await send(`nostro-accounts/${suppression.id}/approve`, "POST", {
+    actor: "checker.seed-cleanup",
+  });
+}
+nostros = await get("nostro-accounts");
 for (const entity of [
   {
     branchCode: "HK01",
@@ -188,15 +209,14 @@ for (const item of activeSsis) {
     ["BACKUP", 20],
   ]) {
     const maskedAccountRef = `${item.route.accountId}-${suffix}`;
-    let record = nostros.find(
-      (value) =>
-        value.ownLegalEntityId === (item.route.bookingEntity ?? "HK01") &&
-        value.accountServicerBic === item.route.accountWithBic &&
-        value.currency === item.route.currency &&
-        value.maskedAccountRef === maskedAccountRef &&
-        (value.status === "ACTIVE" ||
-          (value.status === "DRAFT" && value.maker === "maker.swiftdata")),
-    );
+    const desired = {
+      ownLegalEntityId: item.route.bookingEntity ?? "HK01",
+      accountServicerBic: item.route.accountWithBic,
+      currency: item.route.currency,
+      purpose: "SETTLEMENT",
+      maskedAccountRef,
+    };
+    let record = findCurrentSeedNostro(nostros, desired, "maker.swiftdata");
     if (!record)
       record = await send("nostro-accounts", "POST", {
         ownLegalEntityId: item.route.bookingEntity ?? "HK01",
@@ -211,6 +231,7 @@ for (const item of activeSsis) {
         validTo: "2027-12-31",
         maker: "maker.swiftdata",
         source: "SYNTHETIC_DEMO",
+        dataUse: "OPERATIONAL_DEMO",
       });
     else if (record.accountReference !== item.route.accountId) {
       record = await send(`nostro-accounts/${record.id}/revise`, "POST", {
@@ -229,6 +250,7 @@ for (const item of activeSsis) {
         validTo: "2027-12-31",
         maker: "maker.swiftdata",
         source: "SYNTHETIC_DEMO",
+        dataUse: "OPERATIONAL_DEMO",
       });
     }
     await activate(

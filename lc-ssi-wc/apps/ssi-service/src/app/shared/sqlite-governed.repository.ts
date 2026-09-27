@@ -51,6 +51,11 @@ export interface PageRequest {
   search?: string;
 }
 
+interface PageScope {
+  readonly clauses: readonly string[];
+  readonly parameters: readonly SqliteParameter[];
+}
+
 function revisionWipTtlMinutes(): number {
   const configured = Number(process.env["REVISION_WIP_TTL_MINUTES"] ?? "30");
   return Number.isFinite(configured) && configured > 0 ? configured : 30;
@@ -382,7 +387,10 @@ export abstract class SqliteGovernedRepository<
       Math.max(1, Math.trunc(request.pageSize ?? 20)),
     );
     const clauses: string[] = [];
-    const parameters: (string | number)[] = [];
+    const parameters: SqliteParameter[] = [];
+    const scope = this.listPageScope();
+    clauses.push(...scope.clauses);
+    parameters.push(...scope.parameters);
     const statuses = maintenanceIndexStatuses(request.status);
     clauses.push(
       `json_extract(payload,'$.status') IN (${statuses.map(() => "?").join(",")})`,
@@ -454,6 +462,9 @@ export abstract class SqliteGovernedRepository<
       hasPrevious: page > 1,
       hasNext: page < totalPages,
     };
+  }
+  protected listPageScope(): PageScope {
+    return { clauses: [], parameters: [] };
   }
   hasOpenRevision(id: string): boolean {
     this.expireRevisionWorkInProgress();

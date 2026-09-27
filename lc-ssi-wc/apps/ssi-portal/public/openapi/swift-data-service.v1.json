@@ -3518,6 +3518,12 @@
           "maker": {
             "type": "string",
             "minLength": 1
+          },
+          "dataUse": {
+            "type": "string",
+            "enum": ["OPERATIONAL_DEMO", "BASELINE", "FIXTURE", "QA"],
+            "default": "OPERATIONAL_DEMO",
+            "description": "Server-governed data-purpose classification. Non-operational classes remain available to controlled resolution and QA flows but are excluded from the operational maintenance index."
           }
         }
       },

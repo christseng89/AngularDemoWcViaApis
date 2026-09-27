@@ -10,7 +10,10 @@ import {
   type NostroRecord,
 } from "../../app/nostro/nostro.repository";
 import { RmaRepository, type RmaRecord } from "../../app/rma/rma.repository";
-import { SqliteSsiRepository, type SsiRecord } from "../../app/sqlite-ssi.repository";
+import {
+  SqliteSsiRepository,
+  type SsiRecord,
+} from "../../app/sqlite-ssi.repository";
 
 const now = "2026-09-18T00:00:00.000Z";
 const operatingStatuses = ["ACTIVE", "SUPPRESSED"];
@@ -131,6 +134,65 @@ describe("maintenance index ALL operating-record denominator", () => {
     expect(page).toMatchObject({ totalItems: 2, totalPages: 2, hasNext: true });
     expect(page.items).toHaveLength(1);
     expect(page.items[0]?.status).toMatch(/^(ACTIVE|SUPPRESSED)$/);
+  });
+
+  it("keeps baseline, fixture and QA Nostros out of the operational index", () => {
+    const repository = track(new NostroRepository());
+    const base: NostroRecord = {
+      id: "NOSTRO-OPERATIONAL",
+      ownLegalEntityId: "HK01",
+      accountServicerBic: "SMBCJPJT",
+      currency: "JPY",
+      maskedAccountRef: "DEMO-JPY-PRIMARY",
+      accountReference: "DEMO-JPY",
+      purpose: "SETTLEMENT",
+      priority: 10,
+      validFrom: "2026-01-01",
+      validTo: "2027-12-31",
+      maker: "maker.test",
+      status: "ACTIVE",
+      version: 1,
+      source: "SYNTHETIC_DEMO",
+      dataUse: "OPERATIONAL_DEMO",
+      createdAt: now,
+      updatedAt: now,
+    };
+    for (const row of [
+      base,
+      {
+        ...base,
+        id: "NOSTRO-BASELINE",
+        ownLegalEntityId: "BASELINE-HK",
+      },
+      {
+        ...base,
+        id: "NOSTRO-FIXTURE",
+        fixtureFamily: "MT2-UI-PARITY-V1",
+        fixtureBindingIds: ["FIXTURE-MT202-OP-DIRECT"],
+      },
+      {
+        ...base,
+        id: "NOSTRO-QA",
+        usageGroup: "QA-NEGATIVE",
+      },
+      {
+        ...base,
+        id: "NOSTRO-HISTORY",
+        status: "SUPERSEDED",
+      },
+    ])
+      repository.save(row, "CREATED", base.maker, "NOSTRO");
+
+    const page = repository.listPage({
+      status: "ACTIVE",
+      page: 1,
+      pageSize: 20,
+      search: "JPY",
+    });
+
+    expect(page).toMatchObject({ totalItems: 1, totalPages: 1 });
+    expect(page.items.map((row) => row.id)).toEqual(["NOSTRO-OPERATIONAL"]);
+    expect(repository.find("NOSTRO-FIXTURE")).toBeDefined();
   });
 
   it("groups RMA ALL by business identity and operating status only", () => {
