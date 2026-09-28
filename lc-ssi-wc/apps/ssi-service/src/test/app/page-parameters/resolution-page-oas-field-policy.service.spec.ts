@@ -84,7 +84,7 @@ describe("ResolutionPageOasFieldPolicyService", () => {
     });
     expect(policy.scenarioApplicability("MT400", field, "MT400-001")).toEqual({
       applicable: true,
-      required: true,
+      required: false,
     });
     expect(
       policy.scenarioApplicability("MT400", field, "MT400-003"),

@@ -302,7 +302,7 @@
         "targetRole": "BENEFICIARY_BANK",
         "sequenceId": "MESSAGE",
         "applicableScenarioIds": ["MT400-001"],
-        "required": true,
+        "required": false,
         "inputOwnership": "TRANSACTION_USER",
         "visibility": "USER_INPUT",
         "processingPolicy": "APPLY"

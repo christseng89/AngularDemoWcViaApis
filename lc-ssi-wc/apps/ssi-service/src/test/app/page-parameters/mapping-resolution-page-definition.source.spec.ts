@@ -830,7 +830,7 @@ describe("MappingResolutionPageDefinitionSource", () => {
       applicability: "APPLICABLE",
       inputOwnership: "TRANSACTION_USER",
       visibility: "USER_INPUT",
-      required: true,
+      required: false,
       readOnly: false,
     });
     expect(
@@ -854,13 +854,13 @@ describe("MappingResolutionPageDefinitionSource", () => {
         governedInputs.map(({ lookup }) => lookup!.targetRole).sort(),
       ).toEqual([...expectedRoles].sort());
     }
-    for (const [messageType, scenarioId, targetRole] of [
-      ["MT400", "MT400-001", "BENEFICIARY_BANK"],
-      ["MT742", "MT742-006", "BENEFICIARY_BANK"],
-      ["MT742", "MT742-013", "BENEFICIARY_BANK"],
-      ["MT754", "MT754-005", "REIMBURSING_BANK"],
-      ["MT754", "MT754-011", "BENEFICIARY_BANK"],
-      ["MT754", "MT754-013", "BENEFICIARY_BANK"],
+    for (const [messageType, scenarioId, targetRole, required] of [
+      ["MT400", "MT400-001", "BENEFICIARY_BANK", false],
+      ["MT742", "MT742-006", "BENEFICIARY_BANK", true],
+      ["MT742", "MT742-013", "BENEFICIARY_BANK", true],
+      ["MT754", "MT754-005", "REIMBURSING_BANK", true],
+      ["MT754", "MT754-011", "BENEFICIARY_BANK", true],
+      ["MT754", "MT754-013", "BENEFICIARY_BANK", true],
     ] as const) {
       const contract = definitions.find(
         (definition) => definition.messageType === messageType,
@@ -879,7 +879,7 @@ describe("MappingResolutionPageDefinitionSource", () => {
         applicability: "APPLICABLE",
         inputOwnership: "TRANSACTION_USER",
         visibility: "USER_INPUT",
-        required: true,
+        required,
         readOnly: false,
       });
     }

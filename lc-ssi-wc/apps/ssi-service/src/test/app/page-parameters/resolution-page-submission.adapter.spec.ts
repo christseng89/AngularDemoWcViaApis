@@ -1046,6 +1046,61 @@ describe("ResolutionPageSubmissionAdapter", () => {
     ]);
   });
 
+  it("omits an unprovided optional transaction-context Bank Service from results", () => {
+    const transactionScenario = {
+      ...scenario,
+      fieldPolicies: scenario.fieldIds.map((fieldId) => ({
+        fieldId,
+        applicability: "APPLICABLE" as const,
+        inputOwnership: "TRANSACTION_USER" as const,
+        visibility: "USER_INPUT" as const,
+        processingPolicy: "APPLY" as const,
+        required: false,
+        readOnly: false,
+      })),
+    };
+    const transactionAdapter = new ResolutionPageSubmissionAdapter(
+      {
+        getByIdentity: () => ({
+          contract: { ...definition, scenarios: [transactionScenario] },
+          contractSha256: SHA,
+        }),
+      } as never,
+      fixtures as never,
+      controlled as never,
+      banks as never,
+    );
+
+    controlled.resolve.mockReturnValueOnce({
+      payloadGenerated: true,
+      resolvedFields: [
+        {
+          sequence: "Q9",
+          settlementLeg: "Synthetic leg",
+          tag: "57",
+          option: "A",
+          officialFieldName: "Account With Institution",
+          officialRole: "Account With Institution",
+          resolutionStatus: "N_A",
+          resolvedValue: null,
+          reasonCode: "TRANSACTION_CONTEXT_PROVIDED",
+          provenance: { source: "TRANSACTION_CONTEXT" },
+        },
+      ],
+    });
+
+    const result = transactionAdapter.execute({
+      ...submission,
+      contractSha256: SHA,
+      values: {
+        ...values,
+        "Q9.57.bankServiceId": "",
+      },
+    });
+
+    expect(result.fields).toEqual([]);
+  });
+
   it("selects one canonical fixture-set member by governed SSI Counterparty identity", () => {
     const alternative = {
       ...candidate,

@@ -293,16 +293,18 @@ export class ResolutionPageSubmissionAdapter {
       "roleAccountReferences.",
     );
     const evidenceIds = definition.evidence.map(({ evidenceId }) => evidenceId);
-    const fields = (raw.resolvedFields ?? []).map((field) =>
-      this.fieldResult(
-        field,
-        [...fieldsById.values()],
-        request.roleBankServiceIds,
-        partyIdentifiers,
-        accountReferences,
-        evidenceIds,
-      ),
-    );
+    const fields = (raw.resolvedFields ?? [])
+      .map((field) =>
+        this.fieldResult(
+          field,
+          [...fieldsById.values()],
+          request.roleBankServiceIds,
+          partyIdentifiers,
+          accountReferences,
+          evidenceIds,
+        ),
+      )
+      .filter((field) => this.isProvidedTransactionContext(field));
     const requestSha256 = hashCanonical(request);
     const responseSha256 = hashCanonical(raw);
     return {
@@ -992,6 +994,15 @@ export class ResolutionPageSubmissionAdapter {
       provenance,
       evidenceIds,
     };
+  }
+
+  private isProvidedTransactionContext(
+    field: ResolutionPageFieldResult,
+  ): boolean {
+    return (
+      field.reasonCode !== "TRANSACTION_CONTEXT_PROVIDED" ||
+      Boolean(field.value || field.partyIdentifier || field.accountReference)
+    );
   }
 
   private fieldRole(
