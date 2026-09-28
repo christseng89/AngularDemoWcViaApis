@@ -26,6 +26,6 @@
   "negativeOraclePolicy": "Negative conditions remain isolated by fixture binding; lookup eligibility is canonical and does not constitute a PASS oracle.",
   "canonicalSeed": {
     "path": "data/reload-test-data/ssi-demo.mt1-mt2.v1.approved.canonical.seed.json",
-    "sha256": "4D17A179ECCB45212DAC6BFF5E242AFF1388F490486A67072EA49E4605CBC1AA"
+    "sha256": "BCCEF9FFDCE4C233E23A6638FAF1B52AE564A03BE16B303D675C1DF6614770E3"
   }
 }

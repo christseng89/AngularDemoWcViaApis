@@ -18,22 +18,22 @@
   "baselineArtifacts": [
     {
       "file": "../../../../data/reload-test-data/ssi-demo.mt1-mt2.v1.approved.canonical.seed.json",
-      "sha256": "4D17A179ECCB45212DAC6BFF5E242AFF1388F490486A67072EA49E4605CBC1AA",
+      "sha256": "BCCEF9FFDCE4C233E23A6638FAF1B52AE564A03BE16B303D675C1DF6614770E3",
       "role": "CANONICAL_POSITIVE_SEED"
     },
     {
       "file": "../../../../data/qa/mt2/mt2-pacs009-proposal-case-groups.json",
-      "sha256": "8A4D591811CAC71EA3B1692AF1C184259301E393B8810194049888DBA3599FF3",
+      "sha256": "FDBC2FC1E959BFA9FC3068BCF4DD8EC856E9F3FBB20588203D9915834EF295CC",
       "role": "PROPOSAL_CASE_CATALOGUE"
     },
     {
       "file": "../../../../data/qa/mt2/mt2-pacs009-proposal-fixtures.json",
-      "sha256": "20D7CF2AA1F24157B6A8DBF1A4176E4C6E954A301EA695774F680F0258C92E25",
+      "sha256": "ADF35D9B75DD89959A3A8D0BC6BC6483E67271A25845FB5CFD5DD0B416732D05",
       "role": "PROPOSAL_EXECUTABLE_FIXTURES"
     },
     {
       "file": "../../../../openapi/swift-data-service.v1.json",
-      "sha256": "75C23B3EC9B5922482822178D5DF6E279C1E604CCEA31432DA7ACFDCF03A748B",
+      "sha256": "5B211FFB4B8AE89A683BAAA4C8A1A3BE66E2E168BCDE039DF49AE2B0C446898C",
       "role": "CURRENT_OAS"
     },
     {
@@ -43,7 +43,7 @@
     },
     {
       "file": "../../../../parameters/resolution-page-scenarios.mt2-pacs009.sr2026.json",
-      "sha256": "7024B1F978FECFD2E4F5A6376BBA929F46E08AFA4A9C699F099E944A8C481707",
+      "sha256": "CB1162016CF8EE016639A3CF08338C6C020719AF7C2BD39743F54BEDEC3ED894",
       "role": "CONTROLLED_SCENARIOS"
     }
   ],
