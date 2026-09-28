@@ -1,5 +1,9 @@
 import { HttpException, UnprocessableEntityException } from "@nestjs/common";
 import { FinControlledResolutionService } from "../../app/fin-controlled-resolution.service";
+import { FinFieldResolutionService } from "../../app/fin-field-resolution.service";
+import { MappingCatalogueService } from "../../app/mapping-catalogue.service";
+import { FinFieldResolutionPolicy } from "../../app/fin-field-resolution.policy";
+import { BankServiceDirectory } from "../../app/bank-service-directory";
 
 const request = {
   messageType: "MT300",
@@ -27,6 +31,103 @@ const candidate = {
 };
 
 describe("FinControlledResolutionService", () => {
+  it("rebinds transaction-context 58A evidence to the Bank Service selected by the user", () => {
+    const selected = {
+      ...candidate,
+      bindingId: "FIX-MT300-011@v1",
+      sequence: "D",
+      settlementLeg: "Split Settlement Details",
+      roleValues: {
+        DELIVERY_AGENT: "CITIUS33",
+        RECEIVING_AGENT: "DEUTDEFF",
+        BENEFICIARY_INSTITUTION: "BARCGB22",
+      },
+      roleSources: {
+        DELIVERY_AGENT: "SYNTHETIC_DEMO",
+        RECEIVING_AGENT: "SYNTHETIC_DEMO",
+        BENEFICIARY_INSTITUTION: "BANK_SERVICE_ID",
+      },
+      roleEvidence: {
+        DELIVERY_AGENT: {
+          ownerSide: "SENDER_SIDE",
+          sourceType: "SYNTHETIC_DEMO",
+          sourceRecordId: "ssi-1",
+          status: "ACTIVE",
+          approvalStatus: "APPROVED",
+          effectiveFrom: "2026-01-01",
+          effectiveTo: "2027-01-01",
+        },
+        RECEIVING_AGENT: {
+          ownerSide: "RECEIVER_SIDE",
+          sourceType: "SYNTHETIC_DEMO",
+          sourceRecordId: "ssi-1",
+          status: "ACTIVE",
+          approvalStatus: "APPROVED",
+          effectiveFrom: "2026-01-01",
+          effectiveTo: "2027-01-01",
+        },
+        BENEFICIARY_INSTITUTION: {
+          ownerSide: "TRANSACTION_PARTY",
+          sourceType: "BANK_SERVICE_ID",
+          sourceRecordId: "BANK-SVC-BARCGB22",
+          version: "1",
+          status: "ACTIVE",
+          approvalStatus: "APPROVED",
+          effectiveFrom: "2026-01-01",
+          effectiveTo: "2027-01-01",
+        },
+      },
+    };
+    const service = new FinControlledResolutionService(
+      {
+        list: jest.fn(() => ({
+          fixtureFamily: "MT347-SR2026-SSI",
+          source: "CANONICAL_DATABASE",
+          count: 1,
+          candidates: [selected],
+        })),
+      } as never,
+      new FinFieldResolutionService(
+        new MappingCatalogueService(),
+        new FinFieldResolutionPolicy(),
+      ),
+      {
+        current: jest.fn(() => ({
+          sha256: "snapshot",
+          method: "SQLITE_WAL_AWARE_LOGICAL_SNAPSHOT_V1",
+        })),
+      } as never,
+      new BankServiceDirectory(),
+    );
+
+    const result = service.resolve({
+      ...request,
+      sequence: "D",
+      bindingId: selected.bindingId,
+      transactionReference: "QA-MT300-011-CITI",
+      roleBankServiceIds: {
+        BENEFICIARY_INSTITUTION: "BANK-SVC-CITIUS33",
+      },
+    }) as { resolvedFields: Array<Record<string, unknown>> };
+    const beneficiary = result.resolvedFields.find(
+      ({ tag }) => tag === "58",
+    );
+
+    expect(beneficiary).toMatchObject({
+      resolvedValue: "CITIUS33",
+      reasonCode: "PRESERVED_FROM_TRANSACTION_CONTEXT",
+      provenance: {
+        ownerSide: "TRANSACTION_PARTY",
+        source: "BANK_SERVICE_ID",
+        sourceRecordId: "BANK-SVC-CITIUS33",
+        version: "1",
+        accountRelationshipStatus: "NOT_EVALUATED",
+      },
+    });
+    expect(beneficiary?.provenance).not.toHaveProperty("sourceSsiId");
+    expect(beneficiary?.reasonCode).not.toBe("EXACT_ELIGIBLE_SSI");
+  });
+
   it("resolves one exact DB fixture and emits snapshot evidence", () => {
     const resolve = jest.fn(() => ({ resolvedFields: [] }));
     const service = new FinControlledResolutionService(

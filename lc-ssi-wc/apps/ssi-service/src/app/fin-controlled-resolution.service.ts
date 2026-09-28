@@ -34,6 +34,17 @@ export class FinControlledResolutionService {
     if (fixtureResult.count !== 1)
       this.dataQualityFailure(fixtureResult.count, request);
     const selected = fixtureResult.candidates[0]!;
+    const roleSelections = Object.entries(request.roleBankServiceIds ?? {}).map(
+      ([role, bankServiceId]) => ({
+        role,
+        bankServiceId,
+        bankService: this.bankServices.resolve(bankServiceId),
+      }),
+    );
+    const transactionPartySelections = roleSelections.filter(
+      ({ role }) =>
+        selected.roleEvidence[role]?.["ownerSide"] === "TRANSACTION_PARTY",
+    );
     const result = this.resolution.resolve({
       service: "FIN",
       resolutionMode: request.messageType.startsWith("MT3")
@@ -55,11 +66,11 @@ export class FinControlledResolutionService {
       roles: {
         ...selected.roleValues,
         ...Object.fromEntries(
-          Object.entries(request.roleBankServiceIds ?? {}).map(
-            ([role, bankServiceId]) => [
+          roleSelections.map(
+            ({ role, bankService }) => [
               role,
               this.renderRoleValue(
-                this.bankServices.resolve(bankServiceId).bic,
+                bankService.bic,
                 request.rolePartyIdentifiers?.[role],
                 request.roleAccountReferences?.[role],
               ),
@@ -67,8 +78,30 @@ export class FinControlledResolutionService {
           ),
         ),
       },
-      roleSources: selected.roleSources,
-      roleEvidence: selected.roleEvidence,
+      roleSources: {
+        ...selected.roleSources,
+        ...Object.fromEntries(
+          transactionPartySelections.map(({ role }) => [
+            role,
+            "BANK_SERVICE_ID",
+          ]),
+        ),
+      },
+      roleEvidence: {
+        ...selected.roleEvidence,
+        ...Object.fromEntries(
+          transactionPartySelections.map(({ role, bankServiceId }) => [
+            role,
+            {
+              ...selected.roleEvidence[role],
+              ownerSide: "TRANSACTION_PARTY",
+              sourceType: "BANK_SERVICE_ID",
+              sourceRecordId: bankServiceId,
+              version: selected.roleEvidence[role]?.["version"] ?? "1",
+            },
+          ]),
+        ),
+      },
     });
     const snapshot = this.snapshots.current();
     return {
