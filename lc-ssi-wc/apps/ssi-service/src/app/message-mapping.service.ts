@@ -438,6 +438,8 @@ export class MessageMappingService {
       return "RESOLVED_FROM_COUNTERPARTY_SSI" as const;
     }
     if (ownerSide === "SENDER_SIDE") return "RESOLVED_FROM_OWN_SSI" as const;
+    if (ownerSide === "TRANSACTION_PARTY")
+      return "PRESERVED_FROM_TRANSACTION_CONTEXT" as const;
     return "EXACT_ELIGIBLE_SSI" as const;
   }
 

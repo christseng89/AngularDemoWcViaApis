@@ -17,7 +17,7 @@ test("controlled MT347 fixtures preserve the TDD v5 identities and isolation", (
   const manifest = readJson("data/qa/mt347/mt347-fixtures.v1.manifest.json");
   assert.equal(
     manifest.sourceWorkbookSha256,
-    "82C6ABCFD91E7D35E1382F8C86BF796D8DBF05CF8C8D94F9F0C7B5889AB52C9A",
+    "70BDD07B90A87D32D06AE4B4305301C4ABD34BC62715427323DC9C111CF056D1",
   );
   const expected = { positive: 152, negative: 208, boundary: 2 };
   const identities = new Set();

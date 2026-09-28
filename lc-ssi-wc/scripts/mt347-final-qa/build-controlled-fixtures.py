@@ -26,7 +26,7 @@ SCOPE = {
     "MT400", "MT730", "MT734", "MT742", "MT750", "MT752", "MT754",
     "MT756", "MT765", "MT768", "MT769",
 }
-WORKBOOK_SHA256 = "82C6ABCFD91E7D35E1382F8C86BF796D8DBF05CF8C8D94F9F0C7B5889AB52C9A"
+WORKBOOK_SHA256 = "70BDD07B90A87D32D06AE4B4305301C4ABD34BC62715427323DC9C111CF056D1"
 MEMORY_SHA256 = "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A"
 CASE_ID_COLUMN = "Test Case No."
 CATALOGUE_FILE = "parameters/ssi-mappings.sr2026.json"
@@ -101,7 +101,7 @@ def update_catalogue(workbook: Any, source: Path, target: Path) -> dict[str, int
         mapping["presence"] = rule["presence"]
         mapping["nvrRefs"] = rule["nvrRefs"]
         mapping["ruleId"] = rule["ruleId"]
-        mapping["governanceSource"] = "MT347_SR2026_SSI_TDD_CONTROLLED_v5.xlsx"
+        mapping["governanceSource"] = "MT347_SR2026_SSI_TDD_CONTROLLED_v6.xlsx"
         mapping["governanceSourceSha256"] = WORKBOOK_SHA256
         matched.add(key)
         touched += 1
@@ -621,7 +621,7 @@ def write_fixture_artifacts(
             "fixtureId": f"MT347-{name.upper()}-V1",
             "classification": "SYNTHETIC_DEMO_QA_UAT",
             "loadPolicy": "CANONICAL_RELOAD" if name == "positive" else "ISOLATED_TEST_ONLY",
-            "sourceWorkbook": "qa/tdd/mt347/MT347_SR2026_SSI_TDD_CONTROLLED_v5.xlsx",
+            "sourceWorkbook": "qa/tdd/mt347/MT347_SR2026_SSI_TDD_CONTROLLED_v6.xlsx",
             "sourceWorkbookSha256": WORKBOOK_SHA256,
             "memorySha256": MEMORY_SHA256,
             "records": rows,
@@ -841,7 +841,7 @@ def main() -> None:
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[2])
     args = parser.parse_args()
     root = args.root.resolve()
-    workbook_path = root / "qa/tdd/mt347/MT347_SR2026_SSI_TDD_CONTROLLED_v5.xlsx"
+    workbook_path = root / "qa/tdd/mt347/MT347_SR2026_SSI_TDD_CONTROLLED_v6.xlsx"
     if sha256(workbook_path) != WORKBOOK_SHA256:
         raise AssertionError("controlled TDD v5 SHA-256 mismatch")
     workbook = load_workbook(workbook_path, data_only=True, read_only=True)

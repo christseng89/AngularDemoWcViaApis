@@ -1100,6 +1100,7 @@ export class MappingResolutionPageDefinitionSource implements ResolutionPageDefi
     const defaultRuleIds = validationRules
       .filter(({ owner }) => owner === "SSI_FIELD_RESOLUTION_API")
       .map(({ ruleId }) => ruleId);
+    const fullFinRuleIds = scenario.fullFinValidationRuleIds ?? [];
     const upstreamValidation = scenarioConstraints.some(
       ({ validationOwner }) => validationOwner === "UPSTREAM_FIN_VALIDATOR",
     );
@@ -1124,6 +1125,7 @@ export class MappingResolutionPageDefinitionSource implements ResolutionPageDefi
     const upstreamTaxonomy = scenarioConstraints.find(
       ({ validationOwner }) => validationOwner === "UPSTREAM_FIN_VALIDATOR",
     )?.sourceTaxonomy;
+    const ssiRuleIds = ruleIds.length ? ruleIds : defaultRuleIds;
     const validation = upstreamValidation
       ? {
           owner: "UPSTREAM_FIN_VALIDATOR" as const,
@@ -1152,8 +1154,19 @@ export class MappingResolutionPageDefinitionSource implements ResolutionPageDefi
                 scenario.polarity === "NEGATIVE" && ruleIds.length
                   ? ("FAIL" as const)
                   : ("PASS" as const),
-              ruleIds: ruleIds.length ? ruleIds : defaultRuleIds,
+              ruleIds: ssiRuleIds,
             },
+            ...(fullFinRuleIds.length
+              ? [
+                  {
+                    validationScope: "OUT_OF_SCOPE_FULL_FIN_NVR" as const,
+                    owner: "UPSTREAM_FIN_VALIDATOR" as const,
+                    taxonomy: "NETWORK_VALIDATED_RULE" as const,
+                    expectedOutcome: "NOT_EVALUATED" as const,
+                    ruleIds: fullFinRuleIds,
+                  },
+                ]
+              : []),
           ],
         };
     return {
@@ -1165,7 +1178,9 @@ export class MappingResolutionPageDefinitionSource implements ResolutionPageDefi
       sequenceIds: definition.sequences.map(({ sequenceId }) => sequenceId),
       fieldIds: fieldPolicies.map(({ fieldId }) => fieldId),
       fieldPolicies,
-      validationRuleIds: ruleIds.length ? ruleIds : defaultRuleIds,
+      validationRuleIds: upstreamValidation
+        ? ruleIds
+        : [...ssiRuleIds, ...fullFinRuleIds],
       validation,
       fixture: {
         bindingId: fixture.bindingId,
@@ -1225,10 +1240,24 @@ export class MappingResolutionPageDefinitionSource implements ResolutionPageDefi
         evidenceIds: ["EVIDENCE-SCENARIO-CATALOGUE"],
       }),
     );
+    const fullFinRules = scenarios.flatMap((scenario) =>
+      (scenario.fullFinValidationRuleIds ?? []).map(
+        (ruleId): PageParameterValidationRule => ({
+          ruleId,
+          taxonomy: "NETWORK_VALIDATED_RULE",
+          owner: "UPSTREAM_FIN_VALIDATOR",
+          validationScope: "OUT_OF_SCOPE_FULL_FIN_NVR",
+          appliesToFieldIds: ["context.transactionReference"],
+          reasonCode: `${ruleId}_NOT_EVALUATED`,
+          evidenceIds: ["EVIDENCE-SCENARIO-CATALOGUE"],
+        }),
+      ),
+    );
     return [
       ...definition.validationRules,
       ...inputRules,
       ...constraintRules,
+      ...fullFinRules,
     ].filter(
       (rule, index, rules) =>
         rules.findIndex(({ ruleId }) => ruleId === rule.ruleId) === index,

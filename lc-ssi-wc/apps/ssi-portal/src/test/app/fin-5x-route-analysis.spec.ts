@@ -79,6 +79,37 @@ describe("route-first FIN 5x applicability", () => {
     ).toBe(false);
   });
 
+  it("does not present a transaction-party suggestion as eligible SSI", () => {
+    const rows = analyzeFin5xSupport({
+      messageType: "MT300",
+      fields: [
+        {
+          tag: "58A",
+          semanticRole: "BENEFICIARY_INSTITUTION",
+          expectedSource: "SSI_ROUTE",
+        },
+      ],
+      candidate: null,
+      suggestions: [
+        {
+          tag: "58A",
+          value: "BARCGB22",
+          provenance: {
+            source: "BANK_SERVICE_ID",
+            sourceRecordId: "BANK-SVC-BARCGB22",
+            ownerSide: "TRANSACTION_PARTY",
+          },
+        },
+      ],
+    });
+
+    expect(rows[0]).toMatchObject({
+      resolutionStatus: "RESOLVED",
+      reasonCode: "PRESERVED_FROM_TRANSACTION_CONTEXT",
+      accountRelationshipStatus: "NOT_EVALUATED",
+    });
+  });
+
   it("marks 57 not required when unequal 53/54 already complete the route", () => {
     const candidate = candidates[0]!;
     expect(candidate.routeGraph.senderCorrespondent).not.toBe(

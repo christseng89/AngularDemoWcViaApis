@@ -616,6 +616,7 @@ describe("MessageMappingService FIN context and support decisions", () => {
     for (const [ownerSide, reasonCode] of [
       ["RECEIVER_SIDE", "RESOLVED_FROM_COUNTERPARTY_SSI"],
       ["SENDER_SIDE", "RESOLVED_FROM_OWN_SSI"],
+      ["TRANSACTION_PARTY", "PRESERVED_FROM_TRANSACTION_CONTEXT"],
       [undefined, "EXACT_ELIGIBLE_SSI"],
     ] as const) {
       expect(

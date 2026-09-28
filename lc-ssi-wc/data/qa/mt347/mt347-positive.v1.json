@@ -3,8 +3,8 @@
   "fixtureId": "MT347-POSITIVE-V1",
   "classification": "SYNTHETIC_DEMO_QA_UAT",
   "loadPolicy": "CANONICAL_RELOAD",
-  "sourceWorkbook": "qa/tdd/mt347/MT347_SR2026_SSI_TDD_CONTROLLED_v5.xlsx",
-  "sourceWorkbookSha256": "82C6ABCFD91E7D35E1382F8C86BF796D8DBF05CF8C8D94F9F0C7B5889AB52C9A",
+  "sourceWorkbook": "qa/tdd/mt347/MT347_SR2026_SSI_TDD_CONTROLLED_v6.xlsx",
+  "sourceWorkbookSha256": "70BDD07B90A87D32D06AE4B4305301C4ABD34BC62715427323DC9C111CF056D1",
   "memorySha256": "682075A1EC36AD1A5397382063B1AFEE08F0E88921E139E7E62A8033552A985A",
   "records": [
     {
@@ -176,7 +176,7 @@
         }
       },
       "roleValuesSource": "INPUT_CONFIGURATION",
-      "expectedOutput": "B2.53A=CITIUS33; B2.57A=DEUTDEFF; B2.58A=BARCGB22; 56a omitted/NOT_REQUIRED; no duplicate institution across roles",
+      "expectedOutput": "B2.53A=CITIUS33; B2.57A=DEUTDEFF; B2.58A=BARCGB22; 56a omitted/NOT_REQUIRED; 58x is preserved transaction context and may equal the receiving institution",
       "expectedStatus": "RESOLVED",
       "expectedHttp": "200",
       "polarity": "POSITIVE",
@@ -251,7 +251,7 @@
         }
       },
       "roleValuesSource": "INPUT_CONFIGURATION",
-      "expectedOutput": "B2.53A=CITIUS33; B2.56A=HSBCHKHH; B2.57A=DEUTDEFF; B2.58A=BARCGB22; role values must remain distinct",
+      "expectedOutput": "B2.53A=CITIUS33; B2.56A=HSBCHKHH; B2.57A=DEUTDEFF; B2.58A=BARCGB22; 58x is preserved transaction context and may equal the receiving institution",
       "expectedStatus": "RESOLVED",
       "expectedHttp": "200",
       "polarity": "POSITIVE",
@@ -319,11 +319,11 @@
         }
       },
       "roleValuesSource": "INPUT_CONFIGURATION",
-      "expectedOutput": "D.53A=CITIUS33; D.57A=DEUTDEFF; D.58A=BARCGB22; 56a omitted/NOT_REQUIRED; no duplicate institution across roles",
+      "expectedOutput": "D.53A=CITIUS33; D.57A=DEUTDEFF; D.58A=BARCGB22; 56a omitted/NOT_REQUIRED; 58x is preserved transaction context and may equal the receiving institution",
       "expectedStatus": "RESOLVED",
       "expectedHttp": "200",
       "polarity": "POSITIVE",
-      "mrgEvidence": "us3ma_20260717.pdf p.19; C4 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.21-22",
+      "mrgEvidence": "us3ma_20260717.pdf p.19; C3/C4 Sequence D presence and mandatory content - p.22; D96 repetition count - p.77",
       "identity": {
         "ssi": {
           "id": "41d3fb5e-e787-5565-875a-37643167d576",
@@ -394,11 +394,11 @@
         }
       },
       "roleValuesSource": "INPUT_CONFIGURATION",
-      "expectedOutput": "D.53A=CITIUS33; D.56A=HSBCHKHH; D.57A=DEUTDEFF; D.58A=BARCGB22; role values must remain distinct",
+      "expectedOutput": "D.53A=CITIUS33; D.56A=HSBCHKHH; D.57A=DEUTDEFF; D.58A=BARCGB22; 58x is preserved transaction context and may equal the receiving institution",
       "expectedStatus": "RESOLVED",
       "expectedHttp": "200",
       "polarity": "POSITIVE",
-      "mrgEvidence": "us3ma_20260717.pdf p.19; C4 mandatory fields within an optional sequence - us3ma_20260717.pdf pp.21-22",
+      "mrgEvidence": "us3ma_20260717.pdf p.19; C3/C4 Sequence D presence and mandatory content - p.22; D96 repetition count - p.77",
       "identity": {
         "ssi": {
           "id": "d4af05e3-cefe-5bb9-aae5-6c1d4f3a8c23",
@@ -646,7 +646,7 @@
         }
       },
       "roleValuesSource": "INPUT_CONFIGURATION",
-      "expectedOutput": "B2.53A=CITIUS33; B2.57A=DEUTDEFF; B2.58A=BARCGB22; 56a omitted/NOT_REQUIRED; no duplicate institution across roles",
+      "expectedOutput": "B2.53A=CITIUS33; B2.57A=DEUTDEFF; B2.58A=BARCGB22; 56a omitted/NOT_REQUIRED; 58x is preserved transaction context and may equal the receiving institution",
       "expectedStatus": "RESOLVED",
       "expectedHttp": "200",
       "polarity": "POSITIVE",
@@ -721,7 +721,7 @@
         }
       },
       "roleValuesSource": "INPUT_CONFIGURATION",
-      "expectedOutput": "B2.53A=CITIUS33; B2.56A=HSBCHKHH; B2.57A=DEUTDEFF; B2.58A=BARCGB22; role values must remain distinct",
+      "expectedOutput": "B2.53A=CITIUS33; B2.56A=HSBCHKHH; B2.57A=DEUTDEFF; B2.58A=BARCGB22; 58x is preserved transaction context and may equal the receiving institution",
       "expectedStatus": "RESOLVED",
       "expectedHttp": "200",
       "polarity": "POSITIVE",
@@ -789,7 +789,7 @@
         }
       },
       "roleValuesSource": "INPUT_CONFIGURATION",
-      "expectedOutput": "E.53A=CITIUS33; E.57A=DEUTDEFF; E.58A=BARCGB22; 56a omitted/NOT_REQUIRED; no duplicate institution across roles",
+      "expectedOutput": "E.53A=CITIUS33; E.57A=DEUTDEFF; E.58A=BARCGB22; 56a omitted/NOT_REQUIRED; 58x is preserved transaction context and may equal the receiving institution",
       "expectedStatus": "RESOLVED",
       "expectedHttp": "200",
       "polarity": "POSITIVE",
@@ -864,7 +864,7 @@
         }
       },
       "roleValuesSource": "INPUT_CONFIGURATION",
-      "expectedOutput": "E.53A=CITIUS33; E.56A=HSBCHKHH; E.57A=DEUTDEFF; E.58A=BARCGB22; role values must remain distinct",
+      "expectedOutput": "E.53A=CITIUS33; E.56A=HSBCHKHH; E.57A=DEUTDEFF; E.58A=BARCGB22; 58x is preserved transaction context and may equal the receiving institution",
       "expectedStatus": "RESOLVED",
       "expectedHttp": "200",
       "polarity": "POSITIVE",
@@ -1210,7 +1210,7 @@
         }
       },
       "roleValuesSource": "INPUT_CONFIGURATION",
-      "expectedOutput": "C.53A=CITIUS33; C.57A=DEUTDEFF; C.58A=BARCGB22; 56a omitted/NOT_REQUIRED; no duplicate institution across roles",
+      "expectedOutput": "C.53A=CITIUS33; C.57A=DEUTDEFF; C.58A=BARCGB22; 56a omitted/NOT_REQUIRED; 58x is preserved transaction context and may equal the receiving institution",
       "expectedStatus": "RESOLVED",
       "expectedHttp": "200",
       "polarity": "POSITIVE",
@@ -1285,7 +1285,7 @@
         }
       },
       "roleValuesSource": "INPUT_CONFIGURATION",
-      "expectedOutput": "C.53A=CITIUS33; C.56A=HSBCHKHH; C.57A=DEUTDEFF; C.58A=BARCGB22; role values must remain distinct",
+      "expectedOutput": "C.53A=CITIUS33; C.56A=HSBCHKHH; C.57A=DEUTDEFF; C.58A=BARCGB22; 58x is preserved transaction context and may equal the receiving institution",
       "expectedStatus": "RESOLVED",
       "expectedHttp": "200",
       "polarity": "POSITIVE",
@@ -1353,7 +1353,7 @@
         }
       },
       "roleValuesSource": "INPUT_CONFIGURATION",
-      "expectedOutput": "E.53A=CITIUS33; E.57A=DEUTDEFF; E.58A=BARCGB22; 56a omitted/NOT_REQUIRED; no duplicate institution across roles",
+      "expectedOutput": "E.53A=CITIUS33; E.57A=DEUTDEFF; E.58A=BARCGB22; 56a omitted/NOT_REQUIRED; 58x is preserved transaction context and may equal the receiving institution",
       "expectedStatus": "RESOLVED",
       "expectedHttp": "200",
       "polarity": "POSITIVE",
@@ -1428,7 +1428,7 @@
         }
       },
       "roleValuesSource": "INPUT_CONFIGURATION",
-      "expectedOutput": "E.53A=CITIUS33; E.56A=HSBCHKHH; E.57A=DEUTDEFF; E.58A=BARCGB22; role values must remain distinct",
+      "expectedOutput": "E.53A=CITIUS33; E.56A=HSBCHKHH; E.57A=DEUTDEFF; E.58A=BARCGB22; 58x is preserved transaction context and may equal the receiving institution",
       "expectedStatus": "RESOLVED",
       "expectedHttp": "200",
       "polarity": "POSITIVE",
@@ -1680,7 +1680,7 @@
         }
       },
       "roleValuesSource": "INPUT_CONFIGURATION",
-      "expectedOutput": "C.53A=CITIUS33; C.57A=DEUTDEFF; C.58A=BARCGB22; 56a omitted/NOT_REQUIRED; no duplicate institution across roles",
+      "expectedOutput": "C.53A=CITIUS33; C.57A=DEUTDEFF; C.58A=BARCGB22; 56a omitted/NOT_REQUIRED; 58x is preserved transaction context and may equal the receiving institution",
       "expectedStatus": "RESOLVED",
       "expectedHttp": "200",
       "polarity": "POSITIVE",
@@ -1755,7 +1755,7 @@
         }
       },
       "roleValuesSource": "INPUT_CONFIGURATION",
-      "expectedOutput": "C.53A=CITIUS33; C.56A=HSBCHKHH; C.57A=DEUTDEFF; C.58A=BARCGB22; role values must remain distinct",
+      "expectedOutput": "C.53A=CITIUS33; C.56A=HSBCHKHH; C.57A=DEUTDEFF; C.58A=BARCGB22; 58x is preserved transaction context and may equal the receiving institution",
       "expectedStatus": "RESOLVED",
       "expectedHttp": "200",
       "polarity": "POSITIVE",
@@ -1823,7 +1823,7 @@
         }
       },
       "roleValuesSource": "INPUT_CONFIGURATION",
-      "expectedOutput": "D.53A=CITIUS33; D.57A=DEUTDEFF; D.58A=BARCGB22; 56a omitted/NOT_REQUIRED; no duplicate institution across roles",
+      "expectedOutput": "D.53A=CITIUS33; D.57A=DEUTDEFF; D.58A=BARCGB22; 56a omitted/NOT_REQUIRED; 58x is preserved transaction context and may equal the receiving institution",
       "expectedStatus": "RESOLVED",
       "expectedHttp": "200",
       "polarity": "POSITIVE",
@@ -1898,7 +1898,7 @@
         }
       },
       "roleValuesSource": "INPUT_CONFIGURATION",
-      "expectedOutput": "D.53A=CITIUS33; D.56A=HSBCHKHH; D.57A=DEUTDEFF; D.58A=BARCGB22; role values must remain distinct",
+      "expectedOutput": "D.53A=CITIUS33; D.56A=HSBCHKHH; D.57A=DEUTDEFF; D.58A=BARCGB22; 58x is preserved transaction context and may equal the receiving institution",
       "expectedStatus": "RESOLVED",
       "expectedHttp": "200",
       "polarity": "POSITIVE",
@@ -1966,7 +1966,7 @@
         }
       },
       "roleValuesSource": "INPUT_CONFIGURATION",
-      "expectedOutput": "E.53A=CITIUS33; E.57A=DEUTDEFF; E.58A=BARCGB22; 56a omitted/NOT_REQUIRED; no duplicate institution across roles",
+      "expectedOutput": "E.53A=CITIUS33; E.57A=DEUTDEFF; E.58A=BARCGB22; 56a omitted/NOT_REQUIRED; 58x is preserved transaction context and may equal the receiving institution",
       "expectedStatus": "RESOLVED",
       "expectedHttp": "200",
       "polarity": "POSITIVE",
@@ -2041,7 +2041,7 @@
         }
       },
       "roleValuesSource": "INPUT_CONFIGURATION",
-      "expectedOutput": "E.53A=CITIUS33; E.56A=HSBCHKHH; E.57A=DEUTDEFF; E.58A=BARCGB22; role values must remain distinct",
+      "expectedOutput": "E.53A=CITIUS33; E.56A=HSBCHKHH; E.57A=DEUTDEFF; E.58A=BARCGB22; 58x is preserved transaction context and may equal the receiving institution",
       "expectedStatus": "RESOLVED",
       "expectedHttp": "200",
       "polarity": "POSITIVE",
@@ -2109,7 +2109,7 @@
         }
       },
       "roleValuesSource": "INPUT_CONFIGURATION",
-      "expectedOutput": "F.53A=CITIUS33; F.57A=DEUTDEFF; F.58A=BARCGB22; 56a omitted/NOT_REQUIRED; no duplicate institution across roles",
+      "expectedOutput": "F.53A=CITIUS33; F.57A=DEUTDEFF; F.58A=BARCGB22; 56a omitted/NOT_REQUIRED; 58x is preserved transaction context and may equal the receiving institution",
       "expectedStatus": "RESOLVED",
       "expectedHttp": "200",
       "polarity": "POSITIVE",
@@ -2184,7 +2184,7 @@
         }
       },
       "roleValuesSource": "INPUT_CONFIGURATION",
-      "expectedOutput": "F.53A=CITIUS33; F.56A=HSBCHKHH; F.57A=DEUTDEFF; F.58A=BARCGB22; role values must remain distinct",
+      "expectedOutput": "F.53A=CITIUS33; F.56A=HSBCHKHH; F.57A=DEUTDEFF; F.58A=BARCGB22; 58x is preserved transaction context and may equal the receiving institution",
       "expectedStatus": "RESOLVED",
       "expectedHttp": "200",
       "polarity": "POSITIVE",
@@ -2436,7 +2436,7 @@
         }
       },
       "roleValuesSource": "INPUT_CONFIGURATION",
-      "expectedOutput": "C.53A=CITIUS33; C.57A=DEUTDEFF; C.58A=BARCGB22; 56a omitted/NOT_REQUIRED; no duplicate institution across roles",
+      "expectedOutput": "C.53A=CITIUS33; C.57A=DEUTDEFF; C.58A=BARCGB22; 56a omitted/NOT_REQUIRED; 58x is preserved transaction context and may equal the receiving institution",
       "expectedStatus": "RESOLVED",
       "expectedHttp": "200",
       "polarity": "POSITIVE",
@@ -2511,7 +2511,7 @@
         }
       },
       "roleValuesSource": "INPUT_CONFIGURATION",
-      "expectedOutput": "C.53A=CITIUS33; C.56A=HSBCHKHH; C.57A=DEUTDEFF; C.58A=BARCGB22; role values must remain distinct",
+      "expectedOutput": "C.53A=CITIUS33; C.56A=HSBCHKHH; C.57A=DEUTDEFF; C.58A=BARCGB22; 58x is preserved transaction context and may equal the receiving institution",
       "expectedStatus": "RESOLVED",
       "expectedHttp": "200",
       "polarity": "POSITIVE",
@@ -2579,7 +2579,7 @@
         }
       },
       "roleValuesSource": "INPUT_CONFIGURATION",
-      "expectedOutput": "D.53A=CITIUS33; D.57A=DEUTDEFF; D.58A=BARCGB22; 56a omitted/NOT_REQUIRED; no duplicate institution across roles",
+      "expectedOutput": "D.53A=CITIUS33; D.57A=DEUTDEFF; D.58A=BARCGB22; 56a omitted/NOT_REQUIRED; 58x is preserved transaction context and may equal the receiving institution",
       "expectedStatus": "RESOLVED",
       "expectedHttp": "200",
       "polarity": "POSITIVE",
@@ -2654,7 +2654,7 @@
         }
       },
       "roleValuesSource": "INPUT_CONFIGURATION",
-      "expectedOutput": "D.53A=CITIUS33; D.56A=HSBCHKHH; D.57A=DEUTDEFF; D.58A=BARCGB22; role values must remain distinct",
+      "expectedOutput": "D.53A=CITIUS33; D.56A=HSBCHKHH; D.57A=DEUTDEFF; D.58A=BARCGB22; 58x is preserved transaction context and may equal the receiving institution",
       "expectedStatus": "RESOLVED",
       "expectedHttp": "200",
       "polarity": "POSITIVE",
@@ -2722,7 +2722,7 @@
         }
       },
       "roleValuesSource": "INPUT_CONFIGURATION",
-      "expectedOutput": "E.53A=CITIUS33; E.57A=DEUTDEFF; E.58A=BARCGB22; 56a omitted/NOT_REQUIRED; no duplicate institution across roles",
+      "expectedOutput": "E.53A=CITIUS33; E.57A=DEUTDEFF; E.58A=BARCGB22; 56a omitted/NOT_REQUIRED; 58x is preserved transaction context and may equal the receiving institution",
       "expectedStatus": "RESOLVED",
       "expectedHttp": "200",
       "polarity": "POSITIVE",
@@ -2797,7 +2797,7 @@
         }
       },
       "roleValuesSource": "INPUT_CONFIGURATION",
-      "expectedOutput": "E.53A=CITIUS33; E.56A=HSBCHKHH; E.57A=DEUTDEFF; E.58A=BARCGB22; role values must remain distinct",
+      "expectedOutput": "E.53A=CITIUS33; E.56A=HSBCHKHH; E.57A=DEUTDEFF; E.58A=BARCGB22; 58x is preserved transaction context and may equal the receiving institution",
       "expectedStatus": "RESOLVED",
       "expectedHttp": "200",
       "polarity": "POSITIVE",
@@ -2865,7 +2865,7 @@
         }
       },
       "roleValuesSource": "INPUT_CONFIGURATION",
-      "expectedOutput": "F.53A=CITIUS33; F.57A=DEUTDEFF; F.58A=BARCGB22; 56a omitted/NOT_REQUIRED; no duplicate institution across roles",
+      "expectedOutput": "F.53A=CITIUS33; F.57A=DEUTDEFF; F.58A=BARCGB22; 56a omitted/NOT_REQUIRED; 58x is preserved transaction context and may equal the receiving institution",
       "expectedStatus": "RESOLVED",
       "expectedHttp": "200",
       "polarity": "POSITIVE",
@@ -2940,7 +2940,7 @@
         }
       },
       "roleValuesSource": "INPUT_CONFIGURATION",
-      "expectedOutput": "F.53A=CITIUS33; F.56A=HSBCHKHH; F.57A=DEUTDEFF; F.58A=BARCGB22; role values must remain distinct",
+      "expectedOutput": "F.53A=CITIUS33; F.56A=HSBCHKHH; F.57A=DEUTDEFF; F.58A=BARCGB22; 58x is preserved transaction context and may equal the receiving institution",
       "expectedStatus": "RESOLVED",
       "expectedHttp": "200",
       "polarity": "POSITIVE",
@@ -3065,7 +3065,7 @@
         }
       },
       "roleValuesSource": "INPUT_CONFIGURATION",
-      "expectedOutput": "C.53A=CITIUS33; C.57A=DEUTDEFF; C.58A=BARCGB22; 56a omitted/NOT_REQUIRED; no duplicate institution across roles",
+      "expectedOutput": "C.53A=CITIUS33; C.57A=DEUTDEFF; C.58A=BARCGB22; 56a omitted/NOT_REQUIRED; 58x is preserved transaction context and may equal the receiving institution",
       "expectedStatus": "RESOLVED",
       "expectedHttp": "200",
       "polarity": "POSITIVE",
@@ -3140,7 +3140,7 @@
         }
       },
       "roleValuesSource": "INPUT_CONFIGURATION",
-      "expectedOutput": "C.53A=CITIUS33; C.56A=HSBCHKHH; C.57A=DEUTDEFF; C.58A=BARCGB22; role values must remain distinct",
+      "expectedOutput": "C.53A=CITIUS33; C.56A=HSBCHKHH; C.57A=DEUTDEFF; C.58A=BARCGB22; 58x is preserved transaction context and may equal the receiving institution",
       "expectedStatus": "RESOLVED",
       "expectedHttp": "200",
       "polarity": "POSITIVE",
@@ -3208,7 +3208,7 @@
         }
       },
       "roleValuesSource": "INPUT_CONFIGURATION",
-      "expectedOutput": "D.53A=CITIUS33; D.57A=DEUTDEFF; D.58A=BARCGB22; 56a omitted/NOT_REQUIRED; no duplicate institution across roles",
+      "expectedOutput": "D.53A=CITIUS33; D.57A=DEUTDEFF; D.58A=BARCGB22; 56a omitted/NOT_REQUIRED; 58x is preserved transaction context and may equal the receiving institution",
       "expectedStatus": "RESOLVED",
       "expectedHttp": "200",
       "polarity": "POSITIVE",
@@ -3283,7 +3283,7 @@
         }
       },
       "roleValuesSource": "INPUT_CONFIGURATION",
-      "expectedOutput": "D.53A=CITIUS33; D.56A=HSBCHKHH; D.57A=DEUTDEFF; D.58A=BARCGB22; role values must remain distinct",
+      "expectedOutput": "D.53A=CITIUS33; D.56A=HSBCHKHH; D.57A=DEUTDEFF; D.58A=BARCGB22; 58x is preserved transaction context and may equal the receiving institution",
       "expectedStatus": "RESOLVED",
       "expectedHttp": "200",
       "polarity": "POSITIVE",
@@ -3535,7 +3535,7 @@
         }
       },
       "roleValuesSource": "INPUT_CONFIGURATION",
-      "expectedOutput": "C.53A=CITIUS33; C.57A=DEUTDEFF; C.58A=BARCGB22; 56a omitted/NOT_REQUIRED; no duplicate institution across roles",
+      "expectedOutput": "C.53A=CITIUS33; C.57A=DEUTDEFF; C.58A=BARCGB22; 56a omitted/NOT_REQUIRED; 58x is preserved transaction context and may equal the receiving institution",
       "expectedStatus": "RESOLVED",
       "expectedHttp": "200",
       "polarity": "POSITIVE",
@@ -3610,7 +3610,7 @@
         }
       },
       "roleValuesSource": "INPUT_CONFIGURATION",
-      "expectedOutput": "C.53A=CITIUS33; C.56A=HSBCHKHH; C.57A=DEUTDEFF; C.58A=BARCGB22; role values must remain distinct",
+      "expectedOutput": "C.53A=CITIUS33; C.56A=HSBCHKHH; C.57A=DEUTDEFF; C.58A=BARCGB22; 58x is preserved transaction context and may equal the receiving institution",
       "expectedStatus": "RESOLVED",
       "expectedHttp": "200",
       "polarity": "POSITIVE",
@@ -3735,7 +3735,7 @@
         }
       },
       "roleValuesSource": "INPUT_CONFIGURATION",
-      "expectedOutput": "C.53A=CITIUS33; C.57A=DEUTDEFF; C.58A=BARCGB22; 56a omitted/NOT_REQUIRED; no duplicate institution across roles",
+      "expectedOutput": "C.53A=CITIUS33; C.57A=DEUTDEFF; C.58A=BARCGB22; 56a omitted/NOT_REQUIRED; 58x is preserved transaction context and may equal the receiving institution",
       "expectedStatus": "RESOLVED",
       "expectedHttp": "200",
       "polarity": "POSITIVE",
@@ -3810,7 +3810,7 @@
         }
       },
       "roleValuesSource": "INPUT_CONFIGURATION",
-      "expectedOutput": "C.53A=CITIUS33; C.56A=HSBCHKHH; C.57A=DEUTDEFF; C.58A=BARCGB22; role values must remain distinct",
+      "expectedOutput": "C.53A=CITIUS33; C.56A=HSBCHKHH; C.57A=DEUTDEFF; C.58A=BARCGB22; 58x is preserved transaction context and may equal the receiving institution",
       "expectedStatus": "RESOLVED",
       "expectedHttp": "200",
       "polarity": "POSITIVE",

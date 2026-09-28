@@ -177,6 +177,50 @@ describe("ResolutionPageScenarioCatalogueService", () => {
     expect(service.fieldOptionsFor("MT730-003")).toEqual({ "57": "Z" });
   });
 
+  it("catalogues every positive scenario with a transaction-context 58A input", () => {
+    const service = new ResolutionPageScenarioCatalogueService(
+      new PageParameterEnvironmentPolicy("DEMO"),
+    );
+    const all58aScenarios = service
+      .get()
+      .scenarios.filter(({ inputValues }) =>
+        Object.keys(inputValues ?? {}).some((fieldId) =>
+          fieldId.includes("beneficiaryBankServiceId"),
+        ),
+      );
+    expect(all58aScenarios).toHaveLength(40);
+    expect(
+      all58aScenarios.every(
+        ({ inputValues }) =>
+          inputValues?.["context.beneficiaryBankServiceId"] ===
+          "BANK-SVC-BARCGB22",
+      ),
+    ).toBe(true);
+  });
+
+  it("keeps MT300 Sequence D full-FIN NVRs downstream without turning them into SSI inputs", () => {
+    const scenarios = new ResolutionPageScenarioCatalogueService(
+      new PageParameterEnvironmentPolicy("QA"),
+    ).get().scenarios;
+
+    for (const scenarioId of ["MT300-011", "MT300-012"]) {
+      const scenario = scenarios.find(
+        (candidate) => candidate.scenarioId === scenarioId,
+      );
+      expect(scenario?.fullFinValidationRuleIds).toEqual([
+        "MT300-C3",
+        "MT300-C4",
+        "MT300-D96",
+      ]);
+      expect(Object.keys(scenario?.inputValues ?? {})).not.toEqual(
+        expect.arrayContaining([
+          expect.stringMatching(/17U/),
+          expect.stringMatching(/16A/),
+        ]),
+      );
+    }
+  });
+
   it("keeps controlled cross-field facts as server-owned scenario inputs", () => {
     const service = new ResolutionPageScenarioCatalogueService(
       new PageParameterEnvironmentPolicy("QA"),

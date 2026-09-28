@@ -1160,6 +1160,44 @@ describe("FinFieldResolutionService", () => {
       },
     });
   });
+
+  it("does not mislabel an SSI-supported 58A transaction input as eligible SSI", () => {
+    const mapping = catalogue.mappings.find(
+      ({ messageType, tag }) => messageType === "MT300" && tag === "58",
+    )!;
+    const result = serviceWithMappings([mapping]).resolve({
+      ...treasuryRequest,
+      messageType: "MT300",
+      businessFunction: "FX_CONFIRMATION",
+      sequence: "B2",
+      settlementLeg: "Amount Sold",
+      roles: { BENEFICIARY_INSTITUTION: "BARCGB22" },
+      roleEvidence: {
+        BENEFICIARY_INSTITUTION: {
+          ownerSide: "TRANSACTION_PARTY",
+          sourceType: "BANK_SERVICE_ID",
+          sourceRecordId: "BANK-SVC-BARCGB22",
+          status: "ACTIVE",
+          approvalStatus: "APPROVED",
+          effectiveFrom: "2026-01-01",
+          effectiveTo: "2027-01-01",
+        },
+      },
+    }) as { resolvedFields: Array<Record<string, unknown>> };
+
+    expect(result.resolvedFields[0]).toMatchObject({
+      tag: "58",
+      resolutionStatus: "RESOLVED",
+      reasonCode: "PRESERVED_FROM_TRANSACTION_CONTEXT",
+      resolvedValue: "BARCGB22",
+      provenance: {
+        source: "BANK_SERVICE_ID",
+        sourceRecordId: "BANK-SVC-BARCGB22",
+        ownerSide: "TRANSACTION_PARTY",
+        accountRelationshipStatus: "NOT_EVALUATED",
+      },
+    });
+  });
 });
 
 interface ResolvedFieldForTest {

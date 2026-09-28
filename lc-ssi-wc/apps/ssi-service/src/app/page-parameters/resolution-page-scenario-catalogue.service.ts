@@ -58,6 +58,8 @@ export interface ResolutionPageConfiguredScenario {
   readonly inputValues?: Readonly<Record<string, string | boolean>>;
   readonly fieldOptions?: Readonly<Record<string, string>>;
   readonly reasonCode?: string;
+  /** Full-FIN NVRs recorded for downstream validation; never SSI workbench inputs. */
+  readonly fullFinValidationRuleIds?: readonly string[];
 }
 
 export interface ResolutionPageScenarioDefinition {
@@ -515,6 +517,16 @@ export class ResolutionPageScenarioCatalogueService {
     const fixture = scenario["fixtureBinding"] as Record<string, unknown>;
     const executionContext = scenario["executionContext"] as
       Record<string, unknown> | undefined;
+    const validation = scenario["validation"] as
+      | Record<string, unknown>
+      | undefined;
+    const fullFinValidationRuleIds = Array.isArray(
+      validation?.["fullFinValidationRuleIds"],
+    )
+      ? (validation!["fullFinValidationRuleIds"] as unknown[])
+          .map((value) => scalarText(value).trim())
+          .filter(Boolean)
+      : [];
     const rawFieldOptions = executionContext?.["fieldOptions"];
     const fieldOptions =
       rawFieldOptions &&
@@ -547,6 +559,9 @@ export class ResolutionPageScenarioCatalogueService {
       ],
       inputValues: values,
       ...(Object.keys(fieldOptions).length ? { fieldOptions } : {}),
+      ...(fullFinValidationRuleIds.length
+        ? { fullFinValidationRuleIds }
+        : {}),
       reasonCode: governedScenarioReasonCode(expected["statusOrError"]),
     };
   }
@@ -951,6 +966,11 @@ export class ResolutionPageScenarioCatalogueService {
           ].includes(String(scenario["flowKind"])) ||
           !hasText(scenario["fixtureBindingId"]) ||
           !Array.isArray(scenario["expectedHttp"]) ||
+          (scenario["fullFinValidationRuleIds"] !== undefined &&
+            (!Array.isArray(scenario["fullFinValidationRuleIds"]) ||
+              (scenario["fullFinValidationRuleIds"] as unknown[]).some(
+                (ruleId) => !hasText(ruleId),
+              ))) ||
           (scenario["fieldOptions"] !== undefined &&
             (!scenario["fieldOptions"] ||
               typeof scenario["fieldOptions"] !== "object" ||

@@ -520,6 +520,7 @@ export interface ResolutionPageFieldResult {
     readonly ownerSide?: string;
     readonly version?: string;
     readonly canonicalRouteNodeId?: string;
+    readonly accountRelationshipStatus?: "NOT_EVALUATED";
   };
   readonly evidenceIds: readonly string[];
 }

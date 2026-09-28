@@ -30,6 +30,7 @@ export interface Fin5xSupportRow {
   suggestedValue?: string;
   source?: string;
   ownerSide?: string;
+  accountRelationshipStatus?: "NOT_EVALUATED";
   evidence?: string;
   reasonCode: Fin5xReasonCode;
 }
@@ -140,6 +141,8 @@ const supportedOutcome = (
 function resolvedReason(ownerSide?: string): Fin5xReasonCode {
   if (ownerSide === "RECEIVER_SIDE") return "RESOLVED_FROM_COUNTERPARTY_SSI";
   if (ownerSide === "SENDER_SIDE") return "RESOLVED_FROM_OWN_SSI";
+  if (ownerSide === "TRANSACTION_PARTY")
+    return "PRESERVED_FROM_TRANSACTION_CONTEXT";
   return "EXACT_ELIGIBLE_SSI";
 }
 
@@ -202,6 +205,9 @@ function analyzeField(
     source: suggestion.provenance.source,
     ...(suggestion.provenance.ownerSide
       ? { ownerSide: suggestion.provenance.ownerSide }
+      : {}),
+    ...(suggestion.provenance.ownerSide === "TRANSACTION_PARTY"
+      ? { accountRelationshipStatus: "NOT_EVALUATED" as const }
       : {}),
     ...(suggestion.provenance.sourceRecordId
       ? { evidence: suggestion.provenance.sourceRecordId }

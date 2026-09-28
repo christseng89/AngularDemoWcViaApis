@@ -54,6 +54,9 @@ const provenanceSummary = (
       ? `pages ${provenance.fieldProfileEvidencePages.join(", ")}`
       : undefined,
     provenance.canonicalRouteNodeId,
+    provenance.accountRelationshipStatus
+      ? `ACCOUNT_RELATIONSHIP_${provenance.accountRelationshipStatus}`
+      : undefined,
   ]
     .filter((value): value is string => Boolean(value))
     .join(" · ");
@@ -179,8 +182,14 @@ export const resolutionResultRows = (
     status: field.resolutionStatus,
     statusLabel: statusLabel(field.resolutionStatus),
     reasonCode: field.reasonCode ?? "",
-    statusDetail:
-      field.reasonCode ||
+    statusDetail: [
+      field.reasonCode,
+      field.provenance.accountRelationshipStatus
+        ? `ACCOUNT_RELATIONSHIP_${field.provenance.accountRelationshipStatus}`
+        : undefined,
+    ]
+      .filter(Boolean)
+      .join(" · ") ||
       (field.provenance.source ? `Source: ${field.provenance.source}` : ""),
     provenance: provenanceSummary(field.provenance),
   }));

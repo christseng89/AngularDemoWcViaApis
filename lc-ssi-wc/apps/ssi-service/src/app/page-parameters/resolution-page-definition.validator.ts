@@ -317,21 +317,29 @@ const validateScenario = (
     validationOwner !== "UPSTREAM_FIN_VALIDATOR"
   )
     throw new Error("PAGE_SCENARIO_NVR_DISPOSITION_INVALID");
-  if (
-    scenario.validationRuleIds.some(
-      (ruleId) => rulesById.get(ruleId)?.owner !== validationOwner,
+  const dispositions = scenario.validation.dispositions;
+  if (!dispositions?.length) {
+    if (
+      scenario.validationRuleIds.some(
+        (ruleId) => rulesById.get(ruleId)?.owner !== validationOwner,
+      )
     )
-  )
-    throw new Error("PAGE_SCENARIO_RULE_OWNER_MISMATCH");
-  if (
-    scenario.validation.dispositions?.some(
-      ({ owner, taxonomy, ruleIds }) =>
-        owner !== validationOwner ||
-        taxonomy !== validationTaxonomy ||
-        ruleIds.some((ruleId) => !scenario.validationRuleIds.includes(ruleId)),
+      throw new Error("PAGE_SCENARIO_RULE_OWNER_MISMATCH");
+  } else {
+    const [primary] = dispositions;
+    if (
+      primary?.owner !== validationOwner ||
+      primary.taxonomy !== validationTaxonomy ||
+      dispositions.some(({ owner, ruleIds }) =>
+        ruleIds.some(
+          (ruleId) =>
+            !scenario.validationRuleIds.includes(ruleId) ||
+            rulesById.get(ruleId)?.owner !== owner,
+        ),
+      )
     )
-  )
-    throw new Error("PAGE_SCENARIO_VALIDATION_DISPOSITION_MISMATCH");
+      throw new Error("PAGE_SCENARIO_VALIDATION_DISPOSITION_MISMATCH");
+  }
   const expectedIsolation = {
     POSITIVE: "CANONICAL",
     NEGATIVE: "TRANSACTIONAL_NEGATIVE",

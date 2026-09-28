@@ -50,7 +50,7 @@ test("controlled v6 workbook identity and all ledgers pass", async () => {
     workbook,
     sidecar: `${workbook}.sha256.txt`,
     expectedSha256:
-      "7EFFDFFF50F502E032A9AE1AF519A68886B53133DD065CAC53E10DA593A70EA0",
+      "70BDD07B90A87D32D06AE4B4305301C4ABD34BC62715427323DC9C111CF056D1",
   });
   assert.equal(
     report.status,

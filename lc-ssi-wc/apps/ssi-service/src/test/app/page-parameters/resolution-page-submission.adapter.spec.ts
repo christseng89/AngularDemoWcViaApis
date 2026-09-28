@@ -623,6 +623,106 @@ describe("ResolutionPageSubmissionAdapter", () => {
     ]);
   });
 
+  it("accepts a governed Bank Service selection for transaction-context 58A", () => {
+    const beneficiaryField = {
+      ...definition.fields.find(
+        ({ fieldId }) => fieldId === "Q9.57.bankServiceId",
+      )!,
+      fieldId: "Q9.58.bankServiceId",
+      path: "transactionContext.beneficiaryBankServiceId",
+      label: "SWIFT 58A • Beneficiary Institution",
+      swiftTag: "58",
+      officialRole: "BENEFICIARY_INSTITUTION",
+      lookup: {
+        provider: "BANK_SERVICE" as const,
+        action: "BANK_SERVICE" as const,
+        endpoint: "/api/v1/resolution-page-definitions/lookups/bank-services",
+        valueField: "bankServiceId" as const,
+        displayField: "bic" as const,
+        validationField: "bic" as const,
+        targetRole: "BENEFICIARY_INSTITUTION",
+      },
+    };
+    const fields = [...definition.fields, beneficiaryField];
+    const governedScenario = {
+      ...scenario,
+      fieldIds: [...scenario.fieldIds, beneficiaryField.fieldId],
+      fieldPolicies: fields.map((field) => ({
+        fieldId: field.fieldId,
+        applicability: "APPLICABLE" as const,
+        inputOwnership: "TRANSACTION_USER" as const,
+        visibility: "USER_INPUT" as const,
+        processingPolicy: "APPLY" as const,
+        required: true,
+        readOnly: false,
+      })),
+    };
+    const conflictingCandidate = {
+      ...candidate,
+      roleValues: {
+        ACCOUNT_WITH_INSTITUTION: "DEUTDEFF",
+        BENEFICIARY_INSTITUTION: "BARCGB22",
+      },
+      transactionRoleValues: {
+        BENEFICIARY_INSTITUTION: "BARCGB22",
+      },
+    };
+    const controlledResolution = {
+      resolve: jest.fn(() => ({ payloadGenerated: true, resolvedFields: [] })),
+    };
+    const governed = new ResolutionPageSubmissionAdapter(
+      {
+        getByIdentity: () => ({
+          contract: {
+            ...definition,
+            fields,
+            scenarios: [governedScenario],
+          },
+          contractSha256: SHA,
+        }),
+      } as never,
+      {
+        list: jest.fn(() => ({ candidates: [conflictingCandidate] })),
+      } as never,
+      controlledResolution as never,
+      {
+        resolve: jest.fn((id: string) => ({
+          bankServiceId: id,
+          bic:
+            id === "BANK-SVC-DEUTDEFF"
+              ? "DEUTDEFF"
+              : id === "BANK-SVC-BARCGB22"
+                ? "BARCGB22"
+                : "CITIUS33",
+        })),
+      } as never,
+      {
+        constraintsFor: () => [],
+        fieldOptionsFor: () => ({}),
+      } as never,
+    );
+    const execute = () =>
+      governed.execute({
+        ...submission,
+        contractSha256: SHA,
+        values: {
+          ...submission.values,
+          "Q9.57.bankServiceId": "BANK-SVC-DEUTDEFF",
+          "Q9.58.bankServiceId": "BANK-SVC-CITIUS33",
+        },
+      });
+
+    expect(execute).not.toThrow();
+    expect(controlledResolution.resolve).toHaveBeenCalledTimes(1);
+    expect(controlledResolution.resolve).toHaveBeenCalledWith(
+      expect.objectContaining({
+        roleBankServiceIds: expect.objectContaining({
+          BENEFICIARY_INSTITUTION: "BANK-SVC-CITIUS33",
+        }),
+      }),
+    );
+  });
+
   it("keeps a not-required FIN role visible without fabricating SSI details", () => {
     const notRequired = new ResolutionPageSubmissionAdapter(
       pages,

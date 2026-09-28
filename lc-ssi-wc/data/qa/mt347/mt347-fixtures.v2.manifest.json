@@ -5,12 +5,12 @@
     "positiveBase": {
       "path": "data/qa/mt347/mt347-positive.v1.json",
       "count": 152,
-      "sha256": "3E8D6B1F0FB82E38382E6C65C1744D68571F72C75D8CD0B9C51ACA9717F5780A"
+      "sha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711"
     },
     "negativeBase": {
       "path": "data/qa/mt347/mt347-negative.v1.json",
       "count": 208,
-      "sha256": "473665D99EDBFFF5E99B04856E4C49FF488B7EC9C3CB6504ADC6A92C394510CD"
+      "sha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800"
     },
     "counterpartyVariants": {
       "path": "data/qa/mt347/mt347-executable-counterparties.v4.json",
@@ -18,7 +18,13 @@
       "sha256": "8698E430DFF9A306EF7048D9EEB7D152BF692B56DB3FDC987890AF69375EE67A"
     },
     "expectedFixtureGroups": 359,
-    "supportedCurrencies": ["USD", "EUR", "GBP", "JPY", "HKD"],
+    "supportedCurrencies": [
+      "USD",
+      "EUR",
+      "GBP",
+      "JPY",
+      "HKD"
+    ],
     "expectedCounterpartiesPerCurrency": 3,
     "expectedCurrenciesPerGroup": 5,
     "expectedCandidatesPerGroup": 15

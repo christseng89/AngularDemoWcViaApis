@@ -212,6 +212,27 @@ describe("resolution result presenter", () => {
     expect(row?.statusDetail).toBe("RESOLVED_FROM_OWN_SSI");
   });
 
+  it("makes an unverified transaction-context account relationship visible", () => {
+    const [row] = resolutionResultRows([
+      {
+        ...resolved,
+        reasonCode: "PRESERVED_FROM_TRANSACTION_CONTEXT",
+        provenance: {
+          source: "BANK_SERVICE_ID",
+          ownerSide: "TRANSACTION_PARTY",
+          accountRelationshipStatus: "NOT_EVALUATED",
+        },
+      },
+    ]);
+
+    expect(row).toMatchObject({
+      statusDetail:
+        "PRESERVED_FROM_TRANSACTION_CONTEXT · ACCOUNT_RELATIONSHIP_NOT_EVALUATED",
+      provenance:
+        "BANK_SERVICE_ID · TRANSACTION_PARTY · ACCOUNT_RELATIONSHIP_NOT_EVALUATED",
+    });
+  });
+
   it("does not attribute a message-level resolution domain to a field", () => {
     const output: ResolutionPageGeneratedOutput = {
       outputId: "iso-20022",

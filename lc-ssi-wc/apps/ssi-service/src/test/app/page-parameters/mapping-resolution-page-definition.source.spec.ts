@@ -10,6 +10,7 @@ import { ResolutionPageFixtureManifestService } from "../../../app/page-paramete
 import { IndexPaginationPolicy } from "../../../app/index-pagination.policy";
 import { PaymentMessageIndexService } from "../../../app/payment-message-index.service";
 import { ResolutionPageOasFieldPolicyService } from "../../../app/page-parameters/resolution-page-oas-field-policy.service";
+import { validateResolutionPageDefinition } from "../../../app/page-parameters/resolution-page-definition.validator";
 
 const SHA = "a".repeat(64);
 
@@ -1013,6 +1014,47 @@ describe("MappingResolutionPageDefinitionSource", () => {
           execution.expectedHttp.join(",") === "200",
       ),
     ).toBe(true);
+
+    for (const scenarioId of ["MT300-011", "MT300-012"]) {
+      const splitSettlement = definitions
+        .flatMap(({ scenarios }) => scenarios)
+        .find((scenario) => scenario.scenarioId === scenarioId)!;
+      expect(splitSettlement.execution).toMatchObject({
+        action: "RESOLVE_SSI",
+        owner: "SSI_FIELD_RESOLUTION_API",
+      });
+      expect(splitSettlement.validation.dispositions).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            validationScope: "IN_SCOPE_SSI_TAG_NVR",
+            owner: "SSI_FIELD_RESOLUTION_API",
+            expectedOutcome: "PASS",
+          }),
+          {
+            validationScope: "OUT_OF_SCOPE_FULL_FIN_NVR",
+            owner: "UPSTREAM_FIN_VALIDATOR",
+            taxonomy: "NETWORK_VALIDATED_RULE",
+            expectedOutcome: "NOT_EVALUATED",
+            ruleIds: ["MT300-C3", "MT300-C4", "MT300-D96"],
+          },
+        ]),
+      );
+      expect(splitSettlement.validationRuleIds).toEqual(
+        expect.arrayContaining(["MT300-C3", "MT300-C4", "MT300-D96"]),
+      );
+    }
+    const mt300SplitDefinition = definitions.find(
+      ({ messageType, sequences }) =>
+        messageType === "MT300" && sequences[0]?.sequenceId === "D",
+    )!;
+    expect(() =>
+      validateResolutionPageDefinition(mt300SplitDefinition, {
+        standardsRelease: "SR2026",
+        messageFamily: "MT347",
+        messageType: "MT300",
+        direction: "OUTGOING",
+      }),
+    ).not.toThrow();
     const mt742CrossField = definitions
       .flatMap(({ scenarios }) => scenarios)
       .find(({ scenarioId }) => scenarioId === "MT742-007")!;

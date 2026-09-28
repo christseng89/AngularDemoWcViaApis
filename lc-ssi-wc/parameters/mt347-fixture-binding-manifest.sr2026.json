@@ -3,31 +3,31 @@
   "manifestId": "MT347-SR2026-FIXTURE-BINDINGS",
   "status": "BACKEND_INTEGRATION_DRAFT_NOT_DB_LOAD_MANIFEST",
   "sourceWorkbook": "qa/tdd/mt347/MT347_SR2026_SSI_TDD_CONTROLLED_v6.xlsx",
-  "sourceWorkbookSha256": "7EFFDFFF50F502E032A9AE1AF519A68886B53133DD065CAC53E10DA593A70EA0",
+  "sourceWorkbookSha256": "70BDD07B90A87D32D06AE4B4305301C4ABD34BC62715427323DC9C111CF056D1",
   "fixtureSources": {
     "POSITIVE": {
       "path": "data/qa/mt347/mt347-positive.v1.json",
-      "sha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "fixtureId": "MT347-POSITIVE-V1",
       "recordCount": 152,
-      "declaredSourceWorkbook": "qa/tdd/mt347/MT347_SR2026_SSI_TDD_CONTROLLED_v5.xlsx",
-      "declaredSourceWorkbookSha256": "82C6ABCFD91E7D35E1382F8C86BF796D8DBF05CF8C8D94F9F0C7B5889AB52C9A"
+      "declaredSourceWorkbook": "qa/tdd/mt347/MT347_SR2026_SSI_TDD_CONTROLLED_v6.xlsx",
+      "declaredSourceWorkbookSha256": "70BDD07B90A87D32D06AE4B4305301C4ABD34BC62715427323DC9C111CF056D1"
     },
     "NEGATIVE": {
       "path": "data/qa/mt347/mt347-negative.v1.json",
-      "sha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "fixtureId": "MT347-NEGATIVE-V1",
       "recordCount": 208,
-      "declaredSourceWorkbook": "qa/tdd/mt347/MT347_SR2026_SSI_TDD_CONTROLLED_v5.xlsx",
-      "declaredSourceWorkbookSha256": "82C6ABCFD91E7D35E1382F8C86BF796D8DBF05CF8C8D94F9F0C7B5889AB52C9A"
+      "declaredSourceWorkbook": "qa/tdd/mt347/MT347_SR2026_SSI_TDD_CONTROLLED_v6.xlsx",
+      "declaredSourceWorkbookSha256": "70BDD07B90A87D32D06AE4B4305301C4ABD34BC62715427323DC9C111CF056D1"
     },
     "BOUNDARY": {
       "path": "data/qa/mt347/mt347-boundary.v1.json",
-      "sha256": "2E31424D58D4DA06CDA24C1631C0990B1E0EB0B4BD2CF06C0E945C9865791325",
+      "sha256": "7528F79A32FC7D5C8AF11D065A2F174010C4CB98E9FD5A44FC2AC1EA5543A68F",
       "fixtureId": "MT347-BOUNDARY-V1",
       "recordCount": 2,
-      "declaredSourceWorkbook": "qa/tdd/mt347/MT347_SR2026_SSI_TDD_CONTROLLED_v5.xlsx",
-      "declaredSourceWorkbookSha256": "82C6ABCFD91E7D35E1382F8C86BF796D8DBF05CF8C8D94F9F0C7B5889AB52C9A"
+      "declaredSourceWorkbook": "qa/tdd/mt347/MT347_SR2026_SSI_TDD_CONTROLLED_v6.xlsx",
+      "declaredSourceWorkbookSha256": "70BDD07B90A87D32D06AE4B4305301C4ABD34BC62715427323DC9C111CF056D1"
     }
   },
   "counts": {
@@ -49,7 +49,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "b006b443-a420-542d-9b01-a9a85a570d52",
@@ -82,7 +82,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "41301d25-d09c-56f4-980d-4aa298b014c2",
@@ -115,7 +115,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "b11eb36e-4b91-5f52-86dd-b119f9bcf82f",
@@ -148,7 +148,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "105b1a3c-c40a-559c-b5fa-6ad986c323ac",
@@ -181,7 +181,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "1d4f5f4a-23ff-5ba7-b5ba-17d0b84b5827",
@@ -214,7 +214,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "41714b20-c566-542b-b61f-1b7a155801ed",
@@ -235,7 +235,7 @@
       },
       "expectedAccountReference": "MT347-MT300-006-USD-001",
       "bankServiceBindings": "BANK-SVC-DEMOHKHH; BANK-SVC-CITIUS33; BANK-SVC-HSBCHKHH; BANK-SVC-DEUTDEFF; BANK-SVC-BARCGB22; beneficiaryBankServiceId=BANK-SVC-BARCGB22@v1; beneficiaryProvenance=TRANSACTION_CONTEXT",
-      "recordSha256": "55B8D65F02EADDBE0D6A36FAF721C2BD07F9B932D8E0C895745FD3A9D5B3D862",
+      "recordSha256": "A96ECD43A43238072B4A00CF5D6FB21D9371BD2FF26EA73F83575FC5F4832686",
       "tddTrace": {
         "sheet": "TDD Cases",
         "row": 7
@@ -247,7 +247,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "a94d1a96-e283-5087-b2de-7e388e9eb72b",
@@ -268,7 +268,7 @@
       },
       "expectedAccountReference": "MT347-MT300-007-USD-001",
       "bankServiceBindings": "BANK-SVC-DEMOHKHH; BANK-SVC-CITIUS33; BANK-SVC-HSBCHKHH; BANK-SVC-DEUTDEFF; BANK-SVC-BARCGB22; beneficiaryBankServiceId=BANK-SVC-BARCGB22@v1; beneficiaryProvenance=TRANSACTION_CONTEXT",
-      "recordSha256": "1EC4957C0E3A3C04450542C91DE5B1B0D39AE1EBC7D0E622DB3F34CB6DFE6A2A",
+      "recordSha256": "A045C74A64647FBD2743DBFA9C39EAD3123C98368CE7F98381477EAE6CDB191C",
       "tddTrace": {
         "sheet": "TDD Cases",
         "row": 8
@@ -280,7 +280,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "31fb022a-1272-5515-9778-5939fdbd16dc",
@@ -313,7 +313,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "705a550b-605d-5c38-b706-ecfa3e9c485b",
@@ -346,7 +346,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "4a780ec2-d95f-5c3f-898d-f018b5329d3c",
@@ -379,7 +379,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "41d3fb5e-e787-5565-875a-37643167d576",
@@ -400,7 +400,7 @@
       },
       "expectedAccountReference": "MT347-MT300-011-USD-001",
       "bankServiceBindings": "BANK-SVC-DEMOHKHH; BANK-SVC-CITIUS33; BANK-SVC-HSBCHKHH; BANK-SVC-DEUTDEFF; BANK-SVC-BARCGB22; beneficiaryBankServiceId=BANK-SVC-BARCGB22@v1; beneficiaryProvenance=TRANSACTION_CONTEXT",
-      "recordSha256": "0D1A8735D88178864E609B00BCBB03AF5312B385CD185C5CCF35D0C891AA443E",
+      "recordSha256": "F5F394AD7D9DEC951F5018F8C0CAB9954177385AC9C5D3423F2FEE864C0653CA",
       "tddTrace": {
         "sheet": "TDD Cases",
         "row": 12
@@ -412,7 +412,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "d4af05e3-cefe-5bb9-aae5-6c1d4f3a8c23",
@@ -433,7 +433,7 @@
       },
       "expectedAccountReference": "MT347-MT300-012-USD-001",
       "bankServiceBindings": "BANK-SVC-DEMOHKHH; BANK-SVC-CITIUS33; BANK-SVC-HSBCHKHH; BANK-SVC-DEUTDEFF; BANK-SVC-BARCGB22; beneficiaryBankServiceId=BANK-SVC-BARCGB22@v1; beneficiaryProvenance=TRANSACTION_CONTEXT",
-      "recordSha256": "DD79022DEF5D8C6894879CF33A372C4D7BA7A01E31F42C142686F07F9A04B2AD",
+      "recordSha256": "EBE3B39186F71DA83879F6C0495CA0C35A9DF440E33AB05A91945616A2AA8FAF",
       "tddTrace": {
         "sheet": "TDD Cases",
         "row": 13
@@ -445,7 +445,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "f34b9973-84af-5817-b4d1-ffae43bfeebe",
@@ -478,7 +478,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "78ef238c-ff99-56a5-a2eb-955d5d021d35",
@@ -511,7 +511,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "d3f1c5cf-70cc-5398-8498-362a46669115",
@@ -544,7 +544,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "e570ce30-b01a-512f-a826-5307d98458a2",
@@ -577,7 +577,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "56028ca7-dc7c-5d44-82c9-de4f54e63657",
@@ -610,7 +610,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "5d292148-c4c8-5259-8212-9bd98a10802b",
@@ -643,7 +643,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "9ff0b29b-947b-5230-9a00-f38ce66bcbcf",
@@ -676,7 +676,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "c5cbab7a-be9d-5fcd-85cc-7bdbe5e5fc04",
@@ -709,7 +709,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "7a3f49fd-bdc4-59fe-ba91-c50d43145dfa",
@@ -730,7 +730,7 @@
       },
       "expectedAccountReference": "MT347-MT304-006-USD-001",
       "bankServiceBindings": "BANK-SVC-DEMOHKHH; BANK-SVC-CITIUS33; BANK-SVC-HSBCHKHH; BANK-SVC-DEUTDEFF; BANK-SVC-BARCGB22; beneficiaryBankServiceId=BANK-SVC-BARCGB22@v1; beneficiaryProvenance=TRANSACTION_CONTEXT",
-      "recordSha256": "D4A0FF7853DE033F29FFECAB6F869CF3541AC9DD0726D674F8E18FA676B49BB0",
+      "recordSha256": "CF17A1209C8107D3AB8712603E3F23FA866755F29C0BE08BD244D562C2DB7E80",
       "tddTrace": {
         "sheet": "TDD Cases",
         "row": 22
@@ -742,7 +742,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "a1a67d02-1d3a-570a-ac85-de99ab6d2baa",
@@ -763,7 +763,7 @@
       },
       "expectedAccountReference": "MT347-MT304-007-USD-001",
       "bankServiceBindings": "BANK-SVC-DEMOHKHH; BANK-SVC-CITIUS33; BANK-SVC-HSBCHKHH; BANK-SVC-DEUTDEFF; BANK-SVC-BARCGB22; beneficiaryBankServiceId=BANK-SVC-BARCGB22@v1; beneficiaryProvenance=TRANSACTION_CONTEXT",
-      "recordSha256": "F4840F9F17FA4D17861F26D632E2B2E1914D4CE997E4649D3FE29EF48C776A03",
+      "recordSha256": "7440FF1489FD1A9819C75F43BB27794530FC77F8D5CAB2E750DE8C7E9E9A9E12",
       "tddTrace": {
         "sheet": "TDD Cases",
         "row": 23
@@ -775,7 +775,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "1d2c7893-3051-5a52-afc1-4c1429f2af6e",
@@ -808,7 +808,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "4f2a670a-f23e-5ca6-bd25-e078924fb2b9",
@@ -841,7 +841,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "292ecb9c-d1c7-552c-8157-ef5bef0f3a55",
@@ -874,7 +874,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "37c4fde8-be44-545b-ab9c-9d4b21dee50c",
@@ -895,7 +895,7 @@
       },
       "expectedAccountReference": "MT347-MT304-011-USD-001",
       "bankServiceBindings": "BANK-SVC-DEMOHKHH; BANK-SVC-CITIUS33; BANK-SVC-HSBCHKHH; BANK-SVC-DEUTDEFF; BANK-SVC-BARCGB22; beneficiaryBankServiceId=BANK-SVC-BARCGB22@v1; beneficiaryProvenance=TRANSACTION_CONTEXT",
-      "recordSha256": "E9986B03FADB267DCD47FEAD33AAF17A59418EC8FE817BF65EA08FC03D2BDDF7",
+      "recordSha256": "54538D8DAD115D398ACE1A764EA4F32C418572AA03CAA75006ABCCA184301109",
       "tddTrace": {
         "sheet": "TDD Cases",
         "row": 27
@@ -907,7 +907,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "197bf109-5275-540f-9128-03b471e08da1",
@@ -928,7 +928,7 @@
       },
       "expectedAccountReference": "MT347-MT304-012-USD-001",
       "bankServiceBindings": "BANK-SVC-DEMOHKHH; BANK-SVC-CITIUS33; BANK-SVC-HSBCHKHH; BANK-SVC-DEUTDEFF; BANK-SVC-BARCGB22; beneficiaryBankServiceId=BANK-SVC-BARCGB22@v1; beneficiaryProvenance=TRANSACTION_CONTEXT",
-      "recordSha256": "B4A3A6448BC9D294C7E11997154E833672E906AD15F842AC364CABB23B78339C",
+      "recordSha256": "A86088CFD2FA2AEAEE29486311839BC742576A054A42988D70CFBD4918CC4F08",
       "tddTrace": {
         "sheet": "TDD Cases",
         "row": 28
@@ -940,7 +940,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "b1f69cc7-0537-5373-9c4b-57017f93efa7",
@@ -973,7 +973,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "7d88c646-32ff-51f4-acec-8849abf383c4",
@@ -1006,7 +1006,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "bcade199-7ec9-540f-84fd-20e9d9204457",
@@ -1039,7 +1039,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "900b46ab-96bf-505c-9208-8122066435d3",
@@ -1072,7 +1072,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "fab01759-710b-55c1-afb1-bba041d3d371",
@@ -1105,7 +1105,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "fb1b13f8-9508-565d-a922-c72445036081",
@@ -1138,7 +1138,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "5bf1f730-38b2-5e61-9f36-1e26cc3ba247",
@@ -1171,7 +1171,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "79835cbc-1943-5e40-a803-8f976f4fa572",
@@ -1204,7 +1204,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "095f7312-2353-5f11-9726-9adb21b4c1ee",
@@ -1225,7 +1225,7 @@
       },
       "expectedAccountReference": "MT347-MT306-001-USD-001",
       "bankServiceBindings": "BANK-SVC-DEMOHKHH; BANK-SVC-CITIUS33; BANK-SVC-HSBCHKHH; BANK-SVC-DEUTDEFF; BANK-SVC-BARCGB22; beneficiaryBankServiceId=BANK-SVC-BARCGB22@v1; beneficiaryProvenance=TRANSACTION_CONTEXT",
-      "recordSha256": "307B64C9CC92F0AA629DFB6C74A8702CADAA26A4EA72AC5EB80741490CDF2F6B",
+      "recordSha256": "92FAF8C858926A6AD9EE4A850EEDF583FA959571E3CE71AF75D8B5887BDBA84F",
       "tddTrace": {
         "sheet": "TDD Cases",
         "row": 37
@@ -1237,7 +1237,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "56958b92-385e-596d-b36c-8b1aa710b0ea",
@@ -1258,7 +1258,7 @@
       },
       "expectedAccountReference": "MT347-MT306-002-USD-001",
       "bankServiceBindings": "BANK-SVC-DEMOHKHH; BANK-SVC-CITIUS33; BANK-SVC-HSBCHKHH; BANK-SVC-DEUTDEFF; BANK-SVC-BARCGB22; beneficiaryBankServiceId=BANK-SVC-BARCGB22@v1; beneficiaryProvenance=TRANSACTION_CONTEXT",
-      "recordSha256": "B9B911770F76A4BFAD8887C32B930783E250E1FFDD377814F76B0966EC56FA85",
+      "recordSha256": "15AAEB78593EB722B072EBCA1A2D94E018F51CE19DF62BC82A26F6A76430CB6A",
       "tddTrace": {
         "sheet": "TDD Cases",
         "row": 38
@@ -1270,7 +1270,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "437de773-8085-5431-ac6a-b60a85cb17bb",
@@ -1303,7 +1303,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "3898b2ed-7460-5e02-9c02-cf7f5293c43f",
@@ -1336,7 +1336,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "0c3c9111-a5ce-58d0-8576-79388918a382",
@@ -1369,7 +1369,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "296f8ac2-3d93-556e-ba1e-e1f7e09300ab",
@@ -1402,7 +1402,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "33b73c76-ff2d-5162-8afe-3fb9a7aeae4f",
@@ -1423,7 +1423,7 @@
       },
       "expectedAccountReference": "MT347-MT306-007-USD-001",
       "bankServiceBindings": "BANK-SVC-DEMOHKHH; BANK-SVC-CITIUS33; BANK-SVC-HSBCHKHH; BANK-SVC-DEUTDEFF; BANK-SVC-BARCGB22; beneficiaryBankServiceId=BANK-SVC-BARCGB22@v1; beneficiaryProvenance=TRANSACTION_CONTEXT",
-      "recordSha256": "CE697F29DC505685C9086C4A3D1D4F175DA8D268951C962BBC69498B0D5596F1",
+      "recordSha256": "9742D35AAF9AB7CA9997059233D24492F5A68FD41FD832679E5BF1BC3402798E",
       "tddTrace": {
         "sheet": "TDD Cases",
         "row": 43
@@ -1435,7 +1435,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "3d89ced2-84d1-54d1-b682-5ec01fb74df3",
@@ -1456,7 +1456,7 @@
       },
       "expectedAccountReference": "MT347-MT306-008-USD-001",
       "bankServiceBindings": "BANK-SVC-DEMOHKHH; BANK-SVC-CITIUS33; BANK-SVC-HSBCHKHH; BANK-SVC-DEUTDEFF; BANK-SVC-BARCGB22; beneficiaryBankServiceId=BANK-SVC-BARCGB22@v1; beneficiaryProvenance=TRANSACTION_CONTEXT",
-      "recordSha256": "6C3342D8A4741A5D65A74432B46AC11D07F5C5C658ED03F47DA3CD73B770D479",
+      "recordSha256": "06DDB9871A2AE18B53EC497CEC730DA2D4A118CD160329B14E4A074A49D856FA",
       "tddTrace": {
         "sheet": "TDD Cases",
         "row": 44
@@ -1468,7 +1468,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "b37d7a3c-da99-52fc-8e5f-26b13d22db49",
@@ -1501,7 +1501,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "2a07516b-8aa8-58eb-9cb2-9f698f17b9e5",
@@ -1534,7 +1534,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "1e188ce2-8a52-5097-9119-22e0dbd71b78",
@@ -1567,7 +1567,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "55550eaa-63f3-5639-baca-dc2afc3abf12",
@@ -1600,7 +1600,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "ac71cff3-79a7-5e1f-9346-73927f17f1bf",
@@ -1633,7 +1633,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "535fd73a-e749-5d1e-a4bc-52c1d17f5d65",
@@ -1666,7 +1666,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "5d17c965-d763-5190-b6e2-46270b451d50",
@@ -1699,7 +1699,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "21abcec9-9cf6-53e4-90ba-86c2d5569ccc",
@@ -1732,7 +1732,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "dc9126b4-b905-518c-ad10-9dde56ab1348",
@@ -1765,7 +1765,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "a19bc03a-6372-56d6-a40e-3003ffd99c6c",
@@ -1798,7 +1798,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "05424953-041c-5822-a83c-0bddc147c743",
@@ -1819,7 +1819,7 @@
       },
       "expectedAccountReference": "MT347-MT320-001-USD-001",
       "bankServiceBindings": "BANK-SVC-DEMOHKHH; BANK-SVC-CITIUS33; BANK-SVC-HSBCHKHH; BANK-SVC-DEUTDEFF; BANK-SVC-BARCGB22; beneficiaryBankServiceId=BANK-SVC-BARCGB22@v1; beneficiaryProvenance=TRANSACTION_CONTEXT",
-      "recordSha256": "D51A14A97E573C198561D72E1157A39A5A8006CCDD26A489E1A22BE401C99A7D",
+      "recordSha256": "687AD11C1226CE70E6934D0AE5033108FFBC327DCA5B51181037DB2F30922EB5",
       "tddTrace": {
         "sheet": "TDD Cases",
         "row": 55
@@ -1831,7 +1831,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "ab740092-98aa-5208-9408-ec5d5d0d35ad",
@@ -1852,7 +1852,7 @@
       },
       "expectedAccountReference": "MT347-MT320-002-USD-001",
       "bankServiceBindings": "BANK-SVC-DEMOHKHH; BANK-SVC-CITIUS33; BANK-SVC-HSBCHKHH; BANK-SVC-DEUTDEFF; BANK-SVC-BARCGB22; beneficiaryBankServiceId=BANK-SVC-BARCGB22@v1; beneficiaryProvenance=TRANSACTION_CONTEXT",
-      "recordSha256": "B7224D604AAE90C115E08B01A02DB2E50F94D0395FB5D1BF2E76D4928E76B184",
+      "recordSha256": "CC66F01D1A04834A0F0E0059E14A1884B45072894288F21A3C1FD9CD1BEDF7BA",
       "tddTrace": {
         "sheet": "TDD Cases",
         "row": 56
@@ -1864,7 +1864,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "eb59e2df-e26f-51ce-96ae-0e0da140b9de",
@@ -1897,7 +1897,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "1d4739fc-166e-5a90-aec4-f7697e89d1bf",
@@ -1930,7 +1930,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "11263aa3-9114-5e10-b46a-7d379040145c",
@@ -1963,7 +1963,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "5bf5a7c7-e19b-570b-acde-1a25100ec1c8",
@@ -1996,7 +1996,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "edeaedfa-e417-5e89-80d4-1394af7848d1",
@@ -2017,7 +2017,7 @@
       },
       "expectedAccountReference": "MT347-MT320-007-USD-001",
       "bankServiceBindings": "BANK-SVC-DEMOHKHH; BANK-SVC-CITIUS33; BANK-SVC-HSBCHKHH; BANK-SVC-DEUTDEFF; BANK-SVC-BARCGB22; beneficiaryBankServiceId=BANK-SVC-BARCGB22@v1; beneficiaryProvenance=TRANSACTION_CONTEXT",
-      "recordSha256": "ECB517123E3E2FFCF0DFFD7B66CF5F82D2D3BCC47E97A9CBF4DC0498F254B2A1",
+      "recordSha256": "692C26321A05D05CA30B3C539A889C75BB2ACF15EA396C6450FACB96A0E866BC",
       "tddTrace": {
         "sheet": "TDD Cases",
         "row": 61
@@ -2029,7 +2029,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "36448874-b8c6-536f-89e3-daf4aa3c0830",
@@ -2050,7 +2050,7 @@
       },
       "expectedAccountReference": "MT347-MT320-008-USD-001",
       "bankServiceBindings": "BANK-SVC-DEMOHKHH; BANK-SVC-CITIUS33; BANK-SVC-HSBCHKHH; BANK-SVC-DEUTDEFF; BANK-SVC-BARCGB22; beneficiaryBankServiceId=BANK-SVC-BARCGB22@v1; beneficiaryProvenance=TRANSACTION_CONTEXT",
-      "recordSha256": "E6849F3AFE412F398BE9BC31A0FE43A7DBAE85ED4C8A16F335ABBDFE64D721EE",
+      "recordSha256": "5F5B959570F1781EDA43252C99331AF01663332BB62CD2569AD86F6576CE6546",
       "tddTrace": {
         "sheet": "TDD Cases",
         "row": 62
@@ -2062,7 +2062,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "95993a5a-da52-5c1e-90e6-19764534e9a6",
@@ -2095,7 +2095,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "a1952d06-7c6d-5716-b40c-9d975c581dff",
@@ -2128,7 +2128,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "96f68bd3-44da-5439-9be4-88cef41e1142",
@@ -2161,7 +2161,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "d3b47e9b-db35-5b51-b3a6-aae894022d9d",
@@ -2194,7 +2194,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "1699d960-c66c-51f4-984c-69b26e4a8f1d",
@@ -2215,7 +2215,7 @@
       },
       "expectedAccountReference": "MT347-MT320-013-USD-001",
       "bankServiceBindings": "BANK-SVC-DEMOHKHH; BANK-SVC-CITIUS33; BANK-SVC-HSBCHKHH; BANK-SVC-DEUTDEFF; BANK-SVC-BARCGB22; beneficiaryBankServiceId=BANK-SVC-BARCGB22@v1; beneficiaryProvenance=TRANSACTION_CONTEXT",
-      "recordSha256": "516D442634FB3B54380C15382C34D6CC9CE620FA59087AE1B4FC136605E68FB2",
+      "recordSha256": "CABCD584F2E83CC0BF63F0ADCA4C1085E229663D596497FA79A5AE88F814FE2B",
       "tddTrace": {
         "sheet": "TDD Cases",
         "row": 67
@@ -2227,7 +2227,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "27109afb-0bbe-599e-b150-f99f39635a50",
@@ -2248,7 +2248,7 @@
       },
       "expectedAccountReference": "MT347-MT320-014-USD-001",
       "bankServiceBindings": "BANK-SVC-DEMOHKHH; BANK-SVC-CITIUS33; BANK-SVC-HSBCHKHH; BANK-SVC-DEUTDEFF; BANK-SVC-BARCGB22; beneficiaryBankServiceId=BANK-SVC-BARCGB22@v1; beneficiaryProvenance=TRANSACTION_CONTEXT",
-      "recordSha256": "347FD12C02C25D7C5D6373BF106B16C1A7B960793A4B1555F06816B87FDE0549",
+      "recordSha256": "C063E7C78CDF2CDD1E56855BA2D748B278C6BE695403C80948F8440B64F33426",
       "tddTrace": {
         "sheet": "TDD Cases",
         "row": 68
@@ -2260,7 +2260,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "f14842d7-be30-5481-bddf-e3b25a90aa21",
@@ -2293,7 +2293,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "746da3f0-e3aa-52fd-951e-958663ab247b",
@@ -2326,7 +2326,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "2e339bff-ba3b-5296-a36d-7c423ab17854",
@@ -2359,7 +2359,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "85231a0e-b43a-5e94-a3e7-89379bccf1be",
@@ -2392,7 +2392,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "c8f9bad1-c93c-503e-a7fe-d34f86924e8b",
@@ -2413,7 +2413,7 @@
       },
       "expectedAccountReference": "MT347-MT320-019-USD-001",
       "bankServiceBindings": "BANK-SVC-DEMOHKHH; BANK-SVC-CITIUS33; BANK-SVC-HSBCHKHH; BANK-SVC-DEUTDEFF; BANK-SVC-BARCGB22; beneficiaryBankServiceId=BANK-SVC-BARCGB22@v1; beneficiaryProvenance=TRANSACTION_CONTEXT",
-      "recordSha256": "A182A2C8604A36AD011B35309A5BA121F3F7A54EAD66B30CC5CDE364BB8C42D9",
+      "recordSha256": "D3F03E1B4FE58B42700C5E1C7DF448D9D2CED3458AE8991015D59D7F72C5C5FB",
       "tddTrace": {
         "sheet": "TDD Cases",
         "row": 73
@@ -2425,7 +2425,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "03789d53-d1a0-53fd-b648-a15bf7eb832b",
@@ -2446,7 +2446,7 @@
       },
       "expectedAccountReference": "MT347-MT320-020-USD-001",
       "bankServiceBindings": "BANK-SVC-DEMOHKHH; BANK-SVC-CITIUS33; BANK-SVC-HSBCHKHH; BANK-SVC-DEUTDEFF; BANK-SVC-BARCGB22; beneficiaryBankServiceId=BANK-SVC-BARCGB22@v1; beneficiaryProvenance=TRANSACTION_CONTEXT",
-      "recordSha256": "A75CCE77219CF59013EC429AA4416EF0C31F97C99542BCED5C58608DB7649E9E",
+      "recordSha256": "ABAA10495599DDAD7BBD036ECC2569E51D3C0D3DC3AF275A7EAAA238603A8409",
       "tddTrace": {
         "sheet": "TDD Cases",
         "row": 74
@@ -2458,7 +2458,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "c0e7a747-e35b-515d-b64f-c1cbaa4a1ef0",
@@ -2491,7 +2491,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "6f6eb23c-c5bc-5d3c-a6ac-09335e7d627e",
@@ -2524,7 +2524,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "b2456e98-fbf6-5683-9152-b7c7587b2741",
@@ -2557,7 +2557,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "a6051ff4-243a-514b-bb41-c59be0c3da76",
@@ -2590,7 +2590,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "9e1ee2bf-3843-5899-b6d4-eea8738cb519",
@@ -2623,7 +2623,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "15f6cbe9-ad28-59d4-9e57-b877f5073f17",
@@ -2656,7 +2656,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "529661e6-9a4d-58cb-9980-9fc15804e9d8",
@@ -2689,7 +2689,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "1912c10c-f9de-5322-8038-37ce9b32806a",
@@ -2722,7 +2722,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "a234280a-ee36-5520-abe9-710c29c9f42f",
@@ -2755,7 +2755,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "1ff6b25b-cdea-58cc-b085-68f3d04327a7",
@@ -2788,7 +2788,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "3c69a79a-372a-51dc-9f66-28184fc59437",
@@ -2809,7 +2809,7 @@
       },
       "expectedAccountReference": "MT347-MT330-001-USD-001",
       "bankServiceBindings": "BANK-SVC-DEMOHKHH; BANK-SVC-CITIUS33; BANK-SVC-HSBCHKHH; BANK-SVC-DEUTDEFF; BANK-SVC-BARCGB22; beneficiaryBankServiceId=BANK-SVC-BARCGB22@v1; beneficiaryProvenance=TRANSACTION_CONTEXT",
-      "recordSha256": "DD7DECC6E09855E01FDB2B184F88685DE903526D6AC42C45731B744F47AF8825",
+      "recordSha256": "492635B340663774070EF98854932C67AC4EBDC24BC19C3ADCF0A2646215CAE7",
       "tddTrace": {
         "sheet": "TDD Cases",
         "row": 85
@@ -2821,7 +2821,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "81664bc1-d5c6-5759-9cd0-2798d17a5240",
@@ -2842,7 +2842,7 @@
       },
       "expectedAccountReference": "MT347-MT330-002-USD-001",
       "bankServiceBindings": "BANK-SVC-DEMOHKHH; BANK-SVC-CITIUS33; BANK-SVC-HSBCHKHH; BANK-SVC-DEUTDEFF; BANK-SVC-BARCGB22; beneficiaryBankServiceId=BANK-SVC-BARCGB22@v1; beneficiaryProvenance=TRANSACTION_CONTEXT",
-      "recordSha256": "903321740741B1DAFE22D4630359F655D01A92C731C87F850B4AD24FDED8A08E",
+      "recordSha256": "352133180138CBE794610472A997F1F95DDD42DE7A209CEE705A92673F737620",
       "tddTrace": {
         "sheet": "TDD Cases",
         "row": 86
@@ -2854,7 +2854,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "ef9299f8-020d-513a-88d7-f50cfe0f095a",
@@ -2887,7 +2887,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "1fa50f23-557b-54c4-a1d1-50bb3d89d678",
@@ -2920,7 +2920,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "f7c710b8-9aa6-59a1-b8f3-4a2446efde64",
@@ -2953,7 +2953,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "a3f7d14e-6337-5fc8-ba56-7d81f4642523",
@@ -2986,7 +2986,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "2175332c-8601-5cc8-9244-e1ef9c30e011",
@@ -3007,7 +3007,7 @@
       },
       "expectedAccountReference": "MT347-MT330-007-USD-001",
       "bankServiceBindings": "BANK-SVC-DEMOHKHH; BANK-SVC-CITIUS33; BANK-SVC-HSBCHKHH; BANK-SVC-DEUTDEFF; BANK-SVC-BARCGB22; beneficiaryBankServiceId=BANK-SVC-BARCGB22@v1; beneficiaryProvenance=TRANSACTION_CONTEXT",
-      "recordSha256": "20D30A93CEB84E9554DC3C6A137E6A285E6B23E105BB3E7024A734F939577C27",
+      "recordSha256": "F372A68A45271E663A0DBA0FF6D39EDBDA374691221E29F527D8C1170D0CD1E6",
       "tddTrace": {
         "sheet": "TDD Cases",
         "row": 91
@@ -3019,7 +3019,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "b8a8c304-4295-5ccf-9bf5-27393a787c7c",
@@ -3040,7 +3040,7 @@
       },
       "expectedAccountReference": "MT347-MT330-008-USD-001",
       "bankServiceBindings": "BANK-SVC-DEMOHKHH; BANK-SVC-CITIUS33; BANK-SVC-HSBCHKHH; BANK-SVC-DEUTDEFF; BANK-SVC-BARCGB22; beneficiaryBankServiceId=BANK-SVC-BARCGB22@v1; beneficiaryProvenance=TRANSACTION_CONTEXT",
-      "recordSha256": "A4CF8231F33BBE9205D3D11024A6C9E79E75B2E52A9DDF8312F7301D94251B25",
+      "recordSha256": "30D18DC429286E11A1ADEC75B1A30095A3E0C0ECA9256DC9D121775F7E62E377",
       "tddTrace": {
         "sheet": "TDD Cases",
         "row": 92
@@ -3052,7 +3052,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "69892abe-2d15-552c-8f00-f93d34025775",
@@ -3085,7 +3085,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "590ff4fd-8b83-5220-aac4-d8f4ca7b66b0",
@@ -3118,7 +3118,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "18446a2f-0a38-5b7e-90c9-1efafd22e99d",
@@ -3151,7 +3151,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "27b20814-c799-59da-96f9-90e015ee6130",
@@ -3184,7 +3184,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "1348e8f6-597f-538a-a2a2-405992f2f4a0",
@@ -3205,7 +3205,7 @@
       },
       "expectedAccountReference": "MT347-MT330-013-USD-001",
       "bankServiceBindings": "BANK-SVC-DEMOHKHH; BANK-SVC-CITIUS33; BANK-SVC-HSBCHKHH; BANK-SVC-DEUTDEFF; BANK-SVC-BARCGB22; beneficiaryBankServiceId=BANK-SVC-BARCGB22@v1; beneficiaryProvenance=TRANSACTION_CONTEXT",
-      "recordSha256": "41ACA231F0609CC8528AD86947836B19820D96CCFD494ED03694456A1A8A5195",
+      "recordSha256": "6764F9B6441BA0BC14B904BF74DAB46A9E0E7CD88F26D6A5197FEFDE969A29FA",
       "tddTrace": {
         "sheet": "TDD Cases",
         "row": 97
@@ -3217,7 +3217,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "49a8b402-3b89-5916-abf2-1e2555d472de",
@@ -3238,7 +3238,7 @@
       },
       "expectedAccountReference": "MT347-MT330-014-USD-001",
       "bankServiceBindings": "BANK-SVC-DEMOHKHH; BANK-SVC-CITIUS33; BANK-SVC-HSBCHKHH; BANK-SVC-DEUTDEFF; BANK-SVC-BARCGB22; beneficiaryBankServiceId=BANK-SVC-BARCGB22@v1; beneficiaryProvenance=TRANSACTION_CONTEXT",
-      "recordSha256": "1B108BF53CEA150F805DD0B2F3F9A8D8E086040E978AD9695896E41F749716C9",
+      "recordSha256": "36965BC268EC7D2862982B5D4267328B20FA3355D8F312540302698264DD85F9",
       "tddTrace": {
         "sheet": "TDD Cases",
         "row": 98
@@ -3250,7 +3250,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "d2a8d438-51a9-5176-bc09-7978c6ca8797",
@@ -3283,7 +3283,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "fdf6d2f9-cd6e-55a8-ac5a-9af43cd0b86b",
@@ -3316,7 +3316,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "3b231d1a-5110-507f-a145-ce010d907349",
@@ -3349,7 +3349,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "754356d2-e5a7-566b-a1c1-cee70b166fb4",
@@ -3382,7 +3382,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "1872c264-3721-5884-bf6d-cd6a65f54b15",
@@ -3403,7 +3403,7 @@
       },
       "expectedAccountReference": "MT347-MT330-019-USD-001",
       "bankServiceBindings": "BANK-SVC-DEMOHKHH; BANK-SVC-CITIUS33; BANK-SVC-HSBCHKHH; BANK-SVC-DEUTDEFF; BANK-SVC-BARCGB22; beneficiaryBankServiceId=BANK-SVC-BARCGB22@v1; beneficiaryProvenance=TRANSACTION_CONTEXT",
-      "recordSha256": "CCCAD0239F61AD4A9033726837803F6DF6A76F936FEF283A3A121D1DFFD0B922",
+      "recordSha256": "8AB00D33645D2FB27AA6BFD5520F056A661BF85DB7B500BFEF3DE3EE345CF2E7",
       "tddTrace": {
         "sheet": "TDD Cases",
         "row": 103
@@ -3415,7 +3415,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "e8016d2f-f811-5065-97ea-d7d200bb0fbd",
@@ -3436,7 +3436,7 @@
       },
       "expectedAccountReference": "MT347-MT330-020-USD-001",
       "bankServiceBindings": "BANK-SVC-DEMOHKHH; BANK-SVC-CITIUS33; BANK-SVC-HSBCHKHH; BANK-SVC-DEUTDEFF; BANK-SVC-BARCGB22; beneficiaryBankServiceId=BANK-SVC-BARCGB22@v1; beneficiaryProvenance=TRANSACTION_CONTEXT",
-      "recordSha256": "1F394A4F4FA5ED687927B84EBADF2A232CF5EA7AC6DA603B941CC0BB19E00A5D",
+      "recordSha256": "3B15CC12CEEA44BCC23E6B0869A31F135912DAAD7848F40E5FBA68DEA9179E0D",
       "tddTrace": {
         "sheet": "TDD Cases",
         "row": 104
@@ -3448,7 +3448,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "30eab7a5-b045-549d-8665-dce544e76f18",
@@ -3481,7 +3481,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "725b1039-5919-5902-81ca-8cd8b2c1f2bc",
@@ -3514,7 +3514,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "55363e0a-664e-5edd-95fe-97571c8d2f00",
@@ -3547,7 +3547,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "fc29a789-9595-5316-88a2-ba13f5c06422",
@@ -3580,7 +3580,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "960249a2-e1bf-55a5-977b-acb35085d884",
@@ -3601,7 +3601,7 @@
       },
       "expectedAccountReference": "MT347-MT340-001-USD-001",
       "bankServiceBindings": "BANK-SVC-DEMOHKHH; BANK-SVC-CITIUS33; BANK-SVC-HSBCHKHH; BANK-SVC-DEUTDEFF; BANK-SVC-BARCGB22; beneficiaryBankServiceId=BANK-SVC-BARCGB22@v1; beneficiaryProvenance=TRANSACTION_CONTEXT",
-      "recordSha256": "3CECD79A51553A900219DF26853354A295D218E2EC48EA874BE3E25DF03D7663",
+      "recordSha256": "2D2933775FD9090DD5A68DDA7D166FD7A0FCFC7490999042910602F93C59C0E7",
       "tddTrace": {
         "sheet": "TDD Cases",
         "row": 109
@@ -3613,7 +3613,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "6e8e6067-ab92-5042-99fc-99926da01e73",
@@ -3634,7 +3634,7 @@
       },
       "expectedAccountReference": "MT347-MT340-002-USD-001",
       "bankServiceBindings": "BANK-SVC-DEMOHKHH; BANK-SVC-CITIUS33; BANK-SVC-HSBCHKHH; BANK-SVC-DEUTDEFF; BANK-SVC-BARCGB22; beneficiaryBankServiceId=BANK-SVC-BARCGB22@v1; beneficiaryProvenance=TRANSACTION_CONTEXT",
-      "recordSha256": "29D8D4DAEC8F2B4FA0A8704D3BF4918D3637A08C3D21681A0CCB6594F7488C0A",
+      "recordSha256": "C67921A8F89A281AE69E739A63D5E77B4CA7BB94A7BEBF4B004AD61DCB2AEE7D",
       "tddTrace": {
         "sheet": "TDD Cases",
         "row": 110
@@ -3646,7 +3646,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "3acadf9a-e516-52fb-9b95-004ae5b6163b",
@@ -3679,7 +3679,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "960bd20f-3f71-55a6-bc5c-fd05ce38fe02",
@@ -3712,7 +3712,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "8db2783e-5123-5081-8dc0-f4f1a0bb9d18",
@@ -3745,7 +3745,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "246f39d4-fcb4-52d5-aee9-01d0b0eb7d6a",
@@ -3778,7 +3778,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "b8a034ce-755c-5110-9a1b-b207526aecd0",
@@ -3799,7 +3799,7 @@
       },
       "expectedAccountReference": "MT347-MT340-007-USD-001",
       "bankServiceBindings": "BANK-SVC-DEMOHKHH; BANK-SVC-CITIUS33; BANK-SVC-HSBCHKHH; BANK-SVC-DEUTDEFF; BANK-SVC-BARCGB22; beneficiaryBankServiceId=BANK-SVC-BARCGB22@v1; beneficiaryProvenance=TRANSACTION_CONTEXT",
-      "recordSha256": "B890625E73779868F1E52E140CE789C25FCC17E01D73E23F80A76F57AC11ED94",
+      "recordSha256": "BC919E2EB6512242631B0B72E9B97BADE84493FEFB07CCD7422E1166204E1669",
       "tddTrace": {
         "sheet": "TDD Cases",
         "row": 115
@@ -3811,7 +3811,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "3365cff7-8154-5f68-a5ba-c69dfd3c77e2",
@@ -3832,7 +3832,7 @@
       },
       "expectedAccountReference": "MT347-MT340-008-USD-001",
       "bankServiceBindings": "BANK-SVC-DEMOHKHH; BANK-SVC-CITIUS33; BANK-SVC-HSBCHKHH; BANK-SVC-DEUTDEFF; BANK-SVC-BARCGB22; beneficiaryBankServiceId=BANK-SVC-BARCGB22@v1; beneficiaryProvenance=TRANSACTION_CONTEXT",
-      "recordSha256": "0317848AAF17C633E5F55891394C1E174FA1E366B5C5BA26469C35D4D18F6B98",
+      "recordSha256": "71C1DD41E7F10C0F8F0E33BD63710B5B5B452D1CC85E0C4723006D9C3BE6DED2",
       "tddTrace": {
         "sheet": "TDD Cases",
         "row": 116
@@ -3844,7 +3844,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "2ec62d59-73eb-5b6d-930f-320c74f19548",
@@ -3877,7 +3877,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "dd522bf2-9b1b-5a01-9c46-23aaf8a718da",
@@ -3910,7 +3910,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "5fc60c88-1fc7-5873-bda0-3023a1afca75",
@@ -3943,7 +3943,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "af84974a-b72e-5693-8b7d-316a506f005a",
@@ -3976,7 +3976,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "17fe9e69-1e62-5a07-8eed-3c2b248e0871",
@@ -4009,7 +4009,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "618e656a-eee2-5677-8ed4-d98e1910f519",
@@ -4042,7 +4042,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "c1a1c32b-2178-52c8-ab5e-9f716916c40f",
@@ -4075,7 +4075,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "8dcfd8c2-be09-5dac-ae89-37b476bb2b40",
@@ -4108,7 +4108,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "240b64d0-7f62-554d-ae21-9173a02dd0c8",
@@ -4141,7 +4141,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "c585b7d7-e354-58fe-8f58-e744e98a4780",
@@ -4174,7 +4174,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "a145cb00-64d8-5604-b4a3-08a662d48608",
@@ -4195,7 +4195,7 @@
       },
       "expectedAccountReference": "MT347-MT341-001-USD-001",
       "bankServiceBindings": "BANK-SVC-DEMOHKHH; BANK-SVC-CITIUS33; BANK-SVC-HSBCHKHH; BANK-SVC-DEUTDEFF; BANK-SVC-BARCGB22; beneficiaryBankServiceId=BANK-SVC-BARCGB22@v1; beneficiaryProvenance=TRANSACTION_CONTEXT",
-      "recordSha256": "B1230115A585088A749469CB0409D8F192829AF139D510EDD983E991C401E613",
+      "recordSha256": "AEC34FE1862C492981F68515F444DE8565DB48AE524199D2BA740993BD9EC890",
       "tddTrace": {
         "sheet": "TDD Cases",
         "row": 127
@@ -4207,7 +4207,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "63d7a591-9d9a-50c3-a584-8a507c59ee3a",
@@ -4228,7 +4228,7 @@
       },
       "expectedAccountReference": "MT347-MT341-002-USD-001",
       "bankServiceBindings": "BANK-SVC-DEMOHKHH; BANK-SVC-CITIUS33; BANK-SVC-HSBCHKHH; BANK-SVC-DEUTDEFF; BANK-SVC-BARCGB22; beneficiaryBankServiceId=BANK-SVC-BARCGB22@v1; beneficiaryProvenance=TRANSACTION_CONTEXT",
-      "recordSha256": "D824AF881AE996C2BA762B9D341F8BC311EC5B6DA08B66AFA3C9B56AFAC7E87D",
+      "recordSha256": "C870B5C537E27CF4733A003751EDF392E20B209E97B57B414F45CFD0036A6391",
       "tddTrace": {
         "sheet": "TDD Cases",
         "row": 128
@@ -4240,7 +4240,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "714a80c3-fbde-5b2b-b60d-1a8ed1869c93",
@@ -4273,7 +4273,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "166dfe09-e4e5-551c-a146-238eb15a9d1d",
@@ -4306,7 +4306,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "ea11e2fc-116b-5d66-a250-1c7f36c39f9a",
@@ -4339,7 +4339,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "bfcdd3e6-61cb-5d3b-ab5f-a46c4adc6847",
@@ -4372,7 +4372,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "cb4cb7ac-b47d-56e8-9eaf-2526795a1ae3",
@@ -4393,7 +4393,7 @@
       },
       "expectedAccountReference": "MT347-MT350-001-USD-001",
       "bankServiceBindings": "BANK-SVC-DEMOHKHH; BANK-SVC-CITIUS33; BANK-SVC-HSBCHKHH; BANK-SVC-DEUTDEFF; BANK-SVC-BARCGB22; beneficiaryBankServiceId=BANK-SVC-BARCGB22@v1; beneficiaryProvenance=TRANSACTION_CONTEXT",
-      "recordSha256": "57CC0829A5D4E19B130AC0DC0369176540D60006DECE04CAB9C2F85E640A2E40",
+      "recordSha256": "57C9DC0F484B5EF703E3B9899D9E8D7489EEBA31113D193F1C4D2CDE80B2C6B3",
       "tddTrace": {
         "sheet": "TDD Cases",
         "row": 133
@@ -4405,7 +4405,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "2ba75ae8-82ce-5be0-b8b6-500e53b067c0",
@@ -4426,7 +4426,7 @@
       },
       "expectedAccountReference": "MT347-MT350-002-USD-001",
       "bankServiceBindings": "BANK-SVC-DEMOHKHH; BANK-SVC-CITIUS33; BANK-SVC-HSBCHKHH; BANK-SVC-DEUTDEFF; BANK-SVC-BARCGB22; beneficiaryBankServiceId=BANK-SVC-BARCGB22@v1; beneficiaryProvenance=TRANSACTION_CONTEXT",
-      "recordSha256": "0542B3B6F48ADE2ED0D2A9A9BB94CB188657B316282E20FDDF634E34E716F75B",
+      "recordSha256": "A0583693BF0D761019E4DD872E85A0F9C77DB3E195E8CBB1B8EBF964AE2DE2F9",
       "tddTrace": {
         "sheet": "TDD Cases",
         "row": 134
@@ -4438,7 +4438,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "8657f556-dcda-51c5-b1c8-b16e2512a6b6",
@@ -4471,7 +4471,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "806e2523-1896-5981-9c49-d311845be2e9",
@@ -4504,7 +4504,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "acb2cab0-25ed-5b66-ab42-a9f2d117299d",
@@ -4537,7 +4537,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "74a158b6-a39b-55ec-8e85-012cffee2250",
@@ -4570,7 +4570,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "b014cbdd-d2eb-592f-86d8-72c0d56f1f70",
@@ -4603,7 +4603,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "c7ffe8a4-bc85-5cb2-8ca9-d449804efe9b",
@@ -4636,7 +4636,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "222315e9-0abf-5ea1-8365-98a622739a71",
@@ -4669,7 +4669,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "5c78201a-d421-5b92-835f-432d46ab452a",
@@ -4702,7 +4702,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "32c91c67-17c5-50d7-aaf5-cce82b048da7",
@@ -4735,7 +4735,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "ece26aa6-6ab0-5ea3-8210-747ac5fed1bc",
@@ -4768,7 +4768,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "a8594cba-24cb-5fc9-bc47-8de09c6f5980",
@@ -4801,7 +4801,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "bb451fb2-81a6-55a2-9f52-1b874ff2ddab",
@@ -4834,7 +4834,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "0b4bf7c5-e325-59dd-97cb-77d225d4d804",
@@ -4867,7 +4867,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "837839dc-97a6-501f-80be-b9111df1a314",
@@ -4900,7 +4900,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "d5246f7a-6275-5c32-95cc-a4249728c281",
@@ -4933,7 +4933,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "1305d9b6-9c32-5aff-955a-7339c2af0bfb",
@@ -4966,7 +4966,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "37d403e4-7a20-5e5c-a9b8-1545848848b5",
@@ -4999,7 +4999,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "f8990430-7424-5d38-9105-bdfa38e47391",
@@ -5032,7 +5032,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "e8a0f697-0318-5084-8d3a-6b72fbe2954a",
@@ -5065,7 +5065,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "80a77424-61c6-5e42-87c4-d4f9a051fb66",
@@ -5098,7 +5098,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "29ddf87e-fb47-590f-954a-65500661516f",
@@ -5131,7 +5131,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "e8752d69-dba7-5e04-9b81-ed4ae8929ab5",
@@ -5164,7 +5164,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "f9d38065-d18b-5734-bd5d-181fdd9c8705",
@@ -5197,7 +5197,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "0b568798-c836-5baf-9aa8-d54b66e077b9",
@@ -5230,7 +5230,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "53e37326-9c2a-5bf9-83c4-cdc26d3785df",
@@ -5263,7 +5263,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "b0781077-123c-5477-8918-7a64e076e71a",
@@ -5296,7 +5296,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "9dee4918-e81c-5db8-834c-7614a4a5f793",
@@ -5329,7 +5329,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "d0f27ba6-a647-517f-8560-2a5d04e307fc",
@@ -5362,7 +5362,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "0c7d6039-4db4-5d20-b602-54c17b574043",
@@ -5395,7 +5395,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "17626e3f-0e1e-548c-8b0f-32ec5891e65c",
@@ -5428,7 +5428,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "d40a89c9-3d2e-5dc3-816d-b529050e1a7c",
@@ -5461,7 +5461,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "0eee4eed-8357-59e6-be0a-7de03938f1d0",
@@ -5494,7 +5494,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "c0876029-f4d4-5d78-a794-d8edaf9d624a",
@@ -5527,7 +5527,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "f18d6849-4908-5b3b-bd84-5d560d8edf84",
@@ -5560,7 +5560,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "8cbd544d-a339-51a9-ba4b-e37591fac750",
@@ -5593,7 +5593,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "9185675a-3bf6-544c-a011-30c691f7957f",
@@ -5626,7 +5626,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "3648625c-0f2e-5fcc-ae75-f9df09daa290",
@@ -5659,7 +5659,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "4c601b6d-b628-597b-b939-760fd8f32229",
@@ -5692,7 +5692,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "861cc092-a569-59b5-a1fd-3ccaffed4647",
@@ -5725,7 +5725,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "8a6b7ee4-c0d4-5440-97b7-0acb61aa3dc1",
@@ -5758,7 +5758,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "aa4f48fb-fa2b-5623-bf21-575e9d33fa50",
@@ -5791,7 +5791,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "c06a6413-3368-5736-994d-4cbeefa3d5a1",
@@ -5824,7 +5824,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "11666800-cd5c-5c6d-b851-e9e49e704083",
@@ -5857,7 +5857,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "46a4def5-94be-5435-b5b0-49271039cc04",
@@ -5890,7 +5890,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "0c2e7b70-02dc-5c3a-9eff-4892dbf5c05e",
@@ -5923,7 +5923,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "57c38422-a53b-500a-8baf-61eabb849d59",
@@ -5956,7 +5956,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "97ef854b-3ead-5d4b-9391-38b77e720047",
@@ -5989,7 +5989,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "1dc8a2fb-c801-5d22-b80e-02c0db504fdc",
@@ -6022,7 +6022,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "43887968-b267-5b3a-b70d-04ad053fed3b",
@@ -6055,7 +6055,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "de5aaae8-ee8f-578a-82b9-b1c78c8da742",
@@ -6088,7 +6088,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "b8748d52-a303-5e2b-94df-328ffcd8d30a",
@@ -6121,7 +6121,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "a014e308-0a77-5f5e-9181-9a905059eff0",
@@ -6154,7 +6154,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "9913d391-6a45-5521-890b-b410f9b99570",
@@ -6187,7 +6187,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "94096ea2-b93c-5e4f-b9cb-dd84cd9bc285",
@@ -6220,7 +6220,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "871e8e8a-a96f-5c81-8749-028a278c3a1f",
@@ -6253,7 +6253,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "7c65dc8d-87d8-5f06-b0c4-8a5b9e6e53a4",
@@ -6286,7 +6286,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "a5612bff-aa76-54c3-8593-9c8f1f188b55",
@@ -6319,7 +6319,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "4d5a396d-4dc5-5425-b1ed-5514d05ed2da",
@@ -6352,7 +6352,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "a17a04b1-a80c-5869-86a8-b2445cac3572",
@@ -6385,7 +6385,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "d48b993a-ca6c-5059-bfe6-7e3e3d297faf",
@@ -6418,7 +6418,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "ae249bfb-31bd-5258-8051-1c5ec36503bc",
@@ -6451,7 +6451,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "fd6cc2ba-0a1c-5db6-93b4-fb24e75aeedd",
@@ -6484,7 +6484,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "05bdf777-08f5-5cd5-9434-24b25d19b58c",
@@ -6517,7 +6517,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "c0052b28-62a6-5095-bd7b-1d424fb48a11",
@@ -6550,7 +6550,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "17e0b297-7236-5d1f-b0ea-0641cca6929c",
@@ -6583,7 +6583,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "c52409e1-a3f1-5e7a-9af8-e051db01fd20",
@@ -6616,7 +6616,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "399b4db4-73c2-5b1e-9aa6-3ca622fd7f84",
@@ -6649,7 +6649,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "ee0d0c05-3bfb-5243-991a-4cca362e0f65",
@@ -6682,7 +6682,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "fa4e99e4-a8bb-5215-97d5-cd4b2e1f03f5",
@@ -6715,7 +6715,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "71b322f0-ca61-536b-82f0-de240f342066",
@@ -6748,7 +6748,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "be505d56-4649-58ac-9436-1cf34d22f42f",
@@ -6781,7 +6781,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "d8660484-8090-5c98-a14d-332d896fbf93",
@@ -6814,7 +6814,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "0a1326c9-6636-57d9-b3e5-a282d0c55f44",
@@ -6847,7 +6847,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "b5885cfd-6fa1-57ec-b1b0-2607dabca450",
@@ -6880,7 +6880,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "ef692079-55b9-58d3-bd31-345301ff0a33",
@@ -6913,7 +6913,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "3e2e2ac3-f638-5290-890f-47df49cc5287",
@@ -6946,7 +6946,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "7199cce8-e3f5-598d-a067-064f54d97236",
@@ -6979,7 +6979,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "3f9841c5-17a3-59fa-a150-a2c68d390a1f",
@@ -7012,7 +7012,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "bd33027e-bb61-51ad-a1e7-59dec2e1d7da",
@@ -7045,7 +7045,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "6397606b-43c8-56a9-9d31-afa505064150",
@@ -7078,7 +7078,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "526b546a-c1b6-5e81-b239-49fba2bf9e98",
@@ -7111,7 +7111,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "57856ae3-08e4-5ee5-9679-da9b6e993010",
@@ -7144,7 +7144,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "f5134dc0-5071-5c5c-ba4c-61ec45dd4fa8",
@@ -7177,7 +7177,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "e1afccac-e922-5441-9bc4-4a458cb5825a",
@@ -7210,7 +7210,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "3860e54b-c6cc-5e25-a59a-22cc56cc61ba",
@@ -7243,7 +7243,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "1bb64742-cf43-53d9-a8e8-9e5e0be96907",
@@ -7276,7 +7276,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "45727e69-4da3-54eb-baf0-efcd91c0c1c2",
@@ -7309,7 +7309,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "a76d0f43-6d67-585f-9910-03d720531fc0",
@@ -7342,7 +7342,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "f1c3da28-3c58-5485-934f-1b7cbec6e4b8",
@@ -7375,7 +7375,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "b35f2c7d-8634-5ba7-a762-b63fe18a5185",
@@ -7408,7 +7408,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "1e718568-4005-51a2-ae74-61ca1671d34e",
@@ -7441,7 +7441,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "1bb0b01e-804a-583b-9137-3b9af8c234e6",
@@ -7474,7 +7474,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "602fc131-7b5a-5af2-a759-211c0aecffe3",
@@ -7507,7 +7507,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "01439488-f3a9-57dd-85cd-38bba2f635d9",
@@ -7540,7 +7540,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "162e5924-ac7c-5b0c-8bd9-e001f11782b2",
@@ -7573,7 +7573,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "72011a6a-c2d3-56a7-b51a-637cdb1c0a66",
@@ -7606,7 +7606,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "ffabaf8f-85ae-54a2-ab68-d879cf303b81",
@@ -7639,7 +7639,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "a2e8838a-37fc-59f6-9312-29f983609f6b",
@@ -7672,7 +7672,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "877ae68a-e573-5990-97ad-741c7336722e",
@@ -7705,7 +7705,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "d3f5d838-429b-5d0c-8c3c-42a4ca2ead83",
@@ -7738,7 +7738,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "315f0b14-a99e-55f2-b361-fc1ec8f1a238",
@@ -7771,7 +7771,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "997cf472-0b25-54e6-9a80-094def2df519",
@@ -7804,7 +7804,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "2446f062-b3ad-5256-8424-bb96282807b6",
@@ -7837,7 +7837,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "c6362d78-909d-5aab-b6e5-bf3d3317f148",
@@ -7870,7 +7870,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "be277a3e-71c8-55f7-bd1e-e60dfbe5b9dc",
@@ -7903,7 +7903,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "57acf0fd-a3d4-5151-8f02-c19a244df332",
@@ -7936,7 +7936,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "a03c111d-084b-588e-b2b7-fea5a91e5970",
@@ -7969,7 +7969,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "4510d277-e548-5d64-ae76-2dae0701e123",
@@ -8002,7 +8002,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "b62b6a03-6cfa-5be5-8ca9-672e2a4bfb19",
@@ -8035,7 +8035,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "deb834a0-e585-5065-83c0-71f88aba8c27",
@@ -8068,7 +8068,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "28d1f2c0-988f-5412-b159-a7e08add2421",
@@ -8101,7 +8101,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "19b030ee-9bcf-5d0b-a79d-8650531cbefc",
@@ -8134,7 +8134,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "e461f43e-37ae-5d5e-b8fd-86690b5388e2",
@@ -8167,7 +8167,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "8a7f7447-c15a-5394-9168-13e2e9f91c4c",
@@ -8200,7 +8200,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "659b4387-80a4-5beb-9f2b-c407bb91ccaa",
@@ -8233,7 +8233,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "83a10e2c-2f35-5216-992c-b908ab57556c",
@@ -8266,7 +8266,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "a7f51cf4-6ca8-56b1-9bc3-cd35ca2fa0f3",
@@ -8299,7 +8299,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "52fdac61-0dfe-5a3b-8bef-ba17db0ce8f2",
@@ -8332,7 +8332,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "a7da7061-0c32-51da-8f95-c17f04f73eba",
@@ -8365,7 +8365,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "a11392a6-4538-53c6-977f-6c2301606aff",
@@ -8398,7 +8398,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "fa25fee2-7984-534e-8607-a92e1c693e0d",
@@ -8431,7 +8431,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "f96db86c-c9d9-51b6-96b6-a139e48d8829",
@@ -8464,7 +8464,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "9c82f6fa-e06d-59a3-950e-bda5b532005f",
@@ -8497,7 +8497,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "74d610f3-c8d0-5923-ab90-4d2fe7465caf",
@@ -8530,7 +8530,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "9598419b-fc09-51c3-8f44-09ca0986151a",
@@ -8563,7 +8563,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "2abe03db-dc96-531e-ab8e-fb753fbaedad",
@@ -8596,7 +8596,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "d09806b5-0559-5249-877c-860c87bee40d",
@@ -8629,7 +8629,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "d9146149-8b9a-5f6e-ba05-d8df92f63467",
@@ -8662,7 +8662,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "195c497c-0b65-5e47-a8d2-ea828dfa50eb",
@@ -8695,7 +8695,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "eeea0f5e-dfdf-5159-82bc-3938110e9d2a",
@@ -8728,7 +8728,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "d28737c0-32d7-5ae4-8180-5bad23fcd34b",
@@ -8761,7 +8761,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "3051147e-5a20-52e4-939d-ad1399d38aa8",
@@ -8794,7 +8794,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "af158f2b-10d4-5722-960b-1efc99494d96",
@@ -8827,7 +8827,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "d982c1cc-2470-50dc-a49c-2763425d9d35",
@@ -8860,7 +8860,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "bad4347b-ce1d-52b9-bd19-56f25b1294a8",
@@ -8893,7 +8893,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "29ca672e-5918-52b1-aaa1-4b665b6426c8",
@@ -8926,7 +8926,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "11ea2c9e-fd05-5c52-9551-84dfe024c71d",
@@ -8959,7 +8959,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "6b9bf33a-7327-5fa3-86b8-c9cb317c3199",
@@ -8992,7 +8992,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "711342e1-2d0f-54e4-9e9f-a66f58a5a7d4",
@@ -9025,7 +9025,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "d756c7f9-09c1-5c9c-ae52-f52888e4601c",
@@ -9058,7 +9058,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "2a1526fc-cdf2-5b96-b041-35de70a5a633",
@@ -9091,7 +9091,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "fb705130-aba8-5084-a876-b457e9b11b73",
@@ -9124,7 +9124,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "95255886-9c85-5e25-b4e2-9d8c17ff8e1d",
@@ -9157,7 +9157,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "55fcb509-34da-54e5-80ca-f1d301064790",
@@ -9190,7 +9190,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "26bc9e3f-05f4-555f-ac00-2e0384d3c09d",
@@ -9223,7 +9223,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "beb715d7-f8df-51b5-b917-eb1452ce1c7b",
@@ -9256,7 +9256,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "5af91590-dfc3-5175-80e1-9cc7f47d2408",
@@ -9289,7 +9289,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "b03cb126-db75-5d85-83a2-4c8959710243",
@@ -9322,7 +9322,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "512fd063-233b-5a78-832b-1cb853ab3c1f",
@@ -9355,7 +9355,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "08d10d41-380e-5c0d-9bc4-c4774a7af556",
@@ -9388,7 +9388,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "ec25c6fc-c6bb-5b5d-b2ab-79ead3836694",
@@ -9421,7 +9421,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "e692420d-6ec9-597e-9943-6835c78ee352",
@@ -9454,7 +9454,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "f67c761f-f853-506a-a7e4-cf51ad1cde28",
@@ -9487,7 +9487,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "466849a9-2eff-5fef-810c-210d93bad27a",
@@ -9520,7 +9520,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "7d2d8be2-2e0f-5d03-8d00-ef3427b4c6a1",
@@ -9553,7 +9553,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "ae2153df-b997-51e5-80a6-5626ed926e11",
@@ -9586,7 +9586,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "4408e144-f8d6-589e-b8f6-0f036f104863",
@@ -9619,7 +9619,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "1a5cafaf-ea84-580d-bd91-ce8d306ff367",
@@ -9652,7 +9652,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "d5a3171c-ac1f-5474-8997-b06554529d4f",
@@ -9685,7 +9685,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "e403fd0d-f19a-595b-b0c6-5d9e5fa7104a",
@@ -9718,7 +9718,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "3af5fe34-672b-5fdf-b61c-642e0f721e97",
@@ -9751,7 +9751,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "d0e4e438-20d8-511d-bb55-c4af9eef9f12",
@@ -9784,7 +9784,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "30959339-334d-5f8c-9032-5e476c36c111",
@@ -9817,7 +9817,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "1e87b366-ceda-5844-b05e-1b204a9faaef",
@@ -9850,7 +9850,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "ba7f8c5b-3a61-52c2-bbe5-6e7ca38103da",
@@ -9883,7 +9883,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "0eb401fd-bfa2-537c-8d4a-9a6ed7b53ffb",
@@ -9916,7 +9916,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "323aa60d-c730-5b4b-8c0a-020cabc91035",
@@ -9949,7 +9949,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "c10f2c43-ed0d-57e3-9664-478774d347c5",
@@ -9982,7 +9982,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "21ba0104-8417-5593-b263-cfd1216dbff5",
@@ -10015,7 +10015,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "3eb66e1a-2412-5dae-8878-50da0fd1e81c",
@@ -10048,7 +10048,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "984bc15d-7e7c-5a83-966d-c790ab8137fd",
@@ -10081,7 +10081,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "ac232d18-5db7-5e77-b536-1725c744ff2a",
@@ -10114,7 +10114,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "58a30b01-a4a8-5183-a427-9f8c767d18ea",
@@ -10147,7 +10147,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "7612fd83-a88a-5b39-96a1-b837c5299a16",
@@ -10180,7 +10180,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "9e7cca2f-f88e-5946-8913-60c5bca54d4e",
@@ -10213,7 +10213,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "2fe4c1d7-3950-5ecd-951d-a1d0935add5b",
@@ -10246,7 +10246,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "bb9c1e53-d190-5b17-a030-ad2e3fefa75f",
@@ -10279,7 +10279,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "ee081ae8-249e-5a95-b376-8875237b7346",
@@ -10312,7 +10312,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "24cb4e78-745f-5c5e-8e21-ef9ced829545",
@@ -10345,7 +10345,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "5912d6a2-9881-5b42-acf6-1c3b8aed6d65",
@@ -10378,7 +10378,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "5de7f3bc-daf6-59aa-89f6-a3bf94794508",
@@ -10411,7 +10411,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "424eecd9-a84f-5f60-8cf3-16c0300f97c8",
@@ -10444,7 +10444,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "a258df01-7c1d-5370-b235-478369071e16",
@@ -10477,7 +10477,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "a3bcc694-c723-5ad0-ba6f-79c07faf74ab",
@@ -10510,7 +10510,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "a1f68302-ab40-5fee-939a-0b5e637eef1e",
@@ -10543,7 +10543,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "898b728e-d54a-5bf4-8a61-d2f0b5f53941",
@@ -10576,7 +10576,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "19aa884f-bab0-5075-97c9-518c759b7c5e",
@@ -10609,7 +10609,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "3181e997-d393-5f08-b81e-915253b1b7dc",
@@ -10642,7 +10642,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "63edb152-3a48-5a7d-a945-e2e8c4db3be0",
@@ -10675,7 +10675,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "753f7e02-8dab-5e40-a027-a14fc9a07d50",
@@ -10708,7 +10708,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "1853d0bc-ab30-5dec-ad8d-3670d27a4c5d",
@@ -10741,7 +10741,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "f53b75b2-1703-5086-b133-8f2e5dd43dee",
@@ -10774,7 +10774,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "326d9d07-ff83-507b-97f3-a81c83892131",
@@ -10807,7 +10807,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "60a01175-5aac-5f9c-b145-b9e14c9765d8",
@@ -10840,7 +10840,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "62d52c13-c41a-56ab-a2dc-1883a0440359",
@@ -10873,7 +10873,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "a6ea29ca-338d-50d4-b804-ed49e9503d9f",
@@ -10906,7 +10906,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "95919353-c033-52ee-b049-59c36686bad4",
@@ -10939,7 +10939,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "3eca0307-a5a0-5ca3-89a2-b184d51c1499",
@@ -10972,7 +10972,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "a8ad6261-43c3-5fc0-b9c2-1bb84289bf8c",
@@ -11005,7 +11005,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "f7af7ee4-eea5-5bae-9ebe-5eb1f4d4c796",
@@ -11038,7 +11038,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "84781e7f-f9fa-5609-8c3e-91bd78e5e204",
@@ -11071,7 +11071,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "2a72c87d-dc2d-5a90-89ca-7cf95f74a0df",
@@ -11104,7 +11104,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "221417b9-2666-569a-8e9d-f4b3db5c3b57",
@@ -11137,7 +11137,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "c260da0d-c8ac-58ac-b329-8fcba398a26b",
@@ -11170,7 +11170,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "ffc33473-e052-568f-be7b-f6e3b7444bc4",
@@ -11203,7 +11203,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "17fecba0-e053-5a6a-bd3c-8237e1a50739",
@@ -11236,7 +11236,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "ce079ff9-bd90-5acd-8343-c1c8ffce1850",
@@ -11269,7 +11269,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "d437d036-bde0-577c-a58f-d80f7f67d3ab",
@@ -11302,7 +11302,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "f4c6e8bb-7b71-52ab-b114-e0d6ef4d550e",
@@ -11335,7 +11335,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "4406994c-6149-5b49-8c6a-41a91cee00c4",
@@ -11368,7 +11368,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "e1cf61ed-47dd-5077-a9cb-5878133e2a28",
@@ -11401,7 +11401,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "e40fa4ef-7ea0-5488-b5b2-ce86007a4539",
@@ -11434,7 +11434,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "dc951608-641e-503d-a645-3f7f31699ec2",
@@ -11467,7 +11467,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "63d380e2-5e27-598d-bfdc-6ea177969798",
@@ -11500,7 +11500,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "4cb71de9-c041-59bc-98c9-f20b2c8c37be",
@@ -11533,7 +11533,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "c802d887-c60b-528e-a916-6319ca412bfe",
@@ -11566,7 +11566,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "c08b96d8-472d-57e5-bfdd-c950878cb1a3",
@@ -11599,7 +11599,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "4fbac20b-b813-52f0-9de1-a490e8a75862",
@@ -11632,7 +11632,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "291dbd16-3307-5187-8060-2319c24774e6",
@@ -11665,7 +11665,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "c72a1e24-1a40-5736-9eda-8196459f3fd8",
@@ -11698,7 +11698,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "b75a7892-2034-5461-8560-28184e466082",
@@ -11731,7 +11731,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "27630ae0-949f-5ae5-be37-76d77d0950b6",
@@ -11764,7 +11764,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "f487685c-6556-5cd2-8f2d-9a036ac783a1",
@@ -11797,7 +11797,7 @@
       "polarity": "BOUNDARY",
       "fixtureSet": "MT347-SCOPE-BOUNDARY",
       "sourceFile": "data/qa/mt347/mt347-boundary.v1.json",
-      "sourceFileSha256": "2E31424D58D4DA06CDA24C1631C0990B1E0EB0B4BD2CF06C0E945C9865791325",
+      "sourceFileSha256": "7528F79A32FC7D5C8AF11D065A2F174010C4CB98E9FD5A44FC2AC1EA5543A68F",
       "identity": {
         "ssi": {
           "id": null,
@@ -11830,7 +11830,7 @@
       "polarity": "BOUNDARY",
       "fixtureSet": "MT347-SCOPE-BOUNDARY",
       "sourceFile": "data/qa/mt347/mt347-boundary.v1.json",
-      "sourceFileSha256": "2E31424D58D4DA06CDA24C1631C0990B1E0EB0B4BD2CF06C0E945C9865791325",
+      "sourceFileSha256": "7528F79A32FC7D5C8AF11D065A2F174010C4CB98E9FD5A44FC2AC1EA5543A68F",
       "identity": {
         "ssi": {
           "id": null,
@@ -11863,7 +11863,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "de8c9920-b13a-509e-bb11-d90ffb6cedc5",
@@ -11896,7 +11896,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "183784e1-c9f1-55f2-97c5-d7eb41d912ff",
@@ -11929,7 +11929,7 @@
       "polarity": "POSITIVE",
       "fixtureSet": "MT347-CANONICAL-POSITIVE",
       "sourceFile": "data/qa/mt347/mt347-positive.v1.json",
-      "sourceFileSha256": "2B66FF31CE5CF05450BAA795B591CE120D24A9BDA35491E46F424BFAD8964C3B",
+      "sourceFileSha256": "A1E3151E77D81C673FEB00F20364954A72CC25C75BA51F93DA692327349BA711",
       "identity": {
         "ssi": {
           "id": "0bc47589-93b5-56a8-8a47-a227ec4e27c3",
@@ -11962,7 +11962,7 @@
       "polarity": "NEGATIVE",
       "fixtureSet": "MT347-NEGATIVE",
       "sourceFile": "data/qa/mt347/mt347-negative.v1.json",
-      "sourceFileSha256": "A1BEB2CAD51701CD00E3EF9B100E91B4C1CBCDFA9AC46EDBDFA662CD42E27A06",
+      "sourceFileSha256": "C7FC437A49D7FAFFB80D76A74E57522F86A609C1F4EC07D3AF6EE3629D493800",
       "identity": {
         "ssi": {
           "id": "63201a94-e90a-5f0b-b5b6-2158fd58ca8e",

@@ -514,7 +514,10 @@ export class FinFieldResolutionService {
     const ownerSide = evidence?.ownerSide;
     const source =
       request.roleSources?.[mapping.canonicalRole] ?? evidence?.sourceType;
-    const sourceRecordId = evidence?.sourceRecordId ?? request.sourceSsiId;
+    const sourceRecordId =
+      ownerSide === "TRANSACTION_PARTY"
+        ? evidence?.sourceRecordId
+        : evidence?.sourceRecordId ?? request.sourceSsiId;
     const version = evidence?.version;
     const canonicalRouteNodeId = evidence?.canonicalRouteNodeId;
     return {
@@ -528,6 +531,9 @@ export class FinFieldResolutionService {
         ...(source ? { source } : {}),
         ...(sourceRecordId ? { sourceRecordId } : {}),
         ...(ownerSide ? { ownerSide } : {}),
+        ...(ownerSide === "TRANSACTION_PARTY"
+          ? { accountRelationshipStatus: "NOT_EVALUATED" }
+          : {}),
         ...(version ? { version } : {}),
         ...(canonicalRouteNodeId ? { canonicalRouteNodeId } : {}),
       },
@@ -541,6 +547,8 @@ export class FinFieldResolutionService {
     if (ownerSide === "RECEIVER_SIDE") {
       return "RESOLVED_FROM_COUNTERPARTY_SSI";
     }
+    if (ownerSide === "TRANSACTION_PARTY")
+      return "PRESERVED_FROM_TRANSACTION_CONTEXT";
     return "EXACT_ELIGIBLE_SSI";
   }
 
@@ -585,6 +593,7 @@ export class FinFieldResolutionService {
         source: evidence.sourceType,
         sourceRecordId: evidence.sourceRecordId,
         ownerSide: evidence.ownerSide,
+        accountRelationshipStatus: "NOT_EVALUATED",
         ...(evidence.version ? { version: evidence.version } : {}),
         ...(evidence.canonicalRouteNodeId
           ? { canonicalRouteNodeId: evidence.canonicalRouteNodeId }

@@ -1063,6 +1063,10 @@ export class ResolutionPageSubmissionAdapter {
     const ownerSide = optionalText(source, "ownerSide");
     const version = optionalText(source, "version");
     const canonicalRouteNodeId = optionalText(source, "canonicalRouteNodeId");
+    const accountRelationshipStatus = optionalText(
+      source,
+      "accountRelationshipStatus",
+    );
     return {
       ...(catalogueVersion ? { catalogueVersion } : {}),
       ...(sourceArtifactId ? { sourceArtifactId } : {}),
@@ -1074,6 +1078,9 @@ export class ResolutionPageSubmissionAdapter {
       ...(ownerSide ? { ownerSide } : {}),
       ...(version ? { version } : {}),
       ...(canonicalRouteNodeId ? { canonicalRouteNodeId } : {}),
+      ...(accountRelationshipStatus === "NOT_EVALUATED"
+        ? { accountRelationshipStatus }
+        : {}),
     };
   }
 }
