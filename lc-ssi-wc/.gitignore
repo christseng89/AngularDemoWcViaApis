@@ -11,6 +11,7 @@ outputs/
 data/*.sqlite*
 data/export/
 data/backup/
+!data/reload-test-data/
 .env
 playwright-report/
 test-results/
