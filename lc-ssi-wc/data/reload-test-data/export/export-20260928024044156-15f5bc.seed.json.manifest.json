@@ -1,0 +1,14 @@
+{
+  "dataset": {
+    "datasetId": "EXPORT-20260928024044156-15f5bc",
+    "displayName": "export-20260928024044156-15f5bc.seed.json",
+    "version": "1.0",
+    "classification": "SYNTHETIC_DEMO_QA_UAT",
+    "estimatedRows": 44748,
+    "source": "EXPORT",
+    "exportedAt": "2026-09-28T02:40:44.156Z"
+  },
+  "fileName": "export-20260928024044156-15f5bc.seed.json",
+  "sha256": "44774fbd587ff0e440198230582f5ed8da723648f21872699bbf267c746e347a",
+  "createdOrder": 1790563246486000
+}

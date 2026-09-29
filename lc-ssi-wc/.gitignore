@@ -42,3 +42,7 @@ backup/
 backups/
 export/
 ssi-demo.sqlite*
+
+# Controlled reload datasets promoted for repository use.
+!data/reload-test-data/export/
+!data/reload-test-data/export/**
