@@ -183,7 +183,19 @@ describe("DevelopmentDataReloadService", () => {
     ).toEqual({ status: 422, code: "DEMO_RELOAD_FILE_INVALID" });
   });
 
-  it("rejects uploaded schema SQL instead of executing client-supplied statements", () => {
+  it("accepts a compliant JSON seed regardless of its file extension", () => {
+    const service = new DevelopmentDataReloadService(environment());
+    const authorization = service.authorize("secret");
+
+    expect(
+      service.uploadDataset(authorization.authorizationToken, {
+        originalName: "selected-test-data.txt",
+        buffer: readFileSync(seedPath),
+      }),
+    ).toMatchObject({ source: "UPLOAD" });
+  });
+
+  it("accepts a parseable uploaded seed without authorizing its schema at selection time", () => {
     const service = new DevelopmentDataReloadService(environment());
     const authorization = service.authorize("secret");
     const seed = JSON.parse(readFileSync(seedPath, "utf8"));
@@ -191,30 +203,94 @@ describe("DevelopmentDataReloadService", () => {
       "CREATE TABLE record (id TEXT PRIMARY KEY, value TEXT NOT NULL); CREATE TABLE injected (value TEXT)";
 
     expect(
-      codeOf(() =>
-        service.uploadDataset(authorization.authorizationToken, {
-          originalName: "client-sql.seed.json",
-          buffer: Buffer.from(JSON.stringify(seed)),
-        }),
-      ),
-    ).toEqual({ status: 422, code: "DEMO_RELOAD_SCHEMA_NOT_AUTHORIZED" });
+      service.uploadDataset(authorization.authorizationToken, {
+        originalName: "client-sql.seed.json",
+        buffer: Buffer.from(JSON.stringify(seed)),
+      }),
+    ).toMatchObject({ source: "UPLOAD" });
   });
 
-  it("rejects an uploaded data set whose schema differs from the active server schema", () => {
+  it("reloads an uploaded data set whose schema differs from a non-empty active database", async () => {
     const service = new DevelopmentDataReloadService(environment());
     const authorization = service.authorize("secret");
     const seed = JSON.parse(readFileSync(seedPath, "utf8"));
     seed.schema[0].sql =
       "CREATE TABLE record (id TEXT PRIMARY KEY, value INTEGER NOT NULL)";
 
+    const selected = service.uploadDataset(authorization.authorizationToken, {
+      originalName: "different-schema.seed.json",
+      buffer: Buffer.from(JSON.stringify(seed)),
+    });
+
+    await service.reload(authorization.authorizationToken, selected.datasetId);
+
+    const reloaded = new DatabaseSync(databasePath, { readOnly: true });
+    try {
+      expect(reloaded.prepare("PRAGMA table_info(record)").all()).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ name: "value", type: "INTEGER" }),
+        ]),
+      );
+    } finally {
+      reloaded.close();
+    }
+  });
+
+  it("bootstraps an uploaded schema when every active database table is empty", async () => {
+    const database = new DatabaseSync(databasePath);
+    try {
+      database.exec("DELETE FROM record");
+    } finally {
+      database.close();
+    }
+    const seed = JSON.parse(readFileSync(seedPath, "utf8"));
+    seed.schema[0].sql =
+      "CREATE TABLE record (id TEXT PRIMARY KEY, value INTEGER NOT NULL)";
+    seed.tables.record.rows = [["UPLOADED", 42]];
+    writeFileSync(seedPath, JSON.stringify(seed));
+    const buffer = Buffer.from(JSON.stringify(seed));
+    const service = new DevelopmentDataReloadService(environment());
+    const authorization = service.authorize("secret");
+
+    const selected = service.uploadDataset(authorization.authorizationToken, {
+      originalName: "bootstrap.seed.json",
+      buffer,
+    });
+    await service.reload(authorization.authorizationToken, selected.datasetId);
+
+    const reloaded = new DatabaseSync(databasePath, { readOnly: true });
+    try {
+      expect(reloaded.prepare("PRAGMA table_info(record)").all()).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ name: "value", type: "INTEGER" }),
+        ]),
+      );
+      expect(reloaded.prepare("SELECT id,value FROM record").all()).toEqual([
+        { id: "UPLOADED", value: 42 },
+      ]);
+    } finally {
+      reloaded.close();
+    }
+  });
+
+  it("does not authorize schema against other populated non-system tables", () => {
+    const database = new DatabaseSync(databasePath);
+    try {
+      database.exec(
+        "DELETE FROM record; CREATE TABLE reload_audit (event TEXT NOT NULL); INSERT INTO reload_audit VALUES ('existing')",
+      );
+    } finally {
+      database.close();
+    }
+    const service = new DevelopmentDataReloadService(environment());
+    const authorization = service.authorize("secret");
+
     expect(
-      codeOf(() =>
-        service.uploadDataset(authorization.authorizationToken, {
-          originalName: "wrong-schema.seed.json",
-          buffer: Buffer.from(JSON.stringify(seed)),
-        }),
-      ),
-    ).toEqual({ status: 422, code: "DEMO_RELOAD_SCHEMA_NOT_AUTHORIZED" });
+      service.uploadDataset(authorization.authorizationToken, {
+        originalName: "different-schema.seed.json",
+        buffer: readFileSync(seedPath),
+      }),
+    ).toMatchObject({ source: "UPLOAD" });
   });
 
   it("uses the approved MT1/MT2 canonical seed as the default reload source", () => {

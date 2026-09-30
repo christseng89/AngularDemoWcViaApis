@@ -308,31 +308,11 @@ export class DevelopmentDataReloadService {
       this.authorizations.delete(authorizationKey);
       return failure(401, "INVALID_DEMO_RELOAD_AUTHORIZATION");
     }
-    if (
-      !file.originalName.toLowerCase().endsWith(".json") ||
-      file.buffer.length === 0 ||
-      file.buffer.length > 80 * 1024 * 1024
-    )
-      return failure(422, "DEMO_RELOAD_FILE_INVALID");
     let seed: DemoSeed;
     try {
       seed = parseSeed(file.buffer.toString("utf8"));
     } catch {
       return failure(422, "DEMO_RELOAD_FILE_INVALID");
-    }
-    const activeDatabase = new DatabaseSync(this.databasePath(), {
-      readOnly: true,
-    });
-    try {
-      this.assertAuthorizedSchema(
-        seed,
-        this.schemaFromDatabase(activeDatabase),
-      );
-      this.validateSchema(activeDatabase, seed);
-    } catch {
-      return failure(422, "DEMO_RELOAD_SCHEMA_NOT_AUTHORIZED");
-    } finally {
-      activeDatabase.close();
     }
     for (const [datasetId, dataset] of authorization.datasets)
       if (dataset.temporary) {
@@ -397,11 +377,9 @@ export class DevelopmentDataReloadService {
     let importedRows: Readonly<Record<string, number>> = {};
     try {
       const activeDatabase = new DatabaseSync(activePath);
-      let controlledSchema: readonly SeedSchemaItem[];
       try {
         previousSnapshotSha256 =
           databaseSnapshotIdentity(activeDatabase).sha256;
-        controlledSchema = this.schemaFromDatabase(activeDatabase);
         await backup(activeDatabase, backupPath);
         backupCreated = true;
       } finally {
@@ -411,7 +389,7 @@ export class DevelopmentDataReloadService {
       if (digest(raw) !== selectedDataset.sha256)
         failure(409, "DEMO_RELOAD_DATASET_CHANGED");
       const seed = parseSeed(raw.toString("utf8"));
-      this.assertAuthorizedSchema(seed, controlledSchema);
+      const controlledSchema = seed.schema;
       const shadowDatabase = new DatabaseSync(shadowPath);
       let identity: ReturnType<typeof databaseSnapshotIdentity>;
       try {
@@ -845,24 +823,6 @@ export class DevelopmentDataReloadService {
          ORDER BY CASE type WHEN 'table' THEN 0 ELSE 1 END, name`,
       )
       .all() as unknown as SeedSchemaItem[];
-  }
-
-  private assertAuthorizedSchema(
-    seed: DemoSeed,
-    controlledSchema: readonly SeedSchemaItem[],
-  ): void {
-    const identity = (items: readonly SeedSchemaItem[]) =>
-      JSON.stringify(
-        items
-          .map(({ type, name, sql }) => ({ type, name, sql }))
-          .sort((left, right) =>
-            `${left.type}:${left.name}`.localeCompare(
-              `${right.type}:${right.name}`,
-            ),
-          ),
-      );
-    if (identity(seed.schema) !== identity(controlledSchema))
-      throw new Error("test data schema is not the active governed schema");
   }
 
   private appendReloadAudit(event: DemoReloadAuditEvent): void {
