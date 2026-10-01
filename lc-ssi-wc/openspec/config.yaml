@@ -1,0 +1,40 @@
+schema: spec-driven
+
+context: |
+  Project: LC SSI Workbench, an SSI Resolution microservice and parameter-driven Angular workbench.
+  Technology: Angular 22, TypeScript 6, NestJS, Nx, Jest, SQLite, OpenAPI, and governed JSON parameters.
+  Product boundary: Customer intent, Bank SSI, Nostro, Entity, RMA, routing policy, and executable settlement outputs remain distinct domains. The workbench is not a free-form MT/MX message-entry system.
+  Architecture: Controlled OAS / typed contract plus governed parameters / DB feed domain policy and APIs, which provide Page Parameters to a generic UI.
+  Authority is concern-based. Product and SWIFT semantics come from explicit Product Owner decisions, controlled governance and registered standards. Wire contracts require OAS and TypeScript contracts to agree. Catalogue/runtime identity comes from governed parameters, seed/fixture bindings and DB logical snapshots. Implementation and tests are verification evidence and do not invent business rules.
+  Conflicting or incomplete evidence MUST be recorded as DISCREPANCY or NOT_PROVEN and MUST NOT be silently promoted into a current requirement.
+  Current specs describe only implemented, observable and evidenced behaviour. Future or incomplete behaviour remains in openspec/changes/.
+  qa-archived/ is an archive-management-only isolation zone and MUST NOT be read, searched, executed, cited or used as active evidence.
+
+rules:
+  proposal:
+    - MUST state purpose, scope, non-goals, affected capabilities, compatibility, migration, rollback and evidence expectations.
+    - MUST distinguish current implemented behaviour from proposed behaviour and MUST NOT claim unsupported SWIFT, OAS or runtime coverage.
+  specs:
+    - Every normative requirement MUST use SHALL or MUST and MUST include at least one WHEN/THEN scenario.
+    - Every requirement and scenario MUST have a stable identifier for traceability.
+    - Success, principal rejection, stale/conflict and fail-closed behaviour MUST be specified where applicable.
+    - Specs MUST describe observable contracts; implementation details belong in design artifacts.
+    - MT-specific behaviour MUST be driven by governed contracts or parameters and MUST NOT create message-specific UI truth.
+  design:
+    - MUST describe service boundaries, data flow, failure behaviour, security, accessibility, compatibility, rollback and authority conflicts.
+    - MUST preserve server-authoritative eligibility, concurrency and fail-closed behaviour.
+  tasks:
+    - MUST list exact files, validation commands, evidence and 4-EYES checkpoints.
+    - MUST require a new exact candidate commit and re-review after any correction.
+
+operations:
+  apply:
+    guidance:
+      - Work only on an isolated task branch and preserve unrelated working-tree content.
+      - Do not change production behaviour as part of an OpenSpec baseline-adoption change.
+      - Do not hand-edit generated coverage or build output.
+  archive:
+    guidance:
+      - Archive only after all required artifacts and tasks are complete and openspec validate --all --strict --no-interactive passes.
+      - An authoritative Independent Checker verdict MUST bind the exact candidate commit in external review evidence; repository review templates are non-authoritative.
+      - Never carry a Checker verdict forward after a commit changes.
