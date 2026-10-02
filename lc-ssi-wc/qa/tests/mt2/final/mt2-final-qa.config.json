@@ -23,7 +23,7 @@
     },
     {
       "file": "../../../../data/qa/mt2/mt2-pacs009-proposal-case-groups.json",
-      "sha256": "FDBC2FC1E959BFA9FC3068BCF4DD8EC856E9F3FBB20588203D9915834EF295CC",
+      "sha256": "20B6F4B19EF28CE86657EB0D9A270ECF3B769941250AF2DC01D7424D0B0D1862",
       "role": "PROPOSAL_CASE_CATALOGUE"
     },
     {
@@ -33,7 +33,7 @@
     },
     {
       "file": "../../../../openapi/swift-data-service.v1.json",
-      "sha256": "5B211FFB4B8AE89A683BAAA4C8A1A3BE66E2E168BCDE039DF49AE2B0C446898C",
+      "sha256": "29705C7382C1B124DEA74F7AA6F0D24AD0C9485EAEBAB03FA3C38CAE443DDDD4",
       "role": "CURRENT_OAS"
     },
     {
