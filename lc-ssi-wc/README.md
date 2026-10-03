@@ -35,4 +35,4 @@ SQLite data is created under `data/`. No external database or message broker is 
 
 ## Quality
 
-Run `npm run verify`. Coverage gates are set to 95% for lines, statements, functions and branches. See `docs/plans/2026-09-07-ssi-prototype-demo.md` for architecture and acceptance scope.
+Run `npm run verify`. Coverage gates are set to 95% for lines, statements, functions and branches. See `docs/plans/2026-10-01-lc-ssi-wc-openspec-design.md` for the current architecture and acceptance scope.
